@@ -28,6 +28,7 @@ import { Rain } from './rain';
 import { Ambient } from './ambient';
 import { HubPaint } from './hubPaint';
 import { HUB_H, HUB_W } from '../world/hub';
+import { HUB_CX, HUB_STEPS_Y } from './art/hubScene';
 import type { Sky } from '../world/sky';
 import { npcFrame, questMarker } from './art/npcs';
 import { npcMarker } from '../world/npcs';
@@ -71,10 +72,10 @@ const EMISSIVE: ReadonlySet<FxName> = new Set(['hit', 'crit', 'slash', 'boom', '
 const SHORT_SIDE = 270;
 const PHONE_SHORT_SIDE = 230;
 /**
- * At the hub the view comes in much closer (a phone held upright shows about 150 art px across, and
+ * At the hub the view comes in much closer (a phone held upright shows about 170 art px across, and
  * a desktop the same from its short side): the hub is one cozy shop front, painted to fill the screen.
  */
-const HUB_SHORT_SIDE = 150;
+const HUB_SHORT_SIDE = 172;
 /** Where your knight sits on the hub's screen, top to bottom: a little below the middle. */
 const HUB_FOCUS_Y = 0.55;
 
@@ -176,8 +177,9 @@ export class Renderer {
     const ch = Math.floor(window.innerHeight * dpr);
     const phone = Math.min(window.innerWidth, window.innerHeight) < 600;
     let P = Math.max(2, Math.round(Math.min(cw, ch) / (this.hubZoom ? HUB_SHORT_SIDE : phone ? PHONE_SHORT_SIDE : SHORT_SIDE)));
-    // The hub is one painting: closer still where the view would reach past its edges (no void).
-    if (this.hubZoom) P = Math.max(P, Math.ceil(cw / HUB_W), Math.ceil(ch / HUB_H));
+    // The hub is one painting: closer still where the view would reach far past its edges (a little
+    // past is fine: the painting fades into the dark round it).
+    if (this.hubZoom) P = Math.max(P, Math.ceil(cw / (HUB_W * 1.14)), Math.ceil(ch / (HUB_H * 1.14)));
     this.P = P;
     this.W = Math.ceil(cw / this.P);
     this.H = Math.ceil(ch / this.P);
@@ -1531,6 +1533,23 @@ export class Renderer {
   // ------------------------------------------------------------------ overlay
 
   private drawOverlay(ctx: Ctx, w: World, sx: (x: number) => number, sy: (y: number) => number): void {
+    // At the hub, a little gold arrow bobbing over the steps down: the way into the dungeon.
+    if (w.hub) {
+      const lead = w.leader();
+      if (lead && lead.y < HUB_STEPS_Y - 8) {
+        const ARROW = ['..kkk..', '..kYk..', 'kkkYkkk', '.kYYYk.', '..kYk..', '...k...'];
+        const x0 = sx(HUB_CX) - 3;
+        const y0 = sy(HUB_STEPS_Y) - 14 + (Math.floor(this.time * 2.5) % 2);
+        ARROW.forEach((row, yy) => {
+          for (let xx = 0; xx < row.length; xx++) {
+            const c = row[xx];
+            if (c === '.') continue;
+            ctx.fillStyle = c === 'k' ? '#2a1606' : '#ffd25a';
+            ctx.fillRect(x0 + xx, y0 + yy, 1, 1);
+          }
+        });
+      }
+    }
     // Mob health bars (only when hurt). The boss's bar, like every screen-fixed thing, is in the HUD.
     for (const m of w.mobs) {
       if (m.dead || m.boss || m.hp >= m.maxHp) continue;
