@@ -281,3 +281,148 @@ if (what === 'npcs') {
   writePng(out.replace(/\.png$/, '_small.png'), strip, 2);
   console.log('wrote', out);
 }
+
+if (what === 'campkit') {
+  // Each biome's set-up close up on its own ground with a keeper: npx tsx tools/preview.ts campkit out.png [scale]
+  const { BIOME_ORDER, BIOMES } = await import('../src/world/biomes');
+  const { CAMP_PLANS } = await import('../src/world/camps');
+  const { NPC_DEFS } = await import('../src/world/npcs');
+  const { propArt } = await import('../src/render/art/props');
+  const { npcFrame } = await import('../src/render/art/npcs');
+  const scale = Number(process.argv[4] ?? 6);
+  const CW = 64;
+  const CH = 84;
+  const sheet = blank(CW * 6, CH * 2);
+  BIOME_ORDER.forEach((id, k) => {
+    const biome = BIOMES[id];
+    const plan = CAMP_PLANS[id];
+    const cell = blank(CW, CH);
+    // The ground, and a band of the wall behind the set-up.
+    fill(cell, biome.ground.ramp[2]);
+    const oy = 40;
+    const ox = 8;
+    for (let y = 0; y < oy; y++) for (let x = 0; x < CW; x++) setRGB(cell, x, y, y >= oy - 16 && biome.solid.kind !== 'trees' ? biome.solid.face[Math.min(biome.solid.face.length - 1, y < oy - 13 ? 3 : 2)] : biome.solid.top[1]);
+    type D = { y: number; draw: () => void };
+    const list: D[] = plan.pieces.map((pc) => {
+      const art = propArt(pc.kind, biome, ((k * 7 + 3) % 5) * 104729 + 7);
+      return { y: pc.y, draw: () => blit(cell, art.buf, ox + pc.x - art.ax, oy + pc.y - art.ay) };
+    });
+    const def = NPC_DEFS[k % NPC_DEFS.length];
+    const fr = npcFrame(def, 'idle', 'down', 0);
+    list.push({ y: plan.stand.y, draw: () => blit(cell, fr.buf, ox + plan.stand.x - fr.ax, oy + plan.stand.y - fr.ay) });
+    list.sort((a, b) => a.y - b.y);
+    for (const d of list) d.draw();
+    blit(sheet, cell, (k % 6) * CW, Math.floor(k / 6) * CH);
+  });
+  writePng(out, sheet, scale);
+  console.log('wrote', out);
+}
+
+if (what === 'camps') {
+  // The folk's set-ups where they stand on a real floor of each biome: terrain, trees, props, the
+  // keeper and the mobs, under the biome's light (lamps and fires roughly as the game adds them).
+  //   npx tsx tools/preview.ts camps out.png [seed] [biome] [scale]   (RAW=1: no light)
+  const { BIOME_ORDER, BIOMES, isBossFloor } = await import('../src/world/biomes');
+  const { generateFloor } = await import('../src/world/mapgen');
+  const { floorMobs } = await import('../src/world/mobgen');
+  const { placeNpcs } = await import('../src/world/npcs');
+  const { paintTerrainPixels } = await import('../src/render/terrain');
+  const { artOf } = await import('../src/render/art/artOf');
+  const { npcFrame } = await import('../src/render/art/npcs');
+  const { mobFrame } = await import('../src/render/art/mobs');
+  const { rgb } = await import('../src/render/pixel/buf');
+  const { mixHex } = await import('../src/render/art/draw');
+  const seed0 = Number(process.argv[4] ?? 7);
+  const only = process.argv[5];
+  const scale = Number(process.argv[6] ?? 4);
+  const CW = 112;
+  const CH = 92;
+  const ids = BIOME_ORDER.filter((id) => !only || id === only);
+  const cols = Math.min(ids.length, 4);
+  const sheet = blank(CW * cols + (cols - 1) * 2, CH * Math.ceil(ids.length / cols) + (Math.ceil(ids.length / cols) - 1) * 2);
+  fill(sheet, '#101018');
+  const DAY = new Set(['hamlet', 'farmland', 'desert', 'tundra']);
+  ids.forEach((id, k) => {
+    const biome = BIOMES[id];
+    const stretch = BIOME_ORDER.indexOf(id);
+    let floor = stretch * 5 + 2;
+    let seed = seed0;
+    let map = generateFloor({ floor, biome, seed, boss: false });
+    let npcs = placeNpcs(map, floor, id, seed);
+    for (let tries = 0; !npcs.length && tries < 20; tries++) {
+      seed += 101;
+      floor = stretch * 5 + 1 + (tries % 4);
+      if (isBossFloor(floor)) floor++;
+      map = generateFloor({ floor, biome, seed, boss: false });
+      npcs = placeNpcs(map, floor, id, seed);
+    }
+    const n = npcs[0];
+    const t = paintTerrainPixels(map, biome);
+    const img: PixelBuf = { w: t.w, h: t.h, px: t.px.slice() };
+    type D = { y: number; draw: () => void };
+    const list: D[] = [];
+    for (const p of map.props) {
+      const art = artOf(p, biome);
+      list.push({ y: p.y, draw: () => blit(img, art.buf, p.x - art.ax, p.y - art.ay) });
+    }
+    const types = floorMobs(biome, floor, seed);
+    map.spawns.forEach((s, i) => {
+      const fr = mobFrame(types[i % types.length], 'idle', i, 'down', s.elite, false);
+      list.push({ y: s.y, draw: () => blit(img, fr.buf, s.x - fr.ax, s.y - fr.ay) });
+    });
+    for (const x of npcs) {
+      const fr = npcFrame(x.def, 'idle', 'down', 0);
+      list.push({ y: x.y, draw: () => blit(img, fr.buf, x.x - fr.ax, x.y - fr.ay) });
+    }
+    list.sort((a, b) => a.y - b.y);
+    for (const d of list) d.draw();
+    // The light: the ambient over everything, lamps and fires added (dimmer by day), as the game does.
+    if (!process.env.RAW) {
+      const amb = DAY.has(id) ? mixHex(biome.light.ambient, '#fffaf0', 0.6) : id === 'forest' ? mixHex(biome.light.ambient, '#a8b8cc', 0.36) : biome.light.ambient;
+      const [ar, ag, ab] = rgb(amb);
+      const lum = (ar * 0.299 + ag * 0.587 + ab * 0.114) / 255;
+      const lampK = Math.max(0.3, Math.min(1, (0.95 - lum) * 2.4));
+      const L = new Float32Array(img.w * img.h * 3);
+      for (let i = 0; i < img.w * img.h; i++) {
+        L[i * 3] = ar / 255;
+        L[i * 3 + 1] = ag / 255;
+        L[i * 3 + 2] = ab / 255;
+      }
+      const cx = n ? n.x : map.start.x;
+      const cy = n ? n.y : map.start.y;
+      const lights = map.props.flatMap((p) => {
+        const l = artOf(p, biome).light;
+        return l ? [{ x: p.x + l.dx, y: p.y + l.dy, r: l.r * (0.75 + 0.25 * lampK), color: l.color, k: 0.95 * lampK }] : [];
+      });
+      for (const l of lights) {
+        if (Math.abs(l.x - cx) > CW + l.r || Math.abs(l.y - cy) > CH + l.r) continue;
+        const [lr, lg, lb] = rgb(l.color);
+        for (let y = Math.max(0, Math.floor(l.y - l.r)); y < Math.min(img.h, l.y + l.r); y++) {
+          for (let x = Math.max(0, Math.floor(l.x - l.r)); x < Math.min(img.w, l.x + l.r); x++) {
+            const d = Math.hypot(x + 0.5 - l.x, (y + 0.5 - l.y) / 0.8) / l.r;
+            if (d >= 1) continue;
+            const a = d < 0.25 ? 1 - d * 1.12 : d < 0.5 ? 0.72 - (d - 0.25) * 1.44 : d < 0.75 ? 0.36 - (d - 0.5) * 0.96 : 0.12 - (d - 0.75) * 0.48;
+            const i = y * img.w + x;
+            L[i * 3] += (lr / 255) * a * l.k;
+            L[i * 3 + 1] += (lg / 255) * a * l.k;
+            L[i * 3 + 2] += (lb / 255) * a * l.k;
+          }
+        }
+      }
+      for (let i = 0; i < img.w * img.h; i++) {
+        img.px[i * 4] = Math.min(255, img.px[i * 4] * Math.min(2, L[i * 3]));
+        img.px[i * 4 + 1] = Math.min(255, img.px[i * 4 + 1] * Math.min(2, L[i * 3 + 1]));
+        img.px[i * 4 + 2] = Math.min(255, img.px[i * 4 + 2] * Math.min(2, L[i * 3 + 2]));
+      }
+    }
+    // The crop round the keeper.
+    const x0 = Math.max(0, Math.min(img.w - CW, Math.round((n?.x ?? map.start.x) - CW / 2)));
+    const y0 = Math.max(0, Math.min(img.h - CH, Math.round((n?.y ?? map.start.y) - CH * 0.6)));
+    const crop = blank(CW, CH);
+    for (let y = 0; y < CH; y++) crop.px.set(img.px.subarray(((y0 + y) * img.w + x0) * 4, ((y0 + y) * img.w + x0 + CW) * 4), y * CW * 4);
+    blit(sheet, crop, (k % cols) * (CW + 2), Math.floor(k / cols) * (CH + 2));
+    console.log(id.padEnd(10), `floor ${floor} seed ${seed}`, n ? `${n.def.name} at ${n.x},${n.y} ${n.camp?.nook ? 'nook' : 'floor'} room ${map.rooms[n.camp!.room]?.kind}` : 'no npc');
+  });
+  writePng(out, sheet, scale);
+  console.log('wrote', out);
+}

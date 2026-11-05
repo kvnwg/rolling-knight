@@ -13,7 +13,8 @@ board, and the warden by the steps down: walk down them to dive. Above all of th
 black-haired normal guy and the strongest in the game by far. Duplicates become shards or gold;
 shards level your knights. Rebirth
 for permanent luck and power; perks from the first rebirth change how a run plays. Folk on the floors
-hand out jobs, and one of them may be a demon in disguise.
+keep a set-up of their own off the fighting (a market stall, a tent by a campfire, a candlelit shrine)
+and hand out jobs, and one of them may be a demon in disguise.
 
 How every system works, with its numbers: [`DESIGN.md`](DESIGN.md). Art sources and licenses:
 [`CREDITS.md`](CREDITS.md).

@@ -20,7 +20,11 @@ export type PropKind =
   // The wilds and their ruins (art/wild.ts).
   | 'lanternPost' | 'stringLights' | 'roughFence' | 'fern' | 'mossRock' | 'log' | 'brokenPillar' | 'stoneBlock' | 'ruinWall' | 'stairs'
   // The town (art/town.ts).
-  | 'picket' | 'picketSide' | 'hedge' | 'fountain' | 'cafeTable' | 'stringPost' | 'bridgeRail';
+  | 'picket' | 'picketSide' | 'hedge' | 'fountain' | 'cafeTable' | 'stringPost' | 'bridgeRail'
+  // The folk's set-ups (world/camps.ts, art/camps.ts).
+  | 'stallBack' | 'stallFront' | 'yataiBack' | 'yataiFront' | 'hayCart' | 'produceStand' | 'canvasTent' | 'logSeat' | 'hideTent' | 'fireBowl'
+  | 'shrineNiche' | 'stiltHut' | 'rowboat' | 'canopyBack' | 'canopyFront' | 'rug' | 'graveGate' | 'stoneBench' | 'smithCart' | 'anvil'
+  | 'leanTo' | 'crystalLamp';
 export type Weather = 'fireflies' | 'snow' | 'embers' | 'dust' | 'spores' | 'petals' | 'leaves' | 'ash' | 'motes' | 'rain';
 export type BodyPlan = 'slime' | 'beast' | 'humanoid' | 'flyer' | 'plant' | 'golem' | 'bug' | 'pumpkin' | 'ghost' | 'pig' | 'ram' | 'chicken';
 

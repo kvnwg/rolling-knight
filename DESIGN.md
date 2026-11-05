@@ -130,11 +130,21 @@ half HP. Clearing a floor opens the portal. A wiped squad is carried back to the
 goes back to the biome's first floor (on Auto it heads back down by itself unless you move).
 
 Folk turn up on some floors (`src/world/npcs.ts`): farmers, guards, a bard, a goblin accountant, a
-ghost who is three hundred years late, a chicken who is not a chicken. Talk to them for jobs (slay,
-elites, a boss, go deeper, collect) with gold, Hourglasses, potions and banked Lucky Spins as
-rewards; three at once, tracked in the HUD. About one floor in eight hides a demon in disguise. Ask
-the wrong questions and it drops the act: it fights like a boss, with its own bar and banter, but
-the floor's other foes don't fall with it.
+ghost who is three hundred years late, a chicken who is not a chicken. Each keeps a set-up of their
+own in the setting's style (`src/world/camps.ts`, art in `src/render/art/camps.ts`): a market stall
+in the hamlet, a hay cart on the farm, a tent by a campfire in Gloomwood, a hide tent and a fire bowl
+on the tundra, a candlelit shrine in the crypt, a hut on stilts in the bog, a pavilion over a rug in
+the ruins, a cemetery gate with a bench and a lantern, a smith's cart in the Ember Depths, a lean-to
+by a crystal lamp, a little stall hung with paper lanterns at the shrine. It stands off the fighting:
+in a nook cut into the wall beside the start room or a side room when one fits, else with its back to
+a wall in a quiet corner; never on a corridor's line or where it would cut the floor in two, and the
+mobs that would spawn beside it move elsewhere. Talk to them for jobs (slay, elites, a boss, go
+deeper, collect) with gold, Hourglasses, potions and banked Lucky Spins as rewards; three at once,
+tracked in the HUD. In the conversation your replies drop down as one list (arrows, Enter, number
+keys or a tap); a job shows as a parchment card in icons (the goal and its number, the pay and how
+much; a tap for the words), and the replies that lead to it carry the "!" from over the folk's head.
+About one floor in eight hides a demon in disguise. Ask the wrong questions and it drops the act: it
+fights like a boss, with its own bar and banter, but the floor's other foes don't fall with it.
 
 ## 7b. Balance: power, par and difficulty
 

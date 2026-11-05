@@ -13,7 +13,7 @@ const SX = 0.62;
 const SY = 0.34;
 
 /** Small flat things throw no shadow worth drawing. */
-const FLAT = new Set<string>(['flowers', 'bones', 'skull', 'reeds', 'mushroomSmall', 'cabbage', 'wheat']);
+const FLAT = new Set<string>(['flowers', 'bones', 'skull', 'reeds', 'mushroomSmall', 'cabbage', 'wheat', 'rug']);
 
 export function castShadows(m: FloorMap, biome: Biome, W: number, H: number): Uint8Array {
   const mask = new Uint8Array(W * H);
