@@ -197,7 +197,7 @@ export function DungeonHud({ game, controls, press, onCamp, onSettings, onLuck, 
 
       {showHints && me && (
         <div className="hint glass outlined">
-          {touch ? 'Drag on the left to move. Your knights attack on their own.' : 'WASD to move · SPACE dodge roll · E skill roll · 1 2 3 switch knight'}
+          {touch ? 'Drag on the left to move. Your knights attack and roll their skills on their own.' : 'WASD to move · SPACE dodge roll · skills roll on their own (E rolls early) · 1 2 3 switch knight'}
           <span className="t-muted">{CLASSES[me.cls!].auto.name} fires by itself whenever a foe is in range.</span>
         </div>
       )}

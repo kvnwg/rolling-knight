@@ -8,7 +8,7 @@ import type { Rarity } from '../core/rarity';
 import { Rng } from '../core/rng';
 import type { KnightStats } from '../core/roster';
 import type { MutationId } from '../core/state';
-import { heroAi, mobAi } from './ai';
+import { heroAi, heroAutoRoll, mobAi } from './ai';
 import type { Biome } from './biomes';
 import { dist, lineOfSight, moveUnit, norm, type Area, type FloatText, type Fx, type Pickup, type Shot, type Unit, type View } from './entities';
 import { flowFrom, type Flow } from './flow';
@@ -744,6 +744,7 @@ export class World {
         my = this.input.my;
         if (this.input.dodge) heroDodge(this, h, mx, my);
         if (this.input.special) heroSpecial(this, h, false);
+        else heroAutoRoll(this, h, dt);
       } else {
         [mx, my] = heroAi(this, h, lead, dt);
       }

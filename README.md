@@ -4,7 +4,8 @@ A top-down (3/4 view) pixel action roguelite with a rolling game on top, in the 
 Legend. A free Summoning Altar rolls knights forever; you field a squad of three in endless,
 procedurally generated dungeons (hamlets, a farm, dark forests, tundra, crypts, bogs, desert ruins,
 graveyards, lava caves, crystal grottoes, moonlit shrines), control one knight and let the other two
-fight by their class; the skill button rolls a random skill from your class's list. Between dives
+fight by their class; when its cooldown is up in a fight, each knight rolls a random skill from its
+class's list and fires it. Between dives
 you walk round the hub, a lamplit square before the Gilded Reel, where each keeper runs one counter:
 the Oracle's altar, the smith, the junk dealer, the quartermaster, the tinker's hex map of upgrades
 (with chance upgrades like Ricochet and Double or Nothing), the sage, the rebirth shrine, the notice
@@ -64,8 +65,8 @@ npm run dev
 
 Open http://localhost:5173. Keyboard: WASD or arrows to move. At the hub, E or Enter talks to the
 keeper you're standing by; walk down the steps at the foot of the square to go into the dungeon (or
-tell the warden you're ready). In the dungeon: Space or Shift to dodge roll, E or Q to roll a skill, Enter
-or F to talk to someone, 1 2 3 to take control of a knight, T for Auto, Esc to head back up to the
+tell the warden you're ready). In the dungeon: Space or Shift to dodge roll; every knight's skill rolls and
+fires by itself once it's ready in a fight (E or Q rolls yours early); Enter or F to talk to someone, 1 2 3 to take control of a knight, T for Auto, Esc to head back up to the
 hub. Touch: drag to move (anywhere at the hub; on the left side in a fight); the buttons do the rest. Your knights attack on their own whenever
 something is in range.
 

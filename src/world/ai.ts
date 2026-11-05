@@ -83,6 +83,35 @@ export function goodMomentToRoll(w: World, h: Unit, target: Unit | null, foes: r
   return false;
 }
 
+/** The foes a knight is fighting: awake ones, and any close enough to count. */
+function fightFoes(w: World, h: Unit): Unit[] {
+  return w.livingMobs().filter((m) => m.awake || dist(m.x, m.y, h.x, h.y) < 100);
+}
+
+/**
+ * Skill rolls: once the cooldown is up and a fight is on, roll at a good moment for the role (what
+ * lands is up to the dice; when to roll isn't). The longer it waits, the less it takes. A roll fires
+ * its skill as it lands.
+ */
+function autoRoll(w: World, h: Unit, target: Unit | null, foes: readonly Unit[], dt: number): void {
+  const ai = h.ai!;
+  if (h.specialT! > 0 || h.skillRoll || !foes.length) ai.rollWait = 0;
+  else {
+    ai.rollWait = (ai.rollWait ?? 0) + dt;
+    if (goodMomentToRoll(w, h, target, foes, ai.rollWait) && heroSpecial(w, h, false)) ai.rollWait = 0;
+  }
+}
+
+/**
+ * The knight you steer rolls its skill by itself too, the way the squad's AI does: no button needed
+ * (the skill button still rolls it early, while it's ready).
+ */
+export function heroAutoRoll(w: World, h: Unit, dt: number): void {
+  if (!h.ai) return;
+  const foes = fightFoes(w, h);
+  autoRoll(w, h, foes.length ? w.nearestEnemy(h, 160, true) : null, foes, dt);
+}
+
 /** One knight's decision for this frame: where to move (and maybe a dodge or a skill roll). */
 export function heroAi(w: World, h: Unit, lead: Unit | undefined, dt: number): [number, number] {
   const ai = h.ai!;
@@ -95,15 +124,9 @@ export function heroAi(w: World, h: Unit, lead: Unit | undefined, dt: number): [
     const t = threatened(w, h);
     if (t && w.rng.chance(0.55)) heroDodge(w, h, t[0], t[1]);
   }
-  const foes = w.livingMobs().filter((m) => m.awake || dist(m.x, m.y, h.x, h.y) < 100);
+  const foes = fightFoes(w, h);
   let target = foes.length ? w.nearestEnemy(h, 160, true) : null;
-  // --- skill rolls: once the cooldown is up and a fight is on, roll at a good moment for the role
-  // (what lands is up to the dice; when to roll isn't). The longer it waits, the less it takes.
-  if (h.specialT! > 0 || h.skillRoll || !foes.length) ai.rollWait = 0;
-  else {
-    ai.rollWait = (ai.rollWait ?? 0) + dt;
-    if (goodMomentToRoll(w, h, target, foes, ai.rollWait) && heroSpecial(w, h, false)) ai.rollWait = 0;
-  }
+  autoRoll(w, h, target, foes, dt);
   // --- movement
   if (target && target.uid !== ai.target) {
     ai.target = target.uid;

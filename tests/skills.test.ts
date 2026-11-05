@@ -398,7 +398,7 @@ describe('a skill roll', () => {
 });
 
 describe('allies', () => {
-  it('roll on their own in a fight (not the knight you control), and only when one is on', () => {
+  it('roll on their own in a fight, the knight you control too, and only when one is on', () => {
     const w = world([knightId('rare', 'blade'), knightId('rare', 'guardian'), knightId('rare', 'ranger')]);
     const [me, tank, archer] = w.heroes;
     for (const h of w.heroes) h.specialT = 0;
@@ -416,8 +416,9 @@ describe('allies', () => {
     run(w, 12);
     expect(tank.lastSkill?.n ?? 0).toBeGreaterThanOrEqual(1);
     expect(archer.lastSkill?.n ?? 0).toBeGreaterThanOrEqual(1);
-    expect(me.lastSkill).toBeUndefined();
-    expect(got.filter((e) => e.phase === 'land' && e.hero === me).length).toBe(0);
+    // Your knight's special rolls and fires with no button pressed.
+    expect(me.lastSkill?.n ?? 0).toBeGreaterThanOrEqual(1);
+    expect(got.filter((e) => e.phase === 'land' && e.hero === me).length).toBeGreaterThanOrEqual(1);
   });
 
   it('includes your knight on Auto, and Tag Team rolls for free on switching', () => {
