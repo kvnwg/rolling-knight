@@ -4,9 +4,10 @@
  * class or its skill plays is drawn at its chest along its aim, frame by frame over the swing, and
  * each foe it hit gets the stroke's own mark (a cut, a lance through it, the Guardian's thud) in
  * place of the generic spark. Whirlwind and the lunges are drawn while they run. Shots are drawn as
- * what they are, with trails that follow their real path (a homing bolt's curve shows), and when one
- * is gone, an impact bursts where it was: sized to what it hit, bigger on a crit, grit off a wall, a
- * fizzle if it ran out.
+ * what they are, with trails that follow their real path (a homing bolt's curve shows), a flare at
+ * the hands as each leaves, and when one is gone, an impact bursts where it was: sized to what it
+ * hit, bigger on a crit, grit off a wall, a fizzle if it ran out, a clink where a swing cut a foe's
+ * shot out of the air (and one a Blade sent back flies in the knight's colors).
  *
  * Everything goes on the renderer's unlit top layer (`ui`, under the HUD's numbers): crisp, never
  * bloomed, glowing or lighting the scene. Every frame of every effect is drawn once (art.ts) and kept
@@ -15,14 +16,14 @@
  * the steady state (tracks and particles are pooled); the sim's random numbers are never touched.
  */
 import type { SkillId } from '../../core/skillbook';
-import type { Fx, Shot, Unit } from '../../world/entities';
+import type { DashFx, Fx, Shot, Unit } from '../../world/entities';
 import type { World } from '../../world/world';
 import { toCanvas } from '../art/draw';
 import type { PixelBuf } from '../pixel/buf';
 import {
   ARCANE, BOLT_FRAMES, BULLET_FRAMES, CHEST, DUST, FIRE, FIRE_FRAMES, HOLY, IMPACT_FRAMES, IMPACT_FRAME_S, IMPACT_KINDS, ORB_FRAMES, SHOT_DIRS,
   STEEL, SWING_DIRS, dangerRamp, swingReach, arrowSprite, boltSprite, bulletSprite, dirIndex, fireSprite, impactSprite, lungeSprite, orbSprite, rampFrom,
-  spearSprite, swingFrameAt, swingSprite, tone, whirlSprite, type ImpactKind, type VfxSprite,
+  reflectSprite, spearSprite, swingFrameAt, swingSprite, tone, whirlSprite, type ImpactKind, type VfxSprite,
 } from './art';
 import { SWING_STYLES, rainbowStep, swingStyleFor, vfxLook, type Ramp, type SwingStyle, type VfxLook } from './look';
 
@@ -49,6 +50,19 @@ const K_IMPACT = 10;
 function key(kind: number, look: number, dir: number, frame: number, variant: number): number {
   return kind + 16 * (variant + 65536 * (frame + 16 * (dir + 64 * look)));
 }
+
+/**
+ * The impact each dash mark becomes: a shield's thud on a foe bashed aside, a lance's streak through
+ * a foe run through, the Blink's arcane burst where it left, a snare's iron snapping shut (the Power
+ * Shot's release is the arrow's own flare: no impact). `dy` moves it from the mark (a thud rides the chest).
+ */
+const DASH_IMPACT: Readonly<Record<DashFx, { kind: ImpactKind | null; core: Ramp; size: number; dy: number }>> = {
+  bash: { kind: 'thud', core: STEEL, size: 1.3, dy: 6 - CHEST },
+  lunge: { kind: 'pierce', core: STEEL, size: 1.2, dy: 0 },
+  burst: { kind: 'burst', core: ARCANE, size: 1.6, dy: 0 },
+  snare: { kind: 'thud', core: DUST, size: 1.1, dy: 0 },
+  shot: { kind: null, core: STEEL, size: 1, dy: 0 },
+};
 
 /** Frames kept (a fight uses a few hundred; the oldest go first). */
 const CACHE_MAX = 1500;
@@ -208,6 +222,8 @@ export class Vfx {
   private parts = new Parts();
   private ids = new Map<unknown, number>();
   private lastTime = 0;
+  /** Where this frame's clinks are (x, y pairs): the shots they took leave no burst of their own. */
+  private clinks: number[] = [];
 
   /** What's playing (tests and the dev console). */
   stats(): { swings: number; impacts: number; shots: number; sparks: number; cached: number } {
@@ -310,6 +326,26 @@ export class Vfx {
       m.skillN = n;
     }
     for (const [uid, m] of this.mem) if (!m.seen) this.mem.delete(uid);
+    // --- foes' shots a swing cut out of the air (melee.ts): a clink where each one was
+    this.clinks.length = 0;
+    for (let i = w.fx.length - 1; i >= 0; i--) {
+      const f = w.fx[i];
+      if (f.kind !== 'spark' || !f.src) continue;
+      if (f.src === 'cut') {
+        w.fx.splice(i, 1);
+        this.clinks.push(f.x, f.y);
+        const dir = dirIndex(Math.cos(i * 2.4), Math.sin(i * 2.4), SHOT_DIRS);
+        this.impacts.push({ kind: 'clink', look: COMMON, core: dangerRamp(f.color ?? '#ff6a6a'), size: 1, x: f.x, y: f.y, t0: w.time, dir });
+        continue;
+      }
+      // The dashes' marks (world/dash.ts), each its own impact.
+      const dash = DASH_IMPACT[f.src as DashFx];
+      if (!dash) continue;
+      w.fx.splice(i, 1);
+      if (!dash.kind) continue;
+      const a = f.dir ?? 0;
+      this.impacts.push({ kind: dash.kind, look: COMMON, core: dash.core, size: dash.size, x: f.x, y: f.y + dash.dy, t0: w.time, dir: dirIndex(Math.cos(a), Math.sin(a), SHOT_DIRS) });
+    }
     // --- shots
     for (const t of this.tracks.values()) t.seen = false;
     for (const s of w.shots) {
@@ -317,6 +353,7 @@ export class Vfx {
       if (!t) {
         t = this.track(w, s);
         this.tracks.set(s.uid, t);
+        if (t.hero && s.kind !== 'bullet' && s.kind !== 'fire' && !w.rewind) this.muzzle(w, s, t);
       }
       t.seen = true;
       if (Math.abs(s.x - t.x) + Math.abs(s.y - t.y) >= 0.75) {
@@ -427,8 +464,26 @@ export class Vfx {
     return best;
   }
 
+  /** A shot leaving a knight's hands: a flare out along its way, back where it left from. */
+  private muzzle(w: World, s: Shot, t: Track): void {
+    const h = this.heroBy(w, t.from);
+    if (!h) return;
+    const dt = 1 / 60;
+    const x = s.x - s.vx * dt;
+    const y = s.y - s.vy * dt;
+    // (Only out of the hands: not a shot a skill throws from somewhere else.)
+    if (Math.abs(x - h.x) + Math.abs(y - (h.y - CHEST)) > 14) return;
+    const L = this.lookOf(h, w.time);
+    const core = s.kind === 'bolt' ? ARCANE : s.kind === 'orb' ? HOLY : L.level === 0 ? STEEL : L.ramp;
+    this.impacts.push({ kind: 'muzzle', look: L, core, size: t.small ? 0.8 : 1, x, y, t0: w.time, dir: dirIndex(s.vx, s.vy, SHOT_DIRS) });
+  }
+
   /** The impact for a shot that went through a foe ('pierce') or is gone ('end'). */
   private impactFor(w: World, t: Track, why: 'pierce' | 'end'): void {
+    // A foe's shot cut out of the air already has its clink.
+    if (!t.hero && why === 'end') {
+      for (let i = 0; i < this.clinks.length; i += 2) if (Math.abs(this.clinks[i] - t.x) + Math.abs(this.clinks[i + 1] - t.y) < 8) return;
+    }
     const h = t.hero ? this.heroBy(w, t.from) : null;
     const L = h ? this.lookOf(h, w.time) : COMMON;
     const core = t.kind === 'bolt' ? (t.color === '#b08aff' ? ARCANE : rampFrom(t.color)) : t.kind === 'orb' ? HOLY : t.kind === 'fire' ? FIRE : t.kind === 'bullet' ? dangerRamp(t.color) : STEEL;
@@ -537,11 +592,17 @@ export class Vfx {
     this.swings.length = j;
     for (const h of w.heroes) {
       const c = h.channel;
-      if (!c || h.downed) continue;
+      // The Lancer's Spear Lunge dash (world/dash.ts) streaks like Dragon Lunge's.
+      const dash = h.rolling?.kind === 'lunge' ? h.rolling : null;
+      if ((!c && !dash) || h.downed) continue;
       const L = this.lookOf(h, w.time);
       const x = Math.round(h.x) - cx;
       const y = Math.round(h.y) - CHEST - cy;
-      if (c.kind === 'whirlwind') {
+      if (!c) {
+        const dir = dirIndex(dash!.dx, dash!.dy, SWING_DIRS);
+        const phase = Math.floor(w.time * 24) % 3;
+        this.blit(this.sprite(key(K_LUNGE, L.id, dir, phase, 0), () => lungeSprite(L, dir, phase)), x, y, ctx);
+      } else if (c.kind === 'whirlwind') {
         const dir = Math.floor(w.time * 2.2 * SWING_DIRS) % SWING_DIRS;
         const flick = Math.floor(w.time * 20) % 3;
         this.blit(this.sprite(key(K_WHIRL, L.id, dir, flick, 0), () => whirlSprite(L, dir, flick)), x, y, ctx);
@@ -598,8 +659,14 @@ export class Vfx {
           break;
         }
         case 'bullet': {
-          const big = !!w.bossUnit && w.bossUnit.uid === s.from;
           const f = Math.floor(w.time * 12 + (s.uid % 4)) % BULLET_FRAMES;
+          if (s.team === 'hero') {
+            // A foe's shot a Blade sent back: the knight's own now, in its colors.
+            if (t) this.trail(ctx, t, cx, cy, L.level === 0 ? STEEL : L.ramp, STEEL, Math.round(5 * L.trail), false);
+            this.blit(this.sprite(key(K_BULLET, L.id, dir, f, 2), () => reflectSprite(L, dir, f)), x, y, ctx);
+            break;
+          }
+          const big = !!w.bossUnit && w.bossUnit.uid === s.from;
           this.blit(this.sprite(key(K_BULLET, this.idOf(s.color), dir, f, big ? 1 : 0), () => bulletSprite(s.color, dir, f, big)), x, y, ctx);
           break;
         }
@@ -689,7 +756,7 @@ export class Vfx {
       if (x < -40 || y < -40 || x > W + 40 || y > H + 40) continue;
       const bucket = Math.max(1, Math.min(15, Math.round(m.size * 5)));
       const variant = IMPACT_KINDS.indexOf(m.kind) + 16 * (bucket + 16 * Math.min(255, this.idOf(m.core)));
-      const dir = m.kind === 'cut' || m.kind === 'pierce' ? m.dir : 0;
+      const dir = m.kind === 'cut' || m.kind === 'pierce' || m.kind === 'muzzle' || m.kind === 'clink' ? m.dir : 0;
       const p = this.sprite(key(K_IMPACT, m.look.id, dir, f, variant), () => impactSprite(m.kind, m.look, m.core, bucket / 5, f, dir));
       this.blit(p, x, y, ctx);
     }

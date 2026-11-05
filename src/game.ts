@@ -69,8 +69,13 @@ export class Game {
   /** The hub between dives: your knight walking among the keepers. */
   hub: World | null = null;
   private hubKey = '';
-  /** After a wipe on Auto, seconds until the squad heads back down on its own (cancelled by any input). */
+  /** After a wipe with the dev bot playing, seconds until the squad heads back down on its own (cancelled by any input). */
   autoReturnT = 0;
+  /**
+   * Dev and tools only: the knight you control plays itself (World.bot: it moves, dodges and fights by
+   * its class's AI). Set by the ?auto URL flag and the sim; never saved, never in the game's UI.
+   */
+  bot = false;
   /** The latest summons, newest first (the Summon tab's log). */
   recent: Summoned[] = [];
 
@@ -162,6 +167,7 @@ export class Game {
     });
     this.questEvent({ type: 'floor', floor });
     this.world.auto = s.settings.autoPlay;
+    this.world.bot = this.bot;
     // The upgrade map's chance lines play on this floor.
     onFloorStart(this.world, s);
     s.controlled = this.world.controlled;
@@ -283,7 +289,7 @@ export class Game {
     this.fade = 1;
     this.fadeDir = -1;
     this.syncHub(true);
-    if (s.settings.autoPlay) this.autoReturnT = 5;
+    if (this.bot) this.autoReturnT = 5;
     this.save();
     this.version++;
   }
@@ -334,6 +340,7 @@ export class Game {
     }
   }
 
+  /** Auto attack (the setting autoPlay): your knight aims and attacks by itself; you still move and dodge. */
   setAuto(on: boolean): void {
     this.state.settings.autoPlay = on;
     if (this.world) this.world.auto = on;
@@ -476,6 +483,10 @@ export class Game {
         case 'perfect':
           this.emit({ type: 'perfectRoll', mine: e.mine });
           break;
+        case 'clink':
+          // (Only a sound: nothing for the screen to redraw.)
+          this.emit({ type: 'clink', x: e.x, y: e.y, reflect: e.reflect, mine: e.mine });
+          continue;
         default:
           break;
       }

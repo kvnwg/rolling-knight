@@ -139,6 +139,7 @@ export interface GameState {
   settings: {
     sfx: number;
     music: number;
+    /** Auto attack: your knight aims and attacks by itself (you still move and dodge). */
     autoPlay: boolean;
     reduceMotion: boolean;
     showDamage: boolean;

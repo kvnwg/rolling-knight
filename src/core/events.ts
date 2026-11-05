@@ -35,6 +35,8 @@ export type CoreEvent =
   | { type: 'rebirth'; count: number }
   /** A knight's dodge roll made something miss it (once per roll); `mine`: the knight you control. */
   | { type: 'perfectRoll'; mine: boolean }
+  /** A knight's swing cut a foe's shot out of the air, at (x, y) on the floor (`reflect`: sent back; `mine`: your knight's). */
+  | { type: 'clink'; x: number; y: number; reflect: boolean; mine: boolean }
   | { type: 'toast'; text: string; tone?: 'good' | 'bad' | 'info' | 'gold' };
 
 export type EventSink = (e: CoreEvent) => void;

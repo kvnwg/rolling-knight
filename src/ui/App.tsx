@@ -184,6 +184,10 @@ export function App() {
         case 'toast':
           toast({ text: e.text, color: e.tone === 'bad' ? '#ff7a6b' : e.tone === 'gold' ? '#ffcf4a' : undefined });
           break;
+        case 'clink':
+          // A shot cut out of the air: the shield's clang, up high and short (brighter when sent back).
+          sfx.fire('knight_block', { x: e.x, y: e.y, pitch: e.reflect ? 2.1 : 1.7, gain: e.mine ? 0.55 : 0.32, level: 0.2 });
+          break;
         default:
           break;
       }
@@ -216,23 +220,31 @@ export function App() {
         wasIn = game.inDungeon;
         if (!wasIn) music.setScene('camp');
       }
-      // A reveal pauses the fight (the altar keeps its own pace); a sheet hands your knight to Auto.
+      // A reveal pauses the fight (the altar keeps its own pace). Auto attack (the setting, and while a
+      // sheet is open) only aims and attacks for you: moving and dodging stay yours. The dev bot
+      // (?auto, the sim) plays the knight outright.
       game.paused = revealRef.current.length > 0 || talkRef.current !== null;
       if (w) {
         w.auto = game.state.settings.autoPlay || sheetRef.current;
+        w.bot = game.bot;
         // A counter or a sheet open at the hub holds your knight still.
         const hold = !game.inDungeon && sheetRef.current;
         w.input.mx = hold ? 0 : c.mx;
         w.input.my = hold ? 0 : c.my;
         if (c.dodge) w.input.dodge = true;
         if (c.special) w.input.special = true;
-        // Attacking: held, toward the mouse (touch aims at the nearest foe by itself).
+        // Attacking: held, toward the mouse; on touch the Attack button auto-aims, or aims the way
+        // it's dragged (world/aim.ts).
         const fight = game.inDungeon && !hold;
         w.input.attack = fight && c.attack;
         const aim = fight && c.aim ? r.screenToWorld(c.aim.x, c.aim.y) : null;
         w.input.aimX = aim ? aim.x : null;
         w.input.aimY = aim ? aim.y : null;
-      }
+        w.input.aimDx = fight && c.aimDir ? c.aimDir.x : null;
+        w.input.aimDy = fight && c.aimDir ? c.aimDir.y : null;
+        // The crosshair, where the mouse is over the fight (the pointer hides there: .aiming).
+        r.cursor = fight && !w.bot && c.aim && c.overPlay ? c.aim : null;
+      } else r.cursor = null;
       c.dodge = false;
       c.special = false;
       if (c.switchTo !== null) {
@@ -317,9 +329,11 @@ export function App() {
   }, [game]);
 
   const inDungeon = game.inDungeon;
+  // In a fight you steer with the mouse, the game's crosshair stands in for the pointer.
+  const aiming = inDungeon && !game.bot && !sheetOpen && !talking;
   return (
     <>
-      <canvas ref={canvasRef} className="game" data-play="1" />
+      <canvas ref={canvasRef} className={aiming ? 'game aiming' : 'game'} data-play="1" />
       {choosing && <VistaCanvas game={game} wide={wide} pick={csPick} />}
       {inDungeon ? (
         <DungeonHud

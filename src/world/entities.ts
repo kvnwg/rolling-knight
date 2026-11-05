@@ -8,6 +8,16 @@ import type { MobType, Volley } from './mobgen';
 
 export type Team = 'hero' | 'mob';
 export type View = 'down' | 'up' | 'side';
+/**
+ * What a roll looks like and does (dash.ts): a roll, the Ranger's backflip, a vault (a skill's leap),
+ * the Arcanist's blink; the Guardian's shield-first bash, the Blade's shadowstep, the Lancer's lunge.
+ */
+export type DashKind = 'roll' | 'blink' | 'vault' | 'flip' | 'bash' | 'shadow' | 'lunge';
+/**
+ * The marks a dash leaves for the effects and the sounds (dash.ts): a foe bashed aside, a foe run
+ * through by a lunge, the Power Shot's release, a snare snapping shut, the Blink's arcane burst.
+ */
+export type DashFx = 'bash' | 'lunge' | 'shot' | 'snare' | 'burst';
 
 export interface Unit {
   uid: number;
@@ -57,13 +67,35 @@ export interface Unit {
   dodgeCd?: number;
   dodgeT?: number;
   specialCd?: number;
+  /** Seconds this knight's skill rolls are held (the game never holds them now: in a fight one roll
+   * chains to the next; tests and tools set it). */
   specialT?: number;
   /** A skill roll's spin, as a share of ROLL_TIME (Quick Roll shortens it; 1 when left out). */
   rollTimeMult?: number;
   /** Tag Team: seconds left hitting harder after being switched to. */
   tagBoostT?: number;
-  /** An active dodge: direction, time left, speed. */
-  rolling?: { dx: number; dy: number; t: number; dur: number; speed: number; kind: 'roll' | 'blink' | 'vault' | 'flip'; hit: Set<number> };
+  /**
+   * An active dodge (or a skill's leap): direction, time left, speed; untouchable while it lasts.
+   * `land`: a dodge's landing comes after it, this long (s). A dash's own (dash.ts): `struck`, the
+   * foes its Shield Bash or Spear Lunge has hit; `shot`, the foe the Ranger's Power Shot goes for.
+   */
+  rolling?: { dx: number; dy: number; t: number; dur: number; speed: number; kind: DashKind; hit: Set<number>; land?: number; struck?: Set<number>; shot?: number | null };
+  /**
+   * A dodge roll's landing (skills.ts): the last part of the roll, after the untouchable part. The
+   * knight slides on to a stop, can be hit, and can't attack yet. `of` is the whole roll's length.
+   */
+  landing?: { dx: number; dy: number; t: number; dur: number; speed: number; kind: DashKind; of: number };
+  // --- the fight's feel (src/world/aim.ts, melee.ts, feel.ts)
+  /** Seconds left facing the aim: the knight you steer is attacking toward it (the sprite turns to it). */
+  aiming?: number;
+  /** The foe the touch auto-aim is locked on (its uid), kept until it falls or leaves range. */
+  aimLock?: number | null;
+  /** A melee swing's hitbox while it's live: it cuts foes and enemy shots inside it (melee.ts). */
+  swing?: MeleeSwing;
+  /** A knockback (or a swing's step) still sliding the unit: px/s, easing off. */
+  shove?: { vx: number; vy: number };
+  /** Seconds left of the blinking invulnerability after the knight you steer is hit. */
+  graceT?: number;
   /**
    * The last dodge roll (skills.ts heroDodge): the world time its untouchable window ends, and whether
    * something has already missed the knight because of it (a perfect roll is marked once per roll).
@@ -180,6 +212,27 @@ export interface Rush {
   hit: Set<number>;
 }
 
+/**
+ * A melee swing's live hitbox, along the aim (ax, ay): an arc round the knight (`half`: its half
+ * angle, radians) or a thrust (`half`: its half width, px) out to `reach`; live for `t` more seconds.
+ * Foes inside are hit once each (`hit`); enemy shots inside are cut, reflected or popped (`cuts`).
+ */
+export interface MeleeSwing {
+  shape: 'arc' | 'thrust';
+  ax: number;
+  ay: number;
+  reach: number;
+  half: number;
+  t: number;
+  dmg: number;
+  crit: boolean;
+  knock: number;
+  cuts: 'cut' | 'reflect' | 'pop';
+  hit: Set<number>;
+  /** Whether this swing has frozen the moment yet (only the first blow of a swing does). */
+  stopped: boolean;
+}
+
 export interface Shot {
   uid: number;
   team: Team;
@@ -216,7 +269,8 @@ export interface Area {
   dmg: number;
   heal?: number;
   /** ('boulder': an ogre's thrown rock coming down; 'rubble': what's left of it, for show.) */
-  kind: 'meteor' | 'fire' | 'rain' | 'slam' | 'blast' | 'sanctuary' | 'glow' | 'bomb' | 'poison' | 'boulder' | 'rubble';
+  /** ('snare': a Ranger's trap; 'bless': a Cleric's Blessed Step circle: dash.ts.) */
+  kind: 'meteor' | 'fire' | 'rain' | 'slam' | 'blast' | 'sanctuary' | 'glow' | 'bomb' | 'poison' | 'boulder' | 'rubble' | 'snare' | 'bless';
   from: number;
   color: string;
   done?: boolean;
@@ -262,8 +316,11 @@ export interface Fx {
   color?: string;
   size?: number;
   dir?: number;
-  /** What made it, so the renderer can pick the right effect (a slime pops, a knight falls, a slam shakes the ground). */
-  src?: 'slime' | 'hero' | 'boss' | 'slam' | 'bomb' | 'meteor' | 'taunt' | 'boulder';
+  /**
+   * What made it, so the renderer can pick the right effect (a slime pops, a knight falls, a slam
+   * shakes the ground, a swing cuts a foe's shot out of the air).
+   */
+  src?: 'slime' | 'hero' | 'boss' | 'slam' | 'bomb' | 'meteor' | 'taunt' | 'boulder' | 'cut' | DashFx;
   /** The unit it belongs to (a perfect roll's knight). */
   uid?: number;
 }

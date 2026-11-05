@@ -1,5 +1,5 @@
 /**
- * Headless balance run: the real game logic on Auto (every knight played by its class AI), with a
+ * Headless balance run: the real game logic with the dev bot (every knight played by its class AI), with a
  * simple bot that levels the squad, spends on upgrades (the cheaper of the cheapest Luck tier and a
  * combat roll), rolls perks and rebirths when it can (duplicates turn into gold by themselves).
  *   npm run sim -- --minutes 60 --seed 3
@@ -28,7 +28,8 @@ let clock = 1_700_000_000_000 + seed * 1000;
 Date.now = () => clock;
 const g = new Game(true);
 g.state.seed = seed;
-g.setAuto(true);
+// The dev bot plays the knight you control (moving, dodging and fighting), like the rest of the squad.
+g.bot = true;
 const dt = 1 / 30;
 const counts: Record<string, number> = {};
 let lastFloor = 0;

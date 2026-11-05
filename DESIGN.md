@@ -79,20 +79,26 @@ and Mythic or better.
   Humble Beginnings). Old saves' spare copies and shards were cashed in as gold.
 - **Classes** (the kit is the same for every knight of a class):
 
-| Class | Role | Auto attack | Dodge |
+| Class | Role | Attack | Dash (the dodge) |
 | --- | --- | --- | --- |
-| Guardian | Tank | Shield Bash (knockback) | Bulwark Roll (short, then half damage) |
-| Blade | Fighter | Cleave (wide arc) | Combat Roll |
-| Ranger | Archer | Longshot | Backflip (long) |
-| Cleric | Healer | Holy Orb (heals the most hurt ally) | Blessed Step (healing glow) |
-| Arcanist | Mage (rebirth 1) | Arcane Bolt (seeking, splash) | Blink |
-| Lancer | Lancer (rebirth 2) | Pierce (a line) | Vault |
+| Guardian | Tank | Shield Sweep (short heavy arc, big knockback; cuts shots) | Shield Bash (a charge: foes in the way are hit, knocked aside and staggered; shots blocked) |
+| Blade | Fighter | Cleave (wide arc; sends shots back as its own) | Shadowstep (a little longer, afterimages; ready again in 0.5 s) |
+| Ranger | Archer | Longshot | Shot or Snare (toward a foe: a roll and a piercing Power Shot; away: a backflip and a snare) |
+| Cleric | Healer | Holy Orb (heals the most hurt ally) | Blessed Step (a holy circle where it started: 6% of max HP a second for 2.5 s) |
+| Arcanist | Mage (rebirth 1) | Arcane Bolt (bends toward foes, splash) | Blink (1.3x as far, never through a wall; an arcane burst where it left) |
+| Lancer | Lancer (rebirth 2) | Pierce (long thrust; pops shots along it) | Spear Lunge (fast and long: through foes, hitting each and pushing it on) |
 
-- **Skill rolls** (`src/core/skillbook.ts`, `src/world/skills.ts`). There is no fixed special: the
-  skill button spins a 1.8 s reel over the class's list and fires whatever it lands on (the result is
-  fixed when the spin starts, as at the altar). There are no cooldowns: in a fight every knight rolls,
-  fires, and rolls again at once. Quick Roll (the tinker's Combat tab) makes each tier's spin 12%
-  shorter (at 5 tiers: a 0.72 s spin). Knights only roll with an awake foe within a screen of them. Each class has six skills; at luck 1 they weigh 30, 26, 20, 13, 8
+  Melee knights are the sturdy ones: the Guardian has about three times a ranged knight's HP and the
+  most armor by far, the Blade and Lancer about twice, with two to three times the armor; they pay
+  for it in damage, and Power rates every class the same.
+
+- **Skill rolls** (`src/core/skillbook.ts`, `src/world/skills.ts`). There is no fixed special: a
+  1.8 s reel spins over the class's list and fires whatever it stops on (a Legendary slams down onto
+  the screen first; the result is fixed when the spin starts, as at the altar). There are no
+  cooldowns: in a fight every knight rolls, fires, and
+  rolls again as soon as the skill has finished firing (the skill button rolls yours when there's no
+  fight). Quick Roll (the tinker's Combat tab) makes each tier's spin 12% shorter (at 5 tiers: a
+  0.72 s spin). Knights only roll with an awake foe within a screen of them. Each class has six skills; at luck 1 they weigh 30, 26, 20, 13, 8
   and 3 in 100 (two commons, an uncommon, a rare, an epic, a legendary), and luck tilts them rarer
   (weight × luck^(0.1 × tier step), luck capped at 1000; Loaded Dice adds to it). Epic and up chain
   several beats and announce their tier; legendary and up flash the screen and stop time for a beat.
@@ -110,13 +116,37 @@ and Mythic or better.
   Aeon** (Mythic Arcanist) can roll **Rewind**: the squad goes back 4 seconds (positions, HP, fallen
   knights), enemy shots and spells in the air vanish, and damage dealt stays.
 
+## 5b. Fighting
+
+After Enter the Gungeon (`src/world/aim.ts`, `melee.ts`, `feel.ts`, `dash.ts`):
+
+- **Aim.** On a computer the mouse aims, free through 360 degrees, with a small pixel crosshair in
+  place of the cursor (gold over a foe). Hold attack and the knight attacks along the aim at its
+  class's pace, at full walking speed, facing the aim while it does. The camera leans a quarter of
+  the way toward the aim. On a phone, holding Attack aims for you: the foe ahead of where you're
+  walking first, else the nearest in reach and in sight, and it sticks to that one until it falls or
+  gets well away (corner brackets mark it); drag from the Attack button to aim by hand like a second
+  stick. Auto attack does the phone's aiming and holds attack down for you.
+- **Melee** swings are live for a moment: an arc in front (the Blade's wide, the Guardian's short and
+  heavy) or the Lancer's long, narrow thrust, with a small step forward. Only what's in the arc is
+  hit, never what's behind. A swing cuts foes' bullets out of the air with a clink: the Blade (and
+  Kevin) send them back along the aim as their own, the Lancer pops every one along the thrust, and
+  squadmates' swings cut too.
+- **Shots** go straight along the aim and faster than any foe's bullets, with a muzzle flash and a
+  1 px kick; the Arcanist's bend a little toward foes.
+- **Feel.** Melee hits and crits stop the world for 40 to 70 ms (hit-stop, the same at any frame
+  rate), foes flash white and slide back along the blow, heavy hits shake the screen. When your
+  knight is hit: a red flash, a short stop and 0.8 s of blinking safety. A dash is untouchable for
+  most of its length and then lands, open, for a moment; no attacking while it runs.
+
 ## 6. The squad
 
 Three slots. You control one (switch any time); the other two run their role's AI: tanks wade in and
 taunt when the squad is pressed, fighters chase, archers and mages kite, healers stay by whoever is
 hurt and save Sanctuary for when it counts. Everyone dodges what they see coming, most of the time
 (shots, blasts and boulders about to land, a lunge's lane or landing ring once its aim has locked).
-Auto hands your knight to the AI too (and it is on while a menu is open). Empty slots fill with your
+Auto attack aims and fires for your knight too (and it is on while a menu is open); moving and
+dodging stay yours. (A dev bot, `&auto` and `npm run sim`, plays your knight outright.) Empty slots fill with your
 strongest free knight; anything else is your call (or Best squad), at the Warden's by the steps down.
 The squad is locked in the dungeon: knights rolled during a dive wait at the hub, and to change who
 fights (or spend anything) you head back up, or fall.
@@ -164,7 +194,7 @@ and is checked to be fully connected. Mobs are designed
 per floor: body plan, behavior (chaser, archer, charger, bomber, caster, tank, swarm), colors, size,
 features and name; bosses have three of ring, fan, charge, slam, summon, rain and leap (always a
 charge or a leap among them), and enrage at half HP. The way down is open from the start: fight what you like, then stand in the portal a moment to go down (a boss floor's opens when its boss falls). A wiped squad
-is carried back to the hub, and the run goes back to the biome's first floor (on Auto it heads back
+is carried back to the hub, and the run goes back to the biome's first floor (the dev bot heads back
 down by itself unless you move).
 
 **How monsters fight** (after Enter the Gungeon; `src/world/ai.ts`, `src/world/mobgen.ts`). They come
@@ -240,7 +270,7 @@ its HP). (Each blow is lighter than it used to be because monsters now land many
 volleys, quicker feet.) The first floors bite harder than par alone would say (a new squad is usually
 well ahead of it there): on floor 1 foes hit 20% harder and take 10% longer to kill, fading to the
 plain targets by floor 10 (`BAL.balance.early`). The camp and the gate show Power against par with a
-wax seal: Deadly, Hard, Fair, Easy, Trivial. `npm run sim` plays the real game on Auto and logs power
+wax seal: Deadly, Hard, Fair, Easy, Trivial. `npm run sim` plays the real game with the dev bot and logs power
 against par floor by floor.
 
 ## 8. Rebirth and perks

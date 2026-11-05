@@ -242,7 +242,7 @@ export const UPGRADES: UpgradeDef[] = [
   {
     id: 'quickRoll', name: 'Quick Roll', kind: 'squad', group: 'squad', max: 5, icon: 'quickRoll',
     desc: "Your knights' skill rolls spin faster, so skills come out quicker.",
-    text: () => 'Skill rolls spin 12% faster, cooldown 6% shorter',
+    text: () => 'Skill rolls spin 12% faster',
   },
   // ---------------------------------------------------------------- chance (the Combat tab: rolled)
   {
@@ -374,7 +374,7 @@ export function sanitizeUpgrades(state: Pick<GameState, 'upgrades'>): void {
   state.upgrades = out;
 }
 
-/** Quick Roll, per tier: a skill roll spins this much shorter, and its cooldown this much shorter (percent). */
+/** Quick Roll, per tier: a skill roll spins this much shorter (percent). Rolls have no cooldown to shorten. */
 export const QUICK_ROLL = { spinPct: 12 } as const;
 
 /** Attack Speed, per tier: the squad's attack cooldown this much shorter (percent; six tiers, 36%). */
@@ -401,7 +401,7 @@ export function upgradeFx(state: Pick<GameState, 'upgrades'>) {
     speedPct: 6 * t('swiftness'),
     /** Attack Speed: how much shorter the squad's attack cooldown is, in percent. */
     atkCdPct: ATTACK_SPEED.cdPct * t('atkSpeed'),
-    /** Quick Roll: how much shorter a skill roll spins, and how much shorter its cooldown, in percent. */
+    /** Quick Roll: how much shorter a skill roll spins, in percent. */
     rollSpinPct: QUICK_ROLL.spinPct * t('quickRoll'),
     offlineEff: 0.4 * t('offline'),
   };

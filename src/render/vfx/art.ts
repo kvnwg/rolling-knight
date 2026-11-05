@@ -149,13 +149,13 @@ interface SpikeGeom {
 }
 
 const GEOM: Record<SwingStyle, SmearGeom | SpikeGeom> = {
-  slash: { kind: 'smear', a: 21, b: 11, cu: 7, from: 166, past: 14, thick: 8, peak: 0.74, back: [-0.3, -0.85] },
-  chop: { kind: 'smear', a: 15, b: 13, cu: 7, from: 140, past: 40, thick: 10, peak: 0.62, back: null },
+  slash: { kind: 'smear', a: 26, b: 13, cu: 8, from: 166, past: 14, thick: 9, peak: 0.74, back: [-0.3, -0.85] },
+  chop: { kind: 'smear', a: 19, b: 15, cu: 8, from: 140, past: 40, thick: 11, peak: 0.62, back: null },
   cleave: { kind: 'smear', a: 26, b: 17, cu: 8, from: 172, past: 10, thick: 10, peak: 0.66, back: [-0.18, -0.66] },
   bash: { kind: 'smear', a: 15, b: 13, cu: 7, from: 118, past: 32, thick: 10, peak: 0.52, back: null },
   slam: { kind: 'smear', a: 14, b: 13, cu: 6, from: 160, past: 44, thick: 9, peak: 0.6, back: [-0.2, -0.5] },
   spin: { kind: 'smear', a: 22, b: 15, cu: 0, from: 180, past: 180, thick: 6, peak: 0.84, back: null, full: true },
-  thrust: { kind: 'spike', reach: 36, width: 6 },
+  thrust: { kind: 'spike', reach: 44, width: 6 },
   stab: { kind: 'spike', reach: 22, width: 4 },
   impale: { kind: 'spike', reach: 62, width: 7 },
 };
@@ -273,7 +273,7 @@ function onScreen(ax: Frame2, u: number, v: number): [number, number] {
 export function swingSprite(style: SwingStyle, L: VfxLook, dir: number, sign: 1 | -1, frame: number, crit: boolean): VfxSprite {
   const g = GEOM[style];
   const f = Math.max(0, Math.min(SWING_FRAMES - 1, frame | 0));
-  const d = new Draft(L.mono ? 84 : 64);
+  const d = new Draft(L.mono ? 92 : 72);
   const sc = L.scale * (crit ? 1.12 : 1);
   if (g.kind === 'smear') smearSwing(d, g, L, axes(dir, sign), f, sc, crit);
   else spikeSwing(d, g, L, dir, f, sc, crit);
@@ -801,8 +801,21 @@ export function dangerRamp(hex: string): Ramp {
  * flaring) and drags a short tail. Big: a boss's.
  */
 export function bulletSprite(color: string, dir: number, frame: number, big: boolean): VfxSprite {
+  return ballSprite(dangerRamp(color), dir, frame, big);
+}
+
+/**
+ * A foe's shot a Blade cut and sent back, now the knight's own: the same ball, in the knight's colors
+ * (pale steel at common) instead of a danger color, so it never reads as one still coming at you.
+ */
+export function reflectSprite(L: VfxLook, dir: number, frame: number): VfxSprite {
+  const r: Ramp = L.level === 0 ? ['#1e2a40', '#4a6a98', '#9ec4f0', '#e4f2ff', '#ffffff'] : L.mono ? ['#000000', '#3a3a44', '#d8d8e0', '#f4f4f8', '#ffffff'] : [tone(L, 0), tone(L, 1), tone(L, 2), tone(L, 3), '#ffffff'];
+  return ballSprite(r, dir, frame, false);
+}
+
+/** A glossy ball in ramp `r` (ink, dark, body, light, white) with a tail behind it along `dir`. */
+function ballSprite(r: Ramp, dir: number, frame: number, big: boolean): VfxSprite {
   const d = new Draft(16);
-  const r = dangerRamp(color);
   const f = ((frame % BULLET_FRAMES) + BULLET_FRAMES) % BULLET_FRAMES;
   const pulse = f === 1 || f === 2;
   const R = (big ? 3.9 : 3.1) + (pulse ? 0.45 : 0);
@@ -851,11 +864,13 @@ export const SHOT_ART: Readonly<Record<Shot['kind'], { frames: number; draw: (L:
  * flash, a ring racing out); holy: the orb's (a cross of light, a ring); pop: a foe's shot (small, in
  * its color); thud: the Guardian's blow (a flash at the foe, a shock ring at its feet); cut: a blade
  * through a foe (a hot line across it that splits and flies apart); pierce: a lance through a foe (a
- * streak out the far side, a ring); wall: grit off a wall; fizzle: a shot that ran out.
+ * streak out the far side, a ring); wall: grit off a wall; fizzle: a shot that ran out; clink: a foe's
+ * shot cut out of the air by a swing (a white star, steel chips flying off); muzzle: a shot leaving
+ * the knight's hands (a flare along its way, gone in a blink).
  */
-export type ImpactKind = 'spark' | 'burst' | 'holy' | 'pop' | 'thud' | 'cut' | 'pierce' | 'wall' | 'fizzle';
+export type ImpactKind = 'spark' | 'burst' | 'holy' | 'pop' | 'thud' | 'cut' | 'pierce' | 'wall' | 'fizzle' | 'clink' | 'muzzle';
 
-export const IMPACT_KINDS: readonly ImpactKind[] = ['spark', 'burst', 'holy', 'pop', 'thud', 'cut', 'pierce', 'wall', 'fizzle'];
+export const IMPACT_KINDS: readonly ImpactKind[] = ['spark', 'burst', 'holy', 'pop', 'thud', 'cut', 'pierce', 'wall', 'fizzle', 'clink', 'muzzle'];
 
 /**
  * An impact's frame. `core` colors it (the shot's class colors), `L` adds the tier's extras (rings,
@@ -1010,8 +1025,42 @@ export function impactSprite(kind: ImpactKind, L: VfxLook, core: Ramp, size: num
       }
       break;
     }
+    case 'clink': {
+      // A white star where the shot was; then steel chips fly off on the diagonals, and are gone.
+      const steel = L.mono ? ['#ffffff', '#ffffff', '#000000', '#000000'] : ['#ffffff', '#ffffff', STEEL[3], STEEL[2], STEEL[1]];
+      if (f === 0) {
+        star(d, 0, 0, Math.max(2, Math.round(3 * s)), steel, 4, true);
+        d.put(0, 0, '#ffffff', 5);
+      } else if (f <= 2) {
+        const r0 = (f === 1 ? 2 : 4) * s;
+        for (let i = 0; i < 4; i++) {
+          const ang = Math.PI / 4 + (i * Math.PI) / 2 + spin * 0.4;
+          const x = Math.cos(ang) * r0;
+          const y = Math.sin(ang) * r0 * 0.85;
+          stroke(x, y, x + Math.cos(ang) * (f === 1 ? 1.6 : 0.6), y + Math.sin(ang) * (f === 1 ? 1.6 : 0.6), () => 1, (px, py, q) => d.put(px, py, f === 1 ? (q < 0.5 ? '#ffffff' : STEEL[3]) : STEEL[2], 3));
+        }
+        // A spark of the shot's own color, thrown out along one diagonal.
+        if (f === 1) d.put(Math.round(-ux * 3), Math.round(-uy * 3), c(3), 2);
+      }
+      break;
+    }
+    case 'muzzle': {
+      // A flare out of the hands along the shot's way: hot at the root, a point at the tip, sparks off
+      // its sides; then a short stub; then nothing.
+      if (f >= 2) break;
+      const len = (f === 0 ? 5 : 3) * s;
+      stroke(0, 0, ux * len, uy * len, (q) => (f === 0 && q < 0.45 ? 3 : 1), (x, y, q) => d.put(x, y, q < 0.35 ? '#ffffff' : q < 0.7 ? c(4) : c(3), 4));
+      if (f === 0) {
+        for (const side of [-1, 1]) {
+          const nx = -uy * side;
+          const ny = ux * side;
+          d.put(Math.round(ux * 2 + nx * 2.4), Math.round(uy * 2 + ny * 2.4), c(3), 2);
+        }
+      }
+      break;
+    }
   }
-  if (kind !== 'wall' && kind !== 'fizzle' && kind !== 'pop' && kind !== 'cut' && kind !== 'pierce') impactExtras(d, kind, L, s, f);
+  if (kind !== 'wall' && kind !== 'fizzle' && kind !== 'pop' && kind !== 'cut' && kind !== 'pierce' && kind !== 'clink' && kind !== 'muzzle') impactExtras(d, kind, L, s, f);
   return d.sprite();
 }
 

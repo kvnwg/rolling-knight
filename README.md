@@ -4,8 +4,11 @@ A top-down (3/4 view) pixel action roguelite with a rolling game on top, in the 
 Legend. A free Summoning Altar rolls knights forever; you field a squad of three in endless,
 procedurally generated dungeons (hamlets, a farm, dark forests, tundra, a dungeon keep, crypts, bogs, desert ruins,
 graveyards, lava caves, crystal grottoes, moonlit shrines), control one knight and let the other two
-fight by their class; in a fight each knight keeps rolling a random skill from its class's list,
-firing it and rolling the next at once (no cooldowns). Between dives
+fight by their class. The fighting is twin-stick, after Enter the Gungeon: you aim with the mouse
+(or let the game aim for you on a phone), swing or shoot along the aim while you keep moving, cut
+foes' bullets out of the air, and dodge with your class's own dash; in a fight each knight keeps
+rolling a random skill from its class's list, firing it and rolling the next at once (no cooldowns).
+Between dives
 you walk round the hub, a lamplit square before the Gilded Reel, where each keeper runs one counter:
 the Oracle's altar (summons, the odds and the Codex), the tinker's upgrades on two tabs (Luck,
 bought on a honeycomb map, and Combat, rolled for gold on a reel: Strength, Vitality, Attack Speed,
@@ -141,15 +144,22 @@ npm run dev
 
 Open http://localhost:5173. Keyboard: WASD or arrows to move. At the hub, E or Enter talks to the
 keeper you're standing by; walk down the steps at the foot of the square to go into the dungeon (or
-tell the warden you're ready). In the dungeon: hold the left mouse button (or J) to attack toward the mouse;
-Space or Shift to dodge roll; every knight's skill rolls and fires by itself once it's ready in a fight
-(E or Q rolls yours early); Enter or F to talk to someone, 1 2 3 to take control of a knight, T for Auto, Esc to head back up to the
-hub. Touch: drag to move (anywhere at the hub; on the left side in a fight), hold the Attack button to
-attack (it aims at the nearest foe); the other buttons do the rest. Your other two knights attack on
-their own whenever something is in range (and yours too, on Auto).
+tell the warden you're ready). In the dungeon: the mouse aims (a crosshair takes the cursor's place);
+hold the left mouse button (or J) to attack along the aim at your class's pace, moving at full speed;
+Space or Shift for your class's dash (Shield Bash, Shadowstep, Shot or Snare, Blessed Step, Blink,
+Spear Lunge: toward where you're moving, or the aim when you stand still); every knight's skill rolls
+and fires by itself in a fight, one after another (E or Q rolls yours when there's no fight); Enter
+or F to talk to someone, 1 2 3 to take control of a knight, T for Auto attack (your knight aims and
+fires by itself; moving and dodging stay yours), Esc to head back up to the hub. Touch: drag to move
+(anywhere at the hub; on the left side in a fight); hold the Attack button and it aims for you (at
+the foe ahead of where you're walking, else the nearest in reach, and it stays on that one: corner
+brackets mark it), or drag from the Attack button to aim by hand like a second stick; the dodge
+button, named for your class's dash, and the others do the rest. Your other two knights attack on
+their own whenever something is in range (and yours too, on Auto attack).
 
 Dev shortcuts by URL: `?floor=16` starts on that floor with a ready squad, `&squad=mythic` sets its
-rarity, `&classes=arcanist,guardian,cleric` its classes, `&auto` plays itself, `&gold=100000`;
+rarity, `&classes=arcanist,guardian,cleric` its classes, `&auto` hands your knight to a dev bot
+that plays by itself (moving and dodging too), `&gold=100000`;
 `&camp` stays at the hub and `&hub` skips choosing a knight, `&sky=rain` (or `clear`, `overcast`) sets
 every floor's weather, `&design=maze` the next floor's design (`src/world/designs.ts`; then the deck
 as usual). `?fresh` starts a new game. The game is on
@@ -161,12 +171,15 @@ as usual). `?fresh` starts a new game. The game is on
 npm test
 ```
 
-307 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
+341 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
 timing, extra reels, the start's ordinary quick spins, bad-luck protection, Lucky Spins, duplicates
 turning into gold, gold-only levels and reforging, old saves' spares cashed in, Humble Beginnings' 3x,
 rebirth; every biome's floors fully
 connected with spawns reachable and deterministic by seed, mob and boss design, a squad clearing a
-floor on Auto, auto attacks, dodge invulnerability, skill rolls and their odds, Rewind, the balance
+floor on its own, the fighting (attacks along the aim, melee arcs that only hit in front, foes'
+bullets cut and sent back, auto-aim's choice and how it sticks, a knight's moment of safety after a
+hit, hit-stop that plays the same at any frame rate, every class's dash), dodge invulnerability,
+skill rolls one after another and their odds, Rewind, the balance
 curve and the first floors' edge; how monsters fight: every kind with a lunge or a gun, their
 bullets slower than a knight's, each volley's pattern (aimed, fans, bursts, rings, curving shots)
 and the tell before it, dashes and leaps that hit a knight standing in them and go straight through
@@ -198,10 +211,11 @@ Checks the music files too: each one's length and loudness (with ffmpeg installe
 npm run sim -- --minutes 40
 ```
 
-The real game logic on Auto with a bot that levels, buys Luck upgrades, rolls combat upgrades and perks, and rebirths.
-Current result over seeds 1 to 8 (`--seed N`): floor 5 at about 4 minutes (3 to 5), floor 10 at about
-13 (10 to 19), the first rebirth at about 24 (15 to 31; one seed of the eight not yet by 40 minutes),
-with three or so wipes (none on floors 1 to 5) and about 160 perfect rolls in 40 minutes.
+The real game logic with a dev bot at the controls (it moves, aims and dodges too) that levels,
+buys Luck upgrades, rolls combat upgrades and perks, and rebirths. Current result over seeds 1 to 8
+(`--seed N`): floor 5 at about 4 minutes (3 to 4.5), floor 10 at about 8 (7 to 9.5), the first
+rebirth at about 13 (11 to 15) and the second at about 32 (29 to 34), with one wipe in the eight runs
+and about 60 perfect rolls in 40 minutes.
 
 ```bash
 npx tsx tools/preview.ts knights shots/knights.png

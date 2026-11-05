@@ -24,6 +24,7 @@ import { CLASS_ICON } from './classIcons';
 import { Glyph } from './keeper/KeeperScreen';
 import { goalName, questIcon } from './keeper/Shops';
 import { TopBar } from './TopBar';
+import { dashLabel } from '../world/dash';
 import type { KeySize } from './skin';
 
 const touch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
@@ -296,10 +297,10 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
           size="sm"
           rim={s.settings.autoPlay ? 'brass' : 'iron'}
           className={`k-auto ${s.settings.autoPlay ? 'on' : ''}`}
-          label={s.settings.autoPlay ? 'AUTO ON' : 'AUTO'}
+          label="AUTO ATTACK"
           hint="T"
           flash={flash.auto}
-          title="Auto (T)"
+          title="Auto attack: your knight aims and fires by itself (T)"
           onClick={() => (uiSound('tap'), game.setAuto(!s.settings.autoPlay))}
         >
           <Px icon="reel" size="sm" s={1} />
@@ -318,7 +319,7 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
         <Key size="sm" rim="iron" className="k-camp" label="CAMP" hint="ESC" flash={flash.camp} title="Camp (Esc)" onClick={() => (uiSound('close'), onCamp())}>
           <Px icon="flame" size="sm" s={1} />
         </Key>
-        <Key size="md" rim={dodge <= 0 && me ? 'brass' : 'iron'} className={`k-dodge ${dodge <= 0 && me ? 'ready' : 'cooling'}`} label="DODGE" hint="SPACE" flash={flash.dodge} title="Dodge roll (Space)" onDown={() => press('dodge')}>
+        <Key size="md" rim={dodge <= 0 && me ? 'brass' : 'iron'} className={`k-dodge ${dodge <= 0 && me ? 'ready' : 'cooling'}`} label={me ? dashLabel(me) : 'DODGE'} hint="SPACE" flash={flash.dodge} title="Dodge roll (Space)" onDown={() => press('dodge')}>
           <Px icon="boot" s={1} />
           {dodge > 0 && me && <i className="cool" style={{ ['--cd' as string]: `${Math.ceil((dodge / me.dodgeCd!) * 8) * 12.5}%` }} />}
         </Key>
@@ -339,6 +340,11 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
       {controls.stick.active && (
         <div className="stick" style={{ left: controls.stick.ox, top: controls.stick.oy }}>
           <i style={{ left: `calc(50% + ${controls.stick.x - controls.stick.ox}px)`, top: `calc(50% + ${controls.stick.y - controls.stick.oy}px)` }} />
+        </div>
+      )}
+      {controls.aimStick.active && (
+        <div className="stick aim" style={{ left: controls.aimStick.ox, top: controls.aimStick.oy }}>
+          <i style={{ left: `calc(50% + ${controls.aimStick.x - controls.aimStick.ox}px)`, top: `calc(50% + ${controls.aimStick.y - controls.aimStick.oy}px)` }} />
         </div>
       )}
 

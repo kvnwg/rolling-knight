@@ -253,7 +253,7 @@ describe('a squad on Auto', () => {
       const seed = 4321;
       const map = build(design, biome, floor, seed);
       const w = new World({ map, biome: BIOMES[biome], floor, boss: false, mobTypes: floorMobs(BIOMES[biome], floor, seed), bossType: null, squad: squad([knightId('mythic', 'guardian'), knightId('mythic', 'ranger'), knightId('mythic', 'cleric')]), perks: [], controlled: 0, seed, goldPerKill: 3 });
-      w.auto = true;
+      w.bot = true;
       for (let t = 0; t < 300 && !w.exited; t += 1 / 30) w.update(1 / 30);
       expect(w.cleared, `${w.mobs.filter((m) => !m.dead).length} foes left`).toBe(true);
       expect(w.exited).toBe(true);

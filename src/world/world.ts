@@ -21,6 +21,7 @@ import { heroDodge, heroSpecial, heroTick } from './skills';
 import { CLEAR, skyOf, type Sky } from './sky';
 import { onHeroHit, onHeroHurt, onKill, onShotHit, onTick } from './chance';
 import { makeTraps, updateTraps, type Trap } from './traps';
+import { feelHit, tickFeel } from './feel';
 
 export interface HeroSpec {
   knightId: string;
@@ -45,7 +46,9 @@ export type WorldEvent =
   | { type: 'switch'; slot: number }
   | { type: 'bossPhase' }
   /** A knight's dodge roll made something miss that would have hit it (once per roll); `mine`: the knight you control. */
-  | { type: 'perfect'; slot: number; mine: boolean };
+  | { type: 'perfect'; slot: number; mine: boolean }
+  /** A swing cut a foe's shot out of the air (melee.ts); `reflect`: sent back; `mine`: the knight you steer's. */
+  | { type: 'clink'; x: number; y: number; reflect: boolean; mine: boolean };
 
 interface Snapshot {
   heroes: Map<number, { x: number; y: number; hp: number; downed: boolean; view: Unit['view']; dir: 1 | -1 }>;
@@ -59,9 +62,12 @@ export interface Input {
   special: boolean;
   /** Your knight attacks only while this is held (not on Auto, where it fights by itself). */
   attack?: boolean;
-  /** Where to aim (world px), from the mouse; null: at the nearest foe in reach, else straight ahead. */
+  /** Where to aim (world px), from the mouse (aim.ts); with neither this nor aimDx/aimDy: the auto-aim. */
   aimX?: number | null;
   aimY?: number | null;
+  /** Which way to aim (a direction), from a drag off the touch Attack button; it wins over aimX/aimY. */
+  aimDx?: number | null;
+  aimDy?: number | null;
 }
 
 export interface WorldOptions {
@@ -119,7 +125,13 @@ export class World {
   time = 0;
   controlled: number;
   input: Input = { mx: 0, my: 0, dodge: false, special: false };
+  /** Auto attack: the knight you steer aims and attacks by itself (you still move it and dodge). */
   auto = false;
+  /**
+   * Dev and tools only (the ?auto URL flag, npm run sim): the knight you control plays itself,
+   * moving, dodging and fighting by its class's AI like the rest of the squad. Not in the game's UI.
+   */
+  bot = false;
   portalOpen = false;
   /** Seconds the leader has stood in the open portal (it takes EXIT_HOLD to go down). */
   exitHold = 0;
@@ -291,6 +303,7 @@ export class World {
       dodgeCd: h.stats.dodgeCd * (this.perks.has('peasantRevolt') && this.underdogSquad() ? 0.5 : 1),
       dodgeT: 0,
       specialCd: h.stats.specialCd * (this.perks.has('loneWolf') ? 0.7 : 1),
+      // (Skill rolls have no cooldown now: in a fight the next starts as soon as the last skill is done.)
       specialT: 0,
       rollTimeMult: h.stats.rollTimeMult,
       downed: h.hpShare <= 0,
@@ -436,7 +449,7 @@ export class World {
     this.texts.push({ x: h.x, y: h.y - 30, text: mine ? 'PERFECT!' : 'PERFECT', color: '#ffe27a', t: 0, big: mine, style: 'perfect' });
     this.fx.push({ kind: 'perfect', x: h.x, y: h.y - 8, size: mine ? 1 : 0.5, uid: h.uid });
     this.events.push({ type: 'perfect', slot: h.slot!, mine });
-    if (mine && !this.auto) this.hitStop = Math.max(this.hitStop, 0.07);
+    if (mine && !this.bot) this.hitStop = Math.max(this.hitStop, 0.07);
   }
 
   /** The spot within `range` of u that would catch the most foes in a circle of radius `r`. */
@@ -509,6 +522,7 @@ export class World {
     }
     target.hp -= amount;
     target.hurtT = 0.18;
+    feelHit(this, target, from, opts);
     if (opts.knock && !target.boss) {
       const [nx, ny] = opts.kx !== undefined ? norm(opts.kx, opts.ky ?? 0) : from ? norm(target.x - from.x, target.y - from.y) : [0, 0];
       moveUnit(this.map, target, nx * opts.knock * (target.elite ? 0.5 : 1), ny * opts.knock * (target.elite ? 0.5 : 1));
@@ -789,8 +803,10 @@ export class World {
       if (this.history.length > 50) this.history.shift();
     }
     if (this.hitStop > 0) {
-      this.hitStop -= dt;
-      dt *= 0.15;
+      // Only the part of the frame inside the freeze is slowed, so a freeze is as long at any frame rate.
+      const stop = Math.min(this.hitStop, dt);
+      this.hitStop -= stop;
+      dt -= stop * 0.85;
     }
     this.time += dt;
     this.flowT -= dt;
@@ -832,7 +848,7 @@ export class World {
     for (const h of this.heroes) {
       tickStatus(this, h, dt);
       if (h.downed) continue;
-      const mine = h.slot === this.controlled && !this.auto;
+      const mine = h.slot === this.controlled && !this.bot;
       let mx = 0;
       let my = 0;
       if (mine) {
@@ -857,6 +873,7 @@ export class World {
     }
     onTick(this, dt);
     updateTraps(this, this.traps);
+    tickFeel(this, dt);
     separate(this);
     updateShots(this, dt);
     updateAreas(this, dt);
@@ -888,8 +905,8 @@ export class World {
       this.refreshFlows();
     }
     // Down you go after standing in the open portal a moment (so passing over it mid-fight doesn't).
-    // A squad playing itself clears the floor (or its boss) first.
-    const mayLeave = !this.auto || this.cleared || (this.boss && this.portalOpen);
+    // A squad playing itself (the dev bot) clears the floor (or its boss) first.
+    const mayLeave = !this.bot || this.cleared || (this.boss && this.portalOpen);
     if (this.portalOpen && mayLeave && !this.exited && lead && dist(lead.x, lead.y, this.map.exit.x, this.map.exit.y) < 14) {
       this.exitHold += dt;
       if (this.exitHold >= EXIT_HOLD) {

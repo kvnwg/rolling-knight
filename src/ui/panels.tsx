@@ -194,7 +194,7 @@ export function SettingsSheet({ game, onClose }: { game: Game; onClose: () => vo
           </span>
           <input type="range" min={0} max={1} step={0.05} value={s.settings.music} onChange={(e) => set(() => (s.settings.music = Number(e.target.value)))} />
         </label>
-        {toggle('Auto', 'Your knight plays itself', s.settings.autoPlay, (v) => game.setAuto(v))}
+        {toggle('Auto attack', 'Your knight aims and fires by itself', s.settings.autoPlay, (v) => game.setAuto(v))}
         {toggle('Tilt-shift', 'The distance goes soft, like a miniature', s.settings.tiltShift, (v) => (s.settings.tiltShift = v))}
         {toggle('Reduce motion', 'No screen shake, calmer reveals', s.settings.reduceMotion, (v) => (s.settings.reduceMotion = v))}
           </>
@@ -204,11 +204,11 @@ export function SettingsSheet({ game, onClose }: { game: Game; onClose: () => vo
             {(
               [
                 ['Move', 'WASD / arrows', 'drag on the left'],
-                ['Attack', 'click or J (aim with the mouse)', 'hold ATTACK (aims for you)'],
-                ['Dodge roll', 'Space', 'DODGE'],
-                ['Skill', 'rolls and fires by itself; E rolls now', 'SKILL'],
+                ['Attack', 'hold click or J (aim with the mouse)', 'hold ATTACK (aims for you; drag it to aim)'],
+                ['Dash', "Space or Shift (your class's move)", "the dodge key (your class's move)"],
+                ['Skill', 'rolls and fires by itself in a fight; E rolls now', 'SKILL'],
                 ['Switch knight', '1, 2, 3', 'tap their card'],
-                ['Auto', 'T', 'AUTO'],
+                ['Auto attack', 'T (aims and fires for you)', 'AUTO ATTACK'],
                 ['Camp', 'Esc', 'CAMP'],
               ] as const
             ).map(([what, keys, touchKeys]) => (

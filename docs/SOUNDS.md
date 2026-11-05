@@ -14,7 +14,7 @@ A recording plays with the same mix as its placeholder: where it happened (quiet
 
 **Mix**: *background* sounds are dropped first in a crowded fight, then *fight* sounds; *key* moments cut through: they play on their own bus and duck the rest of the fight under them for a moment (the biggest dip the music too); *always* sounds are never dropped. “N at once” is how many of that sound can ring together; “ms apart” the least time between two starting. Several of one sound in the same frame play once, a little louder. The everyday fight sits under the music at the default volumes; the Sound slider (0 is silence) sets all of it.
 
-151 sounds.
+159 sounds.
 
 ## Hits
 
@@ -41,8 +41,16 @@ Your squad.
 | `knight_hurt` | A knight takes a hit: yours louder (the fight dips under it), your squadmates’ quieter; a heavier hit deeper and longer. | An armored thud, a clink and a grunt. | key, 2 at once, 70 ms apart, ducks the fight to 60% |
 | `knight_block` | A knight takes a hit with a shield up (Iron Skin, Aegis, Titan’s Wrath, Rallying Taunt, the Guardian’s roll). | A shield clang. | fight, 2 at once, 80 ms apart |
 | `knight_down` | A knight falls. | A long slide down, a heavy thud and armor clattering. | always, 1 at once, 250 ms apart, ducks the fight to 40%, dips the music |
-| `knight_dodge` | A dodge: a roll, the Ranger’s backflip, the Lancer’s vault. | A cloth whoosh and a soft landing. | background, 2 at once, 60 ms apart |
-| `knight_blink` | The Arcanist’s Blink. | A quick zip and a sparkle. | background, 2 at once, 60 ms apart |
+| `knight_dodge` | A plain roll: the Ranger’s, dashing at a foe (its Power Shot sounds as it looses), and a skill’s leap. | A cloth whoosh and a soft landing. | background, 2 at once, 60 ms apart |
+| `dash_bash` | The Guardian’s dash, Shield Bash: a shield-first charge. | A heavy rush of air and a shield’s scrape. | fight, 2 at once, 80 ms apart |
+| `dash_bash_hit` | A foe the Shield Bash runs into, knocked aside. | A shield’s clang on a body and a dull thud. | fight, 2 at once, 60 ms apart |
+| `dash_shot` | The Ranger’s dash at a foe: the Power Shot it looses as the roll ends. | A heavy bowstring crack and a rising whistle. | fight, 2 at once, 80 ms apart |
+| `dash_snare` | The Ranger’s dash away from the foes: the snare it leaves where it started. | A backflip’s whoosh and a trap set with a clack. | background, 2 at once, 80 ms apart |
+| `snare_snap` | A Ranger’s snare snapping shut on a foe. | Iron jaws snapping shut and a rope’s creak. | fight, 2 at once, 80 ms apart |
+| `dash_shadow` | The Blade’s dash, Shadowstep (Kevin’s too). | A dark, breathy swish. | background, 2 at once, 50 ms apart |
+| `dash_bless` | The Cleric’s dash, Blessed Step: the holy circle it leaves. | A soft whoosh into a warm chime. | background, 2 at once, 80 ms apart |
+| `dash_blink` | The Arcanist’s dash, Blink, and the arcane burst where it left. | A quick zip, a sparkle and a soft arcane pop. | background, 2 at once, 60 ms apart |
+| `dash_lunge` | The Lancer’s dash, Spear Lunge. | A fast rising rush and the spear’s sharp fwip. | fight, 2 at once, 80 ms apart |
 | `perfect_roll` | A PERFECT! roll: a hit (a bullet, a lunge, a blast, a boulder) goes through a rolling knight, once a roll. Yours cuts through the fight; a squadmate’s is a soft chime. | A quick zip up into three bright bells and a sparkle (a squadmate’s: one soft bell). | key, 1 at once, 90 ms apart, ducks the fight to 80% |
 | `revive` | A knight gets back up: revived, Second Wind, the end of a Rewind. | A rising chime. | key, 1 at once, 300 ms apart |
 | `heal` | HP healed (Holy Orbs, Sanctuary’s glow, Blessing): one every 0.14 s at most. | A soft shimmer. | background, 1 at once, 140 ms apart |
@@ -54,7 +62,7 @@ Each class’s auto attack, and where its shots land.
 | Sound | When it plays | Placeholder | Mix |
 | --- | --- | --- | --- |
 | `atk_sword` | The Blade’s Cleave. | A whoosh and a steel slash. | fight, 3 at once, 40 ms apart |
-| `atk_shield` | The Guardian’s Shield Bash. | A dull metal thunk on wood. | fight, 3 at once, 40 ms apart |
+| `atk_shield` | The Guardian’s Shield Sweep. | A dull metal thunk on wood. | fight, 3 at once, 40 ms apart |
 | `atk_spear` | The Lancer’s thrust. | A short, sharp fwip and the shaft’s rattle. | fight, 3 at once, 40 ms apart |
 | `atk_bow` | The Ranger’s Longshot. | A bowstring twang and the arrow’s whistle. | fight, 3 at once, 40 ms apart |
 | `arrow_thunk` | An arrow or a spear strikes a foe or a wall. | A woody thunk. | background, 3 at once, 30 ms apart |
