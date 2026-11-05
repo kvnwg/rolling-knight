@@ -19,7 +19,7 @@ import type { Game } from '../game';
 import { npcFrame } from '../render/art/npcs';
 import { toCanvas } from '../render/art/draw';
 import { biomeForFloor } from '../world/biomes';
-import type { HubStation, StationId } from '../world/hubWorld';
+import { HUB_STEPS_Y, type HubStation, type StationId } from '../world/hubWorld';
 import { Chunky, HeroArt, HeroLive } from './common';
 import { AltarReels } from './fx/AltarReels';
 import { fmt } from './format';
@@ -58,6 +58,8 @@ export function HubHud({ game, onTalk, onSettings, onLuck }: { game: Game; onTal
   const s = game.state;
   const near = game.hub?.nearStation() ?? null;
   const portrait = usePortrait(near);
+  // Out of the way once you're going down the steps (it sits over them).
+  const onSteps = (game.hub?.leader()?.y ?? 0) > HUB_STEPS_Y - 12;
   const floor = s.run.floor;
   const diff = floorDifficulty(floor, squadPower(s));
   const ch = CHALLENGE[diff.challenge];
@@ -117,10 +119,10 @@ export function HubHud({ game, onTalk, onSettings, onLuck }: { game: Game; onTal
           </button>
         </div>
       ) : (
-        s.playTimeMs < 240_000 && (
+        s.playTimeMs < 240_000 && !onSteps && (
           <div className="hint plate outlined">
             {touch ? 'Drag to walk. Walk up to a keeper to talk.' : 'WASD to walk. Walk up to a keeper and press E.'}
-            <span className="t-muted">The steps down to the dungeon are at the foot of the square.</span>
+            <span className="t-muted">To go into the dungeon, walk down the steps at the foot of the square.</span>
           </div>
         )
       )}

@@ -176,6 +176,9 @@ class Sfx {
       case 'floorStart':
         this.sound(e.boss ? 'bossRoar' : 'floorStart', 0);
         break;
+      case 'descend':
+        this.sound('embark', 0);
+        break;
       case 'floorClear':
         this.portal();
         break;

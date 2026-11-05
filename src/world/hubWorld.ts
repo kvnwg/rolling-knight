@@ -11,6 +11,8 @@
 import { hubScene, type HubStation as PaintedStation, type HubStationId } from './hub';
 import type { FloorMap } from './mapgen';
 
+export { HUB_DESCEND_Y, HUB_STEPS_Y } from '../render/art/hubScene';
+
 export type StationId = HubStationId;
 export type HubStation = PaintedStation;
 

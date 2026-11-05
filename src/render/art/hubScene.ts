@@ -137,14 +137,19 @@ function paved(x: number, y: number): boolean {
   return x >= l && x <= r;
 }
 
+/** How far down the steps you walk before the dungeon takes you (feet, art px). */
+export const HUB_DESCEND_Y = 604;
+/** Where the steps begin (feet): below this, the square darkens as you go down. */
+export const HUB_STEPS_Y = PAVE_BOTTOM + 6;
+
 /** Ground you can walk on (before anything standing is taken out): the paving in front of the
- * buildings, and the top of the steps down. */
+ * buildings, and the steps down to the dungeon (walk far enough down them and you're in). */
 export function hubWalkable(x: number, y: number): boolean {
   if (y >= 180 && paved(x, y)) {
     const [l, r] = edgesAt(y);
     return x >= l + 6 && x <= r - 6;
   }
-  return y >= PAVE_BOTTOM - 8 && y < PAVE_BOTTOM + 24 && x > 204 && x < 276;
+  return y >= PAVE_BOTTOM - 8 && y < HUB_DESCEND_Y + 20 && x > 204 && x < 276;
 }
 
 function edgeDist(x: number, y: number): number {

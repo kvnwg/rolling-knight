@@ -58,7 +58,8 @@ function uiPx(): number {
 export function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const game = useMemo(() => devGame(), []);
-  const ctl = useMemo(() => createControls(), []);
+  // At the hub a drag anywhere walks; in a fight the right of the screen is for the buttons.
+  const ctl = useMemo(() => createControls(undefined, () => !game.inDungeon), [game]);
   const [, setTick] = useState(0);
   const [station, setStation] = useState<HubStation | null>(null);
   const stationRef = useRef(station);

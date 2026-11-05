@@ -23,6 +23,8 @@ export type CoreEvent =
   | { type: 'potion'; seconds: number }
   | { type: 'gold'; amount: number; x?: number; y?: number }
   | { type: 'floorStart'; floor: number; biome: string; boss: boolean }
+  /** Your knight walked down the hub's steps: the dungeon is next. */
+  | { type: 'descend' }
   | { type: 'floorClear'; floor: number }
   | { type: 'bossDown'; floor: number; first: boolean }
   | { type: 'wipe'; floor: number; back: number }

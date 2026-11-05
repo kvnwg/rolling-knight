@@ -1,7 +1,8 @@
 /**
  * Controls. Keyboard: WASD or arrows to move, Space or Shift to dodge roll, E or Q for the special,
  * 1/2/3 to take control of a squad member, T to toggle Auto. Touch: a joystick that appears wherever
- * the left half of the screen is touched, and the buttons the HUD draws (they call press()).
+ * the left half of the screen is touched (anywhere, when `stickAnywhere` says so: at the hub, where
+ * there are no fight buttons on the right), and the buttons the HUD draws (they call press()).
  */
 export interface Controls {
   mx: number;
@@ -14,7 +15,7 @@ export interface Controls {
   stick: { active: boolean; ox: number; oy: number; x: number; y: number };
 }
 
-export function createControls(onKey?: (key: string) => void): { controls: Controls; dispose: () => void; press: (what: 'dodge' | 'special') => void } {
+export function createControls(onKey?: (key: string) => void, stickAnywhere?: () => boolean): { controls: Controls; dispose: () => void; press: (what: 'dodge' | 'special') => void } {
   const c: Controls = { mx: 0, my: 0, dodge: false, special: false, switchTo: null, toggleAuto: false, stick: { active: false, ox: 0, oy: 0, x: 0, y: 0 } };
   const keys = new Set<string>();
   const typing = (e: KeyboardEvent) => e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
@@ -55,7 +56,7 @@ export function createControls(onKey?: (key: string) => void): { controls: Contr
     if (e.pointerType === 'mouse') return;
     const el = e.target as HTMLElement;
     if (!el.dataset?.play) return;
-    if (e.clientX > window.innerWidth * 0.55 || touchId !== null) return;
+    if (touchId !== null || (e.clientX > window.innerWidth * 0.55 && !stickAnywhere?.())) return;
     touchId = e.pointerId;
     c.stick = { active: true, ox: e.clientX, oy: e.clientY, x: e.clientX, y: e.clientY };
   };

@@ -19,7 +19,7 @@ import { CAMP_BIOME, biomeForFloor, isBossFloor, type Biome } from './world/biom
 import { campMap, generateFloor, type FloorMap } from './world/mapgen';
 import { floorBoss, floorMobs } from './world/mobgen';
 import { World, type HeroSpec } from './world/world';
-import { hubLayout } from './world/hubWorld';
+import { HUB_DESCEND_Y, HUB_STEPS_Y, hubLayout } from './world/hubWorld';
 import { applyDialogAction, dialogFor, placeNpcs, type DialogChoice, type DialogNode, type Npc } from './world/npcs';
 import { questEvent, type Quest, type QuestEvent, type QuestReward } from './core/quests';
 import { onFloorStart } from './world/chance';
@@ -50,6 +50,8 @@ export class Game {
   fade = 1;
   fadeDir: -1 | 1 = -1;
   private pendingFloor: number | null = null;
+  /** Walking down the hub's steps: the fade out has begun, the dungeon comes when it's black. */
+  private descending = false;
   private wipeT = 0;
   private saveT = 0;
   private listeners = new Set<Listener>();
@@ -288,6 +290,8 @@ export class Game {
     if (!this.state.squad.some(Boolean)) return;
     this.inDungeon = true;
     this.autoReturnT = 0;
+    // The hub waits with your knight back at the top of the square (not halfway down the steps).
+    this.syncHub(true);
     if (!this.world) this.startFloor(this.state.run.floor);
     else {
       this.syncSquad();
@@ -296,6 +300,23 @@ export class Game {
     this.fade = 1;
     this.fadeDir = -1;
     this.version++;
+  }
+
+  /**
+   * The hub's steps: the square darkens as your knight goes down them, and at the bottom the screen
+   * fades out and the dungeon begins (the same as telling the warden you're ready).
+   */
+  private walkDown(): void {
+    const l = this.hub?.leader();
+    if (!l || this.descending || this.fadeDir > 0 || !this.state.squad.some(Boolean)) return;
+    if (l.y >= HUB_DESCEND_Y) {
+      this.descending = true;
+      this.fadeDir = 1;
+      this.emit({ type: 'descend' });
+      return;
+    }
+    const depth = (l.y - HUB_STEPS_Y) / (HUB_DESCEND_Y - HUB_STEPS_Y);
+    if (depth > 0) this.fade = Math.max(this.fade, Math.min(0.7, depth * 0.7));
   }
 
   /** Back to camp: the floor waits as it is. */
@@ -333,6 +354,7 @@ export class Game {
       fillSquad(s);
       this.syncHub();
       this.hub?.update(dt);
+      this.walkDown();
       if (this.autoReturnT > 0) {
         this.autoReturnT -= dt;
         if (this.autoReturnT <= 0) this.enterDungeon();
@@ -350,6 +372,10 @@ export class Game {
     if (this.fade > 0 && this.fadeDir < 0) this.fade = Math.max(0, this.fade - dt * 1.6);
     if (this.fadeDir > 0) {
       this.fade = Math.min(1, this.fade + dt * 2.2);
+      if (this.fade >= 1 && this.descending) {
+        this.descending = false;
+        this.enterDungeon();
+      }
       if (this.fade >= 1 && this.pendingFloor !== null) {
         const f = this.pendingFloor;
         this.pendingFloor = null;

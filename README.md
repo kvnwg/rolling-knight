@@ -8,7 +8,7 @@ fight by their class; the skill button rolls a random skill from your class's li
 you walk round the hub, a lamplit square before the Gilded Reel, where each keeper runs one counter:
 the Oracle's altar, the smith, the junk dealer, the quartermaster, the tinker's hex map of upgrades
 (with chance upgrades like Ricochet and Double or Nothing), the sage, the rebirth shrine, the notice
-board and the steps down. Duplicates become shards or gold; shards level your knights. Rebirth
+board, and the warden by the steps down: walk down them to dive. Duplicates become shards or gold; shards level your knights. Rebirth
 for permanent luck and power; perks from the first rebirth change how a run plays. Folk on the floors
 hand out jobs, and one of them may be a demon in disguise.
 
@@ -63,9 +63,10 @@ npm run dev
 ```
 
 Open http://localhost:5173. Keyboard: WASD or arrows to move. At the hub, E or Enter talks to the
-keeper you're standing by. In the dungeon: Space or Shift to dodge roll, E or Q to roll a skill, Enter
+keeper you're standing by; walk down the steps at the foot of the square to go into the dungeon (or
+tell the warden you're ready). In the dungeon: Space or Shift to dodge roll, E or Q to roll a skill, Enter
 or F to talk to someone, 1 2 3 to take control of a knight, T for Auto, Esc to head back up to the
-hub. Touch: drag to move; the buttons do the rest. Your knights attack on their own whenever
+hub. Touch: drag to move (anywhere at the hub; on the left side in a fight); the buttons do the rest. Your knights attack on their own whenever
 something is in range.
 
 Dev shortcuts by URL: `?floor=16` starts on that floor with a ready squad, `&squad=mythic` sets its

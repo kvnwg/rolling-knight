@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { keeperFrame, HUB_CAST, HUB_TOOLS } from '../src/render/art/hubNpcs';
-import { buildHub } from '../src/render/art/hubScene';
+import { HUB_DESCEND_Y, HUB_STEPS_Y, buildHub } from '../src/render/art/hubScene';
+import { Game } from '../src/game';
 import { HUB_COLS, HUB_H, HUB_ROWS, HUB_W, hubScene } from '../src/world/hub';
 import { FLOOR, TILE, bfs, tileAt } from '../src/world/mapgen';
 
@@ -70,6 +71,32 @@ describe('hub', () => {
       expect(d[ty * s.map.w + tx], st.id).toBeGreaterThanOrEqual(0);
       expect(Math.hypot(st.talk.x - st.x, st.talk.y - st.y), st.id).toBeLessThan(TALK_RANGE);
     }
+  });
+
+  it('lets you walk down the steps far enough to go into the dungeon', () => {
+    const s = hubScene();
+    const d = bfs(s.map, Math.floor(s.spawn.x / TILE), Math.floor(s.spawn.y / TILE));
+    const tx = Math.floor(240 / TILE);
+    const ty = Math.floor((HUB_DESCEND_Y + 4) / TILE);
+    expect(tileAt(s.map, tx, ty)).toBe(FLOOR);
+    expect(d[ty * s.map.w + tx]).toBeGreaterThanOrEqual(0);
+    // The spawn is above the steps: arriving at the hub never takes you straight back down.
+    expect(s.spawn.y).toBeLessThan(HUB_STEPS_Y);
+  });
+
+  it('takes you into the dungeon when you walk down the steps, and back to the top of the square after', () => {
+    const g = new Game(true);
+    for (let t = 0; t < 3; t += 1 / 30) g.tick(1 / 30);
+    expect(g.inDungeon).toBe(false);
+    const l = g.hub!.leader()!;
+    l.y = HUB_DESCEND_Y + 2;
+    for (let t = 0; t < 1.5; t += 1 / 30) g.tick(1 / 30);
+    expect(g.inDungeon).toBe(true);
+    expect(g.world).not.toBeNull();
+    expect(g.hub!.leader()!.y).toBe(hubScene().spawn.y);
+    g.leaveDungeon();
+    for (let t = 0; t < 1; t += 1 / 30) g.tick(1 / 30);
+    expect(g.inDungeon).toBe(false);
   });
 
   it('draws every keeper standing and sitting, facing any way', () => {
