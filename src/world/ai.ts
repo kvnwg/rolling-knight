@@ -280,11 +280,12 @@ function heroAiMove(w: World, h: Unit, lead: Unit | undefined, dt: number): [num
     if (d < 22 && dist(h.x, h.y, fx, fy) < 8) return [0, 0];
     return steer(w, h, fx, fy, w.leaderFlow);
   };
-  // The leader on Auto explores: toward the nearest mob, then the portal.
+  // The leader on Auto explores: toward the nearest mob, then, once the floor is clear (or its boss
+  // is down), the portal. (The way down is open from the start, but the bot clears before it leaves.)
   if (isLead && !target) {
     const goal = w.goalFlow;
     if (goal && flowDist(goal, h.x, h.y) > 0) return flowStep(goal, h.x, h.y) ?? [0, 0];
-    if (w.portalOpen) return steer(w, h, w.map.exit.x, w.map.exit.y, w.goalFlow);
+    if (w.cleared || (w.boss && w.portalOpen)) return steer(w, h, w.map.exit.x, w.map.exit.y, w.goalFlow);
     return [0, 0];
   }
   if (!target) {
