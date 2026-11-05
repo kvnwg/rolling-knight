@@ -2,10 +2,13 @@
 
 A top-down (3/4 view) pixel action roguelite with a rolling game on top, in the style of Dumpster
 Legend. A free Summoning Altar rolls knights forever; you field a squad of three in endless,
-procedurally generated dungeons (hamlets, dark forests, tundra, crypts, bogs, desert ruins,
+procedurally generated dungeons (hamlets, a farm, dark forests, tundra, crypts, bogs, desert ruins,
 graveyards, lava caves, crystal grottoes, moonlit shrines), control one knight and let the other two
-fight by their class. Duplicates become shards or gold; shards level your knights. Rebirth for
-permanent luck and power; perks from the first rebirth change how a run plays.
+fight by their class. Between dives you walk round the hub, where each keeper runs one counter: the
+altar, the smith, the scrapper, the quartermaster, the outfitter, the sage, the rebirth shrine, the
+notice board and the gate down. Duplicates become shards or gold; shards level your knights. Rebirth
+for permanent luck and power; perks from the first rebirth change how a run plays. Folk on the floors
+hand out jobs, and one of them may be a demon in disguise.
 
 How every system works, with its numbers: [`DESIGN.md`](DESIGN.md). Art sources and licenses:
 [`CREDITS.md`](CREDITS.md).
@@ -26,10 +29,13 @@ How every system works, with its numbers: [`DESIGN.md`](DESIGN.md). Art sources 
 - Tilt-shift: the ground goes soft the further past your knight it lies, and a little at the bottom
   edge, so the dungeon looks like a miniature; anything standing (trees, props, characters) stays
   crisp. Half strength indoors (crypts, lava caves). A switch in Settings turns it off.
-- One pixel size: everything is drawn at art resolution (about 216 art pixels on the screen's short
-  side) and scaled up by a whole number.
-- The HUD is the supplied medieval UI: hanging wooden boards, plank signs, wooden buttons, framed HP
-  bars, parchment cards.
+- One pixel size: everything is drawn at art resolution (about 270 art pixels on the screen's short
+  side) and scaled up by a whole number. The camera follows on a critically damped spring and scrolls
+  by sub-pixels in the shader, so the world glides while every sprite stays on the grid.
+- The UI wears the medieval pack's materials, painted in code at startup (`src/ui/skin.ts`): bevelled
+  wooden, brass, crimson, steel and arcane buttons with a lip; dark plates with iron bolts; the pack's
+  copper-rimmed bars; parchment cards; octagonal iron ability slots that turn brass when ready; wax
+  seals for difficulty.
 
 ## Play
 
@@ -43,14 +49,16 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173. Keyboard: WASD or arrows to move, Space or Shift to dodge roll, E or Q
-for the special, 1 2 3 to take control of a knight, T for Auto, M for the menu (R altar, K knights,
-U upgrades, Esc to close). Touch: drag on the left half to move; the buttons do the rest. Your knights
-attack on their own whenever something is in range.
+Open http://localhost:5173. Keyboard: WASD or arrows to move. At the hub, E or Enter talks to the
+keeper you're standing by. In the dungeon: Space or Shift to dodge roll, E or Q for the special, Enter
+or F to talk to someone, 1 2 3 to take control of a knight, T for Auto, Esc to head back up to the
+hub. Touch: drag to move; the buttons do the rest. Your knights attack on their own whenever
+something is in range.
 
 Dev shortcuts by URL: `?floor=16` starts on that floor with a ready squad, `&squad=mythic` sets its
-rarity, `&classes=arcanist,guardian,cleric` its classes, `&auto` plays itself, `&gold=100000`.
-`?fresh` starts a new game. The game is on `window.__game`.
+rarity, `&classes=arcanist,guardian,cleric` its classes, `&auto` plays itself, `&gold=100000`;
+`&camp` stays at the hub and `&hub` skips choosing a knight. `?fresh` starts a new game. The game is on
+`window.__game`, the renderer on `window.__renderer`.
 
 ## Tests, balance and art previews
 

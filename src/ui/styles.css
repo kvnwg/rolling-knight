@@ -1918,3 +1918,12 @@ body,
   bottom: auto;
   top: 58%;
 }
+/* On tall screens the boss's name plate needs the width: the little altar steps down beneath it. */
+@media (max-aspect-ratio: 1/1) {
+  .dhud.has-boss .mini-roller {
+    top: calc(64 * var(--px) + env(safe-area-inset-top, 0px));
+  }
+  .dhud.has-boss .bossbar {
+    width: calc(100vw - 30 * var(--px));
+  }
+}

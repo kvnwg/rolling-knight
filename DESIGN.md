@@ -97,7 +97,9 @@ Three slots. You control one (switch any time); the other two run their role's A
 taunt when the squad is pressed, fighters chase, archers and mages kite, healers stay by whoever is
 hurt and save Sanctuary for when it counts. Everyone dodges what they see coming, most of the time.
 Auto hands your knight to the AI too (and it is on while a menu is open). Empty slots fill with your
-strongest free knight; anything else is your call (or Best squad).
+strongest free knight; anything else is your call (or Best squad), at the quartermaster in the hub.
+The squad is locked in the dungeon: knights rolled during a dive wait at the hub, and to change who
+fights (or spend anything) you head back up, or fall.
 
 ## 7. The dungeon
 
@@ -107,7 +109,30 @@ Moonlit Shrine; after the first lap the order is reshuffled. Each floor is a cha
 start to the exit with side rooms, pools and props, checked to be fully connected. Mobs are designed
 per floor: body plan, behavior (chaser, archer, charger, bomber, caster, tank, swarm), colors, size,
 features and name; bosses have three of ring, fan, charge, slam, summon and rain, and enrage at
-half HP. Clearing a floor opens the portal; a wiped squad goes back to the biome's first floor.
+half HP. Clearing a floor opens the portal. A wiped squad is carried back to the hub, and the run
+goes back to the biome's first floor (on Auto it heads back down by itself unless you move).
+
+Folk turn up on some floors (`src/world/npcs.ts`): farmers, guards, a bard, a goblin accountant, a
+ghost who is three hundred years late, a chicken who is not a chicken. Talk to them for jobs (slay,
+elites, a boss, go deeper, collect) with gold, Hourglasses, potions and banked Lucky Spins as
+rewards; three at once, tracked in the HUD. About one floor in eight hides a demon in disguise. Ask
+the wrong questions and it drops the act: it fights like a boss, with its own bar and banter, but
+the floor's other foes don't fall with it.
+
+## 7b. Balance: power, par and difficulty
+
+`src/core/power.ts`. Every knight is rated from its real stats: damage per second and HP, each
+against a level-1 Common of its class with no upgrades (that knight rates 100), so the rating counts
+rarity, level, mutation, upgrades, rebirths and perks alike, on the same scale for every class.
+Squad Power is the three ratings added up. Each floor has a par (the Squad Power the game expects
+there: 750 on floor 1, then x1.1 a floor). When a floor starts, its foes are built for a difficulty:
+par at par; above par they grow by (power / par)^0.6, so a squad four times par clears about 1.7x
+faster, not four times, and nothing folds in one hit; below par they shrink only by (power / par)^0.2,
+so the wall is real. Foes come from targets, not raw numbers: at their difficulty a plain foe takes
+1.4 s of the squad's damage and each hit takes 5% of a knight's HP (elites 5.5 s and 7.5%, bosses
+28 s and 10%), and each foe type keeps its shape against the plain chaser (a tank has three times
+its HP). The camp and the gate show Power against par with a wax seal: Deadly, Hard, Fair, Easy,
+Trivial. `npm run sim` plays the real game on Auto and logs power against par floor by floor.
 
 ## 8. Rebirth and perks
 

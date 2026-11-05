@@ -20,7 +20,7 @@ import { DungeonHud } from './DungeonHud';
 import { fmt, secs } from './format';
 import { CharacterSelect, HubHud, StationSheet } from './Hub';
 import { HeroDetail, LuckSheet, SettingsSheet } from './panels';
-import type { HubStation } from '../world/hubWorld';
+import { placeholderHub, type HubStation } from '../world/hubWorld';
 import type { Npc } from '../world/npcs';
 import { DialogBox } from './Dialog';
 import { Reveal, type RevealItem } from './fx/Reveal';
@@ -77,6 +77,14 @@ export function App() {
   const sheetOpen = detail !== null || settings || luck || station !== null || choosing;
   const sheetRef = useRef(sheetOpen);
   sheetRef.current = sheetOpen;
+
+  // A brand-new game opens at the altar, so you watch your first knights roll in.
+  useEffect(() => {
+    if (Object.keys(game.state.roster).length === 0 && !game.inDungeon) {
+      const altar = placeholderHub().stations.find((x) => x.id === 'altar');
+      if (altar) setStation(altar);
+    }
+  }, [game]);
 
   // The UI's pixel size and layout.
   useEffect(() => {

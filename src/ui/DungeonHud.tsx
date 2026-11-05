@@ -46,7 +46,7 @@ export function DungeonHud({ game, controls, press, onCamp, onSettings, onLuck, 
   const npc = w?.nearNpc() ?? null;
   const jobs = activeQuests(s.quests ?? []);
   return (
-    <div className="dhud">
+    <div className={`dhud ${boss ? 'has-boss' : ''}`}>
       <TopBar
         game={game}
         onSettings={onSettings}
