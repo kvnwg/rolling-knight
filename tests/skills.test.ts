@@ -20,7 +20,7 @@ import { BIOMES } from '../src/world/biomes';
 import type { Unit } from '../src/world/entities';
 import { generateFloor } from '../src/world/mapgen';
 import { floorMobs } from '../src/world/mobgen';
-import { CAST_TIME, ROLL_TIME, SLAM_TIME, heroSpecial, onSkillRoll, rigSkill, rollLuck, startSkillRoll, type SkillRollEvent } from '../src/world/skills';
+import { CAST_TIME, ROLL_TIME, SLAM_TIME, heroSpecial, onSkillRoll, rigSkill, rollLuck, slams, startSkillRoll, type SkillRollEvent } from '../src/world/skills';
 import { World, type HeroSpec } from '../src/world/world';
 
 const DT = 1 / 30;
@@ -207,13 +207,18 @@ describe('a skill roll', () => {
     expect(h.x).toBeGreaterThan(x0 + 10);
     expect(h.lastSkill).toBeUndefined();
     expect(h.specialT).toBeLessThanOrEqual(0);
-    // It stops on its skill, which slams down a moment later (longer for a rarer skill) and only then fires.
+    // It stops on its skill: a Legendary slams down a moment later and only then fires; anything less fires now.
     run(w, 0.2);
     expect(got.filter((e) => e.phase === 'reveal').length).toBe(1);
-    expect(h.skillSlam?.skill).toBe(decided);
-    expect(h.skillSlam!.dur).toBe(SLAM_TIME[tierStep(SKILLS[decided].tier)]);
-    expect(got.filter((e) => e.phase === 'land').length).toBe(0);
-    expect(heroSpecial(w, h, false)).toBe(false);
+    if (slams(SKILLS[decided].tier)) {
+      expect(h.skillSlam?.skill).toBe(decided);
+      expect(h.skillSlam!.dur).toBe(SLAM_TIME[tierStep(SKILLS[decided].tier)]);
+      expect(got.filter((e) => e.phase === 'land').length).toBe(0);
+      expect(heroSpecial(w, h, false)).toBe(false);
+    } else {
+      expect(h.skillSlam).toBeUndefined();
+      expect(got.filter((e) => e.phase === 'land').length).toBe(1);
+    }
     run(w, SLAM_TIME[SLAM_TIME.length - 1]);
     expect(h.skillSlam).toBeUndefined();
     const lands = got.filter((e) => e.phase === 'land');
@@ -307,10 +312,10 @@ describe('a skill roll', () => {
       for (let t = 0; t < CAST_TIME + DT; t += DT) w.update(DT);
       expect(got.filter((e) => e.phase === 'land').map((e) => e.skill.id), id).toEqual([id]);
       expect(h.lastSkill?.skill).toBe(id);
-      // Your own knight's skill is stamped on the screen as it slams down (the HUD), not shouted over
-      // the knight (Rewind calls its own out).
+      // The shout over the knight; your own Legendary's name is stamped on the screen as it slams down
+      // instead (the HUD). (Rewind calls its own out.)
       if (id === 'rewind') expect(w.rewind !== null || w.texts.some((t) => t.text === 'TIME STOP!')).toBe(true);
-      else expect(w.texts.some((t) => t.text === `${SKILLS[id].name.toUpperCase()}!`), id).toBe(false);
+      else expect(w.texts.some((t) => t.text === `${SKILLS[id].name.toUpperCase()}!`), id).toBe(!slams(SKILLS[id].tier));
       // Let every beat play out, then look for the skill's mark: only the skill could have left it.
       let marked = false;
       for (let t = 0; t < 3.5; t += DT) {

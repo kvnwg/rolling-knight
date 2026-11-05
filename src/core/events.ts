@@ -29,6 +29,8 @@ export type CoreEvent =
   /** A boss floor's way down opened: its boss fell. */
   | { type: 'portalOpen'; floor: number }
   | { type: 'bossDown'; floor: number; first: boolean }
+  /** A checkpoint floor (every 10th) reached: a wipe from here on comes back to it. */
+  | { type: 'checkpoint'; floor: number }
   | { type: 'wipe'; floor: number; back: number }
   | { type: 'rebirth'; count: number }
   /** A knight's dodge roll made something miss it (once per roll); `mine`: the knight you control. */

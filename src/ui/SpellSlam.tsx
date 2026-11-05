@@ -1,11 +1,11 @@
 /**
- * Every spell you cast slams onto the screen. When your knight's skill roll stops, the skill's icon
+ * Your Legendary spells (and the jackpot) slam onto the screen. When your knight's skill roll stops on one, its icon
  * pops out of the big reel, flies to the middle of the screen growing as it comes, hangs there a beat
- * (trembling, rays behind it from Epic up) and slams down: the moment it lands is the moment the skill
- * casts (the world waits for it: Unit.skillSlam, SLAM_TIME in world/skills.ts). On the slam: a flash
- * in the tier's light, a shockwave ring, the icon squashing into place and the skill's name stamped
- * under it. The rarer the skill, the bigger all of it: a Common is a quick thump, a Legendary nearly
- * fills the screen.
+ * (trembling, rays behind it) and slams down: the moment it lands is the moment the skill casts (the
+ * world waits for it: Unit.skillSlam, SLAM_TIME in world/skills.ts). On the slam: a flash in the
+ * tier's light, a shockwave ring, the icon squashing into place and the skill's name stamped under it.
+ * Lesser skills cast as the reel stops, their names popping over it (SkillRoll). (The sizes and
+ * timings below still run by tier, from Common up, should a lesser tier ever slam again.)
  *
  * Driven by the world's own clock (the slam's t / dur) while it flies, so it stays in step with the
  * cast through hit-stops and slow frames; the landing plays out in real time after. Reduce motion: no

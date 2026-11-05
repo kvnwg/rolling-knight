@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BAL } from '../src/core/balance';
 import { KNIGHTS, knightId } from '../src/core/knights';
 import { currentLuck, oneInFor } from '../src/core/luck';
-import { canRebirth, newGame, rebirth } from '../src/core/newGame';
+import { canRebirth, checkpointFor, newGame, rebirth } from '../src/core/newGame';
 import { buyPerk } from '../src/core/perks';
 import { RARITIES, RARITY_ODDS, RARITY_STAT, rarityAtLeast, rarityChances, rollRarity } from '../src/core/rarity';
 import { Rng } from '../src/core/rng';
@@ -215,5 +215,17 @@ describe('rebirth', () => {
     expect(Object.keys(s.codex)).toHaveLength(1);
     expect(currentLuck(s, Date.now())).toBeCloseTo(luck * 1.25, 5);
     expect(s.sigils).toBe(1);
+  });
+});
+
+describe('checkpoints', () => {
+  it('save the run every 10 floors: a wipe on floor 25 goes back to 20, before floor 10 to the start', () => {
+    expect(checkpointFor(25)).toBe(20);
+    expect(checkpointFor(20)).toBe(20);
+    expect(checkpointFor(29)).toBe(20);
+    expect(checkpointFor(30)).toBe(30);
+    expect(checkpointFor(10)).toBe(10);
+    expect(checkpointFor(9)).toBe(1);
+    expect(checkpointFor(1)).toBe(1);
   });
 });

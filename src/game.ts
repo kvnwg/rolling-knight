@@ -7,7 +7,7 @@ import { drawDesign } from './core/deck';
 import type { CoreEvent } from './core/events';
 import { knightDef } from './core/knights';
 import { currentLuck } from './core/luck';
-import { newGame, rebirth as doRebirth } from './core/newGame';
+import { checkpointFor, newGame, rebirth as doRebirth } from './core/newGame';
 import { runOffline, type OfflineReport } from './core/offline';
 import { perksOpen } from './core/perks';
 import { floorDifficulty, squadPower, type Difficulty } from './core/power';
@@ -126,6 +126,11 @@ export class Game {
     const s = this.state;
     s.run.floor = floor;
     s.run.bestFloor = Math.max(s.run.bestFloor, floor);
+    // Every 10th floor saves the run's progress: a wipe from here on comes back to it.
+    if (checkpointFor(floor) === floor && floor > s.run.checkpoint) {
+      s.run.checkpoint = floor;
+      this.emit({ type: 'checkpoint', floor });
+    }
     s.records.bestFloorEver = Math.max(s.records.bestFloorEver, floor);
     const biome = biomeForFloor(floor, s.run.biomeSeed);
     this.biome = biome;
@@ -442,7 +447,6 @@ export class Game {
               s.run.bosses = w.floor / 5;
               if (perksOpen(s)) s.sigils += BAL.perks.sigilsPerBoss;
             }
-            s.run.checkpoint = w.floor + 1;
             this.emit({ type: 'bossDown', floor: w.floor, first });
           }
           break;
@@ -462,7 +466,7 @@ export class Game {
           break;
         case 'wipe':
           s.run.deaths += 1;
-          s.run.checkpoint = Math.max(1, w.floor - ((w.floor - 1) % 5));
+          s.run.checkpoint = checkpointFor(w.floor);
           this.emit({ type: 'wipe', floor: w.floor, back: s.run.checkpoint });
           this.wipeT = 2.5;
           break;

@@ -166,7 +166,10 @@ export function App() {
           toast({ text: 'The way down is open!', color: '#c8a8ff' });
           break;
         case 'bossDown':
-          show({ title: 'BOSS DEFEATED', sub: e.first && game.state.rebirths > 0 ? '+1 Sigil' : 'Checkpoint reached', grad: 'gold' });
+          show({ title: 'BOSS DEFEATED', sub: e.first && game.state.rebirths > 0 ? '+1 Sigil' : undefined, grad: 'gold' });
+          break;
+        case 'checkpoint':
+          toast({ text: `Checkpoint: floor ${e.floor} saved`, color: '#ffcf4a' });
           break;
         case 'wipe':
           show({ title: 'SQUAD DOWN', sub: `Back to floor ${e.back}`, grad: 'red' });

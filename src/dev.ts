@@ -14,6 +14,7 @@
 import { isDesign } from './core/deck';
 import { CLASSES, knightId, type ClassId } from './core/knights';
 import { RARITIES, type Rarity } from './core/rarity';
+import { checkpointFor } from './core/newGame';
 import { addKnight } from './core/roster';
 import { Game } from './game';
 import { forceSky, type SkyKind } from './world/sky';
@@ -31,7 +32,7 @@ export function devGame(): Game {
     s.roll.tutorial = 'done';
     s.run.floor = floor;
     s.run.bestFloor = floor;
-    s.run.checkpoint = floor - ((floor - 1) % 5);
+    s.run.checkpoint = checkpointFor(floor);
     s.run.bosses = Math.floor((floor - 1) / 5);
     const classes: ClassId[] = (q.get('classes')?.split(',') as ClassId[]) ?? ['guardian', 'ranger', 'cleric'];
     classes.slice(0, 3).forEach((c) => addKnight(s, knightId(rarity, c), null));

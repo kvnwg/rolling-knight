@@ -54,6 +54,12 @@ export function rebirthFloor(rebirths: number): number {
   return BAL.rebirth.baseFloor + BAL.rebirth.floorPer * rebirths;
 }
 
+/** The floor a wipe on `floor` sends the squad back to: the last checkpoint (every 10th floor), or the first. */
+export function checkpointFor(floor: number): number {
+  const k = BAL.dungeon.checkpointEvery;
+  return Math.max(1, floor - (floor % k));
+}
+
 export function canRebirth(state: GameState): boolean {
   return state.run.bestFloor >= rebirthFloor(state.rebirths);
 }

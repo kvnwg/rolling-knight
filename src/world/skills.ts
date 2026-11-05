@@ -23,11 +23,16 @@ import { uid, type World } from './world';
 export const ROLL_TIME = 1.8;
 
 /**
- * Seconds from a roll landing to its skill casting, by tier step (Common .. the jackpot): the skill
- * pops out of the reel, grows on its way to the middle of the screen and casts as it slams down. The
- * rarer the skill, the bigger the moment (and the longer it takes).
+ * Seconds from a roll landing to its skill casting, by tier step (Common .. the jackpot). Legendary
+ * and the jackpot pop out of the reel, grow on their way to the middle of the screen and cast as they
+ * slam down; anything less casts the moment the reel stops.
  */
-export const SLAM_TIME = [0.34, 0.4, 0.5, 0.64, 0.84, 1] as const;
+export const SLAM_TIME = [0, 0, 0, 0, 0.84, 1] as const;
+
+/** Does a skill of this tier slam onto the screen before it casts? (Legendary and the jackpot.) */
+export function slams(tier: SkillDef['tier']): boolean {
+  return SLAM_TIME[Math.min(SLAM_TIME.length - 1, tierStep(tier))] > 0;
+}
 /** The longest a roll and its slam take together (tests and anything waiting on a cast). */
 export const CAST_TIME = ROLL_TIME + SLAM_TIME[SLAM_TIME.length - 1];
 
@@ -396,22 +401,24 @@ function dropSkills(h: Unit): void {
   h.skillBuff = undefined;
 }
 
-/** The roll stopped on its skill: it slams down (and casts) SLAM_TIME later. */
+/** The roll stopped on its skill: a Legendary slams down (and casts) SLAM_TIME later; anything else casts now. */
 function reveal(w: World, h: Unit, r: NonNullable<Unit['skillRoll']>): void {
   h.skillRoll = undefined;
   const skill = SKILLS[r.skill];
-  h.skillSlam = { skill: r.skill, t: 0, dur: SLAM_TIME[Math.min(SLAM_TIME.length - 1, tierStep(skill.tier))], free: r.free, luck: r.luck };
+  const slam = { skill: r.skill, t: 0, dur: SLAM_TIME[Math.min(SLAM_TIME.length - 1, tierStep(skill.tier))], free: r.free, luck: r.luck };
   for (const fn of listeners) fn({ phase: 'reveal', world: w, hero: h, skill, free: r.free, luck: r.luck });
+  if (slam.dur > 0) h.skillSlam = slam;
+  else land(w, h, slam);
 }
 
 function land(w: World, h: Unit, r: NonNullable<Unit['skillSlam']>): void {
   h.skillSlam = undefined;
   const skill = SKILLS[r.skill];
-  if (h.slot === w.controlled) {
-    // Your skill slams onto the screen: the world feels it, harder the rarer it is.
+  if (h.slot === w.controlled && r.dur > 0) {
+    // Your Legendary slams onto the screen: the world feels it.
     const step = tierStep(skill.tier);
-    w.shakeIt([1, 1.5, 2, 3, 4.5, 6][Math.min(5, step)], 0.16 + step * 0.05);
-    if (step >= 3) w.hitStop = Math.max(w.hitStop, [0, 0, 0, 0.05, 0.09, 0.12][Math.min(5, step)]);
+    w.shakeIt(step >= 5 ? 6 : 4.5, 0.36 + (step - 4) * 0.05);
+    w.hitStop = Math.max(w.hitStop, step >= 5 ? 0.12 : 0.09);
   }
   castSkill(w, h, skill.id);
   // No cooldown: in a fight the next roll starts as soon as this one fires (roll, fire, roll, fire).
@@ -431,9 +438,9 @@ export function castSkill(w: World, h: Unit, id: SkillId): void {
 /** The skill's name over the knight in its color; Epic and up say their tier, Legendary and up flash the screen. */
 function announce(w: World, h: Unit, sk: SkillDef): void {
   const step = tierStep(sk.tier);
-  // (Rewind calls itself out; your own skill's name is stamped on the screen as it slams down.)
+  // (Rewind calls itself out; your own Legendary's name is stamped on the screen as it slams down.)
   // (Not shown, a name still takes its jitter's draw: the world's random stream stays as it was.)
-  const mine = h.slot === w.controlled;
+  const mine = h.slot === w.controlled && slams(sk.tier);
   const say = (x: number, y: number, text: string, color: string) => (mine ? w.rng.float(-3, 3) : w.text(x, y, text, color, true));
   if (sk.id !== 'rewind') say(h.x, h.y - 30, `${sk.name.toUpperCase()}!`, sk.color);
   if (step < 3) return;

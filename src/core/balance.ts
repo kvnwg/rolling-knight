@@ -120,6 +120,8 @@ export const BAL = {
     maxBand: 50,
   },
   dungeon: {
+    /** Progress is saved every this many floors: a wipe on floor 25 sends the squad back to floor 20. */
+    checkpointEvery: 10,
     goldGrowth: 1.14,
     goldPerKill: 3,
     floorsPerBiome: 5,

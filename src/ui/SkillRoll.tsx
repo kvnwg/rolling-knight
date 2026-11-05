@@ -279,7 +279,8 @@ export function SkillRoll({
         uiSound('reelLand', rarityIndex(TIER_RARITY[sk.tier]));
         if (step >= 3) uiSound('stamp');
       }
-      if (popOnRef.current) setPop({ key: ++popKeys, skill: id });
+      // (The big reel leaves a Legendary's name to its slam; anything less pops its name over the reel.)
+      if (popOnRef.current || step < 4) setPop({ key: ++popKeys, skill: id });
     };
 
     const sparks = (step: number, color: string) => {
