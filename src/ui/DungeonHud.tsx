@@ -4,7 +4,7 @@
  * attack on touch screens, the skill roll, the dodge roll, Auto and Camp).
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { CLASSES, knightDef } from '../core/knights';
+import { knightDef } from '../core/knights';
 import { CHALLENGE } from '../core/power';
 import { activeQuests } from '../core/quests';
 import type { Npc } from '../world/npcs';
@@ -12,18 +12,16 @@ import { RARITY_COLOR } from '../core/rarity';
 import { drySpell } from '../core/roller';
 import type { Controls } from '../input/input';
 import type { Game } from '../game';
-import { Bar, Chunky } from './common';
+import { Chunky } from './common';
 import { Px } from './px';
 import { SkillRoll, skillSlotLabel, skillSlotState } from './SkillRoll';
 import { SpellSlam } from './SpellSlam';
-import { CLASS_TINT } from './ClassTag';
+import { SquadCard } from './SquadCard';
 import { RUN_ITEMS, RUN_ITEM_IDS, canStack } from '../core/runItems';
 import { fmt } from './format';
 import { AltarReels } from './fx/AltarReels';
 import daggerUrl from '../assets/ui/dagger.png';
 import { uiSound } from './sound';
-import { knightFaceUrl } from './sprites';
-import { CLASS_ICON } from './classIcons';
 import { Glyph } from './keeper/KeeperScreen';
 import { goalName, questIcon } from './keeper/Shops';
 import { TopBar } from './TopBar';
@@ -234,36 +232,19 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
         {s.squad.map((id, slot) => {
           if (!id || !s.roster[id]) return null;
           const def = knightDef(id);
-          const h = w?.heroes.find((x) => x.slot === slot);
-          const hp = h ? h.hp / h.maxHp : 1;
           return (
-            <button
+            <SquadCard
               key={slot}
-              className={`member plate ${w?.controlled === slot ? 'me gold' : ''} ${h?.downed ? 'down' : ''}`}
-              style={{ ['--rc' as string]: RARITY_COLOR[def.rarity] }}
-              onClick={() => (uiSound('tap'), game.switchTo(slot))}
-            >
-              <span className="portrait">
-                <img className="px face" src={knightFaceUrl(id, s.roster[id].mutation)} alt="" draggable={false} />
-                {w?.controlled === slot && (
-                  <span className="crown" title="The knight you play">
-                    <Px icon="crown" size="sm" />
-                  </span>
-                )}
-                {h?.downed && (
-                  <span className="downed" title="Down">
-                    <Px icon="skull" size="sm" />
-                  </span>
-                )}
-              </span>
-              <span className="nm">
-                <span>{def.name}</span>
-                <span className="cls-chip" style={{ ['--cc' as string]: CLASS_TINT[def.cls] }} title={CLASSES[def.cls].name}>
-                  <Px icon={CLASS_ICON[def.cls]} size="xs" />
-                </span>
-              </span>
-              <Bar value={hp} kind="hp" />
-            </button>
+              game={game}
+              slot={slot}
+              knightId={id}
+              mutation={s.roster[id].mutation}
+              name={def.name}
+              cls={def.cls}
+              rarity={def.rarity}
+              me={w?.controlled === slot}
+              onPick={() => (uiSound('tap'), game.switchTo(slot))}
+            />
           );
         })}
       </div>
