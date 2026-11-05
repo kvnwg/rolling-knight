@@ -32,9 +32,9 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSPr
 import { knightDef, unlockedClasses } from '../../core/knights';
 import { RARITIES, RARITY_COLOR, RARITY_NAME, rarityIndex } from '../../core/rarity';
 import { chainFloor, reelCount } from '../../core/roller';
-import type { Spin } from '../../core/state';
+import type { MutationId, Spin } from '../../core/state';
 import type { Game } from '../../game';
-import { KNIGHT_PIC_H, KNIGHT_PIC_W, knightUrl } from '../sprites';
+import { KNIGHT_PIC_H, KNIGHT_PIC_W, knightFaceUrl, knightUrl } from '../sprites';
 import { Chunky } from './Chunky';
 import { fxSound } from './fxSound';
 import { Altar, type AltarSignals } from './altar';
@@ -1226,11 +1226,33 @@ function MiniReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
     let glowKey = 'new';
     let lastEl = 0;
     const timers: Array<ReturnType<typeof setTimeout>> = [];
+    // The windows' size (art px): the shrine's cells, or the plain windows' inside.
+    const cells = altarOn ? miniLayout(n).cells : Array.from({ length: n }, () => ({ w: MINI.winW, h: MINI.winH }));
+    // Windows too small for a whole knight (three reels and up) show head and shoulders instead.
+    const bust = cells[0].h < KNIGHT_PIC_H - 7 || cells[0].w < KNIGHT_PIC_W - 12;
+    const pic = (id: string, mutation: MutationId | null) => (bust ? knightFaceUrl(id, mutation) : knightUrl(id, mutation));
+    /** Sizes and centers a window's picture from its own pixels (any picture size: knights, faces, tokens). */
+    const place = (i: number) => {
+      const img = imgs.current[i];
+      const cell = cells[i];
+      if (!img || !cell || !img.naturalWidth) return;
+      const u = uRef.current;
+      const nw = img.naturalWidth;
+      const nh = img.naturalHeight;
+      img.style.width = `${nw * u}px`;
+      img.style.height = `${nh * u}px`;
+      img.style.left = `${Math.floor((cell.w - nw) / 2) * u}px`;
+      img.style.top = `${Math.floor((cell.h - nh) / 2) * u}px`;
+    };
     const setWin = (i: number, url: string, state: 'spin' | 'token' | 'landed', rim: string | null) => {
       const img = imgs.current[i];
       const win = wins.current[i];
       if (!img || !win) return;
-      if (img.getAttribute('src') !== url) img.setAttribute('src', url);
+      if (img.getAttribute('src') !== url) {
+        img.onload = () => place(i);
+        img.setAttribute('src', url);
+      }
+      if (img.complete) place(i);
       win.dataset.state = state;
       if (rim) win.style.setProperty('--rim', rim);
       else win.style.removeProperty('--rim');
@@ -1277,14 +1299,14 @@ function MiniReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
           const stops = reelStops(spin, i);
           return {
             stops,
-            url: knightUrl(r.knightId, r.mutation),
+            url: pic(r.knightId, r.mutation),
             rim: RARITY_COLOR[r.rarity],
             tier: rarityIndex(r.rarity),
             reached: stops.filter((st) => st.at <= timer).length,
             holdUntil: 0,
             nextFlick: 0,
             flick: 0,
-            fillers: Array.from({ length: 12 }, (_, f) => knightUrl(filler(spin.id * 31 + i * 101 + f, false, classes, false).id, null)),
+            fillers: Array.from({ length: 12 }, (_, f) => pic(filler(spin.id * 31 + i * 101 + f, false, classes, false).id, null)),
           };
         });
         shown = combosDone(matched, mults, plan.map((p) => p.reached));
@@ -1406,7 +1428,7 @@ function MiniReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
       cancelAnimationFrame(raf);
       timers.forEach(clearTimeout);
     };
-  }, [game, n]);
+  }, [game, n, altarOn]);
 
   const cols = miniCols(n);
   const rows = Math.ceil(n / cols);
@@ -1434,10 +1456,6 @@ function MiniReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
               top: c.y * u,
               width: c.w * u,
               height: c.h * u,
-              ['--kx' as string]: `${Math.floor((c.w - KW) / 2) * u}px`,
-              ['--ky' as string]: `${Math.floor((c.h - KH) / 2) * u}px`,
-              ['--tx' as string]: `${Math.floor((c.w - 16) / 2) * u}px`,
-              ['--ty' as string]: `${Math.floor((c.h - 16) / 2) * u}px`,
             } as CSSProperties)
           : {};
         return (

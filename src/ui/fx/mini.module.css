@@ -60,18 +60,9 @@
   box-shadow: inset 0 0 0 var(--u) var(--rim, #b9b1a6);
   pointer-events: none;
 }
+/* Sized and centered from its own pixels by the roller (AltarReels.tsx place()). */
 .pic {
   position: absolute;
-  left: var(--u);
-  top: var(--u);
-  width: calc(30 * var(--u));
-  height: calc(21 * var(--u));
-}
-.win[data-state='token'] .pic {
-  left: calc(8 * var(--u));
-  top: calc(3 * var(--u));
-  width: calc(16 * var(--u));
-  height: calc(16 * var(--u));
 }
 .win[data-state='spin'] .pic {
   filter: brightness(0);
@@ -129,14 +120,6 @@
 }
 .mini[data-altar] .win::after {
   display: none;
-}
-.mini[data-altar] .pic {
-  left: var(--kx);
-  top: var(--ky);
-}
-.mini[data-altar] .win[data-state='token'] .pic {
-  left: var(--tx);
-  top: var(--ty);
 }
 .mini[data-altar] .chip {
   z-index: 3;
