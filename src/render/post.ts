@@ -38,6 +38,10 @@ export interface PostParams {
   hazeAmount: number;
   /** Light shafts (0 off) and their color. */
   rays: number;
+  /** Cloud shadows drifting over the ground (0 off, else how dark they get), and the view's top-left in world pixels (they're fixed to the world). */
+  clouds?: number;
+  camX?: number;
+  camY?: number;
   rayColor: [number, number, number];
   /** Grade: shadow tint, highlight tint, saturation (1 = as is), contrast (1 = as is). */
   shadowTint: [number, number, number];
@@ -109,6 +113,9 @@ uniform float u_hazeAmount;
 uniform float u_rays;
 uniform vec3 u_rayColor;
 uniform float u_time;
+uniform float u_clouds;
+uniform vec2 u_cam;
+uniform vec2 u_artSize;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float noise(vec2 p) {
@@ -129,6 +136,12 @@ void main() {
   vec3 g = mix(texture(u_ground, a).rgb, texture(u_groundBlur, vec2(a.x, 1.0 - a.y)).rgb, dof);
   vec4 st = texture(u_stand, a);
   vec3 c = mix(g, st.rgb, st.a);
+  // Cloud shadows: big soft patches fixed to the world, drifting slowly with the wind.
+  if (u_clouds > 0.0) {
+    vec2 wp = (a * u_artSize + u_cam) / 230.0 + vec2(u_time * 0.016, u_time * 0.006);
+    float cn = noise(wp) * 0.62 + noise(wp * 2.3 + 4.1) * 0.38;
+    c *= 1.0 - smoothstep(0.5, 0.72, cn) * u_clouds;
+  }
   // Light: the map is stored at half strength so it can reach 2x (over-bright glows).
   vec3 L = texture(u_light, a).rgb * 2.0;
   c *= L;
@@ -389,6 +402,8 @@ export class Post {
     // 1. The ground blurred (for depth of field), at half resolution. Canvas textures are top-down.
     const blurPx = Math.max(1, p.scale * 0.9);
     this.blur(this.tex!.ground, p.artW * p.scale * 0.5, p.artH * p.scale * 0.5, true, t.dofA, t.dofB, blurPx * 0.5);
+    // Twice, wider the second time: a deep, smooth blur (one half-strength pass leaves stones smeared, not soft).
+    this.blur(t.dofB.tex, t.dofB.w, t.dofB.h, false, t.dofA, t.dofB, blurPx * 1.3);
     // The blurred copy covers the whole texture (bottom-up), so the composite samples it through the
     // same crop and slide as the sharp layers.
     // 2. Composite.
@@ -408,6 +423,9 @@ export class Post {
     gl.uniform1f(gl.getUniformLocation(c, 'u_rays'), p.rays);
     gl.uniform3f(gl.getUniformLocation(c, 'u_rayColor'), ...p.rayColor);
     gl.uniform1f(gl.getUniformLocation(c, 'u_time'), p.time);
+    gl.uniform1f(gl.getUniformLocation(c, 'u_clouds'), p.clouds ?? 0);
+    gl.uniform2f(gl.getUniformLocation(c, 'u_cam'), p.camX ?? 0, p.camY ?? 0);
+    gl.uniform2f(gl.getUniformLocation(c, 'u_artSize'), p.artW, p.artH);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     // 3. Bloom: bright pass at quarter resolution, then a wide blur, twice.
     const br = this.progs!.bright;

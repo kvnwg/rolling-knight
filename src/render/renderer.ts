@@ -105,6 +105,8 @@ export class Renderer {
   private time = 0;
   private weatherT = 0;
   private rain = new Rain();
+  /** The view's whole-pixel top-left in world pixels, this frame. */
+  private origin = { x: 0, y: 0 };
   private flashT = 0;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -260,6 +262,8 @@ export class Renderer {
     const cy = Math.floor(fy);
     this.sub.x = fx - cx;
     this.sub.y = fy - cy;
+    this.origin.x = cx;
+    this.origin.y = cy;
     const sx = (x: number) => Math.round(x) - cx;
     const sy = (y: number) => Math.round(y) - cy;
     const visible = (x: number, y: number, m = 40) => x > cx - m && x < cx + this.W + m && y > cy - m && y < cy + this.H + m * 2;
@@ -445,7 +449,7 @@ export class Renderer {
       if (p.kind !== 'tree' || !p.edge || p.seed % 3 !== 0) continue;
       if (p.x < cx - 30 || p.x > cx + this.W + 30 || p.y < cy - 10 || p.y > cy + this.H + 40) continue;
       const k = 0.5 + 0.5 * Math.sin(this.time * 0.9 + p.seed * 0.37);
-      lights.push({ x: p.x - cx + ((p.seed % 13) - 6), y: p.y - cy + 6 + (p.seed % 7), r: 10 + (p.seed % 9), color: b.light.gradeTop, intensity: 0.18 + 0.22 * k });
+      lights.push({ x: p.x - cx + ((p.seed % 13) - 6), y: p.y - cy + 6 + (p.seed % 7), r: 10 + (p.seed % 9), color: b.light.gradeTop, intensity: 0.1 + 0.14 * k });
     }
   }
 
@@ -563,6 +567,9 @@ export class Renderer {
           focusY,
           dof: settings.tiltShift && biome ? (biome.layout === 'rooms' ? 0.5 : 1) : 0,
           ...grade,
+          clouds: biome ? cloudShadows(biome, sky) : 0,
+          camX: this.origin.x,
+          camY: this.origin.y,
           flash: this.flashT,
           fade: Math.round(game.fade * 8) / 8,
           rewind: w?.rewind ? Math.min(1, w.rewind.t * 6) : 0,
@@ -957,6 +964,10 @@ export class Renderer {
   private collectLights(w: World, biome: Biome, cx: number, cy: number, sx: (x: number) => number, sy: (y: number) => number): Light[] {
     const out: Light[] = [];
     const flick = (seed: number) => 0.85 + 0.15 * Math.sin(this.time * 9 + seed) * Math.sin(this.time * 13.7 + seed * 2);
+    // Lamps and fires hardly show in broad daylight; under cloud a little more; at night in full.
+    const [lr, lg, lb] = rgb(ambientOf(biome, w.sky));
+    const dayLum = (lr * 0.299 + lg * 0.587 + lb * 0.114) / 255;
+    const lampK = Math.max(0.3, Math.min(1, (0.95 - dayLum) * 2.4));
     for (const p of this.props) {
       const l = p.art.light;
       if (!l) continue;
@@ -964,7 +975,7 @@ export class Renderer {
       const y = p.y + l.dy;
       if (x < cx - 80 || x > cx + this.W + 80 || y < cy - 80 || y > cy + this.H + 80) continue;
       const f = l.flicker ? flick(p.seed % 100) : 1;
-      out.push({ x: x - cx, y: y - cy, r: l.r * (0.95 + 0.05 * f), color: l.color, intensity: 0.95 * f, bloom: true });
+      out.push({ x: x - cx, y: y - cy, r: l.r * (0.95 + 0.05 * f) * (0.75 + 0.25 * lampK), color: l.color, intensity: 0.95 * f * lampK, bloom: lampK > 0.6 });
     }
     for (const g of this.terrain!.glows) {
       if (g.x < cx - 60 || g.x > cx + this.W + 60 || g.y < cy - 60 || g.y > cy + this.H + 60) continue;
@@ -1288,6 +1299,13 @@ function ambientOf(b: Biome, sky: Sky | null): string {
   if (kind === 'rain') return mixHex(b.light.ambient, day ? '#c4ccd8' : '#7a8496', 0.7);
   if (kind === 'overcast') return mixHex(b.light.ambient, day ? '#dfe4ea' : '#8a94a6', 0.6);
   return day ? mixHex(b.light.ambient, '#fff8ec', 0.5) : b.light.ambient;
+}
+
+/** How dark the drifting cloud shadows get: on sunny days outdoors; faint under a grey sky; none in rain or below ground. */
+function cloudShadows(b: Biome, sky: Sky | null): number {
+  if (b.layout === 'rooms' || !DAYLIGHT.has(b.id) && b.id !== 'swamp' && b.id !== 'graveyard') return 0;
+  const kind = sky?.kind ?? 'clear';
+  return kind === 'rain' ? 0 : kind === 'overcast' ? 0.06 : DAYLIGHT.has(b.id) ? 0.2 : 0.08;
 }
 
 /** Each biome's look in the shader: haze, shafts of light, split toning, saturation, bloom. */
