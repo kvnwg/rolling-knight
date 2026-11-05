@@ -43,6 +43,7 @@ import { deathFx, deathPoofMs, deathPose, lastMoveOf, mobDirOf, mobPose, pruneMo
 import { mobPaint, type MobPaint } from './pf/mobLook';
 import { facing, type Dir } from './pf/sheet';
 import { Vfx } from './vfx/vfx';
+import { Spells } from './spells';
 import { boulderAt, isStill, mobMotion, type MobMotion } from './mobMotion';
 import { BOMB_R, BOSS_SLAM_R, SLAM_R, lobRadius, lungeOf } from '../world/ai';
 import { blank, rot90, type PixelBuf } from './pixel/buf';
@@ -368,6 +369,8 @@ export class Renderer {
   private pfFx: Array<{ name: SheetName; x: number; y: number; at: number; world: World }> = [];
   /** The attack effects: swings, shots in flight, their impacts (src/render/vfx). */
   private vfx = new Vfx();
+  /** The skills with art of their own: meteors, the Singularity's vortex, Titan's Wrath's rocks... (spells.ts). */
+  private spells = new Spells();
   /** Body boxes of PixelForge frames (for squash and stretch), by sheet and frame. */
   private boxes = new Map<string, Box>();
   /**
@@ -589,7 +592,8 @@ export class Renderer {
       }
     }
     if (!shader && game.state.settings.tiltShift && lead) this.tiltShift(g, sy(lead.y) - 6, w.biome.layout === 'rooms' ? 0.5 : 1);
-    for (const a of w.areas) this.drawArea(g, em, a, sx, sy);
+    this.spells.update(w);
+    for (const a of w.areas) this.drawArea(g, ui, a, sx, sy);
     // Lunges' tells on the ground: a dash's lane, a leap's landing ring.
     for (const m of w.mobs) if (!m.dead && visible(m.x, m.y, 160)) this.drawTell(g, m, sx, sy);
 
@@ -758,6 +762,7 @@ export class Renderer {
     }
     if (hub) list.push(...hub.items(st, em, cx, cy, this.LW, this.LH, this.time));
     list.push(...standingTraps);
+    this.spells.standing(w, st, this.layers.cap.x, sx, sy, list);
     list.sort((a, b) => a.y - b.y);
     for (const d of list) d.draw();
     this.drawPfFx(st, w, sx, sy);
@@ -789,6 +794,7 @@ export class Renderer {
     this.advanceFx(dt);
     this.drawFx(st, sx, sy, false);
     this.drawFx(ui, sx, sy, true);
+    this.spells.drawTop(w, ui, sx, sy);
 
     // --- light (the setting's: effects light nothing)
     const lights = this.collectLights(w, biome, cx, cy, sx, sy);
@@ -1658,7 +1664,7 @@ export class Renderer {
     ctx.drawImage(frameCanvas(name, f[i][0], NO_PAINT), sx(s.x) - px, sy(s.y) - py);
   }
 
-  private drawArea(ctx: Ctx, em: Ctx, a: Area, sx: (x: number) => number, sy: (y: number) => number): void {
+  private drawArea(ctx: Ctx, top: Ctx, a: Area, sx: (x: number) => number, sy: (y: number) => number): void {
     const x = sx(a.x);
     const y = sy(a.y);
     const danger = a.team === 'mob';
@@ -1700,14 +1706,8 @@ export class Renderer {
       ctx.fillStyle = col;
       this.ellipse(ctx, x, y, Math.round(a.r * t), Math.round(a.r * t * 0.6));
       ctx.globalAlpha = 1;
-      if (a.kind === 'meteor') {
-        // The meteor itself, falling.
-        const fy = y - Math.round((1 - t) * 90);
-        em.fillStyle = '#ffd86a';
-        em.fillRect(x - 2, fy - 2, 5, 5);
-        em.fillStyle = '#ff7a2a';
-        for (let k = 1; k < 6; k++) em.fillRect(x - 1 + k, fy - 2 - k * 2, 2, 2);
-      }
+      // The meteor itself, falling; the Singularity's vortex (spells.ts).
+      this.spells.drawArea(a, top, x, y);
       return;
     }
     if (a.kind === 'sanctuary' || a.kind === 'glow') {
@@ -1982,45 +1982,10 @@ export class Renderer {
   }
 
   private burst(f: Fx, w: World): void {
-    // The pack effects (Will Tice / unTied Games), on top of the particles.
-    switch (f.kind) {
-      case 'hit':
-        this.fx('hit', f.x, f.y, Math.random() < 0.5);
-        break;
-      case 'crit':
-        this.fx(Math.random() < 0.5 ? 'crit' : 'slash', f.x, f.y, Math.random() < 0.5);
-        break;
-      case 'death':
-        if (f.src === 'hero') this.fx('death', f.x, f.y - 6);
-        else if (f.src === 'boss') {
-          this.fx('levelUp', f.x, f.y - 12);
-          this.fx('electric', f.x, f.y - 6);
-        } else if (!this.corpses.some((c) => Math.abs(c.x - f.x) < 1 && Math.abs(c.y - 4 - f.y) < 1)) this.fx(f.src === 'slime' ? 'splat' : 'smoke', f.x, f.y - 2);
-        // (A PixelForge mob plays its own death, and poofs at its end: drawCorpse.)
-        break;
-      case 'blast':
-        if (f.src === 'slam') this.fx('shock', f.x, f.y);
-        else if (f.src === 'boulder') this.fx('smoke', f.x, f.y - 2);
-        else if (f.src === 'bomb') this.fx('explosion', f.x, f.y - 6);
-        else if (f.src === 'meteor') {
-          this.fx('boom', f.x, f.y - 8);
-          this.fx('electric', f.x, f.y - 6);
-        } else this.fx((f.size ?? 1) >= 1.5 ? 'boom' : 'explosion', f.x, f.y - 6);
-        break;
-      case 'shock':
-        this.fx('shock', f.x, f.y);
-        this.fx('lightning', f.x, f.y - 8);
-        break;
-      case 'levelup':
-        this.fx('heal', f.x, f.y - 10);
-        break;
-      case 'revive':
-      case 'portal':
-        this.fx('sparkle', f.x, f.y - 8);
-        break;
-      default:
-        break;
-    }
+    // A skill with art of its own (spells.ts) plays that instead of a pack effect.
+    const own = this.spells.claim(f, w);
+    if (own === 'all') return;
+    if (!own) this.packFx(f);
     const add = (n: number, make: (i: number) => Particle) => {
       for (let i = 0; i < n; i++) this.particles.push(make(i));
     };
@@ -2094,6 +2059,48 @@ export class Renderer {
         break;
       }
       case 'coin':
+        break;
+    }
+  }
+
+  /** The pack effects (Will Tice / unTied Games) for a burst, on top of the particles. */
+  private packFx(f: Fx): void {
+    switch (f.kind) {
+      case 'hit':
+        this.fx('hit', f.x, f.y, Math.random() < 0.5);
+        break;
+      case 'crit':
+        this.fx(Math.random() < 0.5 ? 'crit' : 'slash', f.x, f.y, Math.random() < 0.5);
+        break;
+      case 'death':
+        if (f.src === 'hero') this.fx('death', f.x, f.y - 6);
+        else if (f.src === 'boss') {
+          this.fx('levelUp', f.x, f.y - 12);
+          this.fx('electric', f.x, f.y - 6);
+        } else if (!this.corpses.some((c) => Math.abs(c.x - f.x) < 1 && Math.abs(c.y - 4 - f.y) < 1)) this.fx(f.src === 'slime' ? 'splat' : 'smoke', f.x, f.y - 2);
+        // (A PixelForge mob plays its own death, and poofs at its end: drawCorpse.)
+        break;
+      case 'blast':
+        if (f.src === 'slam') this.fx('shock', f.x, f.y);
+        else if (f.src === 'boulder') this.fx('smoke', f.x, f.y - 2);
+        else if (f.src === 'bomb') this.fx('explosion', f.x, f.y - 6);
+        else if (f.src === 'meteor') {
+          this.fx('boom', f.x, f.y - 8);
+          this.fx('electric', f.x, f.y - 6);
+        } else this.fx((f.size ?? 1) >= 1.5 ? 'boom' : 'explosion', f.x, f.y - 6);
+        break;
+      case 'shock':
+        this.fx('shock', f.x, f.y);
+        this.fx('lightning', f.x, f.y - 8);
+        break;
+      case 'levelup':
+        this.fx('heal', f.x, f.y - 10);
+        break;
+      case 'revive':
+      case 'portal':
+        this.fx('sparkle', f.x, f.y - 8);
+        break;
+      default:
         break;
     }
   }
