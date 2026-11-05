@@ -644,7 +644,7 @@ button.kcard:active {
   overflow-wrap: anywhere;
 }
 .kcard .kc-meta {
-  font-size: calc(3.8 * var(--px));
+  font-size: calc(4.2 * var(--px));
   color: var(--muted);
 }
 .kcard .kc-foot {
@@ -655,7 +655,7 @@ button.kcard:active {
   margin-top: auto;
   padding-top: calc(1.5 * var(--px));
   border-top: var(--px) solid color-mix(in srgb, var(--rc) 22%, #3a2a2c);
-  font-size: calc(4 * var(--px));
+  font-size: calc(4.4 * var(--px));
   font-weight: 700;
   white-space: nowrap;
 }
@@ -766,9 +766,10 @@ select.select {
 }
 .kstats > span {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--px);
+  gap: calc(0.5 * var(--px));
   padding: calc(1.5 * var(--px)) var(--px);
   font-size: calc(4.8 * var(--px));
   font-weight: 700;
@@ -776,6 +777,30 @@ select.select {
   color: var(--text);
   background: rgba(10, 6, 8, 0.5);
   box-shadow: 0 0 0 var(--px) var(--ink);
+}
+.kstats > span > small {
+  font-size: calc(3.6 * var(--px));
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.kstats > span > i {
+  display: flex;
+  align-items: center;
+  gap: var(--px);
+  font-style: normal;
+}
+.kspare-count {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(2 * var(--px));
+  font-size: calc(4.4 * var(--px));
+  font-weight: 700;
+}
+.kspare-why {
+  margin: calc(-1 * var(--px)) 0 0;
+  font-size: calc(4.2 * var(--px));
+  line-height: 1.3;
+  color: var(--muted);
 }
 .kpanel {
   display: flex;
@@ -832,8 +857,12 @@ select.select {
 }
 .kspare-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: calc(2.5 * var(--px)) calc(2 * var(--px));
+}
+.kspare-grid .btn {
+  padding-left: calc(1.5 * var(--px));
+  padding-right: calc(1.5 * var(--px));
 }
 /* A trade on a button: [copies] 3 → [shard] +3. */
 .ktrade {
@@ -1582,6 +1611,36 @@ select.select {
   justify-content: flex-end;
 }
 
+/* Narrow screens: the floor's plate on three lines (floor, place, foes left) rather than a ragged wrap. */
+@media (max-width: 480px) {
+  .floor-pill {
+    font-size: calc(3.8 * var(--px));
+    padding: calc(1 * var(--px)) calc(2.5 * var(--px));
+  }
+  .floor-pill b {
+    font-size: calc(5 * var(--px));
+    white-space: nowrap;
+  }
+  .floor-pill .dchip {
+    margin-left: calc(1 * var(--px));
+    font-size: calc(3.6 * var(--px));
+  }
+  .floor-pill .dchip::before {
+    width: calc(9 * var(--px));
+    height: calc(9 * var(--px));
+  }
+  .floor-pill .sep {
+    display: none;
+  }
+  .floor-pill .foes {
+    display: block;
+  }
+  /* The squad's cards start under the floor's plate, however many lines it takes. */
+  .squad.top {
+    top: calc(36 * var(--px) + env(safe-area-inset-top, 0px));
+  }
+}
+
 /* ------------------------------------------------------------ toasts and banners */
 
 .toasts {
@@ -1610,6 +1669,15 @@ select.select {
 }
 .toast .who {
   color: var(--tc, var(--text));
+}
+/* On touch screens the squad's cards sit at the top left: news drops in on the right, under the altar. */
+:root:has(.squad.top) .toasts {
+  top: calc(66 * var(--px) + env(safe-area-inset-top, 0px));
+  left: auto;
+  right: calc(3 * var(--px) + env(safe-area-inset-right, 0px));
+  transform: none;
+  align-items: flex-end;
+  max-width: 58vw;
 }
 /* With a boss on the floor, news drops in under its bar instead of over its name. */
 :root:has(.dhud.has-boss) .toasts {

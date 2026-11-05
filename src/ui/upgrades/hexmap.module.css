@@ -214,13 +214,13 @@
   background: #b6ff5c;
 }
 .cardDesc {
-  font-size: calc(4 * var(--px));
+  font-size: calc(4.4 * var(--px));
   line-height: 1.25;
   color: #6b5446;
 }
 .cardFx {
   font-weight: 700;
-  font-size: calc(4 * var(--px));
+  font-size: calc(4.4 * var(--px));
   line-height: 1.25;
   color: #7a6250;
 }
@@ -322,6 +322,10 @@
   text-shadow: 0 calc(0.6 * var(--px)) 0 var(--ink);
   white-space: nowrap;
 }
+.stat small {
+  font-size: 0.8em;
+  color: #e8d2a8;
+}
 .stat[data-k='luck'] {
   color: var(--good);
 }
@@ -329,6 +333,25 @@
 .overlay[data-calm],
 .overlay[data-calm] .card {
   animation: none !important;
+}
+/* Phones: the bar's gold, Close and numbers all fit across. */
+@media (max-width: 480px) {
+  .coins {
+    font-size: calc(6 * var(--px));
+    gap: calc(1 * var(--px));
+  }
+  .close {
+    min-width: calc(40 * var(--px));
+    min-height: calc(15 * var(--px));
+    font-size: calc(5.5 * var(--px));
+  }
+  .stat {
+    font-size: calc(4.2 * var(--px));
+    gap: calc(1 * var(--px));
+  }
+  .bar {
+    gap: calc(2 * var(--px));
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .overlay,

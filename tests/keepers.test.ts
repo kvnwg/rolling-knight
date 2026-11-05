@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { newGame } from '../src/core/newGame';
 import { PERKS } from '../src/core/perks';
-import { tabLines } from '../src/core/upgradeTree';
+import { effectAt, tabLines } from '../src/core/upgradeTree';
 import { UPGRADES, UPGRADE_TABS, upgradeTab } from '../src/core/upgrades';
 import { lightLayer } from '../src/render/art/keepers/light';
 import { paintKeeperScene } from '../src/render/art/keepers/scenes';
-import { UI_MD, UI_SM, UI_SPRITES, UI_XS } from '../src/render/pixel/ui';
-import { upgradeStats } from '../src/ui/keeper/stats';
+import { UI_SPRITES } from '../src/render/pixel/ui';
 import { TINKER_CATS } from '../src/ui/keeper/tinkerCats';
 import { UPGRADE_ICON_ROWS } from '../src/ui/upgrades/iconRows';
 import type { StationId } from '../src/world/hubWorld';
@@ -27,23 +26,23 @@ describe("the tinker's counter", () => {
     expect(TINKER_CATS.combat.find((c) => c.lines.includes('quickRoll'))?.lines).toContain('swiftness');
   });
 
-  it("shows every line's numbers as an icon and a short figure, at every tier", () => {
+  it('says what every line does in a few words, at every tier (the lines on its card)', () => {
     const s = newGame(1);
     for (const u of UPGRADES) {
       for (let t = 0; t <= u.max; t++) {
-        const stats = upgradeStats(s, u.id, t);
-        expect(stats.length, u.id).toBeGreaterThan(0);
-        for (const st of stats) {
-          expect(st.text.length, `${u.id} ${t}`).toBeGreaterThan(0);
-          // Short: a number, not a sentence.
-          expect(st.text.length, `${u.id} ${t}: ${st.text}`).toBeLessThanOrEqual(8);
-          // A small icon exists for it (no falling back to a big sprite or a star).
-          const small = st.icon in UI_XS || st.icon in UI_SM || st.icon in UI_MD || PX_EXTRA.includes(st.icon);
-          expect(small, `${u.id}: ${st.icon}`).toBe(true);
-        }
+        const text = effectAt(s, u.id, t);
+        expect(text.length, `${u.id} ${t}`).toBeGreaterThan(0);
+        expect(text.length, `${u.id} ${t}: ${text}`).toBeLessThanOrEqual(40);
       }
     }
-    expect(upgradeStats(s, 'quickRoll', 5).map((x) => x.text)).toEqual(['-60%', '-30%']);
+    expect(effectAt(s, 'quickRoll', 5)).toBe('-60% spin, -30% cooldown');
+  });
+
+  it('gives every perk a few words for its card', () => {
+    for (const p of PERKS) {
+      expect(p.short.length, p.id).toBeGreaterThan(0);
+      expect(p.short.length, `${p.id}: ${p.short}`).toBeLessThanOrEqual(34);
+    }
   });
 });
 

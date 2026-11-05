@@ -224,6 +224,7 @@ function BuyCard({ game, node, view, onBuy, onDetails }: { game: Game; node: Hex
       ) : (
         <div className={s.buyCol}>
           <button key={nope ? `n${nope}` : 'buy'} className={`btn green ${s.buy}`} data-afford={afford} data-nope={nope > 0 || undefined} {...hold}>
+            <span>BUY</span>
             <Px icon="coin" size="sm" />
             <span>{fmt(cost)}</span>
           </button>
@@ -765,7 +766,8 @@ export function UpgradeMap({ game, tab = 'luck', onClose, closeText = 'CLOSE', o
       <div className={s.head}>
         <div className={s.titles} ref={titlesRef}>
           {onTab ? (
-            <span className="row" data-ui style={{ gap: 'calc(2 * var(--px))', pointerEvents: 'auto' }}>
+            <>
+              <span className="row" data-ui style={{ gap: 'calc(2 * var(--px))', pointerEvents: 'auto' }}>
               {(['luck', 'combat'] as const).map((t) => (
                 <button key={t} className={`btn small ${t === tab ? (t === 'luck' ? 'green' : 'red') : ''}`} onClick={() => t !== tab && (uiSound('tap'), onTab(t))}>
                   <Px icon={t === 'luck' ? 'clover' : 'swords'} size="sm" />
@@ -773,11 +775,14 @@ export function UpgradeMap({ game, tab = 'luck', onClose, closeText = 'CLOSE', o
                 </button>
               ))}
               {onCards && (
-                <button className="btn small" onClick={() => (uiSound('tap'), onCards())} title="As cards">
+                <button className="btn small" onClick={() => (uiSound('tap'), onCards())} title="The same upgrades as a list of cards">
                   <Px icon="bag" size="sm" />
+                  LIST
                 </button>
               )}
-            </span>
+              </span>
+              <span className={s.sub}>{tab === 'luck' ? 'Upgrades for the altar.' : 'Upgrades for your squad.'} Tap a hex to see it; buying one opens the hexes next to it.</span>
+            </>
           ) : (
             <Chunky text={tab === 'luck' ? 'LUCK MAP' : 'COMBAT MAP'} size={11} grad={tab === 'luck' ? 'green' : 'red'} />
           )}
@@ -805,10 +810,12 @@ export function UpgradeMap({ game, tab = 'luck', onClose, closeText = 'CLOSE', o
           )}
           <span className={s.barRight}>
             <span className={s.stat} title="Squad power">
+              <small>Power</small>
               <Px icon="sword" size="sm" />
               {fmt(power)}
             </span>
             <span className={s.stat} data-k="luck" title="Luck">
+              <small>Luck</small>
               <Px icon="clover" size="sm" />x{luck < 10 ? luck.toFixed(2) : fmt(luck)}
             </span>
           </span>

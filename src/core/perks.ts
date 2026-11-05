@@ -14,6 +14,8 @@ export interface PerkDef {
   name: string;
   cost: number;
   requires: string[];
+  /** What it does in a few words, on its card (the whole of it is in `text`). */
+  short: string;
   text: string;
   icon: string;
 }
@@ -27,29 +29,29 @@ export const PERK_TREES: Array<{ id: PerkTree; name: string; text: string; color
 
 export const PERKS: PerkDef[] = [
   // Underdogs
-  { id: 'humbleBeginnings', tree: 'underdog', name: 'Humble Beginnings', cost: 1, requires: [], icon: 'pitchfork', text: 'Common and Uncommon knights get 3× as much from every level-up.' },
-  { id: 'peasantLevy', tree: 'underdog', name: 'Peasant Levy', cost: 2, requires: ['humbleBeginnings'], icon: 'scroll', text: 'Every 4th spin rolls at luck 1, so Commons keep coming. Common and Uncommon duplicates break into 2 shards.' },
-  { id: 'ragsToRiches', tree: 'underdog', name: 'Rags to Riches', cost: 2, requires: ['humbleBeginnings'], icon: 'coin', text: 'Knights below Legendary get +25% stats for each tier they are below it.' },
-  { id: 'peasantRevolt', tree: 'underdog', name: 'Peasant Revolt', cost: 3, requires: ['peasantLevy', 'ragsToRiches'], icon: 'torch', text: 'A squad of only Common, Uncommon and Rare knights deals double damage and dodges twice as often.' },
-  { id: 'handMeDowns', tree: 'underdog', name: 'Hand-Me-Downs', cost: 4, requires: ['peasantRevolt'], icon: 'chest', text: 'Breaking a duplicate also gives a shard to every knight of its class you own.' },
+  { id: 'humbleBeginnings', tree: 'underdog', name: 'Humble Beginnings', cost: 1, requires: [], icon: 'pitchfork', short: 'Commons level up 3x better', text: 'Common and Uncommon knights get 3× as much from every level-up.' },
+  { id: 'peasantLevy', tree: 'underdog', name: 'Peasant Levy', cost: 2, requires: ['humbleBeginnings'], icon: 'scroll', short: 'More Commons, 2 shards each', text: 'Every 4th spin rolls at luck 1, so Commons keep coming. Common and Uncommon duplicates break into 2 shards.' },
+  { id: 'ragsToRiches', tree: 'underdog', name: 'Rags to Riches', cost: 2, requires: ['humbleBeginnings'], icon: 'coin', short: 'Low-tier knights +25% stats a tier', text: 'Knights below Legendary get +25% stats for each tier they are below it.' },
+  { id: 'peasantRevolt', tree: 'underdog', name: 'Peasant Revolt', cost: 3, requires: ['peasantLevy', 'ragsToRiches'], icon: 'torch', short: 'Low-tier squad: 2x damage', text: 'A squad of only Common, Uncommon and Rare knights deals double damage and dodges twice as often.' },
+  { id: 'handMeDowns', tree: 'underdog', name: 'Hand-Me-Downs', cost: 4, requires: ['peasantRevolt'], icon: 'chest', short: 'Shards for the whole class', text: 'Breaking a duplicate also gives a shard to every knight of its class you own.' },
   // Command
-  { id: 'tagTeam', tree: 'command', name: 'Tag Team', cost: 1, requires: [], icon: 'swap', text: 'Switching knights fires the incoming knight\'s special for free (once every 8 s).' },
-  { id: 'loneWolf', tree: 'command', name: 'Lone Wolf', cost: 2, requires: ['tagTeam'], icon: 'wolf', text: 'Your other two knights stay at camp. The one you control gets ×3 HP, ×2.5 damage and 30% faster specials.' },
-  { id: 'hiveMind', tree: 'command', name: 'Hive Mind', cost: 2, requires: ['tagTeam'], icon: 'eye', text: 'When you dodge, your whole squad dodges with you. Allies\' specials recharge twice as fast.' },
-  { id: 'warBanner', tree: 'command', name: 'War Banner', cost: 3, requires: ['loneWolf', 'hiveMind'], icon: 'banner', text: 'Each hit by the knight you control gives the squad +4% attack speed for 3 s, stacking to +40%.' },
-  { id: 'heirloom', tree: 'command', name: 'Heirloom', cost: 4, requires: ['warBanner'], icon: 'crown', text: 'Your controlled knight survives your next rebirth with its levels and shards.' },
+  { id: 'tagTeam', tree: 'command', name: 'Tag Team', cost: 1, requires: [], icon: 'swap', short: 'Free special when you switch', text: 'Switching knights fires the incoming knight\'s special for free (once every 8 s).' },
+  { id: 'loneWolf', tree: 'command', name: 'Lone Wolf', cost: 2, requires: ['tagTeam'], icon: 'wolf', short: 'Fight alone: x3 HP, x2.5 damage', text: 'Your other two knights stay at camp. The one you control gets ×3 HP, ×2.5 damage and 30% faster specials.' },
+  { id: 'hiveMind', tree: 'command', name: 'Hive Mind', cost: 2, requires: ['tagTeam'], icon: 'eye', short: 'The squad dodges with you', text: 'When you dodge, your whole squad dodges with you. Allies\' specials recharge twice as fast.' },
+  { id: 'warBanner', tree: 'command', name: 'War Banner', cost: 3, requires: ['loneWolf', 'hiveMind'], icon: 'banner', short: 'Your hits speed up the squad', text: 'Each hit by the knight you control gives the squad +4% attack speed for 3 s, stacking to +40%.' },
+  { id: 'heirloom', tree: 'command', name: 'Heirloom', cost: 4, requires: ['warBanner'], icon: 'crown', short: 'Keep your knight through rebirth', text: 'Your controlled knight survives your next rebirth with its levels and shards.' },
   // Rigged Reels
-  { id: 'fourLeafLitter', tree: 'reels', name: 'Four-Leaf Litter', cost: 1, requires: [], icon: 'clover', text: 'Luck tokens land 3× as often. Duplicates sell for half.' },
-  { id: 'bootlegReel', tree: 'reels', name: 'Bootleg Reel', cost: 2, requires: ['fourLeafLitter'], icon: 'reel', text: '+1 reel, but every spin is 50% slower.' },
-  { id: 'greasedGears', tree: 'reels', name: 'Greased Gears', cost: 2, requires: ['fourLeafLitter'], icon: 'gear', text: 'Spins run twice as fast, past the usual limit.' },
-  { id: 'pawnShop', tree: 'reels', name: 'Pawn Shop', cost: 3, requires: ['bootlegReel', 'greasedGears'], icon: 'coin', text: 'Selling duplicates pays 4× the gold.' },
-  { id: 'riggedJackpot', tree: 'reels', name: 'Rigged Jackpot', cost: 4, requires: ['pawnShop'], icon: 'star', text: 'Every 25th spin, every reel lands Legendary or better.' },
+  { id: 'fourLeafLitter', tree: 'reels', name: 'Four-Leaf Litter', cost: 1, requires: [], icon: 'clover', short: '3x luck tokens, half sell price', text: 'Luck tokens land 3× as often. Duplicates sell for half.' },
+  { id: 'bootlegReel', tree: 'reels', name: 'Bootleg Reel', cost: 2, requires: ['fourLeafLitter'], icon: 'reel', short: '+1 reel, slower spins', text: '+1 reel, but every spin is 50% slower.' },
+  { id: 'greasedGears', tree: 'reels', name: 'Greased Gears', cost: 2, requires: ['fourLeafLitter'], icon: 'gear', short: 'Spins twice as fast', text: 'Spins run twice as fast, past the usual limit.' },
+  { id: 'pawnShop', tree: 'reels', name: 'Pawn Shop', cost: 3, requires: ['bootlegReel', 'greasedGears'], icon: 'coin', short: 'Copies sell for 4x gold', text: 'Selling duplicates pays 4× the gold.' },
+  { id: 'riggedJackpot', tree: 'reels', name: 'Rigged Jackpot', cost: 4, requires: ['pawnShop'], icon: 'star', short: 'Every 25th spin: Legendary+', text: 'Every 25th spin, every reel lands Legendary or better.' },
   // Bad Ideas
-  { id: 'glassCannon', tree: 'chaos', name: 'Glass Cannon', cost: 1, requires: [], icon: 'skull', text: 'Double damage, half HP.' },
-  { id: 'rollDancer', tree: 'chaos', name: 'Roll Dancer', cost: 2, requires: ['glassCannon'], icon: 'boot', text: 'Dodge rolls slice everything they pass through and recharge 50% faster. Auto attacks are 20% slower.' },
-  { id: 'bloodPact', tree: 'chaos', name: 'Blood Pact', cost: 2, requires: ['glassCannon'], icon: 'drop', text: 'Every hit heals for 5% of its damage, but healing from Clerics does nothing.' },
-  { id: 'berserker', tree: 'chaos', name: 'Berserker', cost: 3, requires: ['rollDancer', 'bloodPact'], icon: 'axe', text: 'Up to +150% damage the lower a knight\'s HP.' },
-  { id: 'kamikaze', tree: 'chaos', name: 'Kamikaze', cost: 4, requires: ['berserker'], icon: 'bomb', text: 'Every dodge roll leaves a bomb that blows up for 300% damage.' },
+  { id: 'glassCannon', tree: 'chaos', name: 'Glass Cannon', cost: 1, requires: [], icon: 'skull', short: '2x damage, half HP', text: 'Double damage, half HP.' },
+  { id: 'rollDancer', tree: 'chaos', name: 'Roll Dancer', cost: 2, requires: ['glassCannon'], icon: 'boot', short: 'Dodge rolls cut through foes', text: 'Dodge rolls slice everything they pass through and recharge 50% faster. Auto attacks are 20% slower.' },
+  { id: 'bloodPact', tree: 'chaos', name: 'Blood Pact', cost: 2, requires: ['glassCannon'], icon: 'drop', short: 'Hits heal you; no Cleric heals', text: 'Every hit heals for 5% of its damage, but healing from Clerics does nothing.' },
+  { id: 'berserker', tree: 'chaos', name: 'Berserker', cost: 3, requires: ['rollDancer', 'bloodPact'], icon: 'axe', short: 'More damage at low HP', text: 'Up to +150% damage the lower a knight\'s HP.' },
+  { id: 'kamikaze', tree: 'chaos', name: 'Kamikaze', cost: 4, requires: ['berserker'], icon: 'bomb', short: 'Dodge rolls drop bombs', text: 'Every dodge roll leaves a bomb that blows up for 300% damage.' },
 ];
 
 export const PERKS_BY_ID = new Map(PERKS.map((p) => [p.id, p]));

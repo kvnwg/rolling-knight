@@ -48,6 +48,7 @@ export function TopBar({ game, onSettings, onLuck, left }: { game: Game; onSetti
         </div>
         <button className="pill outlined num" onClick={onLuck} title="Luck: tap for the odds">
           <Px icon="clover" size="sm" />
+          <span className="t-muted">Luck</span>
           <span style={{ color: '#9ef06b' }}>×{luck < 100 ? luck.toFixed(2) : fmt(luck)}</span>
           {potion > 0 && <span className="t-muted">potion {secs(potion)}</span>}
         </button>

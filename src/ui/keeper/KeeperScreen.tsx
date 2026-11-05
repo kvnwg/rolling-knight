@@ -3,11 +3,13 @@
  * "Pixel Art GUI" style): the keeper big at their counter in a lamplit scene across the top
  * (SceneView); tabs under it with a small square close button; then a sheet of paper with your purse
  * at the top, a category list down the left when there are categories, the offers as icon cards
- * (OfferCard), and any do-it-all buttons along the foot. Pictures and numbers, hardly any words: an
- * offer's details are in the popup its card opens (InfoPopup).
+ * (OfferCard), and any do-it-all buttons along the foot. Every number says what it is, every button
+ * says what it does, and a line under the purse says what the counter is for (ShopHint); an offer's
+ * full details are in the popup its card opens (InfoPopup).
  *
  *   <KeeperScreen game station tabs tab onTab onClose>
  *     <ShopTop purse={...} title={...} />
+ *     <ShopHint>what this counter is for</ShopHint>
  *     <ShopBody cats={...} cat onCat> ...cards </ShopBody>
  *     <ShopFoot> hints </ShopFoot>
  *   </KeeperScreen>
@@ -148,6 +150,7 @@ export function Purse({ amount, icon = 'coin', label = 'Gold' }: { amount: numbe
   return (
     <span className={s.purse} title={label}>
       <Px icon={icon} size="md" />
+      <small>{label}</small>
       {fmt(Math.round(shown))}
     </span>
   );
@@ -160,14 +163,25 @@ export function Glyph({ icon, size = 'sm' }: { icon: string; size?: 'xs' | 'sm' 
   return <img className="px" src={a.url} alt="" draggable={false} style={{ width: `calc(${a.w} * var(--px))`, height: `calc(${a.h} * var(--px))`, flex: 'none' }} />;
 }
 
-/** A number by its icon, in a slot (the top row's luck, power, sigils...). */
-export function Stat({ icon, children, title }: { icon: string; children: ReactNode; title?: string }) {
+/** A number by its icon and what it is, in a slot (the top row's luck, power, sigils...). */
+export function Stat({ icon, label, children, title }: { icon: string; label?: ReactNode; children: ReactNode; title?: string }) {
   return (
     <span className={s.chip} title={title}>
       <Glyph icon={icon} />
+      {label && <small>{label}</small>}
       {children}
     </span>
   );
+}
+
+/** One or two plain lines under the purse: what this counter is for and how it works. */
+export function ShopHint({ children }: { children: ReactNode }) {
+  return <p className={s.hint}>{children}</p>;
+}
+
+/** A heading across the cards ("YOU GAIN", "YOU LOSE"). */
+export function ShopHeading({ children }: { children: ReactNode }) {
+  return <div className={`${s.heading} ${s.wide}`}>{children}</div>;
 }
 
 /** "now ▸ next": a value, a little arrow, the next value in green (just the next when there's no now). */

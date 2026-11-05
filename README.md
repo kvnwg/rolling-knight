@@ -71,8 +71,11 @@ recording: [`docs/SOUNDS.md`](docs/SOUNDS.md).
   wooden, brass, crimson, steel and arcane buttons with a lip; dark plates with iron bolts; the pack's
   copper-rimmed bars; parchment cards; octagonal iron ability slots that turn brass when ready; wax
   seals for difficulty. The keepers' screens (`src/ui/keeper/`) are lighter: beige paper in a dark
-  brown border with torn corners, green tabs and buttons, slots pressed into the paper, dark brown
-  pixel text, and icons and numbers instead of sentences. Each keeper's scene across the top is
+  brown border with torn corners, green tabs and buttons, slots pressed into the paper and dark brown
+  pixel text. Each counter says in a line what it's for, every number says what it is ("Luck x1.20",
+  "Shards 4/10"), every button says what it does ("LEVEL UP 1.2K", "SELL 3 +57"), and an offer's
+  whole story is a tap away. On a phone the text is bigger (about 130 art pixels across the screen
+  for the UI) and the categories run across the top so the cards get two columns. Each keeper's scene across the top is
   painted and lit in code (`src/render/art/keepers/`: the keeper's bust from their hub look, their
   trade round them, lamps, candles, coals and glowing glass in stepped pools of warm light), at a
   whole number of screen pixels per art pixel; `keepers-preview.html` shows them all.

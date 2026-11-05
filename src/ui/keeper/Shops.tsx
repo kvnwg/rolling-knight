@@ -1,6 +1,7 @@
 /**
- * The other keepers' counters in the shared layout, icons and numbers first, words only in the
- * popups their cards open:
+ * The other keepers' counters in the shared layout: a line under the purse says what each is for,
+ * numbers say what they are, buttons say what they do, and the whole story waits in the popups
+ * their cards open:
  *  - Sage Orrin: perks for sigils, by tree (core/perks.ts);
  *  - Sister Maren: rebirth, what it gives and what it takes, and the button (core/newGame.ts);
  *  - the notice board: your jobs, their progress and rewards (core/quests.ts);
@@ -27,7 +28,7 @@ import { fmt, oneIn } from '../format';
 import { Px, type IconName } from '../px';
 import { uiSound } from '../sound';
 import { InfoPopup } from './InfoPopup';
-import { Delta, Glyph, KeeperScreen, Purse, ShopBody, ShopFoot, ShopGrid, ShopTop, Stat, keeperStyles as s, useGameTick, type KeeperCat } from './KeeperScreen';
+import { Delta, Glyph, KeeperScreen, Purse, ShopBody, ShopFoot, ShopGrid, ShopHeading, ShopHint, ShopTop, Stat, keeperStyles as s, useGameTick, type KeeperCat } from './KeeperScreen';
 import { OfferCard } from './OfferCard';
 import { Icon } from './TinkerShop';
 
@@ -41,7 +42,7 @@ function inkOf(c: string): string {
 // ------------------------------------------------------------------ the sage
 
 const TREE_ICON: Record<PerkTree, string> = { underdog: 'pitchfork', command: 'banner', reels: 'reel', chaos: 'bomb' };
-const TREE_LABEL: Record<PerkTree, string> = { underdog: 'MEEK', command: 'LEAD', reels: 'REELS', chaos: 'CHAOS' };
+const TREE_LABEL: Record<PerkTree, string> = { underdog: 'UNDERDOGS', command: 'COMMAND', reels: 'REELS', chaos: 'BAD IDEAS' };
 /** A perk's picture: its own icon, drawn in the upgrade icons' style (iconRows.ts) or one of the UI's. */
 const perkIcon = (p: PerkDef) => p.icon;
 const sageMemory = { tree: 'underdog' as PerkTree };
@@ -67,57 +68,48 @@ export function SageShop({ game, station, onClose }: { game: Game; station: HubS
   return (
     <>
       <KeeperScreen game={game} station={station} tabs={[{ id: 'perks', label: 'PERKS', icon: 'sigil', badge: PERKS.filter((p) => canBuyPerk(st, p.id)).length }]} tab="perks" onTab={() => {}} onClose={onClose}>
-        <ShopTop purse={<Purse amount={st.sigils} icon="sigil" label="Sigils" />} title={<Stat icon="check">{st.perks.length}/{PERKS.length}</Stat>} />
-        {!open ? (
-          <ShopBody>
-            <ShopGrid>
-              <OfferCard
-                art={<Px icon="rebirth" size="lg" s={1} />}
-                name={<Px icon="lock" size="sm" />}
-                state="locked"
-                lines={[{ icon: 'rebirth', text: 'x1' }]}
-                onArt={() => (uiSound('open'), setInfo('closed'))}
-                button={{ kind: 'locked' }}
-              />
-            </ShopGrid>
-          </ShopBody>
-        ) : (
-          <ShopBody cats={cats} cat={tree} onCat={(t) => ((sageMemory.tree = t as PerkTree), setTree(t as PerkTree))} scrollKey={tree}>
-            <ShopGrid>
-              {PERKS.filter((p) => p.tree === tree).map((p) => {
-                const owned = hasPerk(st, p.id);
-                const met = reqMet(p);
-                return (
-                  <OfferCard
-                    key={p.id}
-                    art={<Icon icon={perkIcon(p)} big />}
-                    name={p.name}
-                    lines={[]}
-                    state={owned ? 'done' : met ? 'open' : 'locked'}
-                    onArt={() => (uiSound('open'), setInfo(p.id))}
-                    button={
-                      owned
-                        ? { kind: 'done' }
+        <ShopTop purse={<Purse amount={st.sigils} icon="sigil" label="Sigils" />} title={<Stat icon="check" label="Owned">{st.perks.length}/{PERKS.length}</Stat>} />
+        <ShopHint>
+          {open ? (
+            <>
+              Perks are <b>bonuses that last through rebirths</b>. Pay with sigils: you get one each rebirth and one for every boss. Tap a perk to read it.
+            </>
+          ) : (
+            <>
+              Perks are <b>bonuses that last through rebirths</b>. They open after your <b>first rebirth</b> (Sister Maren, at floor {rebirthFloor(st.rebirths)}).
+            </>
+          )}
+        </ShopHint>
+        <ShopBody cats={cats} cat={tree} onCat={(t) => ((sageMemory.tree = t as PerkTree), setTree(t as PerkTree))} scrollKey={tree}>
+          <ShopGrid>
+            {PERKS.filter((p) => p.tree === tree).map((p) => {
+              const owned = hasPerk(st, p.id);
+              const met = reqMet(p);
+              const needs = p.requires.map((r) => PERKS.find((x) => x.id === r)!.name).join(p.requires.length > 1 ? ' or ' : '');
+              return (
+                <OfferCard
+                  key={p.id}
+                  art={<Icon icon={perkIcon(p)} big />}
+                  name={p.name}
+                  lines={[{ text: p.short }]}
+                  state={owned ? 'done' : open && met ? 'open' : 'locked'}
+                  onArt={() => (uiSound('open'), setInfo(p.id))}
+                  note={!owned && open && !met ? `Needs ${needs}` : undefined}
+                  button={
+                    owned
+                      ? { kind: 'done', label: 'OWNED' }
+                      : !open
+                        ? { kind: 'locked', label: 'REBIRTH FIRST' }
                         : !met
-                          ? { kind: 'locked' }
-                          : { kind: 'buy', label: `${p.cost}`, icon: 'sigil', ready: st.sigils >= p.cost, onPress: () => buy(p.id), paid: `-${p.cost}`, short: `-${p.cost - st.sigils}` }
-                    }
-                  />
-                );
-              })}
-            </ShopGrid>
-          </ShopBody>
-        )}
+                          ? { kind: 'locked', label: 'LOCKED' }
+                          : { kind: 'buy', verb: 'BUY', label: `${p.cost}`, icon: 'sigil', ready: st.sigils >= p.cost, onPress: () => buy(p.id), paid: `-${p.cost}`, short: `need ${p.cost - st.sigils} more` }
+                  }
+                />
+              );
+            })}
+          </ShopGrid>
+        </ShopBody>
       </KeeperScreen>
-      {info === 'closed' && (
-        <InfoPopup art={<Px icon="sigil" size="lg" s={1} />} name="Perks" onClose={() => setInfo(null)}>
-          <div className={s.popRow}>
-            <Px icon="lock" size="sm" />
-            <Px icon="rebirth" size="sm" />
-            Open after your first rebirth.
-          </div>
-        </InfoPopup>
-      )}
       {infoPerk && (
         <InfoPopup
           art={<Icon icon={perkIcon(infoPerk)} big />}
@@ -129,8 +121,9 @@ export function SageShop({ game, station, onClose }: { game: Game; station: HubS
           }
           onClose={() => setInfo(null)}
           actions={
-            !hasPerk(st, infoPerk.id) && reqMet(infoPerk) ? (
+            open && !hasPerk(st, infoPerk.id) && reqMet(infoPerk) ? (
               <button className={`btn ${s.buy}`} data-kind={st.sigils >= infoPerk.cost ? 'buy' : 'short'} onClick={() => buy(infoPerk.id) && setInfo(null)}>
+                <span className={s.verb}>BUY</span>
                 <Px icon="sigil" size="sm" />
                 <span>{infoPerk.cost}</span>
               </button>
@@ -138,9 +131,16 @@ export function SageShop({ game, station, onClose }: { game: Game; station: HubS
           }
         >
           <p>{infoPerk.text}</p>
+          {!open && (
+            <div className={s.popRow} data-tone="bad">
+              <Px icon="lock" size="sm" />
+              Opens after your first rebirth.
+            </div>
+          )}
           {!hasPerk(st, infoPerk.id) && infoPerk.requires.length > 0 && (
             <div className={s.popRow} data-tone={reqMet(infoPerk) ? 'muted' : 'bad'}>
               <Px icon={reqMet(infoPerk) ? 'check' : 'lock'} size="sm" />
+              Needs
               {infoPerk.requires.map((r, i) => {
                 const q = PERKS.find((x) => x.id === r)!;
                 return (
@@ -180,52 +180,64 @@ export function ShrineShop({ game, station, onClose }: { game: Game; station: Hu
     ...fresh.map((c) => ({ id: `cls-${c}`, art: <HeroArt id={knightId('rare', c)} s={1} />, name: CLASSES[c].name, icon: 'helm' as IconName, line: <b style={{ color: 'var(--good)' }}>NEW</b>, text: `${CLASSES[c].name} knights start turning up at the altar.` })),
     ...(next === BAL.perks.unlockRebirths ? [{ id: 'perks', art: <Px icon="sigil" size="lg" s={1} />, name: 'Perks', icon: 'sigil' as IconName, line: <b style={{ color: 'var(--good)' }}>OPEN</b>, text: 'Sage Orrin sells perks for sigils.' }] : []),
   ];
-  const losses: Array<{ id: string; icon: string; name: string; text: string }> = [
-    { id: 'knights', icon: 'helm10', name: 'Knights', text: 'Your knights, with their levels, shards and duplicates (the Codex stays).' },
-    { id: 'gold', icon: 'coin', name: 'Gold', text: 'All your gold.' },
-    { id: 'upgrades', icon: 'gear', name: 'Upgrades', text: "The tinker's upgrades." },
-    { id: 'perks', icon: 'sigil', name: 'Perks', text: 'Perks and sigils.' },
+  const losses: Array<{ id: string; icon: string; name: string; line: string; text: string }> = [
+    { id: 'knights', icon: 'helm10', name: 'Knights', line: 'All of them', text: 'Your knights, with their levels, shards and duplicates (the Codex stays).' },
+    { id: 'gold', icon: 'coin', name: 'Gold', line: 'Back to 0', text: 'All your gold.' },
+    { id: 'upgrades', icon: 'gear', name: 'Upgrades', line: 'Back to 0', text: "The tinker's upgrades." },
+    { id: 'perks', icon: 'sigil', name: 'Perks', line: 'Bought again', text: 'Your perks go; you start the run with a sigil for each rebirth to buy them again.' },
   ];
-  const all = [...gains.map((g) => ({ ...g, lose: false })), ...losses.map((l) => ({ id: `lose-${l.id}`, art: l.icon in { helm10: 1 } ? <Icon icon={l.icon} big /> : <Px icon={l.icon as IconName} size="lg" s={1} />, name: l.name, icon: l.icon, line: null as ReactNode, text: l.text, lose: true }))];
+  const all = [...gains.map((g) => ({ ...g, lose: false })), ...losses.map((l) => ({ id: `lose-${l.id}`, art: l.icon in { helm10: 1 } ? <Icon icon={l.icon} big /> : <Px icon={l.icon as IconName} size="lg" s={1} />, name: l.name, icon: l.icon, line: l.line as ReactNode, text: l.text, lose: true }))];
+  const card = (g: (typeof all)[number]) => (
+    <OfferCard
+      key={g.id}
+      art={g.art}
+      tall={g.id.startsWith('cls-')}
+      name={g.name}
+      tag={g.lose ? { icon: 'cross', color: '#f4e4c1' } : { icon: 'arrowUp', kind: 'new' }}
+      state={g.lose ? 'done' : 'open'}
+      lines={g.line ? [{ text: g.line, tone: g.lose ? 'bad' : undefined }] : []}
+      onArt={() => (uiSound('open'), setInfo(g.id))}
+    />
+  );
   const pick = all.find((g) => g.id === info);
   return (
     <>
       <KeeperScreen game={game} station={station} tabs={[{ id: 'rebirth', label: 'REBIRTH', icon: 'rebirth' }]} tab="rebirth" onTab={() => {}} onClose={onClose}>
         <ShopTop
           purse={
-            <Stat icon="rebirth" title="Rebirths">
+            <Stat icon="rebirth" label="Rebirths" title="Rebirths">
               {st.rebirths}
             </Stat>
           }
           title={
-            <Stat icon="stairs" title="Best floor this run / the floor a rebirth needs">
+            <Stat icon="stairs" label="Best floor" title="Best floor this run / the floor a rebirth needs">
               {st.run.bestFloor}/{need}
             </Stat>
           }
         />
+        <ShopHint>
+          <b>Rebirth</b>: start over from floor 1, stronger for good. {ok ? 'You can rebirth now.' : <>Reach <b>floor {need}</b> first.</>} Tap a card for more.
+        </ShopHint>
         <ShopBody>
           <ShopGrid>
-            {all.map((g) => (
-              <OfferCard
-                key={g.id}
-                art={g.art}
-                tall={g.id.startsWith('cls-')}
-                name={g.name}
-                tag={g.lose ? { icon: 'cross', color: '#f4e4c1' } : { icon: 'arrowUp', kind: 'new' }}
-                state={g.lose ? 'done' : 'open'}
-                lines={g.line ? [{ text: g.line }] : []}
-                onArt={() => (uiSound('open'), setInfo(g.id))}
-              />
-            ))}
+            <ShopHeading>YOU GAIN FOR GOOD</ShopHeading>
+            {all.filter((g) => !g.lose).map(card)}
+            <ShopHeading>YOU LOSE</ShopHeading>
+            {all.filter((g) => g.lose).map(card)}
           </ShopGrid>
         </ShopBody>
         <ShopFoot>
-          <div className={s.meter} style={{ flex: 1, marginTop: 0 }} data-kind="gold" title={`${st.run.bestFloor}/${need}`}>
-            <i style={{ width: `${Math.min(100, (st.run.bestFloor / need) * 100)}%` }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <span>
+              Floor <b>{st.run.bestFloor}</b> of {need}
+            </span>
+            <div className={s.meter} style={{ marginTop: 'calc(1 * var(--px))' }} data-kind="gold">
+              <i style={{ width: `${Math.min(100, (st.run.bestFloor / need) * 100)}%` }} />
+            </div>
           </div>
           <button className={`btn ${s.bigBtn}`} disabled={!ok} onClick={() => (uiSound('rebirth'), game.rebirth())} style={{ flex: 'none' }}>
             <Px icon={ok ? 'rebirth' : 'lock'} size="md" />
-            {ok ? 'REBIRTH' : need}
+            {ok ? 'REBIRTH' : `FLOOR ${need}`}
           </button>
         </ShopFoot>
       </KeeperScreen>
@@ -276,10 +288,10 @@ function goalName(q: Quest): string {
 
 function rewardLines(q: Quest): Array<{ icon: IconName; text: string; tone: 'gold' }> {
   const out: Array<{ icon: IconName; text: string; tone: 'gold' }> = [];
-  if (q.reward.gold) out.push({ icon: 'coin', text: fmt(q.reward.gold), tone: 'gold' });
-  if (q.reward.hourglasses) out.push({ icon: 'hourglass', text: `${q.reward.hourglasses}`, tone: 'gold' });
-  if (q.reward.luckSpins) out.push({ icon: 'star', text: `${q.reward.luckSpins}`, tone: 'gold' });
-  if (q.reward.potion) out.push({ icon: 'potion', text: '1', tone: 'gold' });
+  if (q.reward.gold) out.push({ icon: 'coin', text: `${fmt(q.reward.gold)} gold`, tone: 'gold' });
+  if (q.reward.hourglasses) out.push({ icon: 'hourglass', text: `${q.reward.hourglasses} hourglass${q.reward.hourglasses > 1 ? 'es' : ''}`, tone: 'gold' });
+  if (q.reward.luckSpins) out.push({ icon: 'star', text: `${q.reward.luckSpins} lucky spin${q.reward.luckSpins > 1 ? 's' : ''}`, tone: 'gold' });
+  if (q.reward.potion) out.push({ icon: 'potion', text: 'Luck potion', tone: 'gold' });
   return out;
 }
 
@@ -292,12 +304,19 @@ export function BoardShop({ game, station, onClose }: { game: Game; station: Hub
   return (
     <>
       <KeeperScreen game={game} station={station} tabs={[{ id: 'jobs', label: 'JOBS', icon: 'book', badge: list.filter((q) => q.done).length }]} tab="jobs" onTab={() => {}} onClose={onClose}>
-        <ShopTop purse={<Purse amount={st.gold} />} title={<Stat icon="book">{list.length}/{MAX_ACTIVE_QUESTS}</Stat>} />
+        <ShopTop purse={<Purse amount={st.gold} />} title={<Stat icon="book" label="Jobs">{list.length}/{MAX_ACTIVE_QUESTS}</Stat>} />
+        <ShopHint>
+          <b>Jobs</b> come from folk camped in the dungeon: talk to them to take one ({MAX_ACTIVE_QUESTS} at a time). When it's done, talk to someone like them again for the reward.
+        </ShopHint>
         <ShopBody>
           {list.length === 0 ? (
             <div className={s.empty}>
               <Icon icon="scroll" big />
-              <div>0/{MAX_ACTIVE_QUESTS}</div>
+              <div>
+                <b>No jobs yet.</b>
+                <br />
+                Look for folk by a tent or a cart on your next run.
+              </div>
             </div>
           ) : (
             <ShopGrid>
@@ -311,7 +330,12 @@ export function BoardShop({ game, station, onClose }: { game: Game; station: Hub
                     tag={q.done ? { icon: 'check', kind: 'new' } : undefined}
                     name={q.done ? (q.giverName ?? q.title) : goalName(q)}
                     state={q.done ? 'done' : 'open'}
-                    lines={[{ text: <ProgressBar value={p / q.target} /> }, ...rewardLines(q)]}
+                    lines={[
+                      { text: q.done ? 'Done! Hand it in' : `${p} of ${q.target}`, tone: q.done ? 'good' : undefined },
+                      { text: <ProgressBar value={p / q.target} /> },
+                      { text: <span className={s.colhead}>REWARD</span> },
+                      ...rewardLines(q),
+                    ]}
                     onArt={() => (uiSound('open'), setInfo(q.id))}
                   />
                 );
@@ -329,7 +353,7 @@ export function BoardShop({ game, station, onClose }: { game: Game; station: Hub
           </div>
           <div className={s.popRow} data-tone="muted">
             <Px icon="coin" size="sm" />
-            {rewardText(pick.reward)}
+            Reward: {rewardText(pick.reward)}
           </div>
         </InfoPopup>
       )}
@@ -373,21 +397,34 @@ export function OracleShop({ game, station, onClose, onOpen }: { game: Game; sta
     >
       <ShopTop
         purse={
-          <Stat icon="clover" title="Luck">
+          <Stat icon="clover" label="Luck" title="Luck">
             x{luck < 10 ? luck.toFixed(2) : fmt(luck)}
           </Stat>
         }
         title={
           <span className={s.chips} style={{ justifyContent: 'flex-end' }}>
-            <Stat icon="reel" title="Reels">
+            <Stat icon="reel" label="Reels" title="Reels">
               {reelCount(st)}
             </Stat>
-            <Stat icon="clock" title="Seconds a spin">
+            <Stat icon="clock" label="Every" title="Seconds a spin">
               {spinCycle(st).toFixed(1)}s
             </Stat>
           </span>
         }
       />
+      <ShopHint>
+        {tab === 'summon' && (
+          <>
+            The altar <b>summons a free knight every {spinCycle(st).toFixed(1)}s</b>, even while you fight. More luck, rarer knights.
+          </>
+        )}
+        {tab === 'latest' && <>Your last summons, newest first. Tap one to see that knight.</>}
+        {tab === 'odds' && (
+          <>
+            How likely each rarity is: the <b>base</b> odds, and <b>your</b> chance with your luck (x{luck < 10 ? luck.toFixed(2) : fmt(luck)}).
+          </>
+        )}
+      </ShopHint>
       <ShopBody scrollKey={tab}>
         {tab === 'summon' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'calc(3 * var(--px))' }}>
@@ -395,15 +432,15 @@ export function OracleShop({ game, station, onClose, onOpen }: { game: Game; sta
               <AltarReels game={game} variant="big" />
             </div>
             <div className={s.chips}>
-              <Stat icon="star" title="Lucky Spin in">
+              <Stat icon="star" label="Lucky spin in" title="Every 10th spin is lucky: extra luck">
                 {lucky}
               </Stat>
               {st.hourglasses > 0 && (
-                <Stat icon="hourglass" title="Turbo spins">
+                <Stat icon="hourglass" label="Hourglasses" title="Turbo spins">
                   {st.hourglasses}
                 </Stat>
               )}
-              <Stat icon="gem" title="Luck token chance">
+              <Stat icon="gem" label="Luck token" title="The chance a spin lands a luck token (x2 to x10)">
                 {Math.round(tokenChance(st) * 100)}%
               </Stat>
             </div>
@@ -411,8 +448,12 @@ export function OracleShop({ game, station, onClose, onOpen }: { game: Game; sta
               <div className={s.note} title="Epic or better guaranteed in">
                 <div className={s.popRow}>
                   <Px icon="shield" size="sm" />
-                  <b style={{ color: inkOf(RARITY_COLOR.epic) }}>EPIC+</b>
-                  <span style={{ marginLeft: 'auto' }}>{pity}</span>
+                  <span>
+                    <b style={{ color: inkOf(RARITY_COLOR.epic) }}>Epic or better</b> guaranteed in
+                  </span>
+                  <b style={{ marginLeft: 'auto' }}>
+                    {pity} spin{pity === 1 ? '' : 's'}
+                  </b>
                 </div>
                 <div className={s.meter} data-kind="purple">
                   <i style={{ width: `${(1 - pity / drySpell(st)) * 100}%` }} />
@@ -425,6 +466,7 @@ export function OracleShop({ game, station, onClose, onOpen }: { game: Game; sta
           (game.recent.length === 0 ? (
             <div className={s.empty}>
               <Px icon="reel" size="lg" s={1} />
+              <div>Nothing summoned yet. The altar is spinning.</div>
             </div>
           ) : (
             <ShopGrid>
@@ -438,7 +480,10 @@ export function OracleShop({ game, station, onClose, onOpen }: { game: Game; sta
                     tall
                     tag={r.isNew ? { text: 'NEW', kind: 'new' } : { color: RARITY_COLOR[def.rarity], title: RARITY_NAME[def.rarity] }}
                     name={def.name}
-                    lines={[{ icon: 'dice', text: oneIn(r.oneIn).replace('1 in ', '1/') }]}
+                    lines={[
+                      { text: RARITY_NAME[def.rarity], tone: 'muted' },
+                      { icon: 'dice', text: oneIn(r.oneIn) },
+                    ]}
                     onArt={st.roster[r.knightId] ? () => (uiSound('tap'), onOpen(r.knightId)) : undefined}
                   />
                 );
@@ -447,6 +492,13 @@ export function OracleShop({ game, station, onClose, onOpen }: { game: Game; sta
           ))}
         {tab === 'odds' && (
           <div className={s.note} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 'calc(1 * var(--px)) calc(4 * var(--px))', fontVariantNumeric: 'tabular-nums' }}>
+            <span className={s.colhead}>RARITY</span>
+            <span className={s.colhead} style={{ textAlign: 'right' }}>
+              BASE
+            </span>
+            <span className={s.colhead} style={{ textAlign: 'right' }}>
+              YOU
+            </span>
             {[...RARITIES].reverse().map((r) => (
               <Row key={r} name={RARITY_NAME[r]} color={RARITY_COLOR[r]} odds={r === 'common' ? '-' : oneIn(RARITY_ODDS[r]).replace('1 in ', '1/')} chance={ch[r] > 0 ? (ch[r] >= 0.001 ? `${(ch[r] * 100).toFixed(ch[r] > 0.1 ? 1 : 2)}%` : oneIn(1 / ch[r]).replace('1 in ', '1/')) : '-'} />
             ))}
@@ -485,13 +537,13 @@ export function GateShop({ game, station, onClose }: { game: Game; station: HubS
     <KeeperScreen game={game} station={station} tabs={[{ id: 'down', label: 'DESCEND', icon: 'swords' }]} tab="down" onTab={() => {}} onClose={onClose}>
       <ShopTop
         purse={
-          <Stat icon="stairs" title="Floor">
+          <Stat icon="stairs" label="Floor" title="Floor">
             {floor}
           </Stat>
         }
         title={
           <span className={s.chips} style={{ justifyContent: 'flex-end' }}>
-            <Stat icon="sword" title="Squad power / par">
+            <Stat icon="sword" label="Power" title="Your squad's power / what this floor expects">
               {fmt(power)}/{fmt(diff.par)}
             </Stat>
             <span className="dchip" style={{ ['--cc' as string]: ch.color, ['--seal' as string]: `var(--sk-seal-${diff.challenge})`, color: '#2b170c', textShadow: 'none' } as CSSProperties} title={ch.text}>
@@ -500,25 +552,29 @@ export function GateShop({ game, station, onClose }: { game: Game; station: HubS
           </span>
         }
       />
+      <ShopHint>
+        Next: <b>floor {floor}</b>, {biome.name}
+        {floor % 5 === 0 ? ', with a boss' : ''}. {ch.text}
+      </ShopHint>
       <ShopBody>
         <ShopGrid>
           <OfferCard
             level={floor % 5 === 0 ? <Px icon="skull" size="sm" /> : undefined}
             art={<Px icon={floor % 5 === 0 ? 'skull' : 'swords'} size="lg" s={1} />}
             name={biome.name}
-            lines={[]}
+            lines={[{ text: floor % 5 === 0 ? `Floor ${floor} · BOSS` : `Floor ${floor}` }]}
           />
           {st.squad.map((id, slot) =>
             id ? (
               <OfferCard
                 key={slot}
                 level={`Lv.${st.roster[id]?.level ?? 1}`}
-                levelRight={slot === st.controlled ? <Px icon="star" size="xs" /> : undefined}
+                levelRight={slot === st.controlled ? 'YOU' : undefined}
                 art={<HeroArt id={id} mutation={st.roster[id]?.mutation ?? null} s={1} />}
                 tall
                 tag={{ color: RARITY_COLOR[knightDef(id).rarity], title: RARITY_NAME[knightDef(id).rarity] }}
                 name={knightDef(id).name}
-                lines={[{ icon: 'sword', text: fmt(knightRating(st, id)) }]}
+                lines={[{ icon: 'sword', text: `Power ${fmt(knightRating(st, id))}` }]}
               />
             ) : null,
           )}
@@ -545,11 +601,14 @@ export function QuartermasterShop({ game, station, onClose, children }: { game: 
       <ShopTop
         purse={<Purse amount={st.gold} />}
         title={
-          <Stat icon="sword" title="Squad power">
+          <Stat icon="sword" label="Squad power" title="Squad power">
             {fmt(squadPower(st))}
           </Stat>
         }
       />
+      <ShopHint>
+        Your <b>squad</b> is the 3 knights who fight; the one with the crown is you. Tap any knight to see it, level it or put it in the squad.
+      </ShopHint>
       <ShopBody>
         <div className={s.legacy}>{children}</div>
       </ShopBody>

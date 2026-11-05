@@ -60,7 +60,7 @@ export function HeroCard({ game, id, onOpen }: { game: Game; id: string; onOpen:
       mutation={r.mutation}
       rarity={def.rarity}
       name={def.name}
-      meta={`Lv ${r.level}`}
+      meta={`Lv ${r.level} ${CLASSES[def.cls].name}`}
       left={
         <>
           <Px icon="might" size="sm" />
@@ -400,29 +400,41 @@ export function HeroDetail({ game, id, onClose }: { game: Game; id: string; onCl
           </span>
           <div className="kstats outlined num">
             <span title="Power">
-              <Px icon="might" size="sm" />
-              <Bump value={power} className="t-gold">
-                {fmt(power)}
-              </Bump>
+              <small>POWER</small>
+              <i>
+                <Px icon="might" size="sm" />
+                <Bump value={power} className="t-gold">
+                  {fmt(power)}
+                </Bump>
+              </i>
             </span>
             <span title="HP">
-              <Px icon="heart" size="sm" />
-              <Bump value={Math.round(st.hp)}>{fmt(st.hp)}</Bump>
+              <small>HP</small>
+              <i>
+                <Px icon="heart" size="sm" />
+                <Bump value={Math.round(st.hp)}>{fmt(st.hp)}</Bump>
+              </i>
             </span>
             <span title="Attack">
-              <Px icon="sword" size="sm" />
-              <Bump value={Math.round(st.atk)}>{fmt(st.atk)}</Bump>
+              <small>ATTACK</small>
+              <i>
+                <Px icon="sword" size="sm" />
+                <Bump value={Math.round(st.atk)}>{fmt(st.atk)}</Bump>
+              </i>
             </span>
             <span title={RARITY_ODDS[def.rarity] <= 1 ? "Odds at the altar: the everyday find" : `Odds at the altar: ${oneIn(RARITY_ODDS[def.rarity])}`}>
-              <Px icon="dice" size="sm" />
-              <b style={{ color: RARITY_COLOR[def.rarity] }}>{rarityOdds(def.rarity)}</b>
+              <small>ODDS</small>
+              <i>
+                <Px icon="dice" size="sm" />
+                <b style={{ color: RARITY_COLOR[def.rarity] }}>{rarityOdds(def.rarity)}</b>
+              </i>
             </span>
           </div>
         </div>
         <LevelPanel {...panel} />
         <SparePanel {...panel} />
         <div className="row ksquad">
-          <span className="outlined">Squad</span>
+          <span className="outlined">Squad slot</span>
           {[0, 1, 2].map((i) => (
             <button
               key={i}
@@ -449,7 +461,7 @@ export function HeroDetail({ game, id, onClose }: { game: Game; id: string; onCl
                 setForge(`${r.rolled!.toUpperCase()}!`);
               } else {
                 uiSound('dupe');
-                setForge(r.rolled ? `${r.rolled.toUpperCase()}: no better` : 'Nothing');
+                setForge(r.rolled ? `Rolled ${r.rolled.toUpperCase()}: no better, kept yours` : 'Rolled nothing this time');
               }
               refresh();
             }}
@@ -683,7 +695,7 @@ export function SettingsSheet({ game, onClose }: { game: Game; onClose: () => vo
         {toggle('Reduce motion', 'No screen shake, calmer reveals', s.settings.reduceMotion, (v) => (s.settings.reduceMotion = v))}
         <div className="section-title outlined">Controls</div>
         <p className="lead">
-          Move: WASD or arrows (touch: drag on the left). Dodge roll: Space. Special: E. Take control of a knight: 1, 2, 3 or tap them. Auto: T. Camp: Esc.
+          Move: WASD or arrows (touch: drag on the left). Attack: click or J, aim with the mouse (touch: hold Attack; it aims for you). Dodge roll: Space (touch: Dodge). Your skill rolls and fires by itself in a fight (E rolls it any time it is ready). Take control of a knight: 1, 2, 3 or tap them. Auto: T. Camp: Esc.
         </p>
         <div className="section-title outlined">Your save</div>
         <p className="lead">

@@ -90,7 +90,7 @@ export function hexAt(hexes: readonly DrawHex[], mx: number, my: number): DrawHe
 /** The skin's ink (styles.css --ink): every outline. */
 export const INK = '#180702';
 /** The UI's pixel font, bold like its buttons. */
-const FONT = '"Pixelify Sans", "Courier New", monospace';
+const FONT = '"RK Digits", "Pixelify Sans", "Courier New", monospace';
 const font = (px: number) => `700 ${px}px ${FONT}`;
 /** Each face shaded top to bottom: steel enamel once owned, iron when open, brass for owned specials, dark iron for "?". */
 export const FACE: Record<'open' | 'owned' | 'gold' | 'mystery', [string, string]> = {

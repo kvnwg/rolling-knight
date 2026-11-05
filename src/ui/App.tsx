@@ -47,11 +47,16 @@ export interface Banner {
 
 let nextId = 1;
 
-/** CSS px per art pixel for the UI: about 180 art pixels across a phone, capped for big screens. */
+/**
+ * CSS px per art pixel for the UI: about 130 art pixels across a phone (so text and buttons are big
+ * enough to read and tap: 3 CSS px a pixel on a 393 px wide phone), about 180 on a desktop's short
+ * side, capped for big screens.
+ */
 function uiPx(): number {
   const w = window.innerWidth;
   const h = window.innerHeight;
-  const raw = Math.min(w, h * 0.62) / 180;
+  const phone = Math.min(w, h) < 600;
+  const raw = phone ? Math.min(w, h * 0.62) / 130 : Math.min(w, h * 0.62) / 180;
   return Math.max(2, Math.min(4, Math.round(raw * 2) / 2));
 }
 

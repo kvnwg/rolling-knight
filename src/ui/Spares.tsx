@@ -43,11 +43,11 @@ export function GoldReadout({ gold, goldRef, className }: { gold: number; goldRe
   );
 }
 
-/** "[copies] 3 → [shard] +3": what a button takes and what it gives (just the icons when it can't). */
-function Trade({ n, give, icon }: { n?: number; give?: string; icon: IconName }) {
+/** "Break 3 → [shard] +3": what a button does and what it gives ("[copies] 3 → ..." without a verb). */
+function Trade({ n, give, icon, verb }: { n?: number; give?: string; icon: IconName; verb?: string }) {
   return (
     <span className="ktrade num">
-      <Px icon="copies" size="sm" />
+      {verb ? <span>{verb}</span> : <Px icon="copies" size="sm" />}
       {n !== undefined && <b>{n}</b>}
       <Px icon="arrowRight" size="xs" className="kto" />
       <Px icon={icon} size="sm" />
@@ -124,13 +124,13 @@ export function LevelPanel({ game, id, fx, shardRef, onChange }: PanelProps) {
   return (
     <section className="kpanel klevel">
       <span className="klv outlined num" title={`Level ${rec.level}`}>
-        <small>Lv</small>
+        <small>LEVEL</small>
         <Bump value={rec.level} />
       </span>
       <div className="kshards" ref={shardRef} title={max ? 'Max level' : `Shards: ${rec.shards} of ${cost.shards} for level ${rec.level + 1}`}>
         <span className="outlined num">
-          <Px icon="shard" /> <Bump value={rec.shards} className="kshard-n" />
-          {max ? '' : `/${cost.shards}`}
+          <Px icon="shard" /> Shards <Bump value={rec.shards} className="kshard-n" />
+          {max ? ' (max level)' : `/${cost.shards}`}
         </span>
         <div className="kbar">
           <Bar value={max ? 1 : rec.shards / cost.shards} kind="sp" />
@@ -149,6 +149,7 @@ export function LevelPanel({ game, id, fx, shardRef, onChange }: PanelProps) {
         }}
       >
         <Px icon="arrowUp" size="sm" />
+        {max ? 'MAX' : 'LEVEL UP'}
         {!max && (
           <span className={`kcost num${s.gold < cost.gold ? ' short' : ''}`}>
             <Px icon="coin" size="xs" />
@@ -185,25 +186,27 @@ export function SparePanel({ game, id, fx, shardRef, goldRef, onChange }: PanelP
   return (
     <section className="kpanel">
       <div className="spread">
-        <span className={`kspare-count${n ? '' : ' none'}`} title={copies(n)}>
+        <span className={`kspare-count outlined${n ? '' : ' none'}`} title={copies(n)}>
           <Bump value={n}>
             <SpareChip n={n} />
           </Bump>
+          <span>{n ? copies(n) : 'No spare copies'}</span>
         </span>
         <HelpButton />
       </div>
+      <p className="kspare-why">Repeats of this knight. Break them into shards to level it up, or sell them for gold.</p>
       <div className="kspare-grid">
         <button className="btn blue small" disabled={n < 1} aria-label={`Break down 1 spare copy: +${one.shards} shards`} onClick={(e) => breakDown(1, e.currentTarget)}>
-          {n >= 1 ? <Trade n={1} give={`+${one.shards}`} icon="shard" /> : <Trade icon="shard" />}
+          <Trade verb="Break" n={1} give={n >= 1 ? `+${one.shards}` : undefined} icon="shard" />
         </button>
         <button className="btn blue small" disabled={n < 2} aria-label={`Break down all ${copies(n)}: +${all.shards} shards`} onClick={(e) => breakDown(n, e.currentTarget)}>
-          {n >= 2 ? <Trade n={n} give={`+${all.shards}`} icon="shard" /> : <Trade icon="shard" />}
+          <Trade verb="Break" n={n >= 2 ? n : undefined} give={n >= 2 ? `+${all.shards}` : undefined} icon="shard" />
         </button>
         <button className="btn gold small" disabled={n < 1} aria-label={`Sell 1 spare copy: +${fmt(one.gold)} gold`} onClick={(e) => sell(1, e.currentTarget)}>
-          {n >= 1 ? <Trade n={1} give={`+${fmt(one.gold)}`} icon="coin" /> : <Trade icon="coin" />}
+          <Trade verb="Sell" n={1} give={n >= 1 ? `+${fmt(one.gold)}` : undefined} icon="coin" />
         </button>
         <button className="btn gold small" disabled={n < 2} aria-label={`Sell all ${copies(n)}: +${fmt(all.gold)} gold`} onClick={(e) => sell(n, e.currentTarget)}>
-          {n >= 2 ? <Trade n={n} give={`+${fmt(all.gold)}`} icon="coin" /> : <Trade icon="coin" />}
+          <Trade verb="Sell" n={n >= 2 ? n : undefined} give={n >= 2 ? `+${fmt(all.gold)}` : undefined} icon="coin" />
         </button>
       </div>
     </section>

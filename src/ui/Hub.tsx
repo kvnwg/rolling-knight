@@ -75,10 +75,12 @@ export function HubHud({ game, onTalk, onSettings, onLuck }: { game: Game; onTal
           <div className="floor-pill plate outlined">
             <b>THE HUB</b>
             <span>
-              Next: floor {floor}, {biomeForFloor(floor, s.run.biomeSeed).name}
+              Next: floor {floor}
               <span className="dchip" style={{ ['--cc' as string]: ch.color, ['--seal' as string]: `var(--sk-seal-${diff.challenge})` }}>
                 {ch.name.toUpperCase()}
               </span>
+              <span className="sep"> · </span>
+              <span className="foes">{biomeForFloor(floor, s.run.biomeSeed).name}</span>
             </span>
           </div>
         }
@@ -167,13 +169,14 @@ function SquadPanel({ game, onOpen }: { game: Game; onOpen: (id: string) => void
   return (
     <>
       <div className="spread">
-        <div className="squad-row">
-          {s.squad.map((id, slot) => (id ? <HeroCard key={slot} game={game} id={id} onOpen={onOpen} /> : null))}
-        </div>
-        <button className="btn small" onClick={() => (bestSquad(s), game.syncHub(true), uiSound('equip', 3))} title="Best squad">
+        <span className="section-title outlined">Your squad</span>
+        <button className="btn small" onClick={() => (bestSquad(s), game.syncHub(true), uiSound('equip', 3))} title="Put your 3 strongest knights in the squad">
           <Px icon="star" size="sm" />
+          Best squad
         </button>
       </div>
+      <div className="squad-row">{s.squad.map((id, slot) => (id ? <HeroCard key={slot} game={game} id={id} onOpen={onOpen} /> : null))}</div>
+      <span className="section-title outlined">All your knights</span>
       <HeroesPanel game={game} onOpen={onOpen} />
     </>
   );

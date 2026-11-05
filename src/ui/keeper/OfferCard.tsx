@@ -4,7 +4,8 @@
  * button, a coin and a number on green. Bought: the card flashes, the price floats up out of it and
  * the level pops. Can't afford it: the button shakes its head and floats how much is missing. Done:
  * a grey button with a check. Locked: a ribbon with a padlock across the picture, a padlock on the
- * button. Words (what it does, what opens it) wait in the popup its picture or name opens.
+ * button. Every number on a card says what it is and its button says what it does; the full story
+ * (what it does, what opens it) waits in the popup its picture or name opens.
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useHoldRepeat } from '../upgrades/parts';
@@ -21,6 +22,8 @@ export interface CardLine {
 export type CardButton =
   | {
       kind: 'buy';
+      /** What the button does, in a word or two ("LEVEL UP", "SELL"), before its price. */
+      verb?: string;
       label: ReactNode;
       icon?: IconName;
       /** Green when it can be bought now; beige with red writing when it can't. */
@@ -157,6 +160,7 @@ export function OfferCard(p: OfferCardProps) {
           data-nope={nope > 0 || undefined}
           {...(btn.hold ? hold : { onClick: () => press(0) })}
         >
+          {btn.verb && <span className={s.verb}>{btn.verb}</span>}
           {btn.icon && <Px icon={btn.icon} size="xs" />}
           <span>{btn.label}</span>
         </button>

@@ -21,9 +21,8 @@ import { cardIcon, hexIcon } from '../upgrades/icons';
 import { SQUAD_STATS, UpgradeMap } from '../upgrades/UpgradeMap';
 import { useHoldRepeat } from '../upgrades/parts';
 import { InfoPopup } from './InfoPopup';
-import { Delta, KeeperScreen, Purse, ShopBody, ShopGrid, ShopTop, Stat, keeperStyles as s, useGameTick, type KeeperCat } from './KeeperScreen';
+import { KeeperScreen, Purse, ShopBody, ShopGrid, ShopHint, ShopTop, Stat, keeperStyles as s, useGameTick, type KeeperCat } from './KeeperScreen';
 import { OfferCard, type CardLine } from './OfferCard';
-import { upgradeStats } from './stats';
 import { TINKER_CATS } from './tinkerCats';
 
 /** Where the tinker's screen was left (kept while the app runs). */
@@ -91,11 +90,11 @@ export function TinkerShop({ game, station, onClose }: { game: Game; station: Hu
           purse={<Purse amount={st.gold} />}
           title={
             tab === 'luck' ? (
-              <Stat icon="clover" title="Luck">
+              <Stat icon="clover" label="Luck" title="Luck">
                 x{luck < 10 ? luck.toFixed(2) : fmt(luck)}
               </Stat>
             ) : (
-              <Stat icon="sword" title="Squad power">
+              <Stat icon="sword" label="Power" title="Squad power">
                 {fmt(squadPower(st))}
               </Stat>
             )
@@ -107,6 +106,17 @@ export function TinkerShop({ game, station, onClose }: { game: Game; station: Hu
             </button>
           }
         />
+        <ShopHint>
+          {tab === 'luck' ? (
+            <>
+              Gold upgrades for <b>the altar</b>: more luck, faster spins, more reels. Buying one opens the ones after it.
+            </>
+          ) : (
+            <>
+              Gold upgrades for <b>your squad</b> in the dungeon: damage, HP, speed and lucky hits. Buying one opens the ones after it.
+            </>
+          )}
+        </ShopHint>
         <ShopBody cats={catList} cat={current.id} onCat={setCat} scrollKey={`${tab}|${current.id}`}>
           <ShopGrid>
             {current.lines.map((id) => (
@@ -132,16 +142,40 @@ function UpgradeCard({ game, id, onBuy, onInfo }: { game: Game; id: UpgradeId; o
   const maxed = t >= def.max;
   const open = upgradeUnlocked(st, id);
   const cost = upgradeCost(st, id);
-  const now = upgradeStats(st, id, t);
-  const next = upgradeStats(st, id, Math.min(def.max, t + 1));
+  const parent = def.requires ? HEX_BY_KEY.get(nodeKey(def.requires.id, def.requires.tier)) : undefined;
+  // What it does now and after the next tier, in words ("+15% luck", "a Lucky Spin every 8 spins").
   let lines: CardLine[];
-  if (maxed) lines = now.map((x) => ({ icon: x.icon, text: x.text, tone: 'good' }));
-  else if (!open) lines = next.map((x) => ({ icon: x.icon, text: x.text, tone: 'muted' }));
-  else lines = next.map((x, i) => ({ icon: x.icon, text: <Delta now={t > 0 ? now[i].text : undefined} next={x.text} /> }));
+  if (maxed) lines = [{ text: effectAt(st, id, t), tone: 'good' }];
+  else if (!open) lines = [{ text: effectAt(st, id, t + 1), tone: 'muted' }];
+  else
+    lines = [
+      ...(t > 0
+        ? [
+            {
+              text: (
+                <>
+                  <span className={s.colhead}>NOW </span>
+                  {effectAt(st, id, t)}
+                </>
+              ),
+              tone: 'muted' as const,
+            },
+          ]
+        : []),
+      {
+        text: (
+          <>
+            {t > 0 && <span className={s.colhead}>NEXT </span>}
+            {effectAt(st, id, t + 1)}
+          </>
+        ),
+        tone: 'good',
+      },
+    ];
   return (
     <OfferCard
       level={`Lv.${t}`}
-      levelRight={`/${def.max}`}
+      levelRight={`of ${def.max}`}
       art={<Icon icon={def.icon} big />}
       tag={def.special ? { icon: 'star', kind: 'gold' } : def.rolls ? { icon: 'dice' } : undefined}
       name={def.name}
@@ -149,13 +183,15 @@ function UpgradeCard({ game, id, onBuy, onInfo }: { game: Game; id: UpgradeId; o
       special={def.special}
       state={maxed ? 'done' : open ? 'open' : 'locked'}
       onArt={onInfo}
+      note={!maxed && !open && parent ? `Needs ${nodeName(parent)}` : undefined}
       button={
         maxed
-          ? { kind: 'done' }
+          ? { kind: 'done', label: 'MAXED' }
           : !open
-            ? { kind: 'locked' }
+            ? { kind: 'locked', label: 'LOCKED' }
             : {
                 kind: 'buy',
+                verb: 'BUY',
                 label: fmt(cost),
                 icon: 'coin',
                 ready: st.gold >= cost,
@@ -163,7 +199,7 @@ function UpgradeCard({ game, id, onBuy, onInfo }: { game: Game; id: UpgradeId; o
                 hold: true,
                 onPress: onBuy,
                 paid: `-${fmt(cost)}`,
-                short: `-${fmt(cost - st.gold)}`,
+                short: `need ${fmt(cost - st.gold)} more`,
               }
       }
     />
@@ -204,6 +240,7 @@ function UpgradeInfo({ game, id, onBuy, onClose }: { game: Game; id: UpgradeId; 
       actions={
         !maxed && open ? (
           <button key={nope} className={`btn ${s.buy}`} data-kind={st.gold >= cost ? (def.special ? 'gold' : 'buy') : 'short'} data-nope={nope > 0 || undefined} {...hold}>
+            <span className={s.verb}>BUY</span>
             <Px icon="coin" size="sm" />
             <span>{fmt(cost)}</span>
           </button>
@@ -226,6 +263,7 @@ function UpgradeInfo({ game, id, onBuy, onClose }: { game: Game; id: UpgradeId; 
       {!open && parent && (
         <div className={s.popRow} data-tone="bad">
           <Px icon="lock" size="sm" />
+          Needs
           <Icon icon={upgradeDef(parent.id)!.icon} />
           {nodeName(parent)}
         </div>

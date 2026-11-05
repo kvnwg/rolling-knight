@@ -20,7 +20,7 @@ import { HeroArt } from '../common';
 import { fmt } from '../format';
 import { Px, type IconName } from '../px';
 import { uiSound } from '../sound';
-import { Glyph, KeeperScreen, Purse, ShopBody, ShopFoot, ShopGrid, ShopTop, Stat, keeperStyles as s, useGameTick, type KeeperCat } from './KeeperScreen';
+import { Glyph, KeeperScreen, Purse, ShopBody, ShopFoot, ShopGrid, ShopHint, ShopTop, Stat, keeperStyles as s, useGameTick, type KeeperCat } from './KeeperScreen';
 import { OfferCard } from './OfferCard';
 
 /** Each class's little picture on its category button. */
@@ -89,15 +89,27 @@ export function SmithShop({ game, station, onClose, onOpen }: { game: Game; stat
       <ShopTop
         purse={<Purse amount={st.gold} />}
         title={
-          <Stat icon="shard" title="Shards across your knights">
+          <Stat icon="shard" label="Shards" title="Shards across your knights">
             {fmt(shards)}
           </Stat>
         }
       />
+      <ShopHint>
+        {leveling ? (
+          <>
+            <b>Level up</b> a knight with its own <b>shards</b> and gold. Shards come from breaking down spare copies at Rusty Mags'.
+          </>
+        ) : (
+          <>
+            <b>Reforge</b> rolls for a <b>mutation</b> (a big power boost) for gold. A better one replaces the old; a worse one changes nothing.
+          </>
+        )}
+      </ShopHint>
       <ShopBody cats={cats} cat={cur} onCat={(c) => ((smithMemory.cat = c), setCatState(c))} scrollKey={`${tab}|${cur}`}>
         {ids.length === 0 ? (
           <div className={s.empty}>
             <Px icon="helm" size="lg" s={1} />
+            <div>No knights yet. Summon some at the altar.</div>
           </div>
         ) : (
           <ShopGrid>
@@ -120,14 +132,15 @@ export function SmithShop({ game, station, onClose, onOpen }: { game: Game; stat
                     onArt={() => (uiSound('tap'), onOpen(id))}
                     state={maxed ? 'done' : 'open'}
                     lines={[
-                      { icon: 'sword', text: fmt(knightRating(st, id)) },
-                      ...(maxed ? [] : [{ icon: 'shard' as IconName, text: `${rec.shards}/${c.shards}`, tone: enoughShards ? ('good' as const) : ('bad' as const) }]),
+                      { icon: 'sword', text: `Power ${fmt(knightRating(st, id))}` },
+                      ...(maxed ? [] : [{ icon: 'shard' as IconName, text: `Shards ${rec.shards}/${c.shards}`, tone: enoughShards ? ('good' as const) : ('bad' as const) }]),
                     ]}
                     button={
                       maxed
                         ? { kind: 'done', label: 'MAX LEVEL' }
                         : {
                             kind: 'buy',
+                            verb: 'LEVEL UP',
                             label: fmt(c.gold),
                             icon: 'coin',
                             ready: canLevel(st, id),
@@ -139,7 +152,7 @@ export function SmithShop({ game, station, onClose, onOpen }: { game: Game; stat
                               return ok;
                             },
                             paid: `Lv.${rec.level + 1}!`,
-                            short: !enoughShards ? `-${c.shards - rec.shards} shards` : `-${fmt(c.gold - st.gold)}`,
+                            short: !enoughShards ? `need ${c.shards - rec.shards} more shards` : `need ${fmt(c.gold - st.gold)} more gold`,
                           }
                     }
                   />
@@ -150,7 +163,7 @@ export function SmithShop({ game, station, onClose, onOpen }: { game: Game; stat
               return (
                 <OfferCard
                   key={id}
-                  level={rec.mutation ? rec.mutation.toUpperCase() : '-'}
+                  level={rec.mutation ? rec.mutation.toUpperCase() : 'No mutation'}
                   levelRight={<Px icon={CLASS_ICON[def.cls]} size="xs" />}
                   art={<Knight game={game} id={id} />}
                   tall
@@ -158,26 +171,30 @@ export function SmithShop({ game, station, onClose, onOpen }: { game: Game; stat
                   name={def.name}
                   onArt={() => (uiSound('tap'), onOpen(id))}
                   state={voided ? 'done' : 'open'}
-                  lines={msg[id] ? [{ icon: 'sparkle', text: msg[id], tone: msg[id].endsWith('!') ? 'good' : 'muted' }] : [{ icon: 'sword', text: fmt(knightRating(st, id)) }]}
+                  lines={[
+                    { icon: 'sword', text: `Power ${fmt(knightRating(st, id))}` },
+                    ...(msg[id] ? [{ icon: 'sparkle' as IconName, text: msg[id], tone: msg[id].endsWith('!') ? ('good' as const) : ('muted' as const) }] : []),
+                  ]}
                   button={
                     voided
                       ? { kind: 'done', label: 'VOID: BEST' }
                       : {
                           kind: 'buy',
+                          verb: 'REFORGE',
                           label: fmt(cost),
                           icon: 'coin',
                           ready: st.gold >= cost,
                           onPress: () => {
                             const r = reforge(st, id, () => game.rng.next());
                             if (!r) return false;
-                            const text = r.improved ? `${r.rolled!.toUpperCase()}!` : r.rolled ? r.rolled : '...';
+                            const text = r.improved ? `${r.rolled!.toUpperCase()}!` : r.rolled ? `Rolled ${r.rolled}: no better` : 'Rolled nothing';
                             uiSound(r.improved ? 'mutation' : 'dupe', r.improved ? 6 : 0);
                             setMsg((m) => ({ ...m, [id]: text }));
                             refresh();
                             return true;
                           },
                           paid: () => `-${fmt(cost)}`,
-                          short: `-${fmt(cost - st.gold)}`,
+                          short: `need ${fmt(cost - st.gold)} more gold`,
                         }
                   }
                 />
@@ -234,8 +251,7 @@ export function ScrapShop({ game, station, onClose, onOpen }: { game: Game; stat
     footer = (
       <>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'calc(1 * var(--px))' }}>
-          <Px icon="bag" size="sm" />
-          <b>x{n}</b>
+          <b>{n}</b> spare{n === 1 ? '' : 's'} in all
         </span>
         <button
           className={`btn ${armed ? 'red' : s.buy}`}
@@ -256,8 +272,9 @@ export function ScrapShop({ game, station, onClose, onOpen }: { game: Game; stat
           }}
         >
           {armed && <Px icon="check" size="xs" />}
+          <span className={s.verb}>{armed ? 'SURE?' : selling ? 'SELL ALL' : 'BREAK ALL'}</span>
           <Px icon={selling ? 'coin' : 'shard'} size="xs" />
-          <span>{selling ? `ALL +${fmt(gold)}` : `ALL +${fmt(shards)}`}</span>
+          <span>+{fmt(selling ? gold : shards)}</span>
         </button>
       </>
     );
@@ -276,16 +293,31 @@ export function ScrapShop({ game, station, onClose, onOpen }: { game: Game; stat
       <ShopTop
         purse={<Purse amount={st.gold} />}
         title={
-          <Stat icon="shard" title="Shards across your knights">
+          <Stat icon="shard" label="Shards" title="Shards across your knights">
             {fmt(st.roster ? Object.values(st.roster).reduce((a, r) => a + r.shards, 0) : 0)}
           </Stat>
         }
       />
+      <ShopHint>
+        {selling ? (
+          <>
+            <b>Spare copies</b> are repeats of knights you already have. <b>Sell</b> them for gold; you always keep one of each knight.
+          </>
+        ) : (
+          <>
+            <b>Break down</b> spare copies into <b>shards</b> for that knight. Brannoc the smith levels it up with them.
+          </>
+        )}
+      </ShopHint>
       <ShopBody cats={all.length ? cats : undefined} cat={cur} onCat={(c) => ((scrapMemory.cat = c), setCatState(c))} scrollKey={`${tab}|${cur}`}>
         {ids.length === 0 ? (
           <div className={s.empty}>
             <Px icon="helm" size="lg" s={1} />
-            <div>x0</div>
+            <div>
+              <b>No spare copies.</b>
+              <br />
+              When the altar summons a knight you already have, the copy lands here.
+            </div>
           </div>
         ) : (
           <ShopGrid>
@@ -296,16 +328,17 @@ export function ScrapShop({ game, station, onClose, onOpen }: { game: Game; stat
               return (
                 <OfferCard
                   key={id}
-                  level={`x${rec.dupes}`}
+                  level={`${rec.dupes} spare${rec.dupes === 1 ? '' : 's'}`}
                   levelRight={<Px icon={CLASS_ICON[def.cls]} size="xs" />}
                   art={<Knight game={game} id={id} />}
                   tall
                   tag={rarityTag(id)}
                   name={def.name}
                   onArt={() => (uiSound('tap'), onOpen(id))}
-                  lines={[{ icon: selling ? 'coin' : 'shard', text: fmt(each), tone: 'gold' }]}
+                  lines={[{ icon: selling ? 'coin' : 'shard', text: selling ? `${fmt(each)} gold each` : `${fmt(each)} shard${each === 1 ? '' : 's'} each`, tone: 'gold' }]}
                   button={{
                     kind: 'buy',
+                    verb: selling ? `SELL ${rec.dupes}` : `BREAK ${rec.dupes}`,
                     label: `+${fmt(each * rec.dupes)}`,
                     icon: selling ? 'coin' : 'shard',
                     ready: true,

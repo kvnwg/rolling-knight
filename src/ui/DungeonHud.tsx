@@ -63,7 +63,9 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
               )}
             </b>
             <span>
-              {game.biome.name} · {w ? (w.portalOpen ? <span className="t-good">portal open</span> : `${mobsLeft} foes`) : '...'}
+              {game.biome.name}
+              <span className="sep"> · </span>
+              <span className="foes">{w ? (w.portalOpen ? <span className="t-good">portal open</span> : `${mobsLeft} foes left`) : '...'}</span>
             </span>
           </div>
         }
