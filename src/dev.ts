@@ -6,15 +6,19 @@
  *   ?auto             the knight you control plays itself
  *   ?gold=1e6         some gold
  *   ?camp             stay at camp (the home screen) after ?floor's setup
+ *   ?sky=rain         every floor's weather (clear, overcast, rain)
  * The game is also on window.__game.
  */
 import { knightId, type ClassId } from './core/knights';
 import { RARITIES, type Rarity } from './core/rarity';
 import { addKnight } from './core/roster';
 import { Game } from './game';
+import { forceSky, type SkyKind } from './world/sky';
 
 export function devGame(): Game {
   const q = new URLSearchParams(location.search);
+  const sky = q.get('sky');
+  if (sky === 'clear' || sky === 'overcast' || sky === 'rain') forceSky(sky as SkyKind);
   const game = new Game(q.has('fresh') || q.has('floor'));
   const s = game.state;
   const floor = Number(q.get('floor') ?? 0);

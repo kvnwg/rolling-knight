@@ -18,6 +18,7 @@ import { TALK_RANGE, type HubStation } from './hubWorld';
 import { demonDeathLines, demonEnrageLines, demonMobType, demonTauntsFor, type Npc, type NpcDef } from './npcs';
 import { floorPar, foeStats } from '../core/power';
 import { heroDodge, heroSpecial, heroTick } from './skills';
+import { CLEAR, skyOf, type Sky } from './sky';
 
 export interface HeroSpec {
   knightId: string;
@@ -84,6 +85,8 @@ export class World {
   map: FloorMap;
   biome: Biome;
   floor: number;
+  /** The weather over this floor (clear under ground and at the hub). */
+  sky: Sky;
   boss: boolean;
   mobTypes: MobType[];
   heroes: Unit[] = [];
@@ -145,6 +148,7 @@ export class World {
     this.map = o.map;
     this.biome = o.biome;
     this.floor = o.floor;
+    this.sky = o.hub || o.camp ? CLEAR : skyOf(o.biome, o.seed, o.floor);
     this.boss = o.boss;
     this.mobTypes = o.mobTypes;
     this.perks = new Set(o.perks);

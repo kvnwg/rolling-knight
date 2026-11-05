@@ -22,6 +22,8 @@ import { frameBuf } from './pixel/indexed';
 import { FX_SHEETS, type FxName } from './packs/fx';
 import { renderText, type TextStyle } from './pixel/font';
 import { paintTerrain, type Terrain } from './terrain';
+import { Rain } from './rain';
+import type { Sky } from '../world/sky';
 import { npcFrame, questMarker } from './art/npcs';
 import { npcMarker } from '../world/npcs';
 
@@ -102,6 +104,7 @@ export class Renderer {
   private fxs: FxSprite[] = [];
   private time = 0;
   private weatherT = 0;
+  private rain = new Rain();
   private flashT = 0;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -163,6 +166,7 @@ export class Renderer {
     this.terrainMap = w.map;
     this.terrain = paintTerrain(w.map, w.biome);
     this.particles = [];
+    this.rain.reset();
     this.props = w.map.props
       .map((p) => {
         const variant = p.seed % 5;
@@ -266,6 +270,10 @@ export class Renderer {
     g.fillRect(0, 0, this.LW, this.LH);
     g.drawImage(this.terrain!.canvas, cx, cy, this.LW, this.LH, 0, 0, this.LW, this.LH);
     this.drawLiquidShimmer(g, w, cx, cy);
+    if (w.sky.rain > 0) {
+      this.rain.update(dt, w.map, w.sky.rain, cx, cy, this.LW, this.LH);
+      this.rain.drawGround(g, cx, cy);
+    }
     if (!shader && game.state.settings.tiltShift && lead) this.tiltShift(g, sy(lead.y) - 6, w.biome.layout === 'rooms' ? 0.5 : 1);
     this.drawPortal(g, em, w, sx, sy);
     for (const a of w.areas) this.drawArea(g, em, a, sx, sy);
@@ -377,6 +385,7 @@ export class Renderer {
     this.weather(biome, dt, cx, cy);
     if (outdoors) this.dropLeaves(biome, cx, cy, dt);
     this.updateParticles(st, em, dt, sx, sy);
+    if (w.sky.rain > 0) this.rain.drawAir(st, cx, cy);
     this.advanceFx(dt);
     this.drawFx(st, sx, sy, false);
     this.drawFx(em, sx, sy, true);
@@ -387,7 +396,7 @@ export class Renderer {
       const l = FX_LIGHT[f.name];
       if (l) out_push(lights, { x: sx(f.x), y: sy(f.y), r: l[1], color: l[0], intensity: 0.9, bloom: true });
     }
-    if (outdoors) this.sunFlecks(lights, w, cx, cy);
+    if (outdoors && w.sky.kind === 'clear') this.sunFlecks(lights, w, cx, cy);
     this.flashT = Math.max(0, this.flashT - dt);
 
     // --- the HUD layer: health bars, numbers, pointers (never lit or graded)
@@ -539,8 +548,9 @@ export class Renderer {
     if (this.post) {
       // The light map, smooth and at half strength (the shader doubles it, so lights can over-brighten).
       const L = this.layers.light.x;
-      this.light.drawMap(L, biome ? biome.light.ambient : '#000000', lights);
-      const grade = biome ? gradeOf(biome) : DEFAULT_GRADE;
+      const sky = w?.sky ?? null;
+      this.light.drawMap(L, biome ? ambientOf(biome, sky) : '#000000', lights);
+      const grade = biome ? gradeOf(biome, sky) : DEFAULT_GRADE;
       this.post.render(
         { ground: this.scene, stand: this.layers.stand.c, emit: this.layers.emit.c, light: this.layers.light.c, ui: this.layers.ui.c },
         {
@@ -1264,21 +1274,40 @@ const DEFAULT_GRADE: Grade = {
   haze: [0.1, 0.1, 0.15], hazeAmount: 0, rays: 0, rayColor: [1, 0.85, 0.6], shadowTint: [1, 1, 1], highlightTint: [1, 1, 1], saturation: 1, contrast: 1, vignette: 0.4, bloom: 0.6,
 };
 
+/** Biomes in daylight. */
+const DAYLIGHT: ReadonlySet<string> = new Set(['hamlet', 'farmland', 'desert', 'tundra', 'shrine']);
+
+/**
+ * The light the scene is multiplied by. Daylight is lifted most of the way to white (a bright, clean
+ * picture, like a sunny afternoon), keeping a touch of the biome's warmth; cloud cools and dims it, rain
+ * more so.
+ */
+function ambientOf(b: Biome, sky: Sky | null): string {
+  const kind = sky?.kind ?? 'clear';
+  const day = DAYLIGHT.has(b.id);
+  if (kind === 'rain') return mixHex(b.light.ambient, day ? '#c4ccd8' : '#7a8496', 0.7);
+  if (kind === 'overcast') return mixHex(b.light.ambient, day ? '#dfe4ea' : '#8a94a6', 0.6);
+  return day ? mixHex(b.light.ambient, '#fff8ec', 0.5) : b.light.ambient;
+}
+
 /** Each biome's look in the shader: haze, shafts of light, split toning, saturation, bloom. */
-function gradeOf(b: Biome): Grade {
-  const sunny = ['hamlet', 'farmland', 'desert', 'tundra', 'shrine', 'forest'].includes(b.id);
+function gradeOf(b: Biome, sky: Sky | null): Grade {
   const indoor = b.layout === 'rooms';
+  const day = DAYLIGHT.has(b.id);
+  const kind = sky?.kind ?? 'clear';
+  const wet = kind === 'rain';
+  const grey = kind !== 'clear';
   return {
-    haze: v3(b.light.fog ?? b.light.gradeTop),
-    hazeAmount: b.light.fog ? 0.2 : indoor ? 0.06 : 0.1,
-    rays: sunny ? (b.id === 'forest' ? 0.07 : 0.11) : b.id === 'crystal' ? 0.05 : 0,
+    haze: wet ? [0.74, 0.79, 0.86] : v3(b.light.fog ?? b.light.gradeTop),
+    hazeAmount: wet ? 0.07 : b.light.fog ? 0.2 : indoor ? 0.06 : day ? 0.04 : 0.1,
+    rays: grey ? 0 : day ? 0.07 : b.id === 'forest' ? 0.06 : b.id === 'crystal' ? 0.05 : 0,
     rayColor: v3(b.light.gradeTop),
-    shadowTint: tint(b.light.gradeBottom, 0.35),
-    highlightTint: tint(b.light.gradeTop, 0.22),
-    saturation: 1.18,
-    contrast: 1.06,
-    vignette: Math.min(0.75, b.light.vignette + 0.1),
-    bloom: indoor ? 0.9 : 0.55,
+    shadowTint: grey ? tint('#4a5a7a', 0.3) : tint(b.light.gradeBottom, day ? 0.25 : 0.35),
+    highlightTint: grey ? tint('#e8f0ff', 0.12) : tint(b.light.gradeTop, day ? 0.16 : 0.22),
+    saturation: wet ? 1.04 : grey ? 1.02 : day ? 1.12 : 1.16,
+    contrast: day || grey ? 1.04 : 1.06,
+    vignette: day || grey ? Math.min(0.32, b.light.vignette * 0.7) : Math.min(0.75, b.light.vignette + 0.1),
+    bloom: indoor ? 0.9 : wet ? 0.65 : 0.5,
   };
 }
 

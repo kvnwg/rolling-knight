@@ -8,6 +8,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { music } from '../audio/music';
+import { rainSound } from '../audio/rain';
 import { sfx } from '../audio/sfx';
 import type { CoreEvent } from '../core/events';
 import { knightDef } from '../core/knights';
@@ -184,6 +185,7 @@ export function App() {
       last = now;
       const c = ctl.controls;
       const w = game.inDungeon ? game.world : game.hub;
+      rainSound.set(game.inDungeon && game.world ? game.world.sky.rain : 0);
       // Walking off at the hub stays there (no auto return).
       if (!game.inDungeon && game.autoReturnT > 0 && (c.mx || c.my)) game.autoReturnT = 0;
       if (game.inDungeon !== wasIn) {
