@@ -25,6 +25,8 @@ export interface KnightRec {
   firstAt: number;
   /** Not yet looked at in the Knights tab. */
   isNew: boolean;
+  /** Times the smith has reforged it (each costs more). */
+  reforges?: number;
 }
 
 /** One reel's result for the current spin. */

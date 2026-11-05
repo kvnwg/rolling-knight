@@ -12,8 +12,8 @@ import { PERKS, PERK_TREES, buyPerk, canBuyPerk, hasPerk, perksOpen } from '../c
 import { RARITIES, RARITY_COLOR, RARITY_NAME, RARITY_ODDS, rarityChances, rarityIndex, type Rarity } from '../core/rarity';
 import { drySpell, reelCount, spinCycle, tokenChance } from '../core/roller';
 import {
-  bestSquad, canLevel, knightStats, levelCost, levelUp, rankedKnights, rebirthStatMult, sellAll, sellDupes, sellValue, setSquadSlot, shardAll, shardDupes,
-  shardsPerDupe, totalDupes,
+  bestSquad, canLevel, canReforge, knightStats, levelCost, levelUp, rankedKnights, rebirthStatMult, reforge, reforgeCost, reforgeOdds, sellAll, sellDupes, sellValue,
+  setSquadSlot, shardAll, shardDupes, shardsPerDupe, totalDupes,
 } from '../core/roster';
 import { CHALLENGE, floorDifficulty, knightRating, squadPower } from '../core/power';
 import type { DupeRule } from '../core/state';
@@ -386,6 +386,7 @@ function Codex({ game }: { game: Game }) {
 export function HeroDetail({ game, id, onClose }: { game: Game; id: string; onClose: () => void }) {
   const s = game.state;
   const [, bump] = useState(0);
+  const [forge, setForge] = useState<string | null>(null);
   const rec = s.roster[id];
   const def = knightDef(id);
   if (!rec) {
@@ -473,6 +474,30 @@ export function HeroDetail({ game, id, onClose }: { game: Game; id: string; onCl
             <button className="btn gold small" disabled={rec.dupes < 1} onClick={() => (sellDupes(s, id), uiSound('sell'), refresh())}>
               <Px icon="coin" size="xs" /> Sell <span className="sub">+{fmt(sellValue(s, id) * rec.dupes)}</span>
             </button>
+          </div>
+          <div className="row">
+            <button
+              className="btn purple small"
+              disabled={!canReforge(s, id)}
+              title={reforgeOdds()
+                .map(([m, p]) => `${m}: ${(p * 100).toFixed(p < 0.01 ? 2 : 1)}%`)
+                .join(' · ')}
+              onClick={() => {
+                const r = reforge(s, id, () => game.rng.next());
+                if (!r) return;
+                if (r.improved) {
+                  uiSound('mutation', 6);
+                  setForge(`REFORGED: ${r.rolled!.toUpperCase()}!`);
+                } else {
+                  uiSound('dupe');
+                  setForge(r.rolled ? `${r.rolled.toUpperCase()}... no better than before` : 'The sparks fade. Nothing this time.');
+                }
+                refresh();
+              }}
+            >
+              <Px icon="sparkle" size="sm" /> Reforge <span className="sub">{rec.mutation === 'void' ? 'already Void' : `${fmt(reforgeCost(s, id))} gold`}</span>
+            </button>
+            {forge && <span className={`outlined ${forge.startsWith('REFORGED') ? 't-gold' : 't-muted'}`}>{forge}</span>}
           </div>
         </div>
         <div className="stack">

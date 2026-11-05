@@ -79,6 +79,12 @@ export const BAL = {
     maxLevel: 60,
     /** Each level adds this share of the knight's base stats (additive). */
     levelPct: 0.1,
+    /**
+     * The smith's reforge: a roll for a better mutation at `oddsMult` times the usual odds (it never
+     * makes a knight worse). Costs `kills` kills' worth of gold at your best floor, more for rarer
+     * knights, and `growth` times more every time that knight is reforged.
+     */
+    reforge: { kills: 40, rarityStep: 0.6, growth: 1.35, oddsMult: 6 },
     /** Gold for selling a duplicate, in kills' worth of gold at your best floor. */
     sellKills: {
       common: 1, uncommon: 2, rare: 5, epic: 15, legendary: 80, mythic: 600, ancient: 900, exalted: 1400,

@@ -86,6 +86,49 @@ export function shardsPerDupe(state: Pick<GameState, 'perks'>, rarity: Rarity): 
 }
 
 /** Gold for one kill on `floor` before multipliers. */
+// ------------------------------------------------------------------ the smith's reforge
+
+/** Gold for reforging this knight: kills' worth at your best floor, more for rarer knights and each time. */
+export function reforgeCost(state: GameState, id: string): number {
+  const R = BAL.roster.reforge;
+  const rec = state.roster[id];
+  const base = R.kills * killGold(Math.max(1, state.run.bestFloor)) * (1 + R.rarityStep * rarityIndex(knightDef(id).rarity));
+  return Math.round(base * Math.pow(R.growth, rec?.reforges ?? 0));
+}
+
+/** The chance a reforge lands each mutation (rarest first, as the altar rolls them). */
+export function reforgeOdds(): Array<[MutationId, number]> {
+  return MUTATIONS.map((m) => [m, Math.min(1, BAL.roster.reforge.oddsMult / BAL.mutations[m].oneIn)] as [MutationId, number]);
+}
+
+export function canReforge(state: GameState, id: string): boolean {
+  const rec = state.roster[id];
+  return !!rec && rec.mutation !== 'void' && state.gold >= reforgeCost(state, id);
+}
+
+/**
+ * Reforge: pay, then roll for a mutation at boosted odds (rarest first). A better one than the knight
+ * has replaces it; anything else leaves it as it was.
+ */
+export function reforge(state: GameState, id: string, rand: () => number): { rolled: MutationId | null; improved: boolean } | null {
+  if (!canReforge(state, id)) return null;
+  const rec = state.roster[id];
+  state.gold -= reforgeCost(state, id);
+  rec.reforges = (rec.reforges ?? 0) + 1;
+  let rolled: MutationId | null = null;
+  const odds = reforgeOdds();
+  for (let i = odds.length - 1; i >= 0; i--) {
+    if (rand() < odds[i][1]) {
+      rolled = odds[i][0];
+      break;
+    }
+  }
+  const rank = (m: MutationId | null) => (m ? MUTATIONS.indexOf(m) : -1);
+  const improved = rolled !== null && rank(rolled) > rank(rec.mutation);
+  if (improved) rec.mutation = rolled;
+  return { rolled, improved };
+}
+
 export function killGold(floor: number): number {
   return BAL.dungeon.goldPerKill * Math.pow(BAL.dungeon.goldGrowth, Math.max(0, floor - 1));
 }
