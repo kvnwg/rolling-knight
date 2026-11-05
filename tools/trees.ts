@@ -1,8 +1,10 @@
 /**
  * Tree previews, as PNGs in shots/:
  *   npx tsx tools/trees.ts sheet            every species and size on its biome's ground (1x and 4x)
- *   npx tsx tools/trees.ts scene hamlet 1 7 a floor planted by placeTrees, ground, shadows and all
- *                                            props, cropped to a screen round the start (1x and 3x)
+ *   npx tsx tools/trees.ts scene hamlet 1 7 [raw|old]
+ *        a floor planted by placeTrees, ground, shadows and all props, cropped to a screen round the
+ *        start (1x and 3x), lit by the biome's ambient (raw: unlit; old: the same floor with the old
+ *        forest wall and treeArt, for a before/after)
  * The scene paints the terrain without the trees, then throws the trees' shadows itself (the same
  * shear as castShadows.ts), so it shows the new trees even before the renderer is switched to them.
  */
@@ -106,10 +108,14 @@ if (mode === 'scene') {
   const biome = BIOMES[id];
   const floor = Number(process.argv[4] ?? 1);
   const seed = Number(process.argv[5] ?? 7);
+  const flag = process.argv[6] ?? '';
+  const old = flag.includes('old');
+  const { treeArt } = await import('../src/render/art/props');
   const m = generateFloor({ floor, biome, seed, boss: false });
   const oldTrees = m.props.filter((p) => p.kind === 'tree' && p.edge).length;
-  const others = m.props.filter((p) => !(p.kind === 'tree' && p.edge));
-  const trees = biome.solid.kind === 'trees' ? placeTrees(m, biome, new Rng(seed * 977 + floor)) : [];
+  const others = m.props.filter((p) => old || !(p.kind === 'tree' && p.edge));
+  const trees = biome.solid.kind === 'trees' && !old ? placeTrees(m, biome, new Rng(seed * 977 + floor)) : [];
+  const artOfTree = (p: (typeof m.props)[number]) => (old ? treeArt(p.tree!, biome, (p.seed % 5) * 7919 + 13) : artForTree(p, biome));
   // The ground without any trees on it (its own baked shadows then come from the other props only).
   m.props = others.filter((p) => p.kind !== 'tree');
   const t = paintTerrainPixels(m, biome);
@@ -119,7 +125,7 @@ if (mode === 'scene') {
   const mask = new Uint8Array(img.w * img.h);
   for (const p of m.props) {
     if (p.kind !== 'tree') continue;
-    const a = artForTree(p, biome);
+    const a = artOfTree(p);
     const left = p.x - a.ax;
     const top = p.y - a.ay;
     for (let v = 0; v < a.buf.h; v++) {
@@ -150,7 +156,7 @@ if (mode === 'scene') {
   type D = { y: number; draw: () => void };
   const list: D[] = [];
   for (const p of m.props) {
-    const art = p.kind === 'tree' ? artForTree(p, biome) : propArt(p.kind, biome, (p.seed % 5) * 104729 + 7);
+    const art = p.kind === 'tree' ? artOfTree(p) : propArt(p.kind, biome, (p.seed % 5) * 104729 + 7);
     list.push({ y: p.y, draw: () => blit(img, art.buf, p.x - art.ax, p.y - art.ay) });
   }
   ['rare-guardian', 'epic-ranger', 'legendary-cleric'].forEach((k, i) => {
@@ -161,7 +167,7 @@ if (mode === 'scene') {
   });
   list.sort((a, b) => a.y - b.y);
   for (const d of list) d.draw();
-  const lit = process.argv[6] !== 'raw';
+  const lit = !flag.includes('raw');
   if (lit) {
     const [ar, ag, ab] = rgb(biome.light.ambient);
     // Roughly the shader's light map: the ambient, a little lifted (the shader doubles a half-strength map).
@@ -178,7 +184,7 @@ if (mode === 'scene') {
   const cy = Math.max(0, Math.min(img.h - ch, m.start.y - ch * 0.62));
   const crop = blank(cw, ch);
   for (let y = 0; y < ch; y++) crop.px.set(img.px.subarray(((cy + y) * img.w + cx) * 4, ((cy + y) * img.w + cx + cw) * 4), y * cw * 4);
-  const name = `shots/scene_${id}_${floor}_${seed}`;
+  const name = `shots/scene_${id}_${floor}_${seed}${flag ? `_${flag}` : ''}`;
   writePng(`${name}.png`, crop, 1);
   writePng(`${name}_3x.png`, crop, 3);
   writePng(`${name}_floor.png`, img, 1);

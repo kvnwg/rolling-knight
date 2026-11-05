@@ -6,8 +6,9 @@
  * fully connected.
  */
 import { Rng } from '../core/rng';
-import type { Biome, PropKind, TreeKind } from './biomes';
+import { BIOMES, type Biome, type PropKind, type TreeKind } from './biomes';
 import { dressFloor } from './decor';
+import { placeTrees, roomTree, type TreeSize } from './forest';
 
 export const TILE = 16;
 export const SOLID = 0;
@@ -35,6 +36,10 @@ export interface Prop {
   seed: number;
   /** Part of the forest wall (drawn denser and darker). */
   edge?: boolean;
+  /** Trees (forest.ts): how big, which painted variant, and how deep in the wood (drawn darker). */
+  size?: TreeSize;
+  variant?: number;
+  depth?: number;
 }
 
 export interface Spawn {
@@ -370,34 +375,6 @@ export function generateFloor(opts: GenOptions): FloorMap {
   const nearCenter = (x: number, yy: number) => rooms.some((r) => (r.kind === 'start' || r.kind === 'exit' || r.kind === 'arena') && Math.abs(x - r.cx) <= 2 && Math.abs(yy - r.cy) <= 2);
   const floorTiles: number[] = [];
   for (let i = 0; i < m.tiles.length; i++) if (m.tiles[i] === FLOOR) floorTiles.push(i);
-  const solidNextToFloor = (x: number, yy: number) => {
-    for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) if (tileAt(m, x + ox, yy + oy) === FLOOR) return true;
-    return false;
-  };
-  // The forest wall: trees on solid ground near the floor (denser at the edge).
-  if (biome.solid.kind === 'trees') {
-    const kinds = biome.solid.trees ?? biome.trees;
-    for (let yy = 0; yy < H; yy++) {
-      for (let x = 0; x < W; x++) {
-        if (m.tiles[yy * W + x] !== SOLID) continue;
-        const edge = solidNextToFloor(x, yy);
-        // Deeper in the woods, a tree on every other tile (the dark floor shows between them).
-        if (!edge && ((x + yy) % 2 === 1 || !propRng.chance(0.55))) continue;
-        // Along a room's south side the trees stand lower, so their crowns don't hide the floor.
-        const southWall = tileAt(m, x, yy - 1) === FLOOR;
-        if (edge && !southWall && propRng.chance(0.25)) continue;
-        m.props.push({
-          kind: 'tree',
-          tree: propRng.pick(kinds),
-          x: x * TILE + 8 + propRng.int(-4, 4),
-          y: yy * TILE + (southWall ? 16 : 12) + propRng.int(-2, 2),
-          solid: true,
-          seed: propRng.int(0, 1 << 30),
-          edge: true,
-        });
-      }
-    }
-  }
   // Wall torches over room walls (rooms layout): on solid tiles with floor right below.
   const lightsWanted = biome.layout === 'rooms' || biome.solid.kind === 'cliff';
   if (lightsWanted) {
@@ -414,8 +391,10 @@ export function generateFloor(opts: GenOptions): FloorMap {
   const weights = biome.props;
   const decor: PropKind[] = ['flowers', 'bones', 'mushroomSmall', 'reeds', 'skull', 'wheat', 'cabbage', 'sunflower', 'fern'];
   const blocking = (k: PropKind) => !decor.includes(k) && k !== 'torch';
-  // Houses, yards, lamps, squares and set pieces (decor.ts); after the trees, which they clear.
+  // Houses, yards, lamps, squares and set pieces (decor.ts).
   dressFloor({ m, biome, rng: new Rng(Rng.hashSeed(opts.seed ^ Math.imul(floor, 40503) ^ 0xdec0)), rooms, occupied, nearCenter, connected: () => countReach(m, start.cx, start.cy) === total() });
+  // The woods (forest.ts): clumps of trees on the solid ground, clear of the lots and buildings decor reserved.
+  if (biome.solid.kind === 'trees') for (const t of placeTrees(m, biome, propRng.fork(7))) m.props.push(t);
   if (biome.fields) plantFields(m, biome, rooms, propRng.fork(3), occupied, nearCenter, () => countReach(m, start.cx, start.cy) === total());
   for (const r of rooms) {
     if (r.kind === 'start') continue;
@@ -441,7 +420,7 @@ export function generateFloor(opts: GenOptions): FloorMap {
       occupied.add(i);
       m.props.push({
         kind,
-        tree: kind === 'tree' ? propRng.pick(biome.trees) : undefined,
+        ...(kind === 'tree' ? roomTree(biome, propRng) : {}),
         x: x * TILE + 8 + (solid ? 0 : propRng.int(-4, 4)),
         y: yy * TILE + (solid ? 13 : 8 + propRng.int(-3, 5)),
         solid,
@@ -631,15 +610,7 @@ export function campMap(): FloorMap {
     m.props.push({ kind: rng.chance(0.6) ? 'flowers' : 'mushroomSmall', ...at(x, y), y: y * TILE + 8, solid: false, seed: rng.int(0, 1 << 30) });
   }
   // The woods all round.
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      if (m.tiles[y * W + x] !== SOLID) continue;
-      let near = false;
-      for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) if (tileAt(m, x + ox, y + oy) === FLOOR) near = true;
-      if (!near && ((x + y) % 2 === 1 || !rng.chance(0.6))) continue;
-      m.props.push({ kind: 'tree', tree: rng.pick(['oak', 'oak', 'maple', 'pine'] as const), x: x * TILE + 8 + rng.int(-4, 4), y: y * TILE + 12 + rng.int(-2, 2), solid: true, seed: rng.int(0, 1 << 30), edge: true });
-    }
-  }
+  for (const t of placeTrees(m, BIOMES.hamlet, rng)) m.props.push(t);
   m.props.sort((a, b) => a.y - b.y);
   m.start = { x: cx * TILE + 8, y: (cy + 2) * TILE + 8 };
   m.exit = { x: cx * TILE + 8, y: 3 * TILE + 8 };

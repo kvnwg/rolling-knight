@@ -1,20 +1,28 @@
 /**
- * The art a placed prop is drawn with: five variants per kind, picked by the prop's seed (the same
- * lookup the renderer's prepareFloor makes), built once and kept. Shared so the shadows baked into the
- * ground (castShadows.ts) match the sprites standing on it.
+ * The art a placed prop is drawn with, built once and kept. Props: five variants per kind, picked by
+ * the prop's seed. Trees: their species, size, painted variant and depth in the wood (trees.ts).
+ * Shared so the shadows baked into the ground (castShadows.ts) match the sprites standing on it.
  */
 import type { Biome } from '../../world/biomes';
 import type { Prop } from '../../world/mapgen';
-import { propArt, treeArt, type PropArt } from './props';
+import { propArt, type PropArt } from './props';
+import { artForTree } from './trees';
 
 const cache = new Map<string, PropArt>();
 
-export function artOf(p: Pick<Prop, 'kind' | 'tree' | 'seed'>, biome: Biome): PropArt {
-  const variant = p.seed % 5;
-  const key = `${biome.id}|${biome.name}|${p.kind}|${p.tree ?? ''}|${variant}`;
+export type ArtProp = Pick<Prop, 'kind' | 'tree' | 'seed' | 'size' | 'variant' | 'depth'>;
+
+/** A key naming a prop's art: props with the same key look the same. */
+export function artKey(p: ArtProp, biome: Biome): string {
+  if (p.kind === 'tree') return `tree|${biome.id}|${biome.name}|${p.tree ?? ''}|${p.size ?? ''}|${p.variant ?? p.seed % 4}|${p.depth ?? 0}`;
+  return `prop|${biome.id}|${biome.name}|${p.kind}|${p.seed % 5}`;
+}
+
+export function artOf(p: ArtProp, biome: Biome): PropArt {
+  const key = artKey(p, biome);
   let a = cache.get(key);
   if (!a) {
-    a = p.kind === 'tree' ? treeArt(p.tree!, biome, variant * 7919 + 13) : propArt(p.kind, biome, variant * 104729 + 7);
+    a = p.kind === 'tree' ? artForTree(p, biome) : propArt(p.kind, biome, (p.seed % 5) * 104729 + 7);
     cache.set(key, a);
     if (cache.size > 2000) cache.delete(cache.keys().next().value!);
   }

@@ -33,7 +33,8 @@ export function castShadows(m: FloorMap, biome: Biome, W: number, H: number): Ui
     if (FLAT.has(p.kind)) continue;
     const art = artOf(p, biome);
     const b = art.buf;
-    if (!floorNear(p, b.h * SX + b.w / 2)) continue;
+    // Trees throw their shadow wherever they stand (pools on their own lawns); other props only when it can land on open floor.
+    if (p.kind !== 'tree' && !floorNear(p, b.h * SX + b.w / 2)) continue;
     const left = p.x - art.ax;
     const top = p.y - art.ay;
     for (let v = 0; v < b.h; v++) {

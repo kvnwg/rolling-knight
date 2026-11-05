@@ -159,8 +159,29 @@ export function placeTrees(m: FloorMap, biome: Biome, rng: Rng): TreeProp[] {
   };
 
   const planned: Planned[] = [];
+  // Planned trees by 32 px cell, so neighbor checks only look nearby.
+  const CELL = 32;
+  const gw = Math.ceil((W * TILE) / CELL) + 1;
+  const buckets = new Map<number, Planned[]>();
+  const nearby = (x: number, y: number, reach: number, fn: (p: Planned) => boolean): boolean => {
+    const c0 = Math.max(0, Math.floor((x - reach) / CELL));
+    const c1 = Math.floor((x + reach) / CELL);
+    const r0 = Math.max(0, Math.floor((y - reach) / CELL));
+    const r1 = Math.floor((y + reach) / CELL);
+    for (let r = r0; r <= r1; r++) {
+      for (let c = c0; c <= c1; c++) {
+        const b = buckets.get(r * gw + c);
+        if (b) for (const p of b) if (fn(p)) return true;
+      }
+    }
+    return false;
+  };
   /** May a tree of this kind and size stand with its foot at (x, y)? */
-  const fits = (x: number, y: number, kind: TreeKind, size: TreeSize, overhang: number): boolean => {
+  const fits = (fx0: number, fy0: number, kind: TreeKind, size: TreeSize, overhang: number): boolean => {
+    // Judged where it will really stand (add() rounds), and never off the map.
+    const x = Math.round(fx0);
+    const y = Math.round(fy0);
+    if (x < 4 || y < 4 || x > W * TILE - 4 || y > H * TILE - 2) return false;
     const d = treeDims(kind, size);
     const tx = Math.floor(x / TILE);
     const ty = Math.floor((y - 1) / TILE);
@@ -178,8 +199,8 @@ export function placeTrees(m: FloorMap, biome: Biome, rng: Rng): TreeProp[] {
     const x1 = x + d.w / 2;
     const y0 = y - d.h;
     const y1 = y - d.under;
-    for (let py = y0; py <= y1; py += 4) {
-      for (let px = x0; px <= x1; px += 4) {
+    for (let py = y0; py <= y1; py += 5) {
+      for (let px = x0; px <= x1; px += 5) {
         // An ellipse inside the crown box.
         const ux = (px - x) / (d.w / 2);
         const uy = (py - (y0 + y1) / 2) / Math.max(1, (y1 - y0) / 2);
@@ -198,18 +219,37 @@ export function placeTrees(m: FloorMap, biome: Biome, rng: Rng): TreeProp[] {
   /** Does a crown of the new tree hide an existing tree's trunk, or the reverse? Are trunks too close? */
   const clashes = (x: number, y: number, kind: TreeKind, size: TreeSize, minGap: number): boolean => {
     const d = treeDims(kind, size);
-    for (const p of planned) {
+    // The farthest a clash can reach: the biggest crown's height or width.
+    return nearby(x, y, 110, (p) => {
       const e = treeDims(p.kind, p.size);
       const gap = Math.hypot(p.x - x, (p.y - y) * 1.3);
       if (gap < (d.trunk + e.trunk) / 2 + minGap) return true;
       // A tree lower on screen is in front: its crown must not cover the other's trunk.
-      const [front, fd, back, bd] = y > p.y ? [{ x, y }, d, p, e] : [p, e, { x, y }, d];
-      const trunkTop = back.y - bd.under;
-      if (Math.abs(front.x - back.x) < fd.w * 0.42 + bd.trunk / 2 && back.y > front.y - fd.h + 2 && trunkTop < front.y - fd.under + 2) return true;
-    }
-    return false;
+      const frontIsNew = y > p.y;
+      const fx = frontIsNew ? x : p.x;
+      const fy = frontIsNew ? y : p.y;
+      const fd = frontIsNew ? d : e;
+      const bx = frontIsNew ? p.x : x;
+      const by = frontIsNew ? p.y : y;
+      const bd = frontIsNew ? e : d;
+      const trunkTop = by - bd.under;
+      return Math.abs(fx - bx) < fd.w * 0.42 + bd.trunk / 2 && by > fy - fd.h + 2 && trunkTop < fy - fd.under + 2;
+    });
   };
-  const add = (x: number, y: number, kind: TreeKind, size: TreeSize, depth: number) => planned.push({ x: Math.round(x), y: Math.round(y), kind, size, depth });
+  const add = (x: number, y: number, kind: TreeKind, size: TreeSize, depth: number) => {
+    // On raised ground, a tree whose foot would land on the ledge's face stands on its top edge.
+    if (biome.solid.ledge) {
+      const tx = Math.floor(x / TILE);
+      const ty = Math.floor((y - 1) / TILE);
+      if (solidAt(tx, ty) && !solidAt(tx, ty + 1)) y = ty * TILE + 1;
+    }
+    const p: Planned = { x: Math.round(x), y: Math.round(y), kind, size, depth };
+    planned.push(p);
+    const k = Math.floor(p.y / CELL) * gw + Math.floor(p.x / CELL);
+    const b = buckets.get(k);
+    if (b) b.push(p);
+    else buckets.set(k, [p]);
+  };
 
   // ---- candidate spots: every solid tile, best first (near the floor), shuffled within a band
   const spots: Array<{ x: number; y: number; d: number; r: number }> = [];
@@ -227,7 +267,7 @@ export function placeTrees(m: FloorMap, biome: Biome, rng: Rng): TreeProp[] {
     const centers: Array<{ x: number; y: number; d: number }> = [];
     for (const s of spots) {
       // Open lawns here and there: no clumps where the low noise dips.
-      if (s.d > 1.5 && noise(s.x / 210, s.y / 210, patchSeed + 13) < (grove ? 0.3 : 0.27)) continue;
+      if (s.d > 1.5 && noise(s.x / 140, s.y / 140, patchSeed + 13) < (grove ? 0.26 : 0.2)) continue;
       const spacing = (grove ? 5.6 : s.d <= 4 ? 5.2 : 4.5) * TILE;
       if (centers.some((c) => Math.hypot(c.x - s.x, (c.y - s.y) * 1.15) < spacing * (0.85 + s.r * 0.3))) continue;
       centers.push({ x: s.x + rng.int(-6, 6), y: s.y + rng.int(-4, 4), d: s.d });
@@ -239,7 +279,7 @@ export function placeTrees(m: FloorMap, biome: Biome, rng: Rng): TreeProp[] {
       const leadKind: TreeKind = lead === 'pine' && biome.id !== 'graveyard' ? 'oak' : lead;
       const sizes: TreeSize[] = [rng.weighted([['huge', c.d > 3 ? 4 : 2], ['medium', 6], ['small', 1]] as const)];
       for (let k = 1; k < n; k++) sizes.push(rng.weighted([['medium', 4], ['small', 3]] as const));
-      const conifer = species.some(([k]) => k === 'pine') && rng.chance(grove ? 0.3 : 0.5);
+      const conifer = species.some(([k]) => k === 'pine') && rng.chance(grove ? 0.3 : 0.4);
       const members: Array<{ x: number; y: number; kind: TreeKind; size: TreeSize }> = [];
       for (let k = 0; k < n; k++) {
         let kind: TreeKind = k === 0 ? leadKind : conifer && k === 1 ? 'pine' : kindAt(c.x + k * 13, c.y, 3 + k);
@@ -331,7 +371,7 @@ export function placeTrees(m: FloorMap, biome: Biome, rng: Rng): TreeProp[] {
       for (const size of sizes) {
         const d = treeDims(kind, size);
         // Trunks keep a tree's width or so apart (crowns overlap), more deeper in.
-        const near = planned.some((p) => Math.hypot(p.x - x, (p.y - y) * 1.5) < (d.w + treeDims(p.kind, p.size).w) * (depth === 0 ? 0.3 : 0.36));
+        const near = nearby(x, y, 70, (p) => Math.hypot(p.x - x, (p.y - y) * 1.5) < (d.w + treeDims(p.kind, p.size).w) * (depth === 0 ? 0.3 : 0.36));
         if (near) continue;
         if (!fits(x, y, kind, size, 14) || clashes(x, y, kind, size, 3)) continue;
         add(x, y, kind, size, depth);

@@ -13,7 +13,8 @@ import { flash, makeCanvas, mixHex, shade, toCanvas } from './art/draw';
 import { CLASS_HAS_SHIELD, KNIGHT_ANCHOR, knightFrame, knightGlow, knightLook, shieldArt, weaponArt, type KnightLook, type View } from './art/knights';
 import { mobFrame, poseFrames, type MobPose } from './art/mobs';
 import { flameArt, type PropArt } from './art/props';
-import { artOf } from './art/artOf';
+import { artKey, artOf } from './art/artOf';
+import type { TreeArt } from './art/trees';
 import { Camera } from './camera';
 import { Lighting, type Light } from './lighting';
 import { Post, type PostParams } from './post';
@@ -99,7 +100,7 @@ export class Renderer {
   readonly camera = new Camera();
   private terrain: Terrain | null = null;
   private terrainMap: FloorMap | null = null;
-  private props: Array<Prop & { art: PropArt; canvas: HTMLCanvasElement; ghost?: HTMLCanvasElement }> = [];
+  private props: Array<Prop & { key: string; art: PropArt; canvas: HTMLCanvasElement; ghost?: HTMLCanvasElement }> = [];
   private cache = new Map<string, HTMLCanvasElement>();
   private mobMeta = new Map<string, { ax: number; ay: number }>();
   private particles: Particle[] = [];
@@ -176,12 +177,11 @@ export class Renderer {
     this.ambient = new Ambient(w.map, w.biome);
     this.props = w.map.props
       .map((p) => {
-        const variant = p.seed % 5;
-        const key = `prop|${w.biome.id}|${p.kind}|${p.tree ?? ''}|${variant}`;
+        const key = artKey(p, w.biome);
         const art = artOf(p, w.biome);
         const canvas = this.cached(key, () => toCanvas(art.buf));
         const ghost = p.kind === 'tree' ? this.cached(`${key}|ghost`, () => toCanvas(art.buf)) : undefined;
-        return { ...p, art, canvas, ghost };
+        return { ...p, key, art, canvas, ghost };
       })
       .sort((a, b) => a.y - b.y);
   }
@@ -292,7 +292,12 @@ export class Renderer {
     g.fillStyle = 'rgba(8,6,16,0.38)';
     for (const p of this.props) {
       if (!visible(p.x, p.y)) continue;
-      if (p.kind === 'tree') this.ellipse(g, sx(p.x + 2), sy(p.y - 1), p.edge ? 9 : 10, 3);
+      if (p.kind === 'tree') {
+        // The crown's shadow is baked into the ground (castShadows); here just the dark at the trunk's foot.
+        const c = (p.art as TreeArt).crown;
+        const rx = c ? Math.max(3, Math.min(12, Math.round(c.w * 0.16))) : 6;
+        this.ellipse(g, sx(p.x + 1), sy(p.y - 1), rx, 2);
+      }
       else if (p.solid) this.ellipse(g, sx(p.x), sy(p.y), Math.max(3, p.art.buf.w / 2 - 1), 2);
     }
     for (const u of [...w.heroes, ...w.mobs]) {
@@ -308,7 +313,7 @@ export class Renderer {
     const leadBox = lead ? { x: lead.x, y: lead.y } : null;
     const outdoors = biome.layout === 'cave';
     for (const p of this.props) {
-      if (!visible(p.x, p.y, 48)) continue;
+      if (!visible(p.x, p.y, p.kind === 'tree' ? 64 : 48)) continue;
       list.push({
         y: p.y,
         draw: () => {
@@ -323,7 +328,13 @@ export class Renderer {
           const y = sy(p.y) - p.art.ay;
           // Trees in front of the leader turn see-through, so you never lose your knight.
           let alpha = 1;
-          if (leadBox && p.kind === 'tree' && p.y > leadBox.y && p.y - leadBox.y < 30 && Math.abs(p.x - leadBox.x) < 14) alpha = 0.45;
+          if (leadBox && p.kind === 'tree' && p.y > leadBox.y) {
+            const c = (p.art as TreeArt).crown;
+            const inside = c
+              ? leadBox.x > p.x + c.x - 2 && leadBox.x < p.x + c.x + c.w + 2 && leadBox.y - 8 > p.y + c.y && leadBox.y - 8 < p.y + c.y + c.h + 6
+              : p.y - leadBox.y < 30 && Math.abs(p.x - leadBox.x) < 14;
+            if (inside) alpha = 0.45;
+          }
           st.globalAlpha = alpha;
           st.drawImage(canvas, x, y);
           st.globalAlpha = 1;
@@ -416,8 +427,8 @@ export class Renderer {
   }
 
   /** A tree with its crown shifted by `dx` pixels, more toward the top (wind). */
-  private swayed(p: { canvas: HTMLCanvasElement; art: PropArt; seed: number; tree?: string }, dx: number): HTMLCanvasElement {
-    const key = `sway|${p.canvas.width}x${p.canvas.height}|${p.tree}|${p.seed % 5}|${dx}|${(p as unknown as { kind: string }).kind}`;
+  private swayed(p: { canvas: HTMLCanvasElement; art: PropArt; key: string }, dx: number): HTMLCanvasElement {
+    const key = `sway|${p.key}|${dx}`;
     return this.cached(key, () => {
       const src = p.canvas;
       const c = makeCanvas(src.width, src.height) as HTMLCanvasElement;
@@ -434,17 +445,21 @@ export class Renderer {
 
   private leafT = 0;
   /** Leaves drift down from the crowns in view. */
-  private dropLeaves(b: Biome, cx: number, cy: number, dt: number): void {
+  private dropLeaves(_b: Biome, cx: number, cy: number, dt: number): void {
     this.leafT += dt;
     if (this.leafT < 0.18) return;
     this.leafT = 0;
-    const trees = this.props.filter((p) => p.kind === 'tree' && p.tree !== 'pine' && p.tree !== 'snowPine' && p.tree !== 'cactus' && p.tree !== 'crystal' && p.x > cx - 10 && p.x < cx + this.W + 10 && p.y > cy && p.y < cy + this.H + 30);
+    // Trees in view that shed (pines, cacti, crystals and dead trees have no leaves to drop).
+    const trees = this.props.filter((p) => p.kind === 'tree' && ((p.art as TreeArt).leaves?.length ?? 0) > 0 && p.x > cx - 10 && p.x < cx + this.W + 10 && p.y > cy && p.y < cy + this.H + 60);
     if (!trees.length) return;
     const t = trees[Math.floor(Math.random() * trees.length)];
-    const ramp = b.treeRamp;
-    const autumn = ['#d8823a', '#c8502a', '#e8b84a'];
-    const color = Math.random() < 0.35 ? autumn[Math.floor(Math.random() * autumn.length)] : ramp[2 + Math.floor(Math.random() * 2)];
-    this.particles.push({ ...this.p('leaf', t.x + (Math.random() - 0.5) * 18, t.y - 18 - Math.random() * 10, color, 4.5), vx: 4 + Math.random() * 6, vy: 7 + Math.random() * 5 });
+    const art = t.art as TreeArt;
+    const color = art.leaves[Math.floor(Math.random() * art.leaves.length)];
+    // From somewhere in the crown.
+    const c = art.crown;
+    const x = t.x + c.x + Math.random() * c.w;
+    const y = t.y + c.y + Math.random() * c.h * 0.8;
+    this.particles.push({ ...this.p('leaf', x, y, color, 4.5), vx: 4 + Math.random() * 6, vy: 7 + Math.random() * 5 });
   }
 
   /** Sun flecks: soft spots of light that shimmer where the canopy lets the sun through. */

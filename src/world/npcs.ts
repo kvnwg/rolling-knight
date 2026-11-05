@@ -20,6 +20,7 @@ import { BIOMES, isBossFloor, type BiomeId } from './biomes';
 import type { View } from './entities';
 import { FLOOR, TILE, tileAt, type FloorMap } from './mapgen';
 import { floorMobs, type BossMove, type MobType } from './mobgen';
+import { treeDims } from './forest';
 
 // ------------------------------------------------------------------ types
 
@@ -916,7 +917,13 @@ export function placeNpcs(map: FloorMap, floor: number, biomeId: string, seed: n
         if (Math.hypot(map.exit.x - x, map.exit.y - y) < 56) continue;
         // Not standing in a lantern, a fence or a crop, nor behind a tree's crown.
         if (tall.some((p) => Math.abs(p.x - x) < 12 && Math.abs(p.y - y) < 12)) continue;
-        if (trees.some((p) => Math.abs(p.x - x) < 16 && p.y > y && p.y - y < 40)) continue;
+        if (
+          trees.some((p) => {
+            const d = treeDims(p.tree ?? 'oak', p.size ?? 'medium');
+            return Math.abs(p.x - x) < d.w / 2 + 4 && p.y > y && p.y - y < d.h;
+          })
+        )
+          continue;
         const score = Math.min(dMob, 110) + (r.kind === 'side' ? 35 : r.kind === 'exit' ? -25 : 0) + rng.next() * 30;
         spots.push({ tx, ty, room: ri, score });
       }

@@ -94,7 +94,7 @@ function sj(seed: number, k = 0): number {
 function recede(r: Ramp, biome: Biome, depth: number): string[] {
   if (depth <= 0) return [...r];
   const fog = biome.light.fog;
-  if (fog) return veil(deepen(r, depth * 0.25), fog, depth * 0.2);
+  if (fog) return veil(deepen(r, depth * 0.22), fog, depth * 0.11);
   return deepen(r, depth * 0.38);
 }
 
