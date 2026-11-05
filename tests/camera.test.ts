@@ -106,6 +106,22 @@ describe('camera', () => {
     expect(small.y).toBe((300 - 480) / 2);
   });
 
+  it('keeps a painting with no margin (the hub) strictly inside, centred where it is smaller than the view', () => {
+    const hub = { mapW: 256, mapH: 336, viewW: 151, viewH: 318, margin: 0 };
+    const cam = new Camera();
+    for (let i = 0; i < 200; i++) cam.update(base({ ...hub, lead: { uid: 1, x: 10, y: 10 } }));
+    expect(cam.x).toBe(0);
+    expect(cam.y).toBe(0);
+    for (let i = 0; i < 400; i++) cam.update(base({ ...hub, lead: { uid: 1, x: 250, y: 330 } }));
+    expect(cam.x).toBeCloseTo(256 - 151, 5);
+    expect(cam.y).toBeCloseTo(336 - 318, 5);
+    // A screen wider than the painting: it sits in the middle across, and follows down.
+    const wide = new Camera();
+    wide.update(base({ ...hub, viewW: 300, viewH: 150, lead: { uid: 1, x: 128, y: 200 } }));
+    expect(wide.x).toBe((256 - 300) / 2);
+    expect(wide.y).toBeGreaterThan(0);
+  });
+
   it('holds still while the game is paused', () => {
     const cam = new Camera();
     cam.update(base({ lead: { uid: 1, x: 1000, y: 1000 } }));

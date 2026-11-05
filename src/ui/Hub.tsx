@@ -122,7 +122,7 @@ export function HubHud({ game, onTalk, onSettings, onLuck }: { game: Game; onTal
         s.playTimeMs < 240_000 && !onSteps && (
           <div className="hint plate outlined">
             {touch ? 'Drag to walk. Walk up to a keeper to talk.' : 'WASD to walk. Walk up to a keeper and press E.'}
-            <span className="t-muted">To go into the dungeon, walk down the steps at the foot of the square.</span>
+            <span className="t-muted">To go into the dungeon, walk down the steps at the foot of the court.</span>
           </div>
         )
       )}

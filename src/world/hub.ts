@@ -1,16 +1,18 @@
 /**
- * The painted hub: where you go between dives. A lamplit square at night in front of the Gilded Reel,
- * the summoning shop (its round reel sign glowing in the gable, string lights along the eaves, golden
- * display windows, the Oracle in the doorway). Round it, each keeper at their trade: the quartermaster
- * at her table by the tavern stall, the tinker in his chair under the upgrades board, the smith at his
- * forge, the junk dealer among her scrap bins, the sage on his bench among the sigil stones, the
- * priestess at the rebirth shrine, the notice board, and the warden at the top of the wooden steps
- * down to the dungeon (a portal glow at the bottom). Lush leaves frame it all.
+ * The painted hub: where you go between dives. One cozy shop front at night, about a phone's screen
+ * of it: the Gilded Reel's timber front under its dark slate roof (the round reel sign glowing in the
+ * gable, string lights along the barge boards, the lit window of goods, the Oracle in the open
+ * doorway), the junk dealer at the lit curio cabinet in the left wing and the notice board by the
+ * door, the tinker at his shelves of bottles in the right wing. In front, a short court of warm
+ * flagstones: the quartermaster at her round table, the sage in his armchair, the priestess at her
+ * candle shrine, the smith at his anvil and brazier, and at its foot the dark stone steps going down
+ * to the dungeon (a violet glow at the bottom), the warden on his landing beside them. Lush leaves
+ * frame it all. The renderer shows it closer than the dungeon (about 150 art px across a phone).
  *
  * Everything is fixed and deterministic, painted once on first use (hubScene() caches it; about half a
  * second, so call it early). Positions are hub pixels (the same as world pixels; TILE = 16): the art
  * covers HUB_W x HUB_H, and the collision grid covers the same area with everything outside the
- * square marked as wall.
+ * court and the steps marked as wall.
  *
  * Drawing it (what tools/hubPreview.ts does, in the shader pipeline's terms):
  *  - ground: the whole buffer to the ground layer (shadows are baked in);
@@ -22,18 +24,18 @@
  *    glow under its own pixels (destination-out), or a window shines through whoever stands before it;
  *  - fore: over everything on the stand layer, after the sorted pass (it is lit like the rest);
  *  - light: the ambient color plus every light (flicker 0..1 for fire), in the usual light map;
- *  - motes: particle spawners (fireflies in the leaves, motes in the shop light, forge sparks);
+ *  - motes: particle spawners (fireflies in the leaves, motes in the shop light, embers and sparks);
  *  - grade: suggested post params; bg fills anything past the art's edges.
  */
 import type { PixelBuf } from '../render/pixel/buf';
 import type { View } from './entities';
 import { BLOCKED, FLOOR, SOLID, TILE, type FloorMap } from './mapgen';
 import type { NpcDef } from './npcs';
-import { buildHub, hubWalkable, type HubArt } from '../render/art/hubScene';
+import { buildHub, HUB_ART_H, HUB_ART_W, HUB_CX, HUB_STEPS_Y, hubWalkable, type HubArt } from '../render/art/hubScene';
 import type { KeeperPose, KeeperTool } from '../render/art/hubNpcs';
 
-export const HUB_W = 480;
-export const HUB_H = 640;
+export const HUB_W = HUB_ART_W;
+export const HUB_H = HUB_ART_H;
 export const HUB_COLS = HUB_W / TILE;
 export const HUB_ROWS = HUB_H / TILE;
 
@@ -204,7 +206,7 @@ function buildMap(art: HubArt, spawn: { x: number; y: number }, keepers: Array<{
     path: pathMask,
     rooms: [{ cx, cy, rx: 12, ry: 12, kind: 'start' }],
     start: { x: spawn.x, y: spawn.y },
-    exit: { x: HUB_W / 2, y: 35 * TILE },
+    exit: { x: HUB_CX, y: HUB_H - TILE },
     props: [],
     spawns: [],
     seed: 7171,
@@ -231,7 +233,8 @@ let cached: HubScene | null = null;
 export function hubScene(): HubScene {
   if (cached) return cached;
   const art = buildHub();
-  const spawn = { x: 240, y: 540, view: 'up' as View, dir: 1 as const };
+  // Just above the steps, facing up the court at the shop.
+  const spawn = { x: HUB_CX, y: HUB_STEPS_Y - 12, view: 'up' as View, dir: 1 as const };
   const people = [...art.stations.filter((s) => s.def), ...art.extras];
   cached = {
     w: HUB_W,

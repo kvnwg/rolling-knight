@@ -3,9 +3,10 @@
  * ground, everything standing y-sorted with the keepers and a knight walking up the path, the
  * framing leaves; then a light map (the night ambient plus every light, smooth falloff, able to push
  * past white), the emissive layer over it, bloom on the brightest parts, a filmic shoulder, the grade
- * and a vignette. Writes the whole hub and a phone-sized and a desktop-sized view, at 3x:
+ * and a vignette. Writes the whole hub and a phone-sized and a desktop-sized view (framed the way the
+ * game's camera frames them at the hub's zoom), at 3x:
  *
- *   npx tsx tools/hubPreview.ts [out.png] [--raw] [--grid] [--kx=240 --ky=420] [--ambient=#544a6a]
+ *   npx tsx tools/hubPreview.ts [out.png] [--raw] [--grid] [--kx=128 --ky=230] [--ambient=#544a6a]
  *
  * --raw also writes the unlit albedo (and albedo + glow); --grid writes the collision grid over the
  * albedo (red: blocked, dark: wall) with each station's keeper (yellow) and talk spot (cyan).
@@ -108,8 +109,8 @@ figures.forEach((f, i) => {
   });
 });
 // The player's knight, walking up the path.
-const kx = opt('kx', 240);
-const ky = opt('ky', 420);
+const kx = opt('kx', scene.spawn.x);
+const ky = opt('ky', scene.spawn.y);
 const L = knightLook('legendary-blade', null, 0);
 const kf = knightFrame(L, 'walk', 'up', 1);
 const wp = weaponArt(L);
@@ -204,7 +205,8 @@ function fall(d: number): number {
   }
   return 0;
 }
-for (const l of scene.lights) {
+// The knight's own little light, as the renderer gives it at the hub.
+for (const l of [...scene.lights, { x: kx, y: ky - 6, r: 36, color: '#ffd9a0', intensity: 0.31 }]) {
   const [r, g, b] = rgb(l.color);
   const R = l.r * S;
   const cx = l.x * S;
@@ -359,11 +361,15 @@ function finish(x0: number, y0: number, w: number, h: number, path: string): voi
 }
 
 finish(0, 0, SW, SH, out);
-// A phone's view (270 x 600 art px) and a desktop's (480 x 300), on the knight.
-const vx = Math.max(0, Math.min(W - 270, kx - 135));
-const vy = Math.max(0, Math.min(H - 600, ky - 330));
-finish(vx * S, vy * S, 270 * S, 600 * S, out.replace(/\.png$/, '_phone.png'));
-const dy = Math.max(0, Math.min(H - 300, ky - 170));
-finish(0, dy * S, 480 * S, 300 * S, out.replace(/\.png$/, '_pc.png'));
+// A phone's view (about 151 x 318 art px: an upright phone at the hub's zoom) and a desktop's (240 x
+// 150), framed on the knight the way the camera frames them (the knight low, the shop ahead).
+const view = (vw: number, vh: number): [number, number] => [
+  Math.round(Math.max(0, Math.min(W - vw, kx - vw / 2))),
+  Math.round(Math.max(0, Math.min(H - vh, ky - 10 - vh * 0.72))),
+];
+const [px0, py0] = view(151, 318);
+finish(px0 * S, py0 * S, 151 * S, 318 * S, out.replace(/\.png$/, '_phone.png'));
+const [dx0, dy0] = view(240, 150);
+finish(dx0 * S, dy0 * S, 240 * S, 150 * S, out.replace(/\.png$/, '_pc.png'));
 console.log(`scene ${t1 - t0} ms, ${scene.sprites.length} sprites, ${scene.emissive.length} glows, ${scene.lights.length} lights, ${scene.fore.length} fore`);
 void ({} as HubScene);

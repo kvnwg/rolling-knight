@@ -42,6 +42,11 @@ export interface CameraFrame {
   rewinding?: boolean;
   /** Reduce motion: follow only, no look-ahead or leaning. */
   calm?: boolean;
+  /**
+   * How far past the map's top edge the view may go (px): a little in the dungeon (8, the default);
+   * none for a painting with nothing past its edges (the hub).
+   */
+  margin?: number;
 }
 
 /** How long the follow takes to settle (seconds), normally and while gliding to another knight. */
@@ -65,8 +70,10 @@ export class Camera {
 
   update(f: CameraFrame): void {
     const { dt, viewW: vw, viewH: vh, mapW, mapH, lead } = f;
+    const top = f.margin ?? 8;
+    // Inside the map; a map smaller than the view (across or down) sits in its middle.
     const clampX = (x: number) => (mapW <= vw ? (mapW - vw) / 2 : Math.max(0, Math.min(mapW - vw, x)));
-    const clampY = (y: number) => (mapH + 8 <= vh ? (mapH - vh) / 2 : Math.max(-8, Math.min(mapH - vh, y)));
+    const clampY = (y: number) => (mapH + top <= vh ? (mapH - vh) / 2 : Math.max(-top, Math.min(mapH - vh, y)));
     if (!lead) return;
     const newMap = this.map !== f.map;
     if (newMap) {
