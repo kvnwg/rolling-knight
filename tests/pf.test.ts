@@ -1,14 +1,16 @@
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { CLASS_IDS, KNIGHTS, type ClassId } from '../src/core/knights';
+import { CLASS_IDS, KEVIN_ID, knightDef, KNIGHTS, type ClassId } from '../src/core/knights';
 import { RARITIES, rarityIndex } from '../src/core/rarity';
 import { MUTATIONS } from '../src/core/state';
-import { SHEETS } from '../src/render/pf/assets';
+import { SHEETS, type SheetName } from '../src/render/pf/assets';
 import { hexToOklch, oklchToHex, ramp } from '../src/render/pf/color';
-import { attackAnim, dodgeAnim, heroPose, travelDir } from '../src/render/pf/heroAnim';
-import { KNIGHT_SHEET, knightPaint, paintStep, PRIMORDIAL_STEPS, tierRamps } from '../src/render/pf/knightLook';
+import { attackAnim, dodgeAnim, heroPose, travelDir, travelDir8 } from '../src/render/pf/heroAnim';
+import { KNIGHT_SHEET, KNIGHT_SHEET_BY_ID, knightPaint, knightSheet, paintStep, PRIMORDIAL_STEPS, tierRamps } from '../src/render/pf/knightLook';
 import { BOSS_ANIM, kitOf, mobPose, moveAnim } from '../src/render/pf/mobAnim';
 import { MONSTER_SHEET, mobPaint, monsterFor, type MonsterId } from '../src/render/pf/mobLook';
-import { DIRS, facing, PFSheet, type PFMeta } from '../src/render/pf/sheet';
+import { DIRS, DIRS8, eventFrame, facing, facing8, PFSheet, type Dir, type PFMeta } from '../src/render/pf/sheet';
+import { readPng } from '../tools/knights/lib/png';
 import { BIOME_ORDER, BIOMES, isBossFloor, biomeForFloor } from '../src/world/biomes';
 import type { Unit } from '../src/world/entities';
 import { floorBoss, floorMobs, type MobType } from '../src/world/mobgen';
@@ -37,17 +39,71 @@ function hero(cls: ClassId, extra: Partial<Unit> = {}): Unit {
 
 const LIGHTNESS = (hex: string) => hexToOklch(hex)[0];
 
+/** Every knight sheet and the class whose animations it plays (class sheets and per-knight ones). */
+function knightSheets(): Array<[SheetName, ClassId]> {
+  const out = new Map<SheetName, ClassId>();
+  for (const cls of CLASS_IDS) out.set(KNIGHT_SHEET[cls], cls);
+  for (const [id, name] of Object.entries(KNIGHT_SHEET_BY_ID)) out.set(name, knightDef(id).cls);
+  return [...out];
+}
+
+/** Loads a sheet's PNG into it (Node has no Image: the tools' decoder reads the file). */
+function loadPixels(name: SheetName): void {
+  if (SHEETS[name].ready) return;
+  const img = readPng(fileURLToPath(new URL(`../src/assets/pf/${name}.png`, import.meta.url)));
+  SHEETS[name].setPixels({ w: img.w, h: img.h, data: img.px });
+}
+
 describe('PixelForge sheets', () => {
-  it('give every knight class what the game plays, drawn in s, e, n and w', () => {
-    for (const cls of CLASS_IDS) {
-      const sheet = SHEETS[KNIGHT_SHEET[cls]];
+  it('give every knight sheet what the game plays in every facing, with pixels, anchors and timing', () => {
+    for (const [name, cls] of knightSheets()) {
+      const sheet = SHEETS[name];
+      const meta = sheet.meta;
+      loadPixels(name);
       const anims = ['idle', 'walk', 'combat_idle', 'hurt', 'stun', 'death', 'victory', attackAnim(cls, null, 0, sheet), attackAnim(cls, null, 3, sheet)];
       for (const kind of ['roll', 'flip', 'vault', 'blink'] as const) anims.push(dodgeAnim(kind, sheet).anim);
-      for (const a of anims) for (const d of DIRS) expect(sheet.has(a, d), `${cls} ${a}_${d}`).toBe(true);
-      expect(sheet.meta.anims.walk.stride?.length, `${cls} walk stride`).toBe(sheet.clip('walk', 'e').length);
-      // Every frame a knight shows has the rig's anchors (capes hang from them).
-      for (const a of ['idle', 'walk', 'combat_idle']) for (const d of DIRS) for (const [k] of sheet.clip(a, d)) expect(sheet.meta.anchors?.[k]?.length).toBe(6);
+      // Any cell size; the pivot inside the cell; four facings at least (diagonals optional).
+      expect(meta.cell, name).toBeGreaterThanOrEqual(16);
+      expect(meta.pivot[0] >= 0 && meta.pivot[0] < meta.cell && meta.pivot[1] >= 0 && meta.pivot[1] < meta.cell, `${name} pivot`).toBe(true);
+      for (const d of meta.dirs ?? DIRS) expect(DIRS8, `${name} dirs`).toContain(d);
+      for (const a of anims) {
+        for (const d of DIRS) expect(sheet.has(a, d), `${name} ${a}_${d}`).toBe(true);
+        const anim = meta.anims[a];
+        const n = sheet.clip(a, 's').length;
+        // Every facing has the same number of frames (heroAnim times them from one).
+        for (const d of Object.keys(anim.dirs) as Dir[]) expect(anim.dirs[d]!.length, `${name} ${a}_${d} frames`).toBe(n);
+        if (anim.phases) expect(anim.phases.length, `${name} ${a} phases`).toBe(n);
+        for (const [f] of anim.events ?? []) expect(f, `${name} ${a} event frame`).toBeLessThan(n);
+        for (const d of Object.keys(anim.dirs) as Dir[]) {
+          for (const [k, ms] of anim.dirs[d]!) {
+            expect(k >= 0 && k < meta.count, `${name} ${a}_${d} frame ${k}`).toBe(true);
+            expect(ms, `${name} ${a}_${d} ms`).toBeGreaterThan(0);
+            // Not empty: something solid in the frame.
+            expect(sheet.indices(k).some((v) => v && meta.colors[v - 1][1] === 255), `${name} ${a}_${d} frame ${k} has pixels`).toBe(true);
+            expect(meta.tops[k][0], `${name} frame ${k} top`).toBeGreaterThanOrEqual(0);
+          }
+        }
+      }
+      // Attacks strike on a drawn frame.
+      for (const a of [attackAnim(cls, null, 0, sheet), attackAnim(cls, null, 3, sheet)]) expect(eventFrame(meta.anims[a], 'hit', 'spawn'), `${name} ${a} strike`).toBeGreaterThanOrEqual(0);
+      expect(meta.anims.walk.stride?.length, `${name} walk stride`).toBe(sheet.clip('walk', 'e').length);
+      // Every frame a knight shows standing or walking has the rig's anchors (capes, halos and stun
+      // stars hang from them): chin, back and hip, and maybe the head's top.
+      for (const a of ['idle', 'walk', 'combat_idle']) {
+        for (const d of DIRS) {
+          for (const [k] of sheet.clip(a, d)) {
+            const anc = meta.anchors?.[k];
+            expect([6, 8], `${name} ${a}_${d} anchors`).toContain(anc?.length);
+            for (let i = 0; i < anc!.length; i++) expect(anc![i] >= 0 && anc![i] < meta.cell, `${name} anchor in the cell`).toBe(true);
+          }
+        }
+      }
+      // A cape layer, when the sheet draws its own, is a frame of the sheet.
+      for (const c of meta.capes ?? []) if (c) for (const k of c) expect(k >= -1 && k < meta.count).toBe(true);
     }
+    // Kevin plays from his own sheet; everyone else from their class's.
+    expect(knightSheet(KEVIN_ID)).toBe('rk_kevin');
+    expect(knightSheet('rare-blade')).toBe(KNIGHT_SHEET.blade);
     // Each class's own dodge is drawn: roll, backflip (Ranger), vault (Lancer), dodge (Arcanist).
     expect(dodgeAnim('flip', SHEETS.rk_ranger).anim).toBe('backflip');
     expect(dodgeAnim('vault', SHEETS.rk_lancer).anim).toBe('vault');
@@ -96,7 +152,7 @@ describe('knight looks', () => {
     for (const k of KNIGHTS) {
       for (const mut of [null, ...MUTATIONS]) {
         const p = knightPaint(k.id, mut);
-        expect(p.sheet).toBe(KNIGHT_SHEET[k.cls]);
+        expect(p.sheet).toBe(knightSheet(k.id));
         for (const [mat, r] of Object.entries(p.recolor)) {
           if (!r || r.length < 2 || mat === 'eyes') continue;
           for (const hex of r) expect(hex).toMatch(/^#[0-9a-f]{6}$/);
@@ -124,8 +180,9 @@ describe('knight looks', () => {
     // Capes from Epic, halos from Celestial, Primordial cycles through its steps.
     for (const k of KNIGHTS) {
       const p = knightPaint(k.id, null);
-      expect(!!p.cape, k.id).toBe(rarityIndex(k.rarity) >= rarityIndex('epic'));
-      expect(!!p.halo, k.id).toBe(rarityIndex(k.rarity) >= rarityIndex('celestial'));
+      const own = k.id in KNIGHT_SHEET_BY_ID;
+      expect(!!p.cape, k.id).toBe(!own && rarityIndex(k.rarity) >= rarityIndex('epic'));
+      expect(!!p.halo, k.id).toBe(!own && rarityIndex(k.rarity) >= rarityIndex('celestial'));
     }
     const steps = new Set(Array.from({ length: 60 }, (_, i) => paintStep('primordial', i * 0.5)));
     expect(steps.size).toBe(PRIMORDIAL_STEPS);
@@ -246,6 +303,30 @@ describe('knight animations from the sim', () => {
     expect(travelDir(10, 9, 's')).toBe('s');
     expect(travelDir(10, 2, 's')).toBe('e');
     expect(travelDir(-10, 1, 'e')).toBe('w');
+  });
+
+  it('face eight ways on sheets that draw diagonals, and fall back to the nearest drawn facing', () => {
+    expect(facing8(1, 1)).toBe('se');
+    expect(facing8(-1, -1)).toBe('nw');
+    expect(facing8(1, -0.2)).toBe('e');
+    expect(facing8(0, -1)).toBe('n');
+    // Holding a diagonal until the heading is well into another sector.
+    expect(travelDir8(1, 0.8, 'se')).toBe('se');
+    expect(travelDir8(1, 0, 'se')).toBe('e');
+    // A four-way sheet shows a diagonal as its side view, and west as west.
+    const sheet = SHEETS.rk_blade;
+    expect(sheet.eightWay).toBe(false);
+    expect(sheet.drawnDir('walk', 'se')).toBe('e');
+    expect(sheet.drawnDir('walk', 'nw')).toBe('w');
+    expect(sheet.clip('walk', 'sw')).toEqual(sheet.clip('walk', 'w'));
+    // An eight-way sheet shows its own diagonals.
+    const meta = structuredClone(sheet.meta) as PFMeta;
+    meta.dirs = [...DIRS8];
+    meta.anims.walk.dirs.se = meta.anims.walk.dirs.s;
+    const eight = new PFSheet(meta);
+    expect(eight.eightWay).toBe(true);
+    expect(eight.drawnDir('walk', 'se')).toBe('se');
+    expect(eight.drawnDir('idle', 'se')).toBe('e');
   });
 
   it('play what the knight is doing', () => {

@@ -34,7 +34,7 @@ import { RARITIES, RARITY_COLOR, RARITY_NAME, rarityIndex } from '../../core/rar
 import { chainFloor, reelCount } from '../../core/roller';
 import type { MutationId, Spin } from '../../core/state';
 import type { Game } from '../../game';
-import { KNIGHT_PIC_H, KNIGHT_PIC_W, knightFaceUrl, knightUrl } from '../sprites';
+import { KNIGHT_PIC_FEET, KNIGHT_PIC_H, KNIGHT_PIC_W, knightFaceUrl, knightUrl } from '../sprites';
 import { Chunky } from './Chunky';
 import { fxSound } from './fxSound';
 import { Altar, type AltarSignals } from './altar';
@@ -66,9 +66,7 @@ function orbFill(luck: number): number {
 
 // ------------------------------------------------------------------ shared
 
-/** Knight pictures are KNIGHT_PIC_W x KNIGHT_PIC_H image pixels (sprites.tsx knightUrl). */
-const KW = KNIGHT_PIC_W;
-const KH = KNIGHT_PIC_H;
+/** Knight pictures are KNIGHT_PIC_W x KNIGHT_PIC_H image pixels (sprites.tsx knightUrl), measured once the sheets load: read them live. */
 /** A token's pop out of its reel and its flight into the reel's stack (ms). */
 const FLIGHT = { pop: 90, fly: 300 } as const;
 const FLIGHT_MS = FLIGHT.pop + FLIGHT.fly;
@@ -141,8 +139,8 @@ function layoutFor(count: number, widthPx: number, u: number, frame: number = FR
   const reelW = Math.max(12, Math.floor((inner - (n - 1) * gap) / n));
   const side = n <= 2;
   const k = side ? (reelW >= (n === 1 ? 150 : 112) ? 2 : 1) : reelW >= 64 ? 2 : 1;
-  const artW = KW * k;
-  const artH = KH * k;
+  const artW = KNIGHT_PIC_W * k;
+  const artH = KNIGHT_PIC_H * k;
   const lab = side ? 0 : k === 2 ? 8 : 6;
   const even = (v: number) => v + (v % 2);
   const cell = even(side ? artH + 4 : artH + lab + 2);
@@ -1236,8 +1234,8 @@ function MiniReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
     const timers: Array<ReturnType<typeof setTimeout>> = [];
     // The windows' size (art px): the shrine's cells, or the plain windows' inside.
     const cells = altarOn ? miniLayout(n).cells : Array.from({ length: n }, () => ({ w: MINI.winW, h: MINI.winH }));
-    // Windows too small for a whole knight (three reels and up) show head and shoulders instead.
-    const bust = cells[0].h < KNIGHT_PIC_H - 7 || cells[0].w < KNIGHT_PIC_W - 12;
+    // Windows too small for a whole knight (two reels and up) show head and shoulders instead.
+    const bust = cells[0].h < 24 || cells[0].w < 24;
     const pic = (id: string, mutation: MutationId | null) => (bust ? knightFaceUrl(id, mutation) : knightUrl(id, mutation));
     /** Sizes and centers a window's picture from its own pixels (any picture size: knights, faces, tokens). */
     const place = (i: number) => {
@@ -1250,7 +1248,9 @@ function MiniReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
       img.style.width = `${nw * u}px`;
       img.style.height = `${nh * u}px`;
       img.style.left = `${Math.floor((cell.w - nw) / 2) * u}px`;
-      img.style.top = `${Math.floor((cell.h - nh) / 2) * u}px`;
+      // A whole knight stands on the window's floor (its feet two pixels up); faces and tokens center.
+      const full = !bust && nw === KNIGHT_PIC_W && nh === KNIGHT_PIC_H;
+      img.style.top = `${(full ? cell.h - 2 - KNIGHT_PIC_FEET : Math.floor((cell.h - nh) / 2)) * u}px`;
     };
     const setWin = (i: number, url: string, state: 'spin' | 'token' | 'landed', rim: string | null) => {
       const img = imgs.current[i];

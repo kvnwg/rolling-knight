@@ -95,3 +95,51 @@ export function shiftL(r: readonly string[], dL: number): string[] {
     return oklchToHex(Math.max(0.3, Math.min(0.85, L + dL)), C, h);
   });
 }
+
+/** Turns hue `h` toward hue `to` by `deg` degrees at most (the short way round). */
+export function hueToward(h: number, to: number, deg: number): number {
+  const d = ((to - h + 540) % 360) - 180;
+  if (Math.abs(d) <= deg) return to;
+  return (h + Math.sign(d) * deg + 360) % 360;
+}
+
+/** Hue the knights' shadows lean toward (blue-violet) and their lights (warm yellow). */
+export const COOL_HUE = 285;
+export const WARM_HUE = 85;
+
+export interface ToneOpts {
+  /** Degrees the shadows turn toward blue-violet. */
+  cool?: number;
+  /** Degrees the lights turn toward warm yellow. */
+  warm?: number;
+  /** The ink's lightness (default: a step under the deep tone). */
+  inkL?: number;
+  /** Chroma of the specular tone (default: a little of the mid's). */
+  specC?: number;
+}
+
+/**
+ * A knight material ramp of 8 colors: ink, deep, shadow, mid, light, highlight, spec, rim (the
+ * order the knight sheets' shades use). `L` holds the six body lightnesses, deep to spec. The darks
+ * lean cool (toward blue-violet) and the lights warm, the way a painter shifts hue instead of only
+ * darkening; chroma peaks in the middle tones and fades toward the spec. The ink is the material's
+ * own near-black (outlines tinted by what they border); the rim, a hair lighter, is the outline on
+ * the lit top-left side, so the line stays crisp and dark all round but never flat.
+ */
+export function toneRamp(L: readonly number[], C: number, h: number, o: ToneOpts = {}): string[] {
+  const cool = o.cool ?? 22;
+  const warm = o.warm ?? 14;
+  const hues = [cool, cool * 0.5, 0, -warm * 0.45, -warm * 0.85, -warm];
+  const chroma = [0.88, 1, 1, 0.94, 0.78, 0.5];
+  const body = L.slice(0, 6).map((l, i) => {
+    const h2 = hues[i] > 0 ? hueToward(h, COOL_HUE, hues[i]) : hueToward(h, WARM_HUE, -hues[i]);
+    const c = i === 5 && o.specC !== undefined ? o.specC : C * chroma[i];
+    return oklchToHex(l, c, h2);
+  });
+  while (body.length < 6) body.push(body[body.length - 1]);
+  const inkL = o.inkL ?? Math.max(0.12, Math.min(0.2, L[0] - 0.17));
+  const inkH = hueToward(h, COOL_HUE, cool * 1.7 + 8);
+  const ink = oklchToHex(inkL, Math.min(0.06, C * 0.55 + 0.02), inkH);
+  const rim = oklchToHex(inkL + Math.max(0.025, (L[0] - inkL) * 0.22), Math.min(0.08, C * 0.7 + 0.02), hueToward(h, COOL_HUE, cool * 1.2));
+  return [ink, ...body, rim];
+}

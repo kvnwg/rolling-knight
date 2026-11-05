@@ -6,13 +6,14 @@
  * style hold. Epic and up add a cape, Celestial and up a halo, Primordial cycles its colors; the
  * mutations repaint on top (Gilded gold, Shadow dark, Radiant light, Void purple-black with cyan).
  */
-import { knightDef, type ClassId } from '../../core/knights';
+import { KEVIN_ID, knightDef, type ClassId } from '../../core/knights';
 import { RARITY_COLOR, rarityIndex, type Rarity } from '../../core/rarity';
 import type { MutationId } from '../../core/state';
 import type { SheetName } from './assets';
 import { hexToOklch, mixHexes, oklchToHex, ramp, rampLike } from './color';
 import type { Recolor } from './sheet';
 
+/** The sheet each class is drawn from (recolored per rarity and mutation). */
 export const KNIGHT_SHEET: Record<ClassId, SheetName> = {
   guardian: 'rk_guardian',
   blade: 'rk_blade',
@@ -21,6 +22,20 @@ export const KNIGHT_SHEET: Record<ClassId, SheetName> = {
   arcanist: 'rk_arcanist',
   lancer: 'rk_lancer',
 };
+
+/**
+ * Knights drawn from a sheet of their own instead of their class's, in that sheet's own colors (no
+ * rarity recolor): Kevin, the one Absolute knight, a plain guy in a tee. A sheet listed here plays
+ * its class's animations (the same names), so it needs all of them.
+ */
+export const KNIGHT_SHEET_BY_ID: Readonly<Record<string, SheetName>> = {
+  [KEVIN_ID]: 'rk_kevin',
+};
+
+/** The sheet a knight is drawn from: its own, or its class's. */
+export function knightSheet(id: string): SheetName {
+  return KNIGHT_SHEET_BY_ID[id] ?? KNIGHT_SHEET[knightDef(id).cls];
+}
 
 // PixelForge's presets (style/style.json), dark to light.
 export const PF = {
@@ -199,10 +214,13 @@ export function knightPaint(id: string, mutation: MutationId | null, step = 0): 
   if (mutation === 'shadow') recolor.skin = rampLike(PF.skins[h % PF.skins.length], 0.035, 30, 2, -0.1);
   const ri = rarityIndex(r);
   const tierColor = RARITY_COLOR[r];
-  const halo: [string, string] | null = ri >= rarityIndex('celestial')
+  // A knight with a sheet of its own wears that sheet's colors and none of the tier's trappings
+  // (Kevin doesn't need a cape or a halo); a mutation still gives off its light.
+  const own = id in KNIGHT_SHEET_BY_ID;
+  const halo: [string, string] | null = !own && ri >= rarityIndex('celestial')
     ? [mixHexes(r === 'primordial' ? oklchToHex(0.85, 0.12, (step / PRIMORDIAL_STEPS) * 360) : tierColor, '#ffffff', 0.45), mixHexes(tierColor, '#3a263a', 0.35)]
     : null;
-  let glow: string | null = ri >= rarityIndex('legendary') ? (r === 'primordial' ? tier.metal[3] : mixHexes(tierColor, tier.metal[3], 0.4)) : null;
+  let glow: string | null = !own && ri >= rarityIndex('legendary') ? (r === 'primordial' ? tier.metal[3] : mixHexes(tierColor, tier.metal[3], 0.4)) : null;
   if (mutation === 'radiant') glow = '#fff2c0';
   else if (mutation === 'void') glow = '#6ae8ff';
   else if (mutation === 'shadow') glow = '#a060ff';
@@ -210,10 +228,10 @@ export function knightPaint(id: string, mutation: MutationId | null, step = 0): 
     cls: def.cls,
     rarity: r,
     mutation,
-    sheet: KNIGHT_SHEET[def.cls],
-    recolor,
+    sheet: knightSheet(id),
+    recolor: own ? {} : recolor,
     key,
-    cape: ri >= rarityIndex('epic') ? tier.cloth.map((c) => mixHexes(c, '#20101e', 0.12)) : null,
+    cape: !own && ri >= rarityIndex('epic') ? tier.cloth.map((c) => mixHexes(c, '#20101e', 0.12)) : null,
     halo,
     glow,
   };

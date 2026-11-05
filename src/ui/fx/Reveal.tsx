@@ -58,9 +58,7 @@ const MUTATION_LOOK: Record<MutationId, { name: string; color: string }> = {
   void: { name: 'VOID', color: '#2a2a6a' },
 };
 
-/** Knight pictures are KNIGHT_PIC_W x KNIGHT_PIC_H image pixels (sprites.tsx knightUrl). */
-const KW = KNIGHT_PIC_W;
-const KH = KNIGHT_PIC_H;
+/** Knight pictures are KNIGHT_PIC_W x KNIGHT_PIC_H image pixels (sprites.tsx knightUrl), measured once the sheets load: read them live. */
 
 const keys = new WeakMap<RevealItem, number>();
 let nextKey = 1;
@@ -241,8 +239,8 @@ function RareReveal({ item, onDone, calm }: { item: RevealItem; onDone: () => vo
   const cols = Math.floor(vp.w / u);
   const rows = Math.floor(vp.h / u);
   // The knight's size: a whole number of UI pixels per image pixel, as big as sits well on the screen.
-  const ks = Math.max(2, Math.min(6, Math.floor(Math.min((cols * 0.66) / KW, (rows * 0.32) / KH))));
-  const half = (KW * ks) / 2;
+  const ks = Math.max(2, Math.min(6, Math.floor(Math.min((cols * 0.66) / KNIGHT_PIC_W, (rows * 0.32) / KNIGHT_PIC_H))));
+  const half = (KNIGHT_PIC_W * ks) / 2;
   const clock = useRef<RevealClock>({ t0: performance.now(), offset: 0 });
   const fx = useRef<HyperHandle | null>(null);
   const [locked, setLocked] = useState(hyper);
@@ -434,8 +432,8 @@ function RareReveal({ item, onDone, calm }: { item: RevealItem; onDone: () => vo
     ['--appear' as string]: `${ph.appear}ms`,
     ['--ix' as string]: pos ? `${pos.ix}px` : '50%',
     ['--iy' as string]: pos ? `${pos.iy}px` : '45%',
-    ['--kw' as string]: `${KW * ks * u}px`,
-    ['--kh' as string]: `${KH * ks * u}px`,
+    ['--kw' as string]: `${KNIGHT_PIC_W * ks * u}px`,
+    ['--kh' as string]: `${KNIGHT_PIC_H * ks * u}px`,
     ['--glowd' as string]: `${Math.round(Math.max(93, half * 3.4)) * u}px`,
     ['--rays' as string]: `${raysPx}px`,
   } as CSSProperties;

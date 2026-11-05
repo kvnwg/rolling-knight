@@ -19,6 +19,7 @@ import rkArcanist from '../../assets/pf/rk_arcanist.json';
 import rkBlade from '../../assets/pf/rk_blade.json';
 import rkCleric from '../../assets/pf/rk_cleric.json';
 import rkGuardian from '../../assets/pf/rk_guardian.json';
+import rkKevin from '../../assets/pf/rk_kevin.json';
 import rkLancer from '../../assets/pf/rk_lancer.json';
 import rkRanger from '../../assets/pf/rk_ranger.json';
 import skeleton from '../../assets/pf/skeleton.json';
@@ -34,6 +35,7 @@ const METAS = {
   rk_cleric: rkCleric,
   rk_arcanist: rkArcanist,
   rk_lancer: rkLancer,
+  rk_kevin: rkKevin,
   slime,
   bat,
   wolf,

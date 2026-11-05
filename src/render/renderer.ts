@@ -32,7 +32,7 @@ import type { Sky } from '../world/sky';
 import { npcFrame, questMarker } from './art/npcs';
 import { npcMarker } from '../world/npcs';
 import { pfReady, SHEETS, type SheetName } from './pf/assets';
-import { frameCanvas, frameMask, haloCanvas, haloSpot } from './pf/frames';
+import { frameCanvas, frameMask, haloCanvas, haloSpot, haloWidth, headTop } from './pf/frames';
 import { heroPose, pruneHeroes, type HeroPose } from './pf/heroAnim';
 import { knightPaint, paintStep } from './pf/knightLook';
 import { deathPoofMs, deathPose, lastMoveOf, mobDirOf, mobPose, pruneMobs } from './pf/mobAnim';
@@ -772,10 +772,10 @@ export class Renderer {
       const [hx, hy] = haloSpot(paint.sheet, pose.k);
       const em = this.layers.emit.x;
       em.globalAlpha = pose.alpha;
-      em.drawImage(haloCanvas(paint.halo), x + hx, y + hy + Math.round(Math.sin(this.time * 2.2 + h.uid) * 0.6));
+      em.drawImage(haloCanvas(paint.halo, haloWidth(paint.sheet)), x + hx, y + hy + Math.round(Math.sin(this.time * 2.2 + h.uid) * 0.6));
       em.globalAlpha = 1;
     }
-    if (pose.stunned) this.stunStars(this.layers.emit.x, sx(h.x), y + SHEETS[paint.sheet].meta.tops[pose.k][0] - 3);
+    if (pose.stunned) this.stunStars(this.layers.emit.x, sx(h.x), y + headTop(paint.sheet, pose.k)[1] - 3);
     if (h.drT > 0 && h.cls === 'guardian' && !h.downed) {
       // Bulwark: a shimmer around the Guardian.
       ctx.fillStyle = 'rgba(255,216,74,0.5)';
