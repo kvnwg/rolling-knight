@@ -1,0 +1,709 @@
+/**
+ * One dungeon floor in motion: the squad, the mobs, shots, ground effects and pickups. The game
+ * controller (game.ts) builds a World per floor and feeds it input; the renderer draws it.
+ */
+import { BAL } from '../core/balance';
+import { CLASSES, type ClassId } from '../core/knights';
+import type { Rarity } from '../core/rarity';
+import { Rng } from '../core/rng';
+import type { KnightStats } from '../core/roster';
+import type { MutationId } from '../core/state';
+import { heroAi, mobAi } from './ai';
+import type { Biome } from './biomes';
+import { dist, lineOfSight, moveUnit, norm, type Area, type FloatText, type Fx, type Pickup, type Shot, type Unit } from './entities';
+import { flowFrom, type Flow } from './flow';
+import { TILE, tileAt, type FloorMap } from './mapgen';
+import { floorScale, type MobType } from './mobgen';
+import { heroDodge, heroSpecial, heroTick } from './skills';
+
+export interface HeroSpec {
+  knightId: string;
+  cls: ClassId;
+  rarity: Rarity;
+  mutation: MutationId | null;
+  stats: KnightStats;
+  slot: number;
+  /** Carried over from the last floor (share of max HP); 1 = full, 0 = downed. */
+  hpShare: number;
+}
+
+export type WorldEvent =
+  | { type: 'kill'; gold: number; elite: boolean; boss: boolean; x: number; y: number }
+  | { type: 'pickup'; kind: Pickup['kind']; amount: number }
+  | { type: 'cleared' }
+  | { type: 'exit' }
+  | { type: 'wipe' }
+  | { type: 'heroDown'; slot: number }
+  | { type: 'switch'; slot: number }
+  | { type: 'bossPhase' };
+
+export interface Input {
+  mx: number;
+  my: number;
+  dodge: boolean;
+  special: boolean;
+}
+
+export interface WorldOptions {
+  map: FloorMap;
+  biome: Biome;
+  floor: number;
+  boss: boolean;
+  mobTypes: MobType[];
+  bossType: MobType | null;
+  squad: HeroSpec[];
+  perks: string[];
+  controlled: number;
+  seed: number;
+  goldPerKill: number;
+}
+
+let nextUid = 1;
+export function uid(): number {
+  return nextUid++;
+}
+
+export class World {
+  map: FloorMap;
+  biome: Biome;
+  floor: number;
+  boss: boolean;
+  mobTypes: MobType[];
+  heroes: Unit[] = [];
+  mobs: Unit[] = [];
+  shots: Shot[] = [];
+  areas: Area[] = [];
+  texts: FloatText[] = [];
+  pickups: Pickup[] = [];
+  fx: Fx[] = [];
+  events: WorldEvent[] = [];
+  time = 0;
+  controlled: number;
+  input: Input = { mx: 0, my: 0, dodge: false, special: false };
+  auto = false;
+  portalOpen = false;
+  cleared = false;
+  exited = false;
+  wiped = false;
+  perks: Set<string>;
+  rng: Rng;
+  goldPerKill: number;
+  /** Seconds the camera should shake, and how hard. */
+  shake = 0;
+  shakePower = 0;
+  /** A short freeze on big hits (hit-stop). */
+  hitStop = 0;
+  heroFlow: Flow | null = null;
+  heroFlowFly: Flow | null = null;
+  leaderFlow: Flow | null = null;
+  goalFlow: Flow | null = null;
+  private flowT = 0;
+  bossUnit: Unit | null = null;
+  /** War Banner stacks (attack speed). */
+  banner = 0;
+  bannerT = 0;
+  tagTeamT = 0;
+  scale: { hp: number; atk: number };
+
+  constructor(o: WorldOptions) {
+    this.map = o.map;
+    this.biome = o.biome;
+    this.floor = o.floor;
+    this.boss = o.boss;
+    this.mobTypes = o.mobTypes;
+    this.perks = new Set(o.perks);
+    this.controlled = o.controlled;
+    this.rng = new Rng(o.seed);
+    this.goldPerKill = o.goldPerKill;
+    const lone = this.perks.has('loneWolf');
+    o.squad.forEach((h, i) => {
+      if (lone && h.slot !== o.controlled) return;
+      const ox = (i - 1) * 12;
+      this.heroes.push(this.makeHero(h, o.map.start.x + ox, o.map.start.y + (i === 1 ? 0 : 6)));
+    });
+    if (!this.heroes.some((h) => h.slot === this.controlled && !h.downed)) {
+      const alive = this.heroes.find((h) => !h.downed);
+      if (alive) this.controlled = alive.slot!;
+    }
+    const scale = floorScale(o.floor);
+    this.scale = scale;
+    for (const s of o.map.spawns) {
+      const t = s.boss ? o.bossType! : this.rng.pick(o.mobTypes);
+      const m = this.makeMob(t, s.x, s.y, s.elite, s.boss, scale);
+      m.room = s.room;
+      this.mobs.push(m);
+      if (s.boss) {
+        this.bossUnit = m;
+        // The boss arrives with a few of the floor's mobs.
+        for (let k = 0; k < 3; k++) {
+          const a = this.makeMob(this.rng.pick(o.mobTypes), s.x + (k - 1) * 30, s.y + 30, false, false, scale);
+          a.room = s.room;
+          this.mobs.push(a);
+        }
+      }
+    }
+    this.refreshFlows();
+  }
+
+  makeHero(h: HeroSpec, x: number, y: number): Unit {
+    const lone = this.perks.has('loneWolf') ? 3 : 1;
+    const maxHp = h.stats.hp * lone;
+    const cls = CLASSES[h.cls];
+    return {
+      uid: uid(),
+      team: 'hero',
+      x,
+      y,
+      vx: 0,
+      vy: 0,
+      r: 4,
+      hp: Math.max(0, maxHp * h.hpShare),
+      maxHp,
+      atk: h.stats.atk * (this.perks.has('loneWolf') ? 2.5 : 1),
+      armor: h.stats.armor,
+      speed: h.stats.speed,
+      dir: 1,
+      view: 'up',
+      moving: false,
+      animT: Math.random(),
+      swingT: 0,
+      swingDur: 0.3,
+      aimX: 0,
+      aimY: -1,
+      hurtT: 0,
+      invuln: 0,
+      dr: 1,
+      drT: 0,
+      stunT: 0,
+      slowT: 0,
+      burnT: 0,
+      burnDps: 0,
+      dead: false,
+      flying: false,
+      knightId: h.knightId,
+      cls: h.cls,
+      rarity: h.rarity,
+      mutation: h.mutation,
+      slot: h.slot,
+      atkCd: h.stats.atkCd,
+      atkT: 0.3,
+      range: h.stats.range,
+      dodgeCd: h.stats.dodgeCd * (this.perks.has('peasantRevolt') && this.underdogSquad() ? 0.5 : 1),
+      dodgeT: 0,
+      specialCd: h.stats.specialCd * (this.perks.has('loneWolf') ? 0.7 : 1),
+      specialT: cls.specialCd * 0.35,
+      downed: h.hpShare <= 0,
+      ai: { target: null, think: 0, dodgeThink: 0, wanderX: 0, wanderY: 0, stuck: 0 },
+    };
+  }
+
+  underdogSquad(): boolean {
+    return this.heroes.length > 0 && this.heroes.every((h) => h.rarity === 'common' || h.rarity === 'uncommon' || h.rarity === 'rare');
+  }
+
+  makeMob(t: MobType, x: number, y: number, elite: boolean, boss: boolean, scale: { hp: number; atk: number }): Unit {
+    const hpMult = boss ? 1 : elite ? 3 : 1;
+    const atkMult = elite ? 1.5 : 1;
+    const maxHp = t.hp * scale.hp * hpMult;
+    return {
+      uid: uid(),
+      team: 'mob',
+      x,
+      y,
+      vx: 0,
+      vy: 0,
+      r: Math.round(t.radius * (elite ? 1.3 : 1)),
+      hp: maxHp,
+      maxHp,
+      atk: t.atk * scale.atk * atkMult,
+      armor: 0,
+      speed: t.speed,
+      dir: this.rng.chance(0.5) ? 1 : -1,
+      view: 'side',
+      moving: false,
+      animT: this.rng.next() * 4,
+      swingT: 0,
+      swingDur: 0.3,
+      aimX: 0,
+      aimY: 1,
+      hurtT: 0,
+      invuln: 0,
+      dr: 1,
+      drT: 0,
+      stunT: 0,
+      slowT: 0,
+      burnT: 0,
+      burnDps: 0,
+      dead: false,
+      flying: t.flying,
+      type: t,
+      elite,
+      boss,
+      awake: boss,
+      atkT: this.rng.float(0.5, t.atkCd),
+      windT: 0,
+      windDur: 0,
+      tauntBy: null,
+      tauntT: 0,
+      bossT: 2,
+      bossPhase: 0,
+      ai: { target: null, think: this.rng.next() * 0.3, dodgeThink: 0, wanderX: x, wanderY: y, stuck: 0 },
+    };
+  }
+
+  leader(): Unit | undefined {
+    return this.heroes.find((h) => h.slot === this.controlled && !h.downed) ?? this.heroes.find((h) => !h.downed);
+  }
+
+  livingHeroes(): Unit[] {
+    return this.heroes.filter((h) => !h.downed);
+  }
+
+  livingMobs(): Unit[] {
+    return this.mobs.filter((m) => !m.dead);
+  }
+
+  enemiesOf(u: Unit): Unit[] {
+    return u.team === 'hero' ? this.mobs.filter((m) => !m.dead) : this.heroes.filter((h) => !h.downed);
+  }
+
+  /** Nearest foe within `range` (in sight, if asked). */
+  nearestEnemy(u: Unit, range: number, sight = true): Unit | null {
+    let best: Unit | null = null;
+    let bd = range;
+    for (const e of this.enemiesOf(u)) {
+      if (e.team === 'mob' && !e.awake && u.team === 'hero' && dist(u.x, u.y, e.x, e.y) > range) continue;
+      const d = dist(u.x, u.y, e.x, e.y) - e.r;
+      if (d > bd) continue;
+      if (sight && !lineOfSight(this.map, u.x, u.y - 4, e.x, e.y - 4)) continue;
+      bd = d;
+      best = e;
+    }
+    return best;
+  }
+
+  enemiesIn(team: Unit['team'], x: number, y: number, r: number): Unit[] {
+    const out: Unit[] = [];
+    const list = team === 'hero' ? this.mobs : this.heroes;
+    for (const e of list) {
+      if (e.dead || e.downed) continue;
+      if (dist(x, y, e.x, e.y) <= r + e.r) out.push(e);
+    }
+    return out;
+  }
+
+  /** The spot within `range` of u that would catch the most foes in a circle of radius `r`. */
+  densest(u: Unit, range: number, r: number): { x: number; y: number; n: number } | null {
+    let best: { x: number; y: number; n: number } | null = null;
+    for (const e of this.enemiesOf(u)) {
+      if (dist(u.x, u.y, e.x, e.y) > range) continue;
+      const n = this.enemiesIn(u.team, e.x, e.y, r).length + (e.boss ? 3 : 0);
+      if (!best || n > best.n) best = { x: e.x, y: e.y, n };
+    }
+    return best;
+  }
+
+  text(x: number, y: number, text: string, color: string, big = false): void {
+    this.texts.push({ x: x + this.rng.float(-3, 3), y, text, color, t: 0, big });
+  }
+
+  shakeIt(power: number, t = 0.2): void {
+    this.shakePower = Math.max(this.shakePower, power);
+    this.shake = Math.max(this.shake, t);
+  }
+
+  heal(target: Unit, amount: number): void {
+    if (target.downed || target.dead || amount <= 0) return;
+    const before = target.hp;
+    target.hp = Math.min(target.maxHp, target.hp + amount);
+    const got = target.hp - before;
+    if (got >= 1) {
+      this.text(target.x, target.y - 22, `+${Math.round(got)}`, '#7dff8a');
+      this.fx.push({ kind: 'heal', x: target.x, y: target.y - 8 });
+    }
+  }
+
+  /** Clerics' healing (Blood Pact turns it off). */
+  clericHeal(target: Unit, amount: number): void {
+    if (this.perks.has('bloodPact')) return;
+    this.heal(target, amount);
+  }
+
+  revive(h: Unit, share: number): void {
+    if (!h.downed) return;
+    h.downed = false;
+    h.hp = h.maxHp * share;
+    h.invuln = 1.2;
+    this.fx.push({ kind: 'revive', x: h.x, y: h.y });
+    this.text(h.x, h.y - 26, 'REVIVED', '#ffe27a', true);
+  }
+
+  /** Deals damage. Returns the amount dealt. */
+  damage(target: Unit, raw: number, from: Unit | null, opts: { crit?: boolean; knock?: number; kx?: number; ky?: number; color?: string; silent?: boolean } = {}): number {
+    if (target.dead || target.downed || target.invuln > 0 || raw <= 0) return 0;
+    let amount = raw;
+    if (from && from.team === 'hero') {
+      // Berserker: up to +150% damage the lower the knight's HP.
+      if (this.perks.has('berserker')) amount *= 1 + 1.5 * (1 - from.hp / from.maxHp);
+      if (this.perks.has('peasantRevolt') && this.underdogSquad()) amount *= 2;
+    }
+    amount *= 1 - target.armor;
+    if (target.drT > 0) amount *= target.dr;
+    amount = Math.max(1, amount);
+    target.hp -= amount;
+    target.hurtT = 0.18;
+    if (opts.knock && !target.boss) {
+      const [nx, ny] = opts.kx !== undefined ? norm(opts.kx, opts.ky ?? 0) : from ? norm(target.x - from.x, target.y - from.y) : [0, 0];
+      moveUnit(this.map, target, nx * opts.knock * (target.elite ? 0.5 : 1), ny * opts.knock * (target.elite ? 0.5 : 1));
+    }
+    if (!opts.silent) {
+      const col = opts.color ?? (target.team === 'hero' ? '#ff5a5a' : opts.crit ? '#ffd84a' : '#ffffff');
+      this.text(target.x, target.y - (target.boss ? 40 : 20), String(Math.round(amount)), col, !!opts.crit);
+      this.fx.push({ kind: opts.crit ? 'crit' : 'hit', x: target.x, y: target.y - 6, color: target.team === 'mob' ? target.type!.ramp[2] : '#ff5a5a' });
+    }
+    if (from && from.team === 'hero' && this.perks.has('bloodPact')) this.heal(from, amount * 0.05);
+    if (target.team === 'mob') {
+      if (!target.awake) this.wake(target);
+      if (from && from.team === 'hero' && from.slot === this.controlled && this.perks.has('warBanner')) {
+        this.banner = Math.min(10, this.banner + 1);
+        this.bannerT = 3;
+      }
+      if (target.hp <= 0) this.killMob(target);
+    } else {
+      this.shakeIt(target.slot === this.controlled ? 2 : 1, 0.12);
+      if (target.hp <= 0) this.downHero(target);
+    }
+    return amount;
+  }
+
+  wake(m: Unit): void {
+    m.awake = true;
+    // Its roommates hear it.
+    for (const o of this.mobs) if (!o.awake && !o.dead && (o.room === m.room || dist(o.x, o.y, m.x, m.y) < 90)) o.awake = true;
+  }
+
+  killMob(m: Unit): void {
+    m.dead = true;
+    m.hp = 0;
+    const t = m.type!;
+    this.fx.push({ kind: 'death', x: m.x, y: m.y - 4, color: t.ramp[2], size: m.boss ? 3 : m.elite ? 2 : 1 });
+    const gold = Math.max(1, Math.round(this.goldPerKill * (m.boss ? 25 : m.elite ? 4 : 1)));
+    this.events.push({ type: 'kill', gold, elite: !!m.elite, boss: !!m.boss, x: m.x, y: m.y });
+    // Coins burst out and fly to the squad.
+    const coins = m.boss ? 18 : m.elite ? 6 : 2 + this.rng.int(0, 1);
+    for (let i = 0; i < coins; i++) this.spawnPickup(m.x, m.y, 'gold', Math.max(1, Math.round(gold / coins)));
+    const d = BAL.dungeon.drops;
+    if (this.rng.chance(m.boss ? d.potionBoss : m.elite ? d.potionElite : d.potionMob)) this.spawnPickup(m.x, m.y, 'potion', 1);
+    if (m.boss) this.spawnPickup(m.x, m.y, 'hourglass', d.hourglassBoss);
+    else if (m.elite && this.rng.chance(d.hourglassElite)) this.spawnPickup(m.x, m.y, 'hourglass', 1);
+    if (m.boss) {
+      this.shakeIt(6, 0.8);
+      this.hitStop = 0.25;
+      // The boss's minions fall with it.
+      for (const o of this.mobs) if (!o.dead) this.killMob(o);
+    } else if (m.elite) {
+      this.shakeIt(3, 0.25);
+    }
+  }
+
+  spawnPickup(x: number, y: number, kind: Pickup['kind'], amount: number): void {
+    const a = this.rng.float(0, Math.PI * 2);
+    const s = this.rng.float(20, 60);
+    this.pickups.push({ uid: uid(), x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s * 0.6, z: 0, vz: this.rng.float(50, 90), kind, amount, t: 0, taken: false });
+  }
+
+  downHero(h: Unit): void {
+    h.hp = 0;
+    h.downed = true;
+    h.rolling = undefined;
+    h.channel = undefined;
+    this.fx.push({ kind: 'death', x: h.x, y: h.y - 6, color: '#c8c8d8', size: 1 });
+    this.events.push({ type: 'heroDown', slot: h.slot! });
+    if (h.slot === this.controlled) {
+      const next = this.heroes.find((x) => !x.downed);
+      if (next) this.switchControl(next.slot!, true);
+    }
+    if (this.heroes.every((x) => x.downed) && !this.wiped) {
+      this.wiped = true;
+      this.events.push({ type: 'wipe' });
+    }
+  }
+
+  switchControl(slot: number, forced = false): boolean {
+    const h = this.heroes.find((x) => x.slot === slot);
+    if (!h || h.downed || slot === this.controlled) return false;
+    this.controlled = slot;
+    this.events.push({ type: 'switch', slot });
+    this.fx.push({ kind: 'spark', x: h.x, y: h.y - 10, color: '#ffe27a' });
+    // Tag Team: the incoming knight's special goes off for free.
+    if (!forced && this.perks.has('tagTeam') && this.tagTeamT <= 0) {
+      this.tagTeamT = 8;
+      heroSpecial(this, h, true);
+    }
+    return true;
+  }
+
+  refreshFlows(): void {
+    const alive = this.livingHeroes();
+    this.heroFlow = flowFrom(this.map, alive);
+    this.heroFlowFly = flowFrom(this.map, alive, true);
+    const lead = this.leader();
+    this.leaderFlow = lead ? flowFrom(this.map, [lead]) : null;
+    const goals = this.portalOpen ? [this.map.exit] : this.livingMobs();
+    this.goalFlow = goals.length ? flowFrom(this.map, goals) : null;
+  }
+
+  update(dt: number): void {
+    if (this.hitStop > 0) {
+      this.hitStop -= dt;
+      dt *= 0.15;
+    }
+    this.time += dt;
+    this.flowT -= dt;
+    if (this.flowT <= 0) {
+      this.flowT = 0.3;
+      this.refreshFlows();
+    }
+    if (this.tagTeamT > 0) this.tagTeamT -= dt;
+    if (this.bannerT > 0) {
+      this.bannerT -= dt;
+      if (this.bannerT <= 0) this.banner = 0;
+    }
+    const lead = this.leader();
+    // --- heroes
+    for (const h of this.heroes) {
+      tickStatus(this, h, dt);
+      if (h.downed) continue;
+      const mine = h.slot === this.controlled && !this.auto;
+      let mx = 0;
+      let my = 0;
+      if (mine) {
+        mx = this.input.mx;
+        my = this.input.my;
+        if (this.input.dodge) heroDodge(this, h, mx, my);
+        if (this.input.special) heroSpecial(this, h, false);
+      } else {
+        [mx, my] = heroAi(this, h, lead, dt);
+      }
+      heroTick(this, h, dt, mx, my);
+    }
+    this.input.dodge = false;
+    this.input.special = false;
+    // --- mobs
+    for (const m of this.mobs) {
+      if (m.dead) continue;
+      tickStatus(this, m, dt);
+      if (m.dead) continue;
+      mobAi(this, m, dt);
+    }
+    separate(this);
+    updateShots(this, dt);
+    updateAreas(this, dt);
+    updatePickups(this, dt);
+    for (const t of this.texts) {
+      t.t += dt;
+      t.y -= dt * (t.big ? 14 : 18);
+    }
+    this.texts = this.texts.filter((t) => t.t < (t.big ? 1.1 : 0.8));
+    if (this.shake > 0) this.shake -= dt;
+    else this.shakePower = 0;
+    this.mobs = this.mobs.filter((m) => !m.dead || m.hurtT > -0.5);
+    for (const m of this.mobs) if (m.dead) m.hurtT -= dt;
+    // --- floor cleared: the portal opens
+    if (!this.cleared && this.mobs.every((m) => m.dead)) {
+      this.cleared = true;
+      this.portalOpen = true;
+      this.events.push({ type: 'cleared' });
+      this.fx.push({ kind: 'portal', x: this.map.exit.x, y: this.map.exit.y });
+      for (const h of this.heroes) if (h.downed) this.revive(h, BAL.dungeon.reviveHpPct);
+      this.refreshFlows();
+    }
+    if (this.portalOpen && !this.exited && lead && dist(lead.x, lead.y, this.map.exit.x, this.map.exit.y) < 14) {
+      this.exited = true;
+      this.events.push({ type: 'exit' });
+    }
+  }
+}
+
+function tickStatus(w: World, u: Unit, dt: number): void {
+  u.animT += dt;
+  if (u.hurtT > 0) u.hurtT -= dt;
+  if (u.invuln > 0) u.invuln -= dt;
+  if (u.drT > 0) u.drT -= dt;
+  if (u.stunT > 0) u.stunT -= dt;
+  if (u.slowT > 0) u.slowT -= dt;
+  if (u.swingT > 0) u.swingT -= dt;
+  if (u.burnT > 0) {
+    u.burnT -= dt;
+    const before = u.hp;
+    u.hp -= u.burnDps * dt;
+    if (Math.floor(before / Math.max(1, u.burnDps)) !== Math.floor(u.hp / Math.max(1, u.burnDps)) && w.rng.chance(0.5)) {
+      w.fx.push({ kind: 'spark', x: u.x, y: u.y - 8, color: '#ff8a3a' });
+    }
+    if (u.hp <= 0) {
+      if (u.team === 'mob') w.killMob(u);
+      else w.downHero(u);
+    }
+  }
+}
+
+/** Units push each other apart a little (heroes and mobs alike). */
+function separate(w: World): void {
+  const all = [...w.heroes.filter((h) => !h.downed && !h.rolling), ...w.mobs.filter((m) => !m.dead)];
+  for (let i = 0; i < all.length; i++) {
+    for (let j = i + 1; j < all.length; j++) {
+      const a = all[i];
+      const b = all[j];
+      const min = a.r + b.r;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 >= min * min || d2 < 1e-6) continue;
+      const d = Math.sqrt(d2);
+      const push = (min - d) * 0.5;
+      const nx = dx / d;
+      const ny = dy / d;
+      const wa = a.boss ? 0.1 : 1;
+      const wb = b.boss ? 0.1 : 1;
+      moveUnit(w.map, a, -nx * push * wa, -ny * push * wa);
+      moveUnit(w.map, b, nx * push * wb, ny * push * wb);
+    }
+  }
+}
+
+function updateShots(w: World, dt: number): void {
+  for (const s of w.shots) {
+    s.life -= dt;
+    if (s.homing) {
+      const foes = s.team === 'hero' ? w.mobs.filter((m) => !m.dead) : w.heroes.filter((h) => !h.downed);
+      let best: Unit | null = null;
+      let bd = 70;
+      for (const f of foes) {
+        const d = dist(s.x, s.y, f.x, f.y);
+        if (d < bd) {
+          bd = d;
+          best = f;
+        }
+      }
+      if (best) {
+        const sp = Math.hypot(s.vx, s.vy);
+        const [nx, ny] = norm(best.x - s.x, best.y - 6 - s.y);
+        s.vx += (nx * sp - s.vx) * Math.min(1, s.homing * dt);
+        s.vy += (ny * sp - s.vy) * Math.min(1, s.homing * dt);
+      }
+    }
+    s.x += s.vx * dt;
+    s.y += s.vy * dt;
+    if (tileAt(w.map, Math.floor(s.x / TILE), Math.floor((s.y + 6) / TILE)) === 0) {
+      s.life = 0;
+      w.fx.push({ kind: 'dust', x: s.x, y: s.y, color: s.color });
+      if (s.splash) splash(w, s);
+      continue;
+    }
+    const targets = s.team === 'hero' ? w.mobs : w.heroes;
+    for (const t of targets) {
+      if (t.dead || t.downed || s.life <= 0) continue;
+      if (s.hit?.has(t.uid)) continue;
+      if (dist(s.x, s.y, t.x, t.y - 6) > s.r + t.r + 2) continue;
+      const from = [...w.heroes, ...w.mobs].find((u) => u.uid === s.from) ?? null;
+      if (t.team === 'hero' && (t.invuln > 0 || t.rolling)) continue;
+      const crit = s.team === 'hero' && w.rng.chance(0.1);
+      w.damage(t, s.dmg * (crit ? 1.6 : 1), from, { crit, knock: s.kind === 'arrow' ? 3 : 2, kx: s.vx, ky: s.vy });
+      if (s.heal && from) {
+        // Holy Orb: heals the most hurt ally.
+        const hurt = w.heroes.filter((h) => !h.downed).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
+        if (hurt) w.clericHeal(hurt, s.heal);
+      }
+      if (s.splash) splash(w, s, t.uid);
+      if (s.pierce && s.pierce > 0) {
+        s.pierce -= 1;
+        (s.hit ??= new Set()).add(t.uid);
+      } else {
+        s.life = 0;
+      }
+    }
+  }
+  w.shots = w.shots.filter((s) => s.life > 0);
+}
+
+function splash(w: World, s: Shot, skip?: number): void {
+  const from = [...w.heroes, ...w.mobs].find((u) => u.uid === s.from) ?? null;
+  w.fx.push({ kind: 'blast', x: s.x, y: s.y, color: s.color, size: 1 });
+  for (const e of w.enemiesIn(s.team, s.x, s.y, s.splash!)) if (e.uid !== skip) w.damage(e, s.dmg * 0.6, from, { knock: 4 });
+}
+
+function updateAreas(w: World, dt: number): void {
+  for (const a of w.areas) {
+    a.t += dt;
+    if (a.delay > 0) {
+      a.delay -= dt;
+      if (a.delay <= 0 && (a.kind === 'meteor' || a.kind === 'slam' || a.kind === 'blast' || a.kind === 'bomb')) {
+        // It goes off: one big hit.
+        const from = [...w.heroes, ...w.mobs].find((u) => u.uid === a.from) ?? null;
+        for (const e of w.enemiesIn(a.team, a.x, a.y, a.r)) {
+          if (e.team === 'hero' && (e.invuln > 0 || e.rolling)) continue;
+          w.damage(e, a.dmg, from, { knock: 10, crit: a.kind === 'meteor' });
+        }
+        w.fx.push({ kind: 'blast', x: a.x, y: a.y, color: a.color, size: a.r / 12 });
+        w.shakeIt(a.kind === 'meteor' ? 5 : 3, 0.3);
+        if (a.kind === 'meteor') {
+          // The meteor leaves fire behind.
+          w.areas.push({ uid: uid(), team: a.team, x: a.x, y: a.y, r: a.r * 0.8, delay: 0, dur: 3, tick: 0.5, tickT: 0, dmg: a.dmg * 0.08, kind: 'fire', from: a.from, color: '#ff7a2a', t: 0 });
+        }
+        if (a.dur <= 0) a.done = true;
+      }
+      continue;
+    }
+    a.dur -= dt;
+    a.tickT -= dt;
+    if (a.tickT <= 0) {
+      a.tickT = a.tick;
+      const from = [...w.heroes, ...w.mobs].find((u) => u.uid === a.from) ?? null;
+      if (a.heal) {
+        for (const h of w.heroes) if (!h.downed && dist(h.x, h.y, a.x, a.y) <= a.r) w.clericHeal(h, h.maxHp * a.heal);
+      }
+      if (a.dmg > 0) {
+        for (const e of w.enemiesIn(a.team, a.x, a.y, a.r)) {
+          if (e.team === 'hero' && (e.invuln > 0 || e.rolling)) continue;
+          w.damage(e, a.dmg, from, { silent: a.kind === 'fire' && w.rng.chance(0.5) });
+        }
+        if (a.kind === 'rain') {
+          for (let k = 0; k < 3; k++) w.fx.push({ kind: 'spark', x: a.x + w.rng.float(-a.r, a.r), y: a.y + w.rng.float(-a.r * 0.6, a.r * 0.6), color: '#e8e0c8' });
+        }
+      }
+    }
+    if (a.dur <= 0) a.done = true;
+  }
+  w.areas = w.areas.filter((a) => !a.done);
+}
+
+function updatePickups(w: World, dt: number): void {
+  const lead = w.leader();
+  for (const p of w.pickups) {
+    p.t += dt;
+    if (p.t < 0.6) {
+      // A little hop where it dropped.
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vz -= 260 * dt;
+      p.z = Math.max(0, p.z + p.vz * dt);
+      p.vx *= 0.9;
+      p.vy *= 0.9;
+      continue;
+    }
+    if (!lead) continue;
+    // Then it flies to the squad's leader.
+    const [nx, ny] = norm(lead.x - p.x, lead.y - 8 - p.y);
+    const sp = 60 + (p.t - 0.6) * 260;
+    p.x += nx * sp * dt;
+    p.y += ny * sp * dt;
+    if (dist(p.x, p.y, lead.x, lead.y - 8) < 6) {
+      p.taken = true;
+      w.events.push({ type: 'pickup', kind: p.kind, amount: p.amount });
+      if (p.kind !== 'gold') {
+        w.text(lead.x, lead.y - 30, p.kind === 'potion' ? 'LUCK POTION!' : `+${p.amount} HOURGLASS`, p.kind === 'potion' ? '#7dff8a' : '#ffd84a', true);
+      }
+    }
+  }
+  w.pickups = w.pickups.filter((p) => !p.taken);
+}

@@ -64,6 +64,16 @@ def main(medieval, cozy, out='src/assets/ui'):
             y = 1 + row * 16
             crop(m, (x, y, 14, 14)).save(os.path.join(out, f'btn{name.capitalize()}{shade}.png'))
             crop(m, (x + 16, y + 1, 14, 13)).save(os.path.join(out, f'btn{name.capitalize()}{shade}Down.png'))
+    # Blank wooden buttons for text labels: the icon painted over with the button's face.
+    for shade in ('', 'Dark'):
+        for down in ('', 'Down'):
+            b = Image.open(os.path.join(out, f'btnPlus{shade}{down}.png')).convert('RGBA')
+            px = b.load()
+            face = px[3, 1]
+            for y in range(2, 10):
+                for x in range(2, 12):
+                    px[x, y] = face
+            b.save(os.path.join(out, f'btnBlank{shade}{down}.png'))
     for name, box in COZY.items():
         crop(c, box).save(os.path.join(out, f'{name}.png'))
     print('wrote', len(os.listdir(out)), 'files to', out)

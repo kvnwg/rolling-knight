@@ -86,8 +86,11 @@ export const BAL = {
     },
   },
   dungeon: {
-    hpGrowth: 1.13,
-    dmgGrowth: 1.095,
+    /** Mob HP and damage at floor 1 (times each mob type's own numbers), growing every floor. */
+    hpBase: 2,
+    atkBase: 1.3,
+    hpGrowth: 1.15,
+    dmgGrowth: 1.1,
     goldGrowth: 1.14,
     goldPerKill: 3,
     floorsPerBiome: 5,
@@ -96,7 +99,7 @@ export const BAL = {
     reviveHpPct: 0.35,
     drops: { potionMob: 0.003, potionElite: 0.05, potionBoss: 0.3, hourglassElite: 0.25, hourglassBoss: 5 },
   },
-  rebirth: { baseFloor: 10, floorPer: 10, luckPer: 0.25, goldMultPer: 0.5, statPctPer: 30 },
+  rebirth: { baseFloor: 15, floorPer: 10, luckPer: 0.25, goldMultPer: 0.5, statPctPer: 30 },
   perks: { unlockRebirths: 1, sigilsPerBoss: 1 },
 } as const;
 
