@@ -137,8 +137,8 @@ export function KeeperScreen({
 export function ShopTop({ purse, title, right }: { purse: ReactNode; title?: ReactNode; right?: ReactNode }) {
   return (
     <div className={s.top}>
-      {purse}
       <div className={s.title}>{title}</div>
+      {purse}
       {right}
     </div>
   );
@@ -148,7 +148,7 @@ export function ShopTop({ purse, title, right }: { purse: ReactNode; title?: Rea
 export function Purse({ amount, icon = 'coin', label = 'Gold' }: { amount: number; icon?: IconName; label?: string }) {
   const shown = useCountUp(Math.floor(amount));
   return (
-    <span className={s.purse} title={label}>
+    <span className={s.purse} title={label} data-purse>
       <Px icon={icon} size="md" />
       <small>{label}</small>
       {fmt(Math.round(shown))}

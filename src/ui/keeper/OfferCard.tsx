@@ -66,6 +66,8 @@ export interface OfferCardProps {
   ribbon?: string;
   onArt?: () => void;
   title?: string;
+  /** Marks the card (data-card) so an effect can find its picture. */
+  cardId?: string;
 }
 
 interface Float {
@@ -111,7 +113,7 @@ export function OfferCard(p: OfferCardProps) {
   }, [float]);
 
   return (
-    <div className={s.card} data-state={p.state ?? 'open'} data-special={p.special || undefined} data-flash={flash ? flash : undefined} title={p.title}>
+    <div className={s.card} data-card={p.cardId} data-state={p.state ?? 'open'} data-special={p.special || undefined} data-flash={flash ? flash : undefined} title={p.title}>
       {flash > 0 && <i key={`flash${flash}`} className={s.flashFx} aria-hidden />}
       {(p.level !== undefined || p.levelRight !== undefined) && (
         <div className={s.head}>

@@ -32,6 +32,7 @@ import { OfferCard } from './OfferCard';
 import { Icon } from './TinkerShop';
 import { CLASS_ICON } from '../classIcons';
 import { Codex } from '../panels';
+import { coinFly } from '../fx/coinFly';
 
 /** A rarity's color made dark enough to read on paper. */
 function inkOf(c: string): string {
@@ -559,6 +560,8 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
   const [msg, setMsg] = useState<Record<string, string>>({});
   const [sure, setSure] = useState<string | null>(null);
   const [sold, setSold] = useState<string | null>(null);
+  // Gold from a sale still flying in as coins: the counter shows it as they land.
+  const [owed, setOwed] = useState(0);
   const [, bump] = useState(0);
   const setTab = (t: string) => ((wardenMemory.tab = t), setTabState(t), setSure(null));
   const setPick = (i: number) => ((wardenMemory.slot = i), setPickState(i));
@@ -607,11 +610,27 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
       return false;
     }
     const name = knightDef(id).name;
+    const art = document.querySelector(`[data-card="${id}"] .${s.well}`);
+    const purse = document.querySelector('[data-keeper] [data-purse]');
     const g = sellKnight(st, id);
     if (!g) return false;
     uiSound('sell', Math.min(6, ri));
     setSure(null);
     setSold(`Sold ${name} for ${fmt(g)} gold`);
+    // The knight turns into coins that fly up into the gold counter.
+    const coins = 6 + ri * 3;
+    let paid = 0;
+    setOwed((o) => o + g);
+    coinFly(art, purse, {
+      coins,
+      reduceMotion: st.settings.reduceMotion,
+      onLand: (i, last) => {
+        const share = last ? g - paid : Math.floor(g / coins);
+        paid += share;
+        setOwed((o) => Math.max(0, o - share));
+        if (last || i % 3 === 0) uiSound('collect', Math.min(4, Math.floor(i / 3)));
+      },
+    });
     refresh();
     return true;
   };
@@ -637,9 +656,9 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
       onClose={onClose}
     >
       <ShopTop
-        purse={<Purse amount={st.gold} />}
+        purse={<Purse amount={st.gold - owed} />}
         title={
-          <span className={s.chips} style={{ justifyContent: 'flex-end' }}>
+          <span className={s.chips}>
             <Stat icon="stairs" label="Floor" title={`Floor ${floor}, ${biome.name}`}>
               {floor}
             </Stat>
@@ -724,6 +743,7 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
                 return (
                   <OfferCard
                     key={id}
+                    cardId={id}
                     level={`Lv ${rec.level}`}
                     levelRight={<Px icon={CLASS_ICON[def.cls]} size="xs" />}
                     art={<HeroArt id={id} mutation={rec.mutation} s={1} />}
