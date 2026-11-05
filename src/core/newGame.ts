@@ -48,7 +48,7 @@ export function newGame(seed = Date.now()): GameState {
     codex: {},
     records: { bestOneIn: 0, bestName: null, bestFloorEver: 1, kills: 0, spins: 0 },
     stats: { killsThisRun: 0, goldPerMinute: 0, goldWindow: [] },
-    settings: { sfx: 0.7, music: 0.5, autoPlay: false, reduceMotion: false, showDamage: true },
+    settings: { sfx: 0.7, music: 0.5, autoPlay: false, reduceMotion: false, showDamage: true, tiltShift: true },
     seen: { tutorialHints: [], perksIntro: false },
   };
 }

@@ -208,6 +208,9 @@ export class Renderer {
     ctx.fillRect(0, 0, this.W, this.H);
     ctx.drawImage(this.terrain!.canvas, cx, cy, this.W, this.H, 0, 0, this.W, this.H);
     this.drawLiquidShimmer(ctx, w, cx, cy);
+    // Tilt-shift: the ground goes soft the further past the leader it lies (and a little at the
+    // bottom edge), like a photo of a miniature. Only the ground: everything standing stays crisp.
+    if (game.state.settings.tiltShift && lead) this.tiltShift(ctx, sy(lead.y) - 6, w.biome.layout === 'rooms' ? 0.5 : 1);
     this.drawPortal(ctx, w, sx, sy);
     for (const a of w.areas) this.drawArea(ctx, a, sx, sy);
 
@@ -296,6 +299,78 @@ export class Renderer {
       ctx.fillRect(0, 0, this.W, this.H);
     }
     this.present();
+  }
+
+  private blurCopy: HTMLCanvasElement | null = null;
+  private blurHalf: HTMLCanvasElement | null = null;
+  private filterOk: boolean | null = null;
+
+  /**
+   * Depth-of-field blur on the ground layer. `focus` is the leader's row on screen: rows within a few
+   * tiles of it stay sharp; above it (further away in the 3/4 view) the blur grows toward the top of
+   * the view; the bottom edge softens a little. `strength` is 1 outdoors, 0.5 indoors. The blur steps
+   * in whole bands, at art resolution, so it stays on the pixel grid.
+   */
+  private tiltShift(ctx: Ctx, focus: number, strength: number): void {
+    const W = this.W;
+    const H = this.H;
+    if (!this.blurCopy || this.blurCopy.width !== W || this.blurCopy.height !== H) {
+      this.blurCopy = makeCanvas(W, H) as HTMLCanvasElement;
+      this.blurHalf = makeCanvas(Math.ceil(W / 2), Math.ceil(H / 2)) as HTMLCanvasElement;
+    }
+    if (this.filterOk === null) this.filterOk = typeof ctx.filter === 'string' && (() => {
+      ctx.filter = 'blur(1px)';
+      const ok = ctx.filter === 'blur(1px)';
+      ctx.filter = 'none';
+      return ok;
+    })();
+    const copy = this.blurCopy.getContext('2d')!;
+    copy.clearRect(0, 0, W, H);
+    copy.drawImage(this.scene, 0, 0);
+    const sharp = 34;
+    const reach = Math.max(40, focus - sharp);
+    const level = (y: number) => {
+      let b = 0;
+      if (y < focus - sharp) b = Math.min(1, (focus - sharp - y) / reach) * 1.8;
+      const edge = 30;
+      if (y > H - edge) b = Math.max(b, ((y - (H - edge)) / edge) * 0.9);
+      return Math.round(b * strength * 4) / 4;
+    };
+    // Group rows into bands of equal blur, and draw each band from a blurred copy.
+    let y0 = 0;
+    let cur = level(0);
+    const flush = (y1: number, b: number) => {
+      if (b <= 0 || y1 <= y0) return;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, y0, W, y1 - y0);
+      ctx.clip();
+      if (this.filterOk) {
+        ctx.filter = `blur(${b}px)`;
+        ctx.drawImage(this.blurCopy!, 0, 0);
+        ctx.filter = 'none';
+      } else {
+        // No canvas filters (older Safari): a half-size smoothed round trip.
+        const h = this.blurHalf!.getContext('2d')!;
+        h.imageSmoothingEnabled = true;
+        h.clearRect(0, 0, this.blurHalf!.width, this.blurHalf!.height);
+        h.drawImage(this.blurCopy!, 0, 0, this.blurHalf!.width, this.blurHalf!.height);
+        ctx.imageSmoothingEnabled = true;
+        ctx.globalAlpha = Math.min(1, b);
+        ctx.drawImage(this.blurHalf!, 0, 0, W, H);
+        ctx.globalAlpha = 1;
+        ctx.imageSmoothingEnabled = false;
+      }
+      ctx.restore();
+    };
+    for (let y = 1; y <= H; y++) {
+      const b = y < H ? level(y) : -1;
+      if (b !== cur) {
+        flush(y, cur);
+        y0 = y;
+        cur = b;
+      }
+    }
   }
 
   /** Time running backwards: a cold tint, rolling scanlines, a jittering band and a big rewind sign. */

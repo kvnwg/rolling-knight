@@ -23,6 +23,9 @@ How every system works, with its numbers: [`DESIGN.md`](DESIGN.md). Art sources 
 - Cinematic light: the scene is multiplied by each biome's ambient (cool and dim, or warm), torches,
   lanterns, braziers, lava, crystals, spells and the knights themselves light it in stepped bands
   with bloom, then a grade and a vignette. Weather per biome: fireflies, snow, embers, petals, fog.
+- Tilt-shift: the ground goes soft the further past your knight it lies, and a little at the bottom
+  edge, so the dungeon looks like a miniature; anything standing (trees, props, characters) stays
+  crisp. Half strength indoors (crypts, lava caves). A switch in Settings turns it off.
 - One pixel size: everything is drawn at art resolution (about 216 art pixels on the screen's short
   side) and scaled up by a whole number.
 - The HUD is the supplied medieval UI: hanging wooden boards, plank signs, wooden buttons, framed HP

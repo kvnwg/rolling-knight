@@ -441,6 +441,9 @@ function Settings({ game }: { game: Game }) {
           <input type="checkbox" checked={s.settings.autoPlay} onChange={(e) => (game.setAuto(e.target.checked), bump((n) => n + 1))} /> Auto: your knight plays itself
         </label>
         <label className="row">
+          <input type="checkbox" checked={s.settings.tiltShift} onChange={(e) => ((s.settings.tiltShift = e.target.checked), bump((n) => n + 1))} /> Tilt-shift: the distance goes soft, like a miniature
+        </label>
+        <label className="row">
           <input type="checkbox" checked={s.settings.reduceMotion} onChange={(e) => ((s.settings.reduceMotion = e.target.checked), bump((n) => n + 1))} /> Reduce motion (no screen shake)
         </label>
       </div>

@@ -131,6 +131,8 @@ export interface GameState {
     autoPlay: boolean;
     reduceMotion: boolean;
     showDamage: boolean;
+    /** Tilt-shift: the ground far past your knight goes soft, like a miniature. */
+    tiltShift: boolean;
   };
   seen: { tutorialHints: string[]; perksIntro: boolean };
 }
