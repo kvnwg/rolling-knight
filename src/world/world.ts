@@ -20,6 +20,7 @@ import { floorPar, foeStats } from '../core/power';
 import { heroDodge, heroSpecial, heroTick } from './skills';
 import { CLEAR, skyOf, type Sky } from './sky';
 import { onHeroHit, onHeroHurt, onKill, onShotHit, onTick } from './chance';
+import { makeTraps, updateTraps, type Trap } from './traps';
 
 export interface HeroSpec {
   knightId: string;
@@ -106,6 +107,8 @@ export class World {
   areas: Area[] = [];
   texts: FloatText[] = [];
   pickups: Pickup[] = [];
+  /** The floor's traps (traps.ts): spikes, fire vents, saws, pressure plates. */
+  traps: Trap[] = [];
   fx: Fx[] = [];
   events: WorldEvent[] = [];
   time = 0;
@@ -205,6 +208,7 @@ export class World {
       return;
     }
     this.difficulty = o.difficulty ?? floorPar(o.floor);
+    this.traps = makeTraps(o.map);
     for (const s of o.map.spawns) {
       const t = s.boss ? o.bossType! : this.rng.pick(o.mobTypes);
       const m = this.makeMob(t, s.x, s.y, s.elite, s.boss);
@@ -831,6 +835,7 @@ export class World {
       mobAi(this, m, dt);
     }
     onTick(this, dt);
+    updateTraps(this, this.traps);
     separate(this);
     updateShots(this, dt);
     updateAreas(this, dt);

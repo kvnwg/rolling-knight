@@ -475,7 +475,9 @@ export function generateFloor(opts: GenOptions): FloorMap {
   rooms.forEach((r, ri) => {
     if (r.kind === 'start' || r.quiet) return;
     if (r.kind === 'arena') {
-      m.spawns.push({ x: r.cx * TILE + 8, y: (r.cy - 3) * TILE + 8, room: ri, elite: false, boss: true });
+      // Three tiles above the middle, unless a prop took that tile: then just inside the clear middle.
+      const by = tileAt(m, r.cx, r.cy - 3) === FLOOR ? r.cy - 3 : r.cy - 2;
+      m.spawns.push({ x: r.cx * TILE + 8, y: by * TILE + 8, room: ri, elite: false, boss: true });
       return;
     }
     const pack = Math.min(9, 3 + Math.floor(floor / 6) + spawnRng.int(0, 2) + (r.kind === 'side' ? -1 : 0));

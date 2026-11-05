@@ -16,6 +16,8 @@
 import { Rng } from '../core/rng';
 import type { Biome, PropKind } from './biomes';
 import { BLOCKED, FLOOR, SOLID, TILE, squeezes, tileAt, type FloorMap, type Room } from './mapgen';
+import { dressDungeon } from './dungeonDecor';
+import { CRYPT_TRAPS, placeTraps } from './traps';
 
 export interface DecorCtx {
   m: FloorMap;
@@ -57,9 +59,12 @@ export function houseLayout(variant: number): HouseLayout {
 export function dressFloor(c: DecorCtx): void {
   if (c.biome.solid.ledge) standOnLedges(c.m);
   if (c.biome.id === 'hamlet') village(c);
+  else if (c.biome.id === 'dungeon') dressDungeon(c);
   else {
     const cfg = WILDS[c.biome.id];
     if (cfg) wilds(c, cfg);
+    // The crypt has a few of the dungeon's traps.
+    if (c.biome.id === 'crypt') placeTraps(c, CRYPT_TRAPS);
     // The farm's lots are fenced and hedged like the town's.
     if (c.biome.id === 'farmland') lotEdges(c, ['roughFence', 'roughFence', 'hedge'], null);
   }
@@ -71,14 +76,14 @@ function at(m: FloorMap, x: number, y: number): number {
   return tileAt(m, x, y);
 }
 
-function free(c: DecorCtx, x: number, y: number): boolean {
+export function free(c: DecorCtx, x: number, y: number): boolean {
   const i = y * c.m.w + x;
   return at(c.m, x, y) === FLOOR && !c.occupied.has(i) && !c.nearCenter(x, y) && !c.m.field?.[i];
 }
 
 /** A solid prop on a floor tile (blocking it), if that leaves every floor tile reachable. Off the
  * road (the corridors' line), unless `paved` (a town paves everything; keep off its middle line). */
-function solidProp(c: DecorCtx, kind: PropKind, x: number, y: number, dx = 0, dy = 0, seed = c.rng.int(0, 1 << 30), paved = false): boolean {
+export function solidProp(c: DecorCtx, kind: PropKind, x: number, y: number, dx = 0, dy = 0, seed = c.rng.int(0, 1 << 30), paved = false): boolean {
   const { m } = c;
   const i = y * m.w + x;
   if (!free(c, x, y) || (m.path[i] && !paved) || (paved && onRoute(m, x, y)) || squeezes(m, x, y)) return false;
@@ -98,7 +103,7 @@ function onRoute(m: FloorMap, x: number, y: number): boolean {
 }
 
 /** Several props sharing one blocked tile (a heap of barrels and a crate). */
-function cluster(c: DecorCtx, x: number, y: number, kinds: PropKind[], paved = false): boolean {
+export function cluster(c: DecorCtx, x: number, y: number, kinds: PropKind[], paved = false): boolean {
   const { m } = c;
   const i = y * m.w + x;
   if (!free(c, x, y) || (m.path[i] && !paved) || (paved && onRoute(m, x, y)) || squeezes(m, x, y)) return false;

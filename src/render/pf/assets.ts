@@ -1,5 +1,6 @@
 /**
- * The PixelForge sheets the game ships (src/assets/pf/, made by tools/packs/pixelforge.py) and their
+ * The PixelForge sheets the game ships (src/assets/pf/, made by tools/packs/pixelforge.py; and the
+ * supplied packs' monsters in the same format, src/assets/packs/, made by tools/packs/enemies.py) and their
  * loading. The JSON is bundled with the code; the PNGs are URLs in the app build and data: URLs in the
  * single-file build. pfLoad() decodes every image once (main.tsx waits for it before the first
  * frame); outside a browser (tests, Node tools) there are no images and pfReady() stays false, so the
@@ -26,6 +27,10 @@ import skeleton from '../../assets/pf/skeleton.json';
 import slime from '../../assets/pf/slime.json';
 import stoneWarden from '../../assets/pf/stone_warden.json';
 import wolf from '../../assets/pf/wolf.json';
+import pkReaper from '../../assets/packs/pk_reaper.json';
+import pkSkeleton from '../../assets/packs/pk_skeleton.json';
+import pkSlime from '../../assets/packs/pk_slime.json';
+import pkVampire from '../../assets/packs/pk_vampire.json';
 import { PFSheet, type PFMeta } from './sheet';
 
 const METAS = {
@@ -46,6 +51,10 @@ const METAS = {
   skeleton,
   ogre,
   stone_warden: stoneWarden,
+  pk_skeleton: pkSkeleton,
+  pk_reaper: pkReaper,
+  pk_vampire: pkVampire,
+  pk_slime: pkSlime,
   fx_poof_smoke: fxPoofSmoke,
   fx_bone_crumble: fxBoneCrumble,
   fx_status_stun: fxStatusStun,
@@ -60,7 +69,10 @@ export const SHEETS: Readonly<Record<SheetName, PFSheet>> = Object.fromEntries(
 
 let urls: Record<string, string> = {};
 try {
-  urls = import.meta.glob<string>('../../assets/pf/*.png', { eager: true, query: '?url', import: 'default' });
+  urls = {
+    ...import.meta.glob<string>('../../assets/pf/*.png', { eager: true, query: '?url', import: 'default' }),
+    ...import.meta.glob<string>('../../assets/packs/*.png', { eager: true, query: '?url', import: 'default' }),
+  };
 } catch {
   /* not built by Vite (a Node tool): no images */
 }

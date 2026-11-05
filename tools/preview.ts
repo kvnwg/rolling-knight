@@ -81,7 +81,9 @@ if (what === 'props') {
   const { BIOMES } = await import('../src/world/biomes');
   const { propArt, treeArt } = await import('../src/render/art/props');
   const biome = BIOMES[(process.argv[4] ?? 'farmland') as keyof typeof BIOMES];
-  const kinds = ['rock', 'bush', 'flowers', 'barrel', 'crate', 'bones', 'torch', 'lantern', 'brazier', 'gravestone', 'crystalSmall', 'reeds', 'mushroomSmall', 'pumpkin', 'stump', 'pillar', 'statue', 'well', 'fence', 'skull', 'cart', 'stoneLantern', 'banner', 'campfire', 'tent', 'hayBale', 'cabbage', 'wheat', 'scarecrow', 'trough', 'sunflower', 'pot', 'bench', 'lampPost', 'signpost', 'sack', 'woodpile', 'noticeBoard', 'flowerBed', 'stall', 'wellStone', 'lanternPost', 'roughFence', 'fern', 'mossRock', 'log', 'brokenPillar', 'stoneBlock', 'ruinWall', 'stairs', 'picket', 'picketSide', 'hedge', 'fountain', 'cafeTable', 'stringPost', 'bridgeRail'] as const;
+  const kinds = ['rock', 'bush', 'flowers', 'barrel', 'crate', 'bones', 'torch', 'lantern', 'brazier', 'gravestone', 'crystalSmall', 'reeds', 'mushroomSmall', 'pumpkin', 'stump', 'pillar', 'statue', 'well', 'fence', 'skull', 'cart', 'stoneLantern', 'banner', 'campfire', 'tent', 'hayBale', 'cabbage', 'wheat', 'scarecrow', 'trough', 'sunflower', 'pot', 'bench', 'lampPost', 'signpost', 'sack', 'woodpile', 'noticeBoard', 'flowerBed', 'stall', 'wellStone', 'lanternPost', 'roughFence', 'fern', 'mossRock', 'log', 'brokenPillar', 'stoneBlock', 'ruinWall', 'stairs', 'picket', 'picketSide', 'hedge', 'fountain', 'cafeTable', 'stringPost', 'bridgeRail',
+    // The dungeon's (pack art; `props out.png dungeon` shows how the dungeon dresses the shared ones too).
+    'wallBanner', 'hangingBanner', 'wallRing', 'cellDoor', 'blueDoor', 'sideTorch', 'cobweb', 'chest', 'candles', 'candlestick', 'flask', 'pedestal', 'armor', 'dragonSkull', 'cabinet', 'rubble', 'coins', 'sword'] as const;
   const cw = 52;
   const ch = 50;
   const cols = 10;
@@ -154,6 +156,14 @@ async function paintFloor(biomeId: string, floor: number, seed: number, design: 
     const variant = p.seed % 5;
     const art = p.kind === 'tree' ? treeArt(p.tree!, biome, variant * 7919 + 13) : propArt(p.kind, biome, variant * 104729 + 7);
     list.push({ y: p.y, draw: () => blit(img, art.buf, p.x - art.ax, p.y - art.ay) });
+  }
+  // Traps (the Dungeon's, the crypt's) at a moment (TRAPS=seconds: 2.4 has spikes up and fire burning).
+  const { trapPieces } = await import('../src/render/packs/trapArt');
+  for (const tr of m.traps ?? []) {
+    for (const p of trapPieces({ ...tr, armedAt: process.env.TRAPS ? 0 : -1 }, Number(process.env.TRAPS ?? 2.4))) {
+      if (p.flat) blit(img, p.buf, p.x, p.y);
+      else list.push({ y: p.base, draw: () => blit(img, p.buf, p.x, p.y) });
+    }
   }
   m.spawns.forEach((s, i) => {
     const ty = s.boss ? bossType! : types[i % types.length];

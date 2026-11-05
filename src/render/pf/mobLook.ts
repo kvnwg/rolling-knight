@@ -2,10 +2,12 @@
  * Which PixelForge monster draws a mob, and its colors. The mapping keeps the sim's mob as it is
  * (name, size, stats, behavior); only the art changes:
  *
- *   slime            slime (the floor's colors)
+ *   slime            the supplied pack's slime with a face (the floor's colors), everywhere
  *   flyer            bat (the farm keeps its crows)
  *   beast            wolf; frost wolf in the tundra
- *   humanoid         goblin archer (ranged); skeleton in the crypt, the graveyard and the desert ruins;
+ *   humanoid         goblin archer (ranged); in the dark biomes (the dungeon, the crypt, the
+ *                    graveyard) the supplied pack's undead: a skeleton with a sword, one with a
+ *                    scythe or a robed vampire, by design; skeleton in the desert ruins;
  *                    orc in the tundra and when the design has horns; goblin otherwise (the goblin
  *                    chief as an elite). The farm keeps its scarecrows, casters their robes
  *   golem            ogre, in the biome's stone
@@ -23,7 +25,10 @@ import { hexToOklch, oklchToHex, ramp, rampLike, shiftL } from './color';
 import type { Paint } from './frames';
 import type { Recolor } from './sheet';
 
-export type MonsterId = 'slime' | 'bat' | 'wolf' | 'frost_wolf' | 'goblin' | 'goblin_archer' | 'goblin_chief' | 'orc' | 'skeleton' | 'ogre' | 'stone_warden';
+export type MonsterId =
+  | 'slime' | 'bat' | 'wolf' | 'frost_wolf' | 'goblin' | 'goblin_archer' | 'goblin_chief' | 'orc' | 'skeleton' | 'ogre' | 'stone_warden'
+  // The supplied packs' (tools/packs/enemies.py): side views, mirrored for the other facing.
+  | 'pk_skeleton' | 'pk_reaper' | 'pk_vampire' | 'pk_slime';
 
 export const MONSTER_SHEET: Record<MonsterId, SheetName> = {
   slime: 'slime',
@@ -37,7 +42,20 @@ export const MONSTER_SHEET: Record<MonsterId, SheetName> = {
   skeleton: 'skeleton',
   ogre: 'ogre',
   stone_warden: 'stone_warden',
+  pk_skeleton: 'pk_skeleton',
+  pk_reaper: 'pk_reaper',
+  pk_vampire: 'pk_vampire',
+  pk_slime: 'pk_slime',
 };
+
+/** Biomes whose humanoids are the pack's undead. */
+const UNDEAD_BIOMES: ReadonlySet<string> = new Set(['dungeon', 'crypt', 'graveyard']);
+
+/** Which of the pack's undead a design is: by its seed and its place on the floor, so a floor's two humanoid designs mostly differ. */
+export function undeadFor(t: MobType): 'pk_skeleton' | 'pk_reaper' | 'pk_vampire' {
+  const i = Number(t.id.split('-')[2]) || 0;
+  return (['pk_skeleton', 'pk_reaper', 'pk_vampire'] as const)[(t.features.seed + i) % 3];
+}
 
 export function biomeOf(t: MobType): string {
   return t.id.split('-')[0];
@@ -50,7 +68,7 @@ export function monsterFor(t: MobType, elite: boolean, boss: boolean): MonsterId
   if (boss) return ['pig', 'ram', 'chicken', 'ghost', 'pumpkin', 'bug', 'plant'].includes(t.plan) ? null : 'stone_warden';
   switch (t.plan) {
     case 'slime':
-      return 'slime';
+      return 'pk_slime';
     case 'flyer':
       return biome === 'farmland' ? null : 'bat';
     case 'beast':
@@ -58,7 +76,8 @@ export function monsterFor(t: MobType, elite: boolean, boss: boolean): MonsterId
     case 'humanoid':
       if (biome === 'farmland' || t.behavior === 'caster') return null;
       if (t.behavior === 'ranged') return 'goblin_archer';
-      if (biome === 'crypt' || biome === 'graveyard' || biome === 'desert') return 'skeleton';
+      if (UNDEAD_BIOMES.has(biome)) return undeadFor(t);
+      if (biome === 'desert') return 'skeleton';
       if (biome === 'tundra' || t.features.horns) return 'orc';
       return elite ? 'goblin_chief' : 'goblin';
     case 'golem':
@@ -91,6 +110,12 @@ const P = {
   gold: ['#bc8f5f', '#d2ab70'],
 } as const;
 
+/** The supplied packs' monsters as drawn: the slime's gel, the skeletons' bone and blades, the vampire's robe. */
+const GEL = ['#374e4a', '#456657', '#547e64', '#92a984'];
+const BONE = ['#676057', '#b3b2a1', '#e6e6e6'];
+const PK_METAL = ['#6d758d', '#b3b9d1', '#dae0ea'];
+const PK_ROBE = ['#5e4e3a', '#827860'];
+
 /** A glow eye in the biome's color, kept inside PixelForge's glow limits (L 0.85, C 0.14). */
 export function glowEye(hex: string): string {
   const [L, C, h] = hexToOklch(hex);
@@ -108,7 +133,7 @@ function hueOf(t: MobType): { h: number; c: number } {
  * turned a little per design so a floor's slimes differ, and C for how vivid.
  */
 const SLIME_HUE: Record<string, [h: number, c: number]> = {
-  hamlet: [150, 0.07], farmland: [150, 0.07], forest: [172, 0.07], tundra: [232, 0.07], crypt: [158, 0.065], swamp: [136, 0.075],
+  hamlet: [150, 0.07], farmland: [150, 0.07], forest: [172, 0.07], tundra: [232, 0.07], dungeon: [146, 0.07], crypt: [158, 0.065], swamp: [136, 0.075],
   desert: [72, 0.08], graveyard: [300, 0.07], ember: [36, 0.11], crystal: [292, 0.09], shrine: [350, 0.07],
 };
 
@@ -117,6 +142,7 @@ const WARDEN: Record<string, { stone: readonly string[]; moss: readonly string[]
   hamlet: { stone: P.granite, moss: P.hide, eye: '#ffe066' },
   forest: { stone: rampLike(P.granite, 0.02, 150, 4, -0.04), moss: rampLike(P.hide, 0.085, 138, 5, 0.04), eye: '#8affc8' },
   tundra: { stone: P.frostStone, moss: ramp([0.7, 0.77, 0.83], 0.02, 240, 2), eye: '#7ae0ff' },
+  dungeon: { stone: rampLike(P.granite, 0.035, 330, 4, -0.04), moss: rampLike(P.hide, 0.03, 300, 4, 0.02), eye: '#ff6a3a' },
   crypt: { stone: P.basalt, moss: rampLike(P.hide, 0.035, 165, 4, 0.05), eye: '#ff3a2a' },
   swamp: { stone: rampLike(P.granite, 0.025, 115, 4, -0.03), moss: P.bog, eye: '#e8ff4a' },
   desert: { stone: P.sandstone, moss: rampLike(P.hide, 0.05, 80, 4, 0.12), eye: '#ffb03a' },
@@ -214,6 +240,30 @@ export function mobPaint(t: MobType, elite: boolean, boss: boolean, enraged = fa
       r.skin = shiftL(stone[biome] ?? rampLike(P.ogreSkin, 0.018, 100, 3, -0.04), dL);
       r.cloth = rampLike(P.cloth, Math.min(0.08, c * ce), h, 5, -0.02);
       r.hair = rampLike(P.leatherDark, 0.02, h, 3);
+      break;
+    }
+    case 'pk_slime': {
+      // Its own lightness steps, in the floor's gel hue (green as drawn in most places).
+      const [sh, sc] = SLIME_HUE[biome] ?? [h, c];
+      const hue = sh + ((t.features.seed % 25) - 12);
+      r.slime = rampLike(GEL, sc * (elite ? 1.2 : 1), hue, 6, dL);
+      r.slime_highlight = [oklchToHex(0.8, 0.04, hue), oklchToHex(0.87, 0.03, hue)];
+      delete r.eyes;
+      break;
+    }
+    case 'pk_skeleton':
+    case 'pk_reaper': {
+      // Bone as drawn in the dungeon, tinted by the crypt's damp and the graveyard's moonlight; an
+      // elite's blade (and its slash) runs red.
+      const tint: Record<string, readonly string[]> = { crypt: rampLike(BONE, 0.03, 140, 4), graveyard: rampLike(BONE, 0.025, 255, 3) };
+      r.bone = shiftL(tint[biome] ?? BONE, dL);
+      if (elite) r.metal = rampLike(PK_METAL, 0.1, 22, 6, -0.04);
+      delete r.eyes;
+      break;
+    }
+    case 'pk_vampire': {
+      r.robe = rampLike(PK_ROBE, Math.max(0.02, Math.min(0.06, c * ce)), h, 5, dL);
+      r.eyes = elite ? ['#a01a1a', '#ff4a3a'] : ['#79191d', '#be2b25'];
       break;
     }
     case 'stone_warden': {

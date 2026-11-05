@@ -352,6 +352,7 @@ function mannequinKind(t: MobType): MannequinKind {
   if (biome === 'farmland') return 'scarecrow';
   if (t.behavior === 'caster') return biome === 'shrine' ? 'monk' : 'cultist';
   switch (biome) {
+    case 'dungeon':
     case 'crypt':
     case 'graveyard':
       return 'skeleton';

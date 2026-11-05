@@ -2,7 +2,7 @@
 
 A top-down (3/4 view) pixel action roguelite with a rolling game on top, in the style of Dumpster
 Legend. A free Summoning Altar rolls knights forever; you field a squad of three in endless,
-procedurally generated dungeons (hamlets, a farm, dark forests, tundra, crypts, bogs, desert ruins,
+procedurally generated dungeons (hamlets, a farm, dark forests, tundra, a dungeon keep, crypts, bogs, desert ruins,
 graveyards, lava caves, crystal grottoes, moonlit shrines), control one knight and let the other two
 fight by their class; when its cooldown is up in a fight, each knight rolls a random skill from its
 class's list and fires it. Between dives
@@ -31,9 +31,12 @@ recording: [`docs/SOUNDS.md`](docs/SOUNDS.md).
   for its rarity (iron and undyed cloth at Common, then bronze, steel, violet silver, gold, rose
   steel, verdigris, crimson steel, star-silver, aurora steel, white gold, obsidian, and cycling
   colors at Primordial, with cloth dyed in the rarity's color), with capes from Epic, halos from
-  Celestial and the mutations (Gilded, Shadow, Radiant, Void). Mobs map by body plan (slimes, bats,
+  Celestial and the mutations (Gilded, Shadow, Radiant, Void). Mobs map by body plan (bats,
   wolves, goblins, goblin archers and chiefs, orcs, skeletons, ogres; the Stone Warden is the boss)
-  and wear their floor's colors. The farm's animals, ghosts, pumpkins, bugs, plants, casters and the
+  and wear their floor's colors. The slimes (a green blob with a face) and the undead of the dark
+  biomes (a skeleton with a sword, one with a scythe and a robed vampire, their attacks with their
+  own slash smears) come from supplied packs, side views turned to face their targets, played by the
+  same sim-driven animator. The farm's animals, ghosts, pumpkins, bugs, plants, casters and the
   demon keep the game's own sprites (built on Snoblin's prototype mannequin or painted from shapes).
 - Attacks are drawn by code on the pixel grid (`src/render/vfx/`). The melee knights swing solid
   white smears in the classic pixel-art way: on the hit, one wedge sweeps from behind the head far
@@ -43,6 +46,13 @@ recording: [`docs/SOUNDS.md`](docs/SOUNDS.md).
   with an ink outline; each shot ends in an impact sized to the hit. Commons stay white; each tier
   tints, edges and layers the smears in its color, up to Primordial's rainbow and Absolute's black
   and white. Like every attack effect they're crisp and flat: nothing glows or lights the scene.
+- The Grimstone Dungeon (floors 21 to 25, before the crypt) is built tile by tile from supplied packs:
+  each floor is purple-brown stone (thin walls, a brick face to the north) or blue stone (thick mauve
+  caps, a cobbled rim round the floor), dressed with torches that light it, banners, cell doors,
+  cobwebs, heaps of barrels, crates and pots, chests, candles, flasks and pedestals. Its traps are real
+  hazards: spikes, fire vents, a saw running along its slot and pressure plates that flip to their
+  spiked side, each with a tell (and a red glow) before it strikes; a dodge roll carries you through,
+  and they hurt mobs too. The crypt has a few.
 - The look follows Firefly Garden turned into pixels: bright, readable places edge to edge. The
   hamlet is a town of half-timbered houses, fenced lots, hedges, a market square with striped stalls,
   a fountain and string lights, and a canal with a bridge; trees stand in clumps on the lawns
@@ -131,7 +141,7 @@ as usual). `?fresh` starts a new game. The game is on
 npm test
 ```
 
-277 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
+291 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
 timing, extra reels, the tutorial's scripted rolls, bad-luck protection, Lucky Spins, duplicates,
 shards, selling, levels and reforging, Humble Beginnings' 3x, rebirth; every biome's floors fully
 connected with spawns reachable and deterministic by seed, mob and boss design, a squad clearing a
@@ -148,7 +158,10 @@ starting up; and the PixelForge art: every sheet holding what the game plays in 
 body plan to monster mapping, the material recolors, every rarity's and mutation's ramps, and the
 animations the sim's state picks (attacks on the hit's tick, windups over the mobs' telegraphs,
 dodges, walks stepped by distance, deaths and revives); and the music: a track for every scene and
-floor, each one's file, credit and loop points, the 5 MB budget.
+floor, each one's file, credit and loop points, the 5 MB budget; the Dungeon: its floors valid in
+both stones, every prop drawn from the packs, its traps warning before they strike, rolled through
+untouched, hurting mobs; the packs' monsters having every animation the sim asks for, striking on
+the frame their smear lands, facing the way the sim says.
 
 ```bash
 npx tsx tools/music.ts
@@ -216,6 +229,16 @@ python3 -I tools/packs/ui.py "<MediavelFree.png>" "<UiCozyFree.png>"
 
 ```bash
 python3 -I tools/packs/fx.py "<Gigapack>/PNG" "<Mini Pack 1>/PNG" src/render/packs/fx.ts
+```
+
+The Dungeon's tiles, props and traps, and the packs' monsters (the undead and the slime):
+
+```bash
+python3 -I tools/packs/dungeon.py "<2D Pixel Dungeon Asset Pack>" "<DungeonAssets>/Pack" "<Craftpix dungeon objects>/PNG" src/render/packs/dungeonArt.ts
+```
+
+```bash
+python3 -I tools/packs/enemies.py "<Enemy_Animations_Set>" "<DungeonAssets>/Pack" src/assets/packs
 ```
 
 The PixelForge sheets (`src/assets/pf/`), from a PixelForge checkout after `pf build --all` and

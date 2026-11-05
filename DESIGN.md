@@ -139,9 +139,9 @@ tab) is owned, and each tier costs its line's growth times the last. Each tab is
 
 ## 7. The dungeon
 
-Endless floors, a new biome every 5 floors (a boss on every 5th): Mossy Hamlet, Gloomwood, Frostfang
-Tundra, Sunken Crypt, Mirewater Bog, Sunscorch Ruins, Hollow Graves, Ember Depths, Prism Grotto,
-Moonlit Shrine; after the first lap the order is reshuffled. Each floor is built to one of ten
+Endless floors, a new biome every 5 floors (a boss on every 5th): Mossy Hamlet, Old MacMayhem's Farm,
+Gloomwood, Frostfang Tundra, Grimstone Dungeon, Sunken Crypt, Mirewater Bog, Sunscorch Ruins, Hollow
+Graves, Ember Depths, Prism Grotto, Moonlit Shrine; after the first lap the order is reshuffled. Each floor is built to one of ten
 designs (`src/world/designs.ts`): a chain of rooms, a loop round a lake or a block of houses, a plaza
 with spokes, switchbacks, arenas joined by bridges, a crossroads with two wings, open ground with
 islands of cover, a valley with ledges, a maze, a keep with a ring road. Their order is a shuffled
@@ -182,6 +182,18 @@ outline, and big moves add a red ! over its head. Every kind has a lunge or a gu
 - Slams and blasts show their red ring from the start of the wind-up too. Bosses charge and leap bigger.
 
 A monster that wakes (or is summoned) rises into the fight in a puff of dust and does nothing for 0.6 s.
+
+**Traps** (`src/world/traps.ts`), on the Dungeon's floors and a few in the crypt's: each room may get
+a set and some halls a line across, never in the start room or by the exit, never under a prop.
+Every trap shows a tell before it strikes (and glows red), a knight mid-roll passes untouched, flyers
+float over, and mobs walking in get hurt too (bosses barely):
+
+| Trap | Cycle | The tell | Hurts | Knights lose | Mobs lose |
+| --- | --- | --- | --- | --- | --- |
+| Spikes | 3 s (a patch's columns a beat apart) | the tips show, 0.6 s | 0.9 s, once | 7% HP | 18% |
+| Fire vent | 3.6 s (every other vent half a cycle apart) | a spark and a small flame, 0.6 s | 0.7 s, every 0.3 s | 3.5% a tick | 9% a tick |
+| Saw | 2.6 s to and fro along a 3-tile slot | always out, running | where the blade is | 8% | 20% |
+| Pressure plate | stepped on, then rests 0.9 s | it turns over, 0.36 s | 0.84 s, once | 9% | 22% |
 
 Folk turn up on some floors (`src/world/npcs.ts`): farmers, guards, a bard, a goblin accountant, a
 ghost who is three hundred years late, a chicken who is not a chicken. Each keeps a set-up of their

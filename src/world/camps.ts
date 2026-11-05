@@ -67,6 +67,7 @@ export const CAMP_PLANS: Readonly<Record<BiomeId, CampPlan>> = {
   farmland: { rows: ['###', '.n.', '...'], pieces: [piece('hayCart', 17, 14), piece('produceStand', 39, 14)], stand: { x: 25, y: 25 } },
   forest: { rows: ['###', '#n#', '...'], pieces: [piece('canvasTent', 20, 14), piece('logSeat', 8, 29), piece('campfire', 40, 28)], stand: { x: 24, y: 25 } },
   tundra: { rows: ['###', '#n#', '...'], pieces: [piece('hideTent', 21, 14), piece('woodpile', 8, 29), piece('fireBowl', 40, 29)], stand: { x: 24, y: 25 } },
+  dungeon: { rows: ['###', '#n#', '...'], pieces: [piece('shrineNiche', 24, 14), piece('fireBowl', 40, 29)], stand: { x: 24, y: 26 } },
   crypt: { rows: ['###', '.n.', '...'], pieces: [piece('shrineNiche', 24, 14)], stand: { x: 24, y: 26 } },
   swamp: { rows: ['###', '#n.', '...'], pieces: [piece('stiltHut', 24, 14), piece('rowboat', 10, 29)], stand: { x: 27, y: 25 } },
   desert: { rows: ['###', '#n#', '...'], pieces: [piece('canopyBack', 24, 16), piece('rug', 24, 17, false), piece('canopyFront', 24, 30)], stand: { x: 24, y: 24 } },

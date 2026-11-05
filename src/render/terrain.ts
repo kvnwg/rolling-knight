@@ -22,6 +22,7 @@ import { castShadows } from './castShadows';
 import { frontDecor } from './art/village';
 import { Grass, grassLook, type GrassLook } from './art/grass';
 import { h2, NPAD, VNoise, vnoise } from './noise';
+import { stampDungeon } from './packs/dungeonTiles';
 
 // ------------------------------------------------------------------ colors
 
@@ -773,7 +774,10 @@ export function paintTerrainPixels(m: FloorMap, biome: Biome): Omit<Terrain, 'ca
   const ledge = biome.solid.ledge;
   const bankable = !!liquid && liquid.kind !== 'lava';
 
-  for (let y = 0; y < H; y++) {
+  // A tiled biome stamps its ground from a pack's tileset instead (walls, floors, their edges).
+  const tiled = biome.tiles === 'dungeon';
+  if (tiled) stampDungeon(m, px, surf);
+  for (let y = 0; y < H && !tiled; y++) {
     const ty = Math.floor(y / TILE);
     const ly = y - ty * TILE;
     const rowT = (ty + TPAD) * GW + TPAD;

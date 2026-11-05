@@ -24,6 +24,8 @@ import { frameBuf } from './pixel/indexed';
 import { FX_SHEETS, type FxName } from './packs/fx';
 import { renderText, type TextStyle } from './pixel/font';
 import { paintTerrain, type Terrain } from './terrain';
+import { trapPieces } from './packs/trapArt';
+import { trapPhase } from '../world/traps';
 import { Rain } from './rain';
 import { Ambient } from './ambient';
 import { HubPaint } from './hubPaint';
@@ -36,7 +38,7 @@ import { pfReady, SHEETS, type SheetName } from './pf/assets';
 import { frameBuf as pfFrameBuf, frameCanvas, frameMask, haloCanvas, haloSpot, haloWidth, headTop, type Paint } from './pf/frames';
 import { heroPose, pruneHeroes, type HeroPose } from './pf/heroAnim';
 import { knightPaint, paintStep } from './pf/knightLook';
-import { deathPoofMs, deathPose, lastMoveOf, mobDirOf, mobPose, pruneMobs } from './pf/mobAnim';
+import { deathFx, deathPoofMs, deathPose, lastMoveOf, mobDirOf, mobPose, pruneMobs } from './pf/mobAnim';
 import { mobPaint, type MobPaint } from './pf/mobLook';
 import { facing, type Dir } from './pf/sheet';
 import { Vfx } from './vfx/vfx';
@@ -572,6 +574,19 @@ export class Renderer {
       this.rain.drawGround(g, cx, cy);
     }
     this.ambient?.drawGround(g, cx, cy, this.LW, this.LH, this.time);
+    // Traps: what lies on the floor goes under everyone; what stands up is sorted with them below.
+    const standingTraps: Array<{ y: number; draw: () => void }> = [];
+    for (const tr of w.traps) {
+      if (!visible(tr.x, tr.y, 72)) continue;
+      for (const piece of trapPieces(tr, w.time)) {
+        const draw = () => {
+          (piece.flat ? g : st).drawImage(this.cached(`trap|${piece.key}`, () => toCanvas(piece.buf)), sx(piece.x), sy(piece.y));
+          if (piece.glow) em.drawImage(this.cached(`trap|${piece.glow.key}`, () => toCanvas(piece.glow!.buf)), sx(piece.x), sy(piece.y));
+        };
+        if (piece.flat) draw();
+        else standingTraps.push({ y: piece.base, draw });
+      }
+    }
     if (!shader && game.state.settings.tiltShift && lead) this.tiltShift(g, sy(lead.y) - 6, w.biome.layout === 'rooms' ? 0.5 : 1);
     // (The hub paints its own way down: its steps, and the glow at their foot.)
     if (!hub) this.drawPortal(g, em, w, sx, sy);
@@ -636,6 +651,9 @@ export class Renderer {
         draw: () => {
           // Trees sway in the wind, a pixel at a time, each on its own beat.
           let canvas = p.canvas;
+          // Pack props that move (flames, a banner, a flask), each on its own beat.
+          const fi = p.art.frames ? Math.floor(this.time * (p.art.fps ?? 8) + (p.seed % 97) * 0.31) % p.art.frames.length : 0;
+          if (p.art.frames && fi) canvas = this.cached(`${p.key}|f${fi}`, () => toCanvas(p.art.frames![fi]));
           if (p.kind === 'tree' && outdoors) {
             const gust = Math.sin(this.time * 0.35 + p.x * 0.004) > 0.6 ? 2 : 1;
             const sway = Math.round(Math.sin(this.time * 1.3 + p.x * 0.07 + p.y * 0.031) * gust);
@@ -655,6 +673,7 @@ export class Renderer {
           st.globalAlpha = alpha;
           st.drawImage(canvas, x, y);
           st.globalAlpha = 1;
+          if (p.art.glow) em.drawImage(this.cached(`${p.key}|g${fi}`, () => toCanvas(p.art.glow![fi])), x, y);
           if (p.art.flame) {
             const fr = Math.floor(this.time * 10 + p.seed) % 4;
             const f = this.cached(`flame|${p.art.flame.size}|${fr}|${biome.light.fire}`, () => toCanvas(flameArt(p.art.flame!.size, fr, biome.light.fire)));
@@ -731,6 +750,7 @@ export class Renderer {
       });
     }
     if (hub) list.push(...hub.items(st, em, cx, cy, this.LW, this.LH, this.time));
+    list.push(...standingTraps);
     list.sort((a, b) => a.y - b.y);
     for (const d of list) d.draw();
     this.drawPfFx(st, w, sx, sy);
@@ -1478,10 +1498,11 @@ export class Renderer {
     }
     if (!c.poofed && ms >= deathPoofMs(c.paint.monster, c.paint.sheet)) {
       c.poofed = true;
-      // PixelForge's own: a skeleton crumbles, the rest go up in a puff (a boss in three).
-      const name: SheetName = c.paint.monster === 'skeleton' ? 'fx_bone_crumble' : 'fx_poof_smoke';
+      // PixelForge's own: a skeleton crumbles, the rest go up in a puff (a boss in three); the
+      // packs' monsters end on the floor by themselves.
+      const name: SheetName | null = deathFx(c.paint.monster);
       const spots: Array<[number, number]> = c.boss ? [[0, 0], [-12, -10], [12, -14]] : [[0, 0]];
-      for (const [dx, dy] of spots) this.pfFx.push({ name, x: c.x + dx, y: c.y + dy, at: w.time, world: w });
+      if (name) for (const [dx, dy] of spots) this.pfFx.push({ name, x: c.x + dx, y: c.y + dy, at: w.time, world: w });
     }
     const [px, py] = SHEETS[c.paint.sheet].meta.pivot;
     ctx.globalAlpha = d.alpha;
@@ -1851,6 +1872,16 @@ export class Renderer {
       }
     }
     if (w.portalOpen) out.push({ x: sx(w.map.exit.x), y: sy(w.map.exit.y) - 4, r: 60, color: '#b08aff', intensity: 1, bloom: true });
+    // Traps: a red glow on one about to strike (the game's telegraph color), and a fire vent lights
+    // the room while it burns.
+    for (const tr of w.traps) {
+      if (tr.x < cx - 80 || tr.x > cx + this.W + 80 || tr.y < cy - 80 || tr.y > cy + this.H + 120) continue;
+      const ph = trapPhase(tr, w.time);
+      if (ph.warn) out.push({ x: sx(tr.x), y: sy(tr.y), r: 17, color: '#ff4a3a', intensity: 0.45 + 0.2 * Math.sin(this.time * 18) });
+      if (tr.kind !== 'vent' || ph.frame === 0) continue;
+      const k = ph.active ? 1 : ph.frame >= 7 ? 0.35 : 0.25;
+      out.push({ x: sx(tr.x), y: sy(tr.y) - (ph.active ? 18 : 4), r: ph.active ? 70 : 30, color: biome.light.fire, intensity: 0.9 * k, bloom: ph.active });
+    }
     for (const p of this.particles) if (p.glow) out.push({ x: sx(p.x), y: sy(p.y - p.z), r: p.kind === 'firefly' ? 8 : 6, color: p.color, intensity: Math.min(1, p.life / p.max + 0.2) * 0.7 });
     return out;
   }

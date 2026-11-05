@@ -40,6 +40,7 @@ export const SCENES: Record<MusicScene, SceneDef> = {
   graveyard: { track: 'angevin', ambience: ['wind', 'toll'] },
   tundra: { track: 'snow', ambience: ['wind'] },
   crystal: { track: 'snow', ambience: ['glints'], tones: G_MINOR_PENTATONIC },
+  dungeon: { track: 'angevin', ambience: ['drips'] },
   crypt: { track: 'angevin', ambience: ['drips'] },
   ember: { track: 'emperor', ambience: ['lava'] },
   shrine: { track: 'village', ambience: ['chimes'] },
