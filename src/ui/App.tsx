@@ -274,7 +274,7 @@ export function App() {
           setStation(near);
         }
       }
-      if ((k === 'f' || k === 'enter') && game.inDungeon && !sheetRef.current && !talkRef.current) {
+      if ((k === 'f' || k === 'enter') && game.inDungeon && !sheetRef.current && !talkRef.current && !e.repeat) {
         const npc = game.world?.nearNpc();
         if (npc) {
           uiSound('open');

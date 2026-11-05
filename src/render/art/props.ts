@@ -7,6 +7,7 @@
 import type { Biome, PropKind, TreeKind } from '../../world/biomes';
 import { blank, type PixelBuf } from '../pixel/buf';
 import { BODY_ANIMS, BODY_FRAMES } from '../packs/mannequin';
+import { campArt } from './camps';
 import { ball, hash, inkOutline, line, mixHex, rect, setRGB, shade } from './draw';
 import { outlineTinted } from './ink';
 import { townArt } from './town';
@@ -525,6 +526,29 @@ export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {
     case 'trough':
     case 'sunflower':
       return farmProp(kind, seed);
+    case 'stallBack':
+    case 'stallFront':
+    case 'yataiBack':
+    case 'yataiFront':
+    case 'hayCart':
+    case 'produceStand':
+    case 'canvasTent':
+    case 'logSeat':
+    case 'hideTent':
+    case 'fireBowl':
+    case 'shrineNiche':
+    case 'stiltHut':
+    case 'rowboat':
+    case 'canopyBack':
+    case 'canopyFront':
+    case 'rug':
+    case 'graveGate':
+    case 'stoneBench':
+    case 'smithCart':
+    case 'anvil':
+    case 'leanTo':
+    case 'crystalLamp':
+      return campArt(kind, biome, seed);
     case 'banner': {
       const b = blank(9, 20);
       rect(b, 1, 0, 1, 20, WOOD[1]);

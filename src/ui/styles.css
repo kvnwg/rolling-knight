@@ -1892,11 +1892,26 @@ body,
 }
 .dialog-box {
   display: flex;
-  gap: calc(3 * var(--px));
+  flex-direction: column;
+  gap: calc(2.5 * var(--px));
   width: min(96vw, calc(220 * var(--px)));
-  margin-bottom: calc(8 * var(--px) + env(safe-area-inset-bottom, 0px));
-  padding: calc(1 * var(--px));
+  max-height: calc(100% - 4 * var(--px));
+  overflow-y: auto;
+  touch-action: pan-y;
+  margin-bottom: calc(6 * var(--px) + env(safe-area-inset-bottom, 0px));
+  padding: calc(1 * var(--px)) calc(1 * var(--px)) calc(4 * var(--px));
   animation: bannerIn 0.2s steps(3) both;
+}
+/* (The replies and the job card sit inside the plate's frame.) */
+.dialog-box .replies,
+.dialog-box .job-card {
+  margin-left: calc(4 * var(--px));
+  margin-right: calc(4 * var(--px));
+}
+.dialog-box .dlg-head {
+  display: flex;
+  align-items: flex-start;
+  gap: calc(3 * var(--px));
 }
 .dialog-box .portrait {
   flex: none;
@@ -1912,12 +1927,13 @@ body,
   width: calc(26 * var(--px));
   height: calc(23 * var(--px));
 }
-.dialog-box .body {
+.dialog-box .dlg-talk {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: calc(2 * var(--px));
+  gap: calc(1.5 * var(--px));
   min-width: 0;
+  padding-top: calc(1 * var(--px));
 }
 .dialog-box .who {
   font-size: calc(5.5 * var(--px));
@@ -1933,18 +1949,285 @@ body,
 .dialog-box .caret {
   animation: blink 0.6s steps(1) infinite;
 }
-.dialog-box .choices {
+
+/* Your replies: one list dropping down beneath what was said, a row each. */
+.dialog-box .replies {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: var(--px) solid rgba(255, 207, 74, 0.3);
+  box-shadow: inset 0 var(--px) 0 0 rgba(0, 0, 0, 0.45);
+  animation: dlgDrop 0.22s steps(6) both;
+}
+.dialog-box .replies > li {
+  animation: dlgRowIn 0.15s steps(3) both;
+  animation-delay: calc(var(--i) * 45ms + 70ms);
+}
+.dialog-box .reply {
+  display: flex;
+  align-items: center;
+  gap: calc(1.5 * var(--px));
+  width: 100%;
+  min-height: calc(12 * var(--px));
+  padding: calc(1.5 * var(--px)) calc(2.5 * var(--px)) calc(1.5 * var(--px)) calc(1 * var(--px));
+  text-align: left;
+  font-size: calc(5 * var(--px));
+  line-height: 1.25;
+  color: var(--text);
+  background: rgba(255, 240, 210, 0.035);
+  box-shadow: inset 0 calc(-1 * var(--px)) 0 0 rgba(0, 0, 0, 0.4);
+}
+/* The cursor: a little gold arrow, stepped like pixel art. */
+.dialog-box .reply .cur {
+  flex: none;
+  width: calc(4 * var(--px));
+  height: calc(7 * var(--px));
+  margin: 0 calc(0.5 * var(--px)) 0 calc(1 * var(--px));
+  background: var(--gold);
+  clip-path: polygon(
+    0 0, calc(1 * var(--px)) 0, calc(1 * var(--px)) calc(1 * var(--px)), calc(2 * var(--px)) calc(1 * var(--px)), calc(2 * var(--px)) calc(2 * var(--px)),
+    calc(3 * var(--px)) calc(2 * var(--px)), calc(3 * var(--px)) calc(3 * var(--px)), calc(4 * var(--px)) calc(3 * var(--px)), calc(4 * var(--px)) calc(4 * var(--px)),
+    calc(3 * var(--px)) calc(4 * var(--px)), calc(3 * var(--px)) calc(5 * var(--px)), calc(2 * var(--px)) calc(5 * var(--px)), calc(2 * var(--px)) calc(6 * var(--px)),
+    calc(1 * var(--px)) calc(6 * var(--px)), calc(1 * var(--px)) calc(7 * var(--px)), 0 calc(7 * var(--px))
+  );
+  visibility: hidden;
+}
+.dialog-box .reply .key {
+  flex: none;
+  display: grid;
+  place-items: center;
+  min-width: calc(6 * var(--px));
+  height: calc(6.5 * var(--px));
+  font-size: calc(3.8 * var(--px));
+  font-weight: 700;
+  color: var(--muted);
+  background: rgba(0, 0, 0, 0.4);
+  box-shadow: inset 0 0 0 var(--px) rgba(255, 255, 255, 0.14);
+}
+.dialog-box .reply .txt {
+  flex: 1;
+  min-width: 0;
+}
+.dialog-box .reply.sel {
+  color: #fff6d8;
+  background: linear-gradient(90deg, rgba(255, 207, 74, 0.26), rgba(255, 207, 74, 0.05));
+  box-shadow: inset var(--px) 0 0 0 var(--gold), inset 0 calc(-1 * var(--px)) 0 0 rgba(0, 0, 0, 0.4);
+}
+.dialog-box .reply.sel .cur {
+  visibility: visible;
+  animation: dlgNudge 0.6s steps(1) infinite;
+}
+.dialog-box .reply.sel .key {
+  color: var(--ink);
+  background: var(--gold);
+}
+.dialog-box .reply.job .txt {
+  color: var(--gold);
+}
+.dialog-box .reply.fight .txt {
+  color: var(--bad);
+}
+.dialog-box .reply.bye .txt {
+  color: var(--muted);
+}
+.dialog-box .reply.sel.bye .txt {
+  color: var(--text);
+}
+/* What a reply does, as an icon at its right end (the job's "!" and "?" are the bubbles over heads). */
+.dialog-box .reply .tag {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: calc(10 * var(--px));
+}
+.dialog-box .reply .bubble {
+  width: calc(10 * var(--px));
+  height: calc(13 * var(--px));
+  margin: calc(-2 * var(--px)) 0;
+}
+@media (pointer: coarse) {
+  .dialog-box .reply {
+    min-height: calc(15 * var(--px));
+  }
+  .dialog-box .reply .key {
+    display: none;
+  }
+}
+@keyframes dlgDrop {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes dlgRowIn {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-3 * var(--px)));
+  }
+}
+@keyframes dlgNudge {
+  50% {
+    transform: translateX(var(--px));
+  }
+}
+
+/* A job's card: parchment set apart from the small talk (an ink outline, a brown rim, a lit edge, a
+   wax seal in its corner), in icons: the goal and its number on a marked chip, an arrow, what it pays.
+   A tap opens it to the words. */
+.dialog-box .job-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: calc(1.5 * var(--px));
+  margin-top: calc(1 * var(--px));
+  margin-bottom: calc(1.5 * var(--px));
+  padding: calc(2.5 * var(--px)) calc(4 * var(--px)) calc(2.5 * var(--px)) calc(3 * var(--px));
+  text-align: left;
+  font-size: calc(4.4 * var(--px));
+  color: var(--text-dark);
+  background: linear-gradient(180deg, #faf0d8 0, #f4e6c8 45%, #ecdab4 100%);
+  box-shadow: 0 0 0 var(--px) #2a120c, inset 0 0 0 var(--px) #9a6440, inset var(--px) var(--px) 0 var(--px) #fffaea,
+    inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 var(--px) #d8bf94, 0 calc(2 * var(--px)) 0 var(--px) rgba(10, 4, 2, 0.55);
+  animation: dlgCard 0.24s steps(4) both;
+}
+.dialog-box .job-card::after {
+  content: '';
+  position: absolute;
+  top: calc(-3 * var(--px));
+  right: calc(3 * var(--px));
+  width: calc(13 * var(--px));
+  height: calc(13 * var(--px));
+  background: var(--sk-seal-fair) center / 100% 100% no-repeat;
+  image-rendering: pixelated;
+}
+.dialog-box .job-card.taken::after,
+.dialog-box .job-card.done::after {
+  background-image: var(--sk-seal-easy);
+}
+.dialog-box .job-card.progress::after {
+  background-image: var(--sk-seal-trivial);
+}
+.dialog-box .job-card.contract::after {
+  background-image: var(--sk-seal-deadly);
+}
+.dialog-box .job-card.contract {
+  background: linear-gradient(180deg, #f6e4cc 0, #eed6b8 50%, #e2c49e 100%);
+}
+.dialog-box .job-row {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: calc(2 * var(--px));
+  padding-right: calc(16 * var(--px));
+  font-size: calc(5.5 * var(--px));
+  font-weight: 700;
 }
-.dialog-box .choices .btn {
-  white-space: normal;
-  text-align: left;
+.dialog-box .job-mark {
+  display: inline-flex;
+  align-items: center;
 }
+.dialog-box .job-mark .bubble {
+  width: calc(10 * var(--px));
+  height: calc(13 * var(--px));
+  margin: calc(-2 * var(--px)) 0;
+}
+/* The goal: its icon and number on a highlighted chip. */
+.dialog-box .job-aim {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(1.5 * var(--px));
+  padding: calc(1 * var(--px)) calc(2.5 * var(--px)) calc(1 * var(--px)) calc(1.5 * var(--px));
+  background: rgba(255, 196, 64, 0.55);
+  box-shadow: inset 0 calc(-1 * var(--px)) 0 0 rgba(176, 100, 12, 0.55), 0 0 0 var(--px) rgba(176, 100, 12, 0.35);
+}
+.dialog-box .job-card.contract .job-aim {
+  background: rgba(200, 48, 42, 0.2);
+  box-shadow: inset 0 calc(-1 * var(--px)) 0 0 rgba(140, 20, 20, 0.45), 0 0 0 var(--px) rgba(140, 20, 20, 0.3);
+}
+.dialog-box .job-card.done .job-aim {
+  background: rgba(130, 220, 124, 0.45);
+  box-shadow: inset 0 calc(-1 * var(--px)) 0 0 rgba(22, 72, 36, 0.45), 0 0 0 var(--px) rgba(22, 72, 36, 0.3);
+}
+/* "For": a little brown arrow, stepped like pixel art. */
+.dialog-box .job-to {
+  width: calc(3 * var(--px));
+  height: calc(5 * var(--px));
+  background: #9a6440;
+  clip-path: polygon(0 0, calc(1 * var(--px)) 0, calc(1 * var(--px)) calc(1 * var(--px)), calc(2 * var(--px)) calc(1 * var(--px)), calc(2 * var(--px)) calc(2 * var(--px)), calc(3 * var(--px)) calc(2 * var(--px)), calc(3 * var(--px)) calc(3 * var(--px)), calc(2 * var(--px)) calc(3 * var(--px)), calc(2 * var(--px)) calc(4 * var(--px)), calc(1 * var(--px)) calc(4 * var(--px)), calc(1 * var(--px)) calc(5 * var(--px)), 0 calc(5 * var(--px)));
+}
+.dialog-box .job-pay {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(1.5 * var(--px)) calc(2.5 * var(--px));
+}
+.dialog-box .job-pay .pay-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(1 * var(--px));
+}
+/* It opens: a small chevron in the corner, pointing down (up once open). */
+.dialog-box .job-more-cue {
+  position: absolute;
+  right: calc(3 * var(--px));
+  bottom: calc(2.5 * var(--px));
+  width: calc(5 * var(--px));
+  height: calc(3 * var(--px));
+  background: #9a6440;
+  clip-path: polygon(0 0, calc(5 * var(--px)) 0, calc(5 * var(--px)) calc(1 * var(--px)), calc(4 * var(--px)) calc(1 * var(--px)), calc(4 * var(--px)) calc(2 * var(--px)), calc(3 * var(--px)) calc(2 * var(--px)), calc(3 * var(--px)) calc(3 * var(--px)), calc(2 * var(--px)) calc(3 * var(--px)), calc(2 * var(--px)) calc(2 * var(--px)), calc(1 * var(--px)) calc(2 * var(--px)), calc(1 * var(--px)) calc(1 * var(--px)), 0 calc(1 * var(--px)));
+}
+.dialog-box .job-card.open .job-more-cue {
+  transform: scaleY(-1);
+}
+.dialog-box .job-bar {
+  display: block;
+  height: calc(2.5 * var(--px));
+  margin-right: calc(16 * var(--px));
+  background: #d9c39c;
+  box-shadow: inset 0 0 0 var(--px) #7e4634;
+}
+.dialog-box .job-bar > i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(180deg, #82dc7c 0 var(--px), #3c964a var(--px) 100%);
+  box-shadow: inset 0 0 0 var(--px) #164824;
+}
+/* Opened: the job in words. */
+.dialog-box .job-words {
+  display: flex;
+  flex-direction: column;
+  gap: calc(1 * var(--px));
+  padding-top: calc(1.5 * var(--px));
+  border-top: var(--px) dashed rgba(126, 70, 52, 0.45);
+  font-size: calc(4.4 * var(--px));
+  line-height: 1.3;
+  animation: dlgRowIn 0.15s steps(3) both;
+}
+.dialog-box .job-words b {
+  font-size: calc(5 * var(--px));
+}
+.dialog-box .job-fine {
+  font-size: calc(2.4 * var(--px));
+  line-height: 1.2;
+  letter-spacing: 0;
+  color: rgba(46, 37, 35, 0.6);
+}
+@keyframes dlgCard {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-4 * var(--px)));
+  }
+}
+/* (Below the squad, so the folk's set-up above them stays in view.) */
 .talk-prompt.dungeon {
   bottom: auto;
-  top: 58%;
+  top: 70%;
 }
 /* On tall screens the boss's name plate needs the width: the little altar steps down beneath it. */
 @media (max-aspect-ratio: 1/1) {

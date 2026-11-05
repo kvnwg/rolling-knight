@@ -130,6 +130,17 @@ const FAMILIES: ReadonlyArray<readonly string[]> = [
 ];
 const NOUNS = [...new Set(FAMILIES.flat())].sort((a, b) => b.length - a.length);
 
+/** The kinds of monster, one per family above (in its order): what a slay job's icon shows. */
+export const MOB_KINDS = ['slime', 'beast', 'goblin', 'flyer', 'plant', 'golem', 'bug', 'pumpkin', 'ghost', 'hog', 'ram', 'hen'] as const;
+export type MobKind = (typeof MOB_KINDS)[number];
+
+/** Which kind of monster a name is ("Grumpy Slime": a slime), or null when its noun is unknown. */
+export function mobKind(name: string): MobKind | null {
+  const noun = mobNoun(name);
+  const i = FAMILIES.findIndex((f) => f.includes(noun));
+  return i >= 0 ? MOB_KINDS[i] : null;
+}
+
 function hasWord(name: string, word: string): boolean {
   const hay = name.toLowerCase();
   const w = word.toLowerCase();
@@ -202,6 +213,25 @@ export function questGoal(q: Quest): string {
       return `Reach floor ${q.floorTaken + q.target} ${p}`;
     case 'collect':
       return `${q.item === 'hourglass' ? 'Hourglasses' : q.item === 'potion' ? 'Luck potions' : 'Coins'} ${p}`;
+  }
+}
+
+/** What a job asks, before it's taken: "Slay 6 slimes", "Reach floor 9", "Find an hourglass". */
+export function questAsk(q: Quest): string {
+  const n = q.target;
+  switch (q.kind) {
+    case 'slay':
+      return `Slay ${n} ${q.mobName ? plural(mobNoun(q.mobName)).toLowerCase() : 'monsters'}`;
+    case 'slayElite':
+      return n === 1 ? 'Slay an elite' : `Slay ${n} elites`;
+    case 'boss':
+      return 'Beat the boss of this stretch';
+    case 'reach':
+      return `Reach floor ${q.floorTaken + n}`;
+    case 'collect':
+      if (q.item === 'hourglass') return n === 1 ? 'Find an hourglass' : `Find ${n} hourglasses`;
+      if (q.item === 'potion') return n === 1 ? 'Find a luck potion' : `Find ${n} luck potions`;
+      return `Pick up ${n} coins`;
   }
 }
 

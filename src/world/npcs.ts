@@ -14,13 +14,13 @@
  * All text is plain ASCII with the bitmap font's punctuation (. , ! ? : ' " - ( )) so barks and
  * taunts can be drawn in the world too.
  */
-import { addQuest, canTakeQuest, fillQuestText, makeQuest, questGoal, rewardText, turnInQuest, type Quest, type QuestItem, type QuestKind, type QuestReward } from '../core/quests';
+import { addQuest, canTakeQuest, fillQuestText, makeQuest, questAsk, questGoal, turnInQuest, type Quest, type QuestItem, type QuestKind, type QuestReward } from '../core/quests';
 import { Rng } from '../core/rng';
 import { BIOMES, isBossFloor, type BiomeId } from './biomes';
+import { pitchCamp, type Camp } from './camps';
 import type { View } from './entities';
-import { FLOOR, TILE, tileAt, type FloorMap } from './mapgen';
+import type { FloorMap } from './mapgen';
 import { floorMobs, type BossMove, type MobType } from './mobgen';
-import { treeDims } from './forest';
 
 // ------------------------------------------------------------------ types
 
@@ -140,6 +140,8 @@ export interface Npc {
   revealed: boolean;
   /** The floor's mob names (for "kill 6 of those slimes" jobs); ctx.mobNames overrides them. */
   mobNames: string[];
+  /** Their set-up on this floor (camps.ts): the stall, tent or shrine they keep, and the spot in front to talk from. */
+  camp?: Camp;
 }
 
 export type DialogAction =
@@ -154,12 +156,47 @@ export interface DialogChoice {
   label: string;
   next?: string;
   action?: DialogAction;
+  /** The line that leads to a job (asks for one, takes it, hands it back): marked apart from small talk. */
+  job?: boolean;
+}
+
+/**
+ * The job a line is about, shown apart from the small talk (a job card): its title, what it asks, how
+ * far along it is, what it pays. `offer`: one you can take; `taken`: just taken; `progress`: one of
+ * theirs under way; `done`: handed back; `contract`: a demon's "deal" (with fine print).
+ */
+export interface DialogJob {
+  stage: 'offer' | 'taken' | 'progress' | 'done' | 'contract';
+  title: string;
+  /** What it asks, in words (shown on a tap): "Slay 6 slimes"; under way, with the count: "Slay slimes 3/6". */
+  goal: string;
+  /** What it asks as an icon and a number. */
+  aim: JobAim;
+  /** How far along (0..1), for a job under way. */
+  progress?: number;
+  reward: QuestReward;
+  /** The small print (a contract's catch). */
+  fine?: string;
+}
+
+/** A job's goal for its icon: what to do and how many (or which floor), and how many are done. */
+export interface JobAim {
+  kind: QuestKind | 'sign';
+  /** How many to slay or pick up; for `reach`, the floor. */
+  n: number;
+  /** So far (a job under way): how many, or the floor reached. */
+  done?: number;
+  /** slay: the pest (its kin count too). */
+  mob?: string;
+  /** collect: what. */
+  item?: QuestItem;
 }
 
 export interface DialogNode {
   speaker: string;
   text: string;
   choices: DialogChoice[];
+  job?: DialogJob;
 }
 
 export interface DialogCtx {
@@ -229,16 +266,16 @@ export const NPC_DEFS: readonly NpcDef[] = [
         kind: 'slay',
         pest: true,
         title: 'Turnip Vengeance',
-        text: 'Those {Mobs} ate my turnips. All of them. Even the ugly one. Kill {n} and the turnips can rest.',
-        waiting: ['How goes the turnip vengeance? The turnips are watching.', 'Any luck with the {mobs}? {left} to go. For the turnips.'],
-        thanks: ['They\'re gone? The turnips are avenged! I\'d plant a memorial turnip, but... well. You know.'],
+        text: 'Those {Mobs} ate my turnips. Even the ugly one. Avenge them.',
+        waiting: ['The turnips are watching.', 'Any luck with the {mobs}? For the turnips.'],
+        thanks: ['The turnips are avenged! I\'d plant a memorial turnip, but... well.'],
       },
       {
         kind: 'reach',
         title: 'The Lost Farm',
-        text: 'If you get down to floor {floor}, look for a farm. Barn, cows, very farm-shaped. Can\'t miss it. I did.',
+        text: 'Look for a farm down there. Barn, cows, very farm-shaped. Can\'t miss it. I did.',
         waiting: ['Floor {floor} yet? Any farms? Farm-shaped things?'],
-        thanks: ['Floor {floor}! And? No farm? Just slimes? ...Well. Slimes are basically wet cows. I\'ll take it.'],
+        thanks: ['No farm? Just slimes? Well. Slimes are basically wet cows. I\'ll take it.'],
       },
     ],
   },
@@ -265,15 +302,15 @@ export const NPC_DEFS: readonly NpcDef[] = [
       {
         kind: 'reach',
         title: 'Where\'s Pip?',
-        text: 'My boy went down. They always go down! Get to floor {floor} and see if he\'s there. Tell him supper\'s cold.',
+        text: 'My boy went down. They always go down! Find him. Tell him supper\'s cold.',
         waiting: ['Floor {floor}, dear. He\'ll be the muddy one. Well. The muddiest one.'],
-        thanks: ['You saw Pip on floor {floor}? Running a gang of slimes? ...That\'s my boy. He\'s grounded. Forever.'],
+        thanks: ['Pip\'s running a gang of slimes? ...That\'s my boy. He\'s grounded. Forever.'],
       },
       {
         kind: 'slay',
         pest: true,
         title: 'Not In My Pantry',
-        text: '{Mobs} got into my pantry. Ate the bread, licked the cheese. Kill {n}. Licking cheese is a crime.',
+        text: '{Mobs} got in my pantry. They licked the cheese. Licking cheese is a crime.',
         waiting: ['Still {mobs} in my pantry, dear. I can hear them licking things.'],
         thanks: ['My pantry\'s safe! I was saving this for a rainy day, but down here every day is rainy.'],
       },
@@ -304,14 +341,14 @@ export const NPC_DEFS: readonly NpcDef[] = [
       {
         kind: 'slayElite',
         title: 'Above My Pay Grade',
-        text: 'See the big shiny ones? I\'m meant to deal with those. My feet say no. Take down {n} and I\'ll split my wages. Ninety-ten. Your ninety.',
-        waiting: ['Still big ones about. {left} to go. Take your time. I\'m on shift. Forever.'],
+        text: 'The big shiny ones are my job. My feet say no. I\'ll split my wages. Your ninety.',
+        waiting: ['Still big ones about. Take your time. I\'m on shift. Forever.'],
         thanks: ['You got the big ones? Brilliant. I\'ll tell the captain it was me. Here\'s your ninety.'],
       },
       {
         kind: 'boss',
         title: 'Report to the Boss',
-        text: 'Their boss sits at the end of this stretch. Big. Mean. Never fills in his paperwork. Go and sort him out.',
+        text: 'Their boss sits at the end of this stretch. Never does his paperwork. Sort him out.',
         waiting: ['The boss is still up, then? I can tell. The walls are grumpy.'],
         thanks: ['You beat their boss? Then who do I report to now? ...Oh no. Is it you? Here. Sir. Boss.'],
       },
@@ -344,15 +381,15 @@ export const NPC_DEFS: readonly NpcDef[] = [
         kind: 'collect',
         item: 'gold',
         title: 'Finder\'s Fee',
-        text: 'Business is slow. Pick up {items} out there and I\'ll pay you a finder\'s fee. In coins. That\'s how money works, I\'m told.',
-        waiting: ['Coins! Pick them up! They\'re just lying about, being money! {left} to go.'],
-        thanks: ['You picked up {n} coins? Lovely. Here\'s your fee. Don\'t spend it on spoons. That\'s my market.'],
+        text: 'Pick up coins out there and I\'ll pay a finder\'s fee. In coins. That\'s how money works.',
+        waiting: ['Coins! Pick them up! They\'re just lying about, being money!'],
+        thanks: ['Lovely. Here\'s your fee. Don\'t spend it on spoons. That\'s my market.'],
       },
       {
         kind: 'collect',
         item: 'hourglass',
         title: 'Rare Goods',
-        text: 'A customer wants an hourglass. Find {items} and I\'ll pay you handsomely. Medium-somely.',
+        text: 'A customer wants an hourglass. I\'ll pay handsomely. Medium-somely.',
         waiting: ['Any hourglasses yet? The customer is very impatient. The customer is me.'],
         thanks: ['An hourglass! The customer will be thrilled. The customer is still me. Here.'],
       },
@@ -381,16 +418,16 @@ export const NPC_DEFS: readonly NpcDef[] = [
       {
         kind: 'reach',
         title: 'Here Be Something',
-        text: 'Scout floor {floor} for me. I\'d go, but my map says "here be death" and I trust my map.',
-        waiting: ['Floor {floor}, remember! And note anything that tries to eat you. For the legend.'],
-        thanks: ['Floor {floor}! What\'s it like? "Damp"? "Bitey"? Perfect. I\'ll draw a little bite. Here, for your trouble.'],
+        text: 'Scout ahead for me. My map says "here be death" and I trust my map.',
+        waiting: ['Floor {floor}, remember! Note anything that tries to eat you. For the legend.'],
+        thanks: ['"Damp"? "Bitey"? Perfect. I\'ll draw a little bite. Here, for your trouble.'],
       },
       {
         kind: 'slay',
         title: 'Clean Margins',
-        text: 'I can\'t draw with monsters chewing my margins. Clear {n} of them out, would you? Any kind. They all smudge.',
-        waiting: ['Still smudges in my margins. {left} of them. Very bitey smudges.'],
-        thanks: ['Clean margins! Look at all that lovely nothing. Here. And a little drawing of you. It\'s a smudge.'],
+        text: 'Monsters keep chewing my margins. Clear some out? Any kind. They all smudge.',
+        waiting: ['Still smudges in my margins. Very bitey smudges.'],
+        thanks: ['Clean margins! All that lovely nothing. And a drawing of you. It\'s a smudge.'],
       },
     ],
   },
@@ -441,15 +478,15 @@ export const NPC_DEFS: readonly NpcDef[] = [
         kind: 'slay',
         pest: true,
         title: 'The Ballad of {Mobs}',
-        text: 'I\'m writing a ballad about a hero who slays {n} {Mobs}. Do it, so the ballad\'s true. Bards have ethics. Bard ethics.',
+        text: 'My ballad\'s about a hero who slays {Mobs}. Make it true. Bards have ethics.',
         waiting: ['(strum) The ballad\'s stuck at verse {done}. (strum) Verse {done}. (strum)'],
-        thanks: ['(strum) The Ballad of {hero}! (strum) They slew {n} {mobs}! (strum) It\'s a hit. Here\'s your cut.'],
+        thanks: ['(strum) The Ballad of {hero}! (strum) It\'s a hit. Here\'s your cut.'],
       },
       {
         kind: 'slayElite',
         title: 'The Big Finish',
-        text: 'My ballad needs a big finish. Slay {n} of the big shiny ones. Then I\'ll strum really, really hard.',
-        waiting: ['(strum) Still waiting on the big finish. {left} to go. (strum)'],
+        text: 'My ballad needs a big finish. A big shiny one. Then I strum really hard.',
+        waiting: ['(strum) Still waiting on the big finish. (strum)'],
         thanks: ['(STRUM) That\'s the big finish! My finger hurts. Worth it. Take the tips.'],
       },
     ],
@@ -477,17 +514,17 @@ export const NPC_DEFS: readonly NpcDef[] = [
         kind: 'collect',
         item: 'hourglass',
         title: 'The Egg',
-        text: 'My egg is missing. Round. Shiny. Sand inside. Bring me {items} and I\'ll sit on it till it hatches into a minute.',
+        text: 'My egg is missing. Round. Shiny. Sand inside. It hatches into a minute.',
         waiting: ['Found my egg yet? It\'s glass. With sand in. Like all eggs.'],
-        thanks: ['My egg! BAWK! I\'ll sit on it until it hatches. Could be a minute. Could be an hour. Here, I found this in a nest.'],
+        thanks: ['My egg! BAWK! I\'ll sit on it till it hatches. Here, I found this in a nest.'],
       },
       {
         kind: 'slay',
         pest: true,
         title: 'Fox Watch',
-        text: 'There are {Mobs} about. To a chicken, everything\'s a fox. Kill {n} foxes. They aren\'t foxes. Kill them anyway.',
-        waiting: ['Still foxes about. {left} of them. Not foxes. Foxes. BAWK.'],
-        thanks: ['The foxes are gone! The not-foxes too! You\'re a good farmer. Here. Don\'t ask where I kept it.'],
+        text: 'To a chicken, {Mobs} are foxes. They aren\'t foxes. Kill them anyway.',
+        waiting: ['Still foxes about. Not foxes. Foxes. BAWK.'],
+        thanks: ['The foxes are gone! The not-foxes too! Here. Don\'t ask where I kept it.'],
       },
     ],
   },
@@ -516,16 +553,16 @@ export const NPC_DEFS: readonly NpcDef[] = [
       {
         kind: 'reach',
         title: 'Tell Them I\'m Coming',
-        text: 'Run ahead to floor {floor} and tell them I\'m on my way! Whoever they are! For whatever it is!',
+        text: 'Run ahead and tell them I\'m on my way! Whoever they are! For whatever it is!',
         waiting: ['Floor {floor}! Hurry! I\'d go myself, but I\'d be late.'],
-        thanks: ['They said WHAT? It was my own funeral? And I missed it AGAIN? ...Well. Thank you anyway. Take this, I can\'t spend it.'],
+        thanks: ['My own funeral? And I missed it AGAIN? ...Take this. I can\'t spend it.'],
       },
       {
         kind: 'boss',
         title: 'The Appointment',
-        text: 'I remember now! I had an appointment with their boss. To haunt him. Could you go in my place? Hit him a lot.',
-        waiting: ['Has my appointment been kept? With the boss? Hit him a lot, remember. Ghostly a lot.'],
-        thanks: ['You kept my appointment! And hit him a lot? Splendid. I\'ll mark it "attended". Here, for your trouble.'],
+        text: 'I had an appointment to haunt their boss. Go in my place? Hit him a lot.',
+        waiting: ['Has my appointment been kept? Hit him a lot, remember. Ghostly a lot.'],
+        thanks: ['You hit him a lot? Splendid. I\'ll mark it "attended". Here, for your trouble.'],
       },
     ],
   },
@@ -554,17 +591,17 @@ export const NPC_DEFS: readonly NpcDef[] = [
       {
         kind: 'slay',
         title: 'Downsizing',
-        text: 'The budget says we have {n} too many monsters on payroll. Please... process them. I\'ll pay a consulting fee.',
-        waiting: ['{left} more to process. Chop chop. Not literally. Well. Literally.'],
+        text: 'Too many monsters on payroll. Please... process them. I\'ll pay a consulting fee.',
+        waiting: ['More to process. Chop chop. Not literally. Well. Literally.'],
         thanks: ['Processed! Beautiful numbers. Here\'s your fee, minus a small fee for the fee.'],
       },
       {
         kind: 'collect',
         item: 'gold',
         title: 'The Audit',
-        text: 'Audit time! Collect {items} so I can count them. I won\'t keep them. I\'ll keep SOME of them. For accuracy.',
-        waiting: ['Coins, coins, coins! The audit waits for no goblin. {left} to go.'],
-        thanks: ['Counted! Every coin accounted for. Here\'s a few back. Don\'t tell the Treasurer. The Treasurer is a slime.'],
+        text: 'Audit time! Bring me coins so I can count them. I\'ll keep SOME. For accuracy.',
+        waiting: ['Coins, coins, coins! The audit waits for no goblin.'],
+        thanks: ['Counted! Here\'s a few back. Don\'t tell the Treasurer. The Treasurer is a slime.'],
       },
     ],
   },
@@ -592,16 +629,16 @@ export const NPC_DEFS: readonly NpcDef[] = [
       {
         kind: 'slayElite',
         title: 'Arcane Ingredients',
-        text: 'Bring down {n} of the big shiny ones. I need their glowing hearts for a spell. The spell is "make the big shiny ones stop". It\'s working already!',
-        waiting: ['The spell still needs glowing hearts. {left} to go. Chop chop. Magically.'],
+        text: 'I need glowing hearts from the big shiny ones. For my spell: "make the big shiny ones stop".',
+        waiting: ['The spell still needs glowing hearts. Chop chop. Magically.'],
         thanks: ['Splendid! The spell is complete! The big shiny ones have stopped. Well. Those ones have.'],
       },
       {
         kind: 'slay',
         pest: true,
         title: 'Toad Practice',
-        text: 'I\'m practicing my toad spell. I need {n} {Mobs} who are NOT toads gone, so I know it failed safely. Science!',
-        waiting: ['Still {left} to go. Toads or not. I genuinely can\'t tell any more.'],
+        text: 'Testing my toad spell. Clear out those {Mobs}. Not toads? It failed safely!',
+        waiting: ['Toads or not? I genuinely can\'t tell any more.'],
         thanks: ['Excellent. No toads. Spell confirmed useless. Science! Here, for your trouble.'],
       },
     ],
@@ -631,15 +668,15 @@ export const NPC_DEFS: readonly NpcDef[] = [
         kind: 'slay',
         pest: true,
         title: 'Stew Fixings',
-        text: 'My stew needs {n} {Mobs}. Freshly slain. Don\'t bring them to me. I\'ll know. A chef always knows.',
-        waiting: ['The stew needs more {mobs}. {left} to go. It\'s bubbling impatiently. Stews do that.'],
+        text: 'My stew needs {Mobs}. Freshly slain. Don\'t bring them. I\'ll know.',
+        waiting: ['The stew needs more {mobs}. It\'s bubbling impatiently. Stews do that.'],
         thanks: ['Magnificent! The stew is complete! It is terrible. Take this instead of a bowl. Trust me.'],
       },
       {
         kind: 'slay',
         title: 'Health Inspection',
-        text: 'The kitchen is crawling. {n} of them, gone, please. The health inspector is coming. He\'s a ghost. Very thorough.',
-        waiting: ['{left} to go and the kitchen passes. The inspector is floating about somewhere. Literally.'],
+        text: 'The kitchen is crawling. Clear it out. The inspector\'s a ghost. Very thorough.',
+        waiting: ['The inspector is floating about somewhere. Literally.'],
         thanks: ['Spotless! The inspector gave us four stars. Out of four hundred. A record! Here.'],
       },
     ],
@@ -668,15 +705,15 @@ export const NPC_DEFS: readonly NpcDef[] = [
       {
         kind: 'boss',
         title: 'Dethrone the Pretender',
-        text: 'A rival king claims this stretch. Big fellow, end of the line. Dethrone him. Politely. Then rudely.',
-        waiting: ['The pretender still sits on his throne. Or squats. Or oozes. I haven\'t actually seen him.'],
-        thanks: ['The pretender has fallen! The hallway is safe! I name you Duke of... that rock. Over there. Also, this.'],
+        text: 'A rival king claims this stretch. End of the line. Dethrone him. Politely. Then rudely.',
+        waiting: ['The pretender still sits on his throne. Or squats. Or oozes. I haven\'t seen him.'],
+        thanks: ['The pretender has fallen! I name you Duke of... that rock. Over there. Also, this.'],
       },
       {
         kind: 'slay',
         title: 'Royal Census',
-        text: 'My kingdom has too many subjects with teeth. Reduce the population by {n}. The ones with teeth.',
-        waiting: ['The census says {left} to go. The census is me. I counted.'],
+        text: 'Too many of my subjects have teeth. Reduce them. The ones with teeth.',
+        waiting: ['The census says more to go. The census is me. I counted.'],
         thanks: ['A leaner, less toothy kingdom! The royal treasury grants you this.'],
       },
     ],
@@ -854,10 +891,15 @@ function npcWeight(d: NpcDef, floor: number, biomeId: string, quests: readonly Q
 }
 
 /**
- * The NPCs on a floor: 0-2 (more likely early on; none on boss floors), standing on open floor in
- * normal or side rooms, away from mob spawns, the start and the portal. About one floor in eight has
- * a demon in disguise among them. Deterministic for the map, floor, biome and seed. Pass the player's
- * quests and the giver of a finished one turns up to take it back.
+ * The NPCs on a floor: 0-2 (more likely early on; none on boss floors), each at a set-up of their own
+ * that suits the biome (camps.ts: a market stall, a tent by a campfire, a candlelit shrine...), backed
+ * against a wall off the fighting: the start room first, then side rooms and quiet corners, away from
+ * the corridors, the portal and the mobs. About one floor in eight has a demon in disguise among them.
+ * Deterministic for the floor, biome and seed. Pass the player's quests and the giver of a finished
+ * one turns up to take it back.
+ *
+ * Pitches the set-ups on `map` (their tiles blocked, their pieces added to the props, mobs that would
+ * spawn beside them moved off), so call it once per map, before the World is built from it.
  */
 export function placeNpcs(map: FloorMap, floor: number, biomeId: string, seed: number, quests: readonly Quest[] = []): Npc[] {
   if (isBossFloor(floor) || map.rooms.some((r) => r.kind === 'arena') || map.spawns.some((s) => s.boss)) return [];
@@ -887,58 +929,17 @@ export function placeNpcs(map: FloorMap, floor: number, biomeId: string, seed: n
     if (!pool.length) break;
     push(rng.weighted(pool), rng.int(0, 0x3fffffff));
   }
-  // Where: open floor tiles (with open floor all round) in normal and side rooms, scored by how far
-  // they are from the mobs, the start and the portal.
-  const spots: Array<{ tx: number; ty: number; room: number; score: number }> = [];
-  const open = (tx: number, ty: number) => {
-    for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) if (tileAt(map, tx + ox, ty + oy) !== FLOOR) return false;
-    return true;
-  };
-  const near = (x: number, y: number, list: ReadonlyArray<{ x: number; y: number }>) => {
-    let d = Infinity;
-    for (const p of list) d = Math.min(d, Math.hypot(p.x - x, p.y - y));
-    return d;
-  };
-  const mobs = map.spawns.filter((s) => !s.boss);
-  const tall = map.props.filter((p) => p.kind !== 'tree' || !p.edge);
-  const trees = map.props.filter((p) => p.kind === 'tree');
+  // Where: each at a set-up of their own, pitched off the fighting.
   const mobNames = floorMobNames(map, floor, biomeId);
-  map.rooms.forEach((r, ri) => {
-    if (r.kind !== 'normal' && r.kind !== 'side' && r.kind !== 'exit') return;
-    for (let ty = r.cy - r.ry; ty <= r.cy + r.ry; ty++) {
-      for (let tx = r.cx - r.rx; tx <= r.cx + r.rx; tx++) {
-        if (!open(tx, ty)) continue;
-        if (map.field && map.field[ty * map.w + tx]) continue;
-        const x = tx * TILE + 8;
-        const y = ty * TILE + 12;
-        const dMob = near(x, y, mobs);
-        if (dMob < 40) continue;
-        if (Math.hypot(map.start.x - x, map.start.y - y) < 72) continue;
-        if (Math.hypot(map.exit.x - x, map.exit.y - y) < 56) continue;
-        // Not standing in a lantern, a fence or a crop, nor behind a tree's crown.
-        if (tall.some((p) => Math.abs(p.x - x) < 12 && Math.abs(p.y - y) < 12)) continue;
-        if (
-          trees.some((p) => {
-            const d = treeDims(p.tree ?? 'oak', p.size ?? 'medium');
-            return Math.abs(p.x - x) < d.w / 2 + 4 && p.y > y && p.y - y < d.h;
-          })
-        )
-          continue;
-        const score = Math.min(dMob, 110) + (r.kind === 'side' ? 35 : r.kind === 'exit' ? -25 : 0) + rng.next() * 30;
-        spots.push({ tx, ty, room: ri, score });
-      }
-    }
-  });
-  spots.sort((a, b) => b.score - a.score || a.ty - b.ty || a.tx - b.tx);
+  const campRng = rng.fork(0xca3b);
+  const camps: Camp[] = [];
   const out: Npc[] = [];
   cast.forEach((def, i) => {
-    const taken = out.map((o) => ({ x: o.x, y: o.y }));
-    const spot = spots.find((s) => !out.some((o) => o.room === s.room) && near(s.tx * TILE + 8, s.ty * TILE + 12, taken) > 96) ?? spots.find((s) => near(s.tx * TILE + 8, s.ty * TILE + 12, taken) > 64);
-    if (!spot) return;
-    const x = spot.tx * TILE + 8;
-    const y = spot.ty * TILE + 12;
+    const camp = pitchCamp(map, biomeId, campRng, camps);
+    if (!camp) return;
+    camps.push(camp);
+    const { x, y } = camp.stand;
     const s = seeds[i];
-    const side = rng.chance(0.3);
     out.push({
       uid: nextNpcUid++,
       def,
@@ -947,9 +948,9 @@ export function placeNpcs(map: FloorMap, floor: number, biomeId: string, seed: n
       homeX: x,
       homeY: y,
       dir: rng.chance(0.5) ? 1 : -1,
-      view: side ? 'side' : 'down',
+      view: 'down',
       animT: rng.next() * 4,
-      room: spot.room,
+      room: camp.room,
       floor,
       biomeId,
       seed: s,
@@ -960,6 +961,7 @@ export function placeNpcs(map: FloorMap, floor: number, biomeId: string, seed: n
       demon: def.kind === 'demon',
       revealed: false,
       mobNames: [...mobNames],
+      camp,
     });
   });
   return out;
@@ -1126,6 +1128,8 @@ interface S {
   node(id: string, text: string, ...choices: DialogChoice[]): void;
   /** The opener: first meeting, coming back, or (while a job of theirs is going) a reminder. */
   open(hello: readonly string[], again: readonly string[]): string;
+  /** The opener was a reminder of their job (the start node gets its job card). */
+  reminded: boolean;
   /** "Need a hand?": adds the job's nodes (offer, busy, recap...) and returns the choice that leads there. */
   questChoice(label: string): DialogChoice[];
   /** Gold worth `kills` kills. */
@@ -1169,16 +1173,20 @@ function makeS(npc: Npc, ctx: DialogCtx): S {
       if (mine) {
         const tpl = templateOf(def, mine);
         const line = tpl ? s.pick(tpl.waiting, 7) : 'How\'s that job coming along?';
-        return `${fillQuestText(line, mine, { hero: s.hero })} (${questGoal(mine)})`;
+        // (The job card under it shows the goal and how far along it is.)
+        s.reminded = true;
+        return fillQuestText(line, mine, { hero: s.hero });
       }
       return npc.talkedTo > 0 ? s.pick(again, 2) : s.pick(hello, 1);
     },
+    reminded: false,
     questChoice: (label) => {
       if (!def.quests.length) return [];
       if (mine) {
         const tpl = templateOf(def, mine);
-        s.node('questRecap', `${mine.text} (${questGoal(mine)})`, bye(tpl?.kind === 'reach' ? 'On my way.' : 'On it.'), to('Something else...', 'start'));
-        return [to(label, 'questRecap')];
+        s.node('questRecap', mine.text, bye(tpl?.kind === 'reach' ? 'On my way.' : 'On it.'), to('Something else...', 'start'));
+        g.questRecap.job = jobOf(mine, 'progress');
+        return [{ ...to(label, 'questRecap'), job: true }];
       }
       const offer = questFor(npc, ctx.goldPerKill, ctx.mobNames);
       const taken = npc.questTaken || (offer !== null && ctx.activeQuests.some((q) => q.id === offer.id));
@@ -1190,20 +1198,42 @@ function makeS(npc: Npc, ctx: DialogCtx): S {
         s.node('questBusy', s.pick(BUSY, 6), to('Fair enough.', 'start'), bye());
         return [to(label, 'questBusy')];
       }
-      s.node('quest', `${offer.text} Reward: ${rewardText(offer.reward)}.`, { label: s.pick(YES, 3), action: { type: 'acceptQuest', quest: offer }, next: 'questYes' }, to(s.pick(NO, 4), 'start'));
+      s.node('quest', offer.text, { label: s.pick(YES, 3), action: { type: 'acceptQuest', quest: offer }, next: 'questYes', job: true }, to(s.pick(NO, 4), 'start'));
+      g.quest.job = jobOf(offer, 'offer');
       s.node('questYes', s.pick(ACCEPTED, 8), bye());
-      return [to(label, 'quest')];
+      g.questYes.job = jobOf(offer, 'taken');
+      return [{ ...to(label, 'quest'), job: true }];
     },
     gold: (kills) => Math.max(1, Math.round(Math.max(0, ctx.goldPerKill) * kills)),
   };
   return s;
 }
 
-/** The graph when a finished job of theirs comes back: thanks and the reward. */
+/** A job card for a quest at some stage (an offer says what it asks; one under way, how far along). */
+function jobOf(q: Quest, stage: DialogJob['stage']): DialogJob {
+  const reach = q.kind === 'reach';
+  return {
+    stage,
+    title: q.title,
+    goal: stage === 'offer' || stage === 'taken' ? questAsk(q) : questGoal(q),
+    aim: {
+      kind: q.kind,
+      n: reach ? q.floorTaken + q.target : q.target,
+      ...(stage === 'progress' ? { done: reach ? q.floorTaken + q.progress : q.progress } : {}),
+      ...(q.mobName ? { mob: q.mobName } : {}),
+      ...(q.item ? { item: q.item } : {}),
+    },
+    ...(stage === 'progress' ? { progress: Math.min(1, q.progress / Math.max(1, q.target)) } : {}),
+    reward: { ...q.reward },
+  };
+}
+
+/** The graph when a finished job of theirs comes back: thanks and the reward (on its job card). */
 function turnInGraph(s: S, q: Quest): Graph {
   const tpl = templateOf(s.def, q);
   const line = tpl ? s.pick(tpl.thanks, 9) : 'You did it! Thank you!';
-  s.node('start', `${fillQuestText(line, q, { hero: s.hero })} Reward: ${rewardText(q.reward)}.`, { label: s.pick(['Happy to help.', 'All in a day\'s work.', 'Any time.'], 10), action: { type: 'turnIn' } });
+  s.node('start', fillQuestText(line, q, { hero: s.hero }), { label: s.pick(['Happy to help.', 'All in a day\'s work.', 'Any time.'], 10), action: { type: 'turnIn' }, job: true });
+  s.g.start.job = jobOf(q, 'done');
   return s.g;
 }
 
@@ -1223,7 +1253,7 @@ const SCRIPTS: Record<string, Script> = {
       to('Are you a demon?', 'accuse'),
       bye('Good luck, Hob.'),
     );
-    s.node('lost', `Followed a chicken into a hole. The chicken knew the way. Then the chicken got promoted. Now I\'m on floor ${s.floor}.`, to('Promoted?', 'promoted'), to('I see.', 'start'));
+    s.node('lost', `Followed a chicken into a hole. Then the chicken got promoted. Now I\'m on floor ${s.floor}.`, to('Promoted?', 'promoted'), to('I see.', 'start'));
     s.node('promoted', 'Runs this whole stretch now. Wears a tiny crown. Won\'t answer my letters.', to('Poor Hob.', 'start'));
     s.node('place', s.quip, to('Huh.', 'start'));
     s.node('accuse', 'Do demons have this many blisters? Look at these hands. Honest work. Honest, terrible blisters.', to('Sorry, Hob.', 'start'));
@@ -1251,7 +1281,7 @@ const SCRIPTS: Record<string, Script> = {
     s.node(
       'start',
       s.open(
-        ['Halt! Who goes... ugh. Never mind. You look fine. Everyone looks fine. I\'ve been on shift since floor one.', 'Halt. State your business. Actually, don\'t. I\'m too tired to care about business.'],
+        ['Halt! Who goes... ugh. Never mind. You look fine. I\'ve been on shift since floor one.', 'Halt. State your business. Actually, don\'t. I\'m too tired to care about business.'],
         ['Oh. You again. Still halted? Good. Very good. Carry on.', 'Still here. Still guarding. Still not sure what.'],
       ),
       to('What are you guarding?', 'guarding'),
@@ -1279,10 +1309,10 @@ const SCRIPTS: Record<string, Script> = {
       bye('Good luck with the spoon.'),
     );
     s.node('spoon', `Look, don\'t touch. That\'s a forty-gold spoon. It\'s been to ${s.biome}.`, to('Why forty gold?', 'spoon2'), to('Nice spoon.', 'start'));
-    s.node('spoon2', `Because it\'s been to ${s.biome}! Provenance! You can\'t put a price on provenance. I did, though. Forty.`, to('I\'ll buy it.', 'buy'), to('I\'ll pass.', 'start'));
+    s.node('spoon2', `It\'s been to ${s.biome}! Provenance! You can\'t put a price on that. I did, though. Forty.`, to('I\'ll buy it.', 'buy'), to('I\'ll pass.', 'start'));
     if (s.npc.gifted) s.node('buy', 'No! Not for sale! I already paid you to forget about it. Did you forget? Forget it.', to('Forgotten.', 'start'));
-    else s.node('buy', 'No! It\'s my only ware! Without it I\'m just a man with a backpack. Here. Take this and forget the spoon.', gift('What spoon?', { gold: s.gold(6) }));
-    s.node('accuse', 'Me? A demon? I\'m a merchant. Totally different. Demons want your soul. I just want forty gold for a spoon.', to('Fair.', 'start'));
+    else s.node('buy', 'No! It\'s my only ware! I\'d just be a man with a backpack. Take this. Forget the spoon.', gift('What spoon?', { gold: s.gold(6) }));
+    s.node('accuse', 'Me? A demon? Demons want your soul. I just want forty gold for a spoon.', to('Fair.', 'start'));
   },
 
   cartographer(s) {
@@ -1299,14 +1329,14 @@ const SCRIPTS: Record<string, Script> = {
     );
     s.node('map', 'So far it says "down", "more down" and "here be slimes". It\'s a living document.', to('Can I see?', 'map2'), to('Nice.', 'start'));
     s.node('map2', `No peeking! It\'s not finished. Also it\'s mostly a drawing of a duck. I got bored on floor ${Math.max(1, s.floor - 1)}.`, to('Nice duck.', 'start'));
-    s.node('accuse', 'Let me check the legend. Demons are marked with a little horn. I\'m marked with a little hat. Different.', to('My mistake.', 'start'));
+    s.node('accuse', 'Let me check the legend. Demons: a little horn. Me: a little hat. Different.', to('My mistake.', 'start'));
   },
 
   rocks(s) {
     s.node(
       'start',
       s.open(
-        ['Oh! A visitor! Do you want to see my rocks? Everyone wants to see my rocks. Nobody\'s said so, but I can tell.', 'Psst! Knight! Want to see something amazing? It\'s a rock.'],
+        ['A visitor! Want to see my rocks? Everyone does. Nobody\'s said so, but I can tell.', 'Psst! Knight! Want to see something amazing? It\'s a rock.'],
         ['Back for more rocks? I knew it. Nobody can resist the rocks.', 'The rocks missed you. Kevin especially.'],
       ),
       to('Show me your rocks.', 'rock1'),
@@ -1341,7 +1371,7 @@ const SCRIPTS: Record<string, Script> = {
     s.node('another', '(strum) That one was also G. They\'re all G. G is the people\'s chord.', to('Learn another chord?', 'chord'), to('Lovely.', 'start'));
     s.node('chord', 'I tried C once. Lost a finger. Not to the chord. To a goblin. But I blame the chord.', to('Fair.', 'start'));
     if (s.npc.gifted) s.node('song', `(strum) ${s.hero}, again! (strum) The sequel sounds exactly like the first one.`, to('A classic.', 'start'));
-    else s.node('song', `(strum) ${s.hero}... (strum) ...was here. (strum) It\'s short. I only just met you. Here, a lucky pick for the road.`, gift('Bravo!', { luckSpins: 1 }));
+    else s.node('song', `(strum) ${s.hero}... (strum) ...was here. (strum) It\'s short. Here, a lucky pick.`, gift('Bravo!', { luckSpins: 1 }));
     s.node('accuse', '(strum) A demon? (strum) No. (strum) Demons can play TWO chords.', to('Fair.', 'start'));
   },
 
@@ -1368,7 +1398,7 @@ const SCRIPTS: Record<string, Script> = {
     s.node(
       'start',
       s.open(
-        ['Oh no, oh no, oh no. I\'m late! So late! Three hundred years late, if this sundial is right. It\'s never right. It\'s indoors.', 'Excuse me, do you have the time? The year would also help.'],
+        ['Oh no, oh no. I\'m late! Three hundred years late, if this sundial is right. It\'s indoors.', 'Excuse me, do you have the time? The year would also help.'],
         ['Still late! Later, now! Thank you for asking. You didn\'t ask.', 'You again! Have I missed it? I\'ve missed it. Whatever it is.'],
       ),
       to('Late for what?', 'what'),
@@ -1377,7 +1407,7 @@ const SCRIPTS: Record<string, Script> = {
       to('Are you a demon?', 'accuse'),
       bye('Don\'t be late.'),
     );
-    s.node('what', 'That\'s the thing! I can\'t remember! A wedding? A war? The dentist? It was important. I wore the good hat.', to('Nice hat.', 'start'));
+    s.node('what', 'I can\'t remember! A wedding? A war? The dentist? It was important. I wore the good hat.', to('Nice hat.', 'start'));
     s.node('dead', 'I\'m a BUSY ghost. There\'s a difference. Busy ghosts are late. Lazy ghosts are just early.', to('Right.', 'start'));
     s.node('accuse', 'Demon? No, no, I\'m dead. Different department. Down the hall, left at the screaming.', to('Thanks.', 'start'));
   },
@@ -1386,7 +1416,7 @@ const SCRIPTS: Record<string, Script> = {
     s.node(
       'start',
       s.open(
-        ['Ah. The knight. According to my ledger, you\'ve killed a lot of my coworkers. That\'s a lot of paperwork.', 'Halt! Do you have a receipt for that sword? No? We\'ll call it a donation.'],
+        ['Ah. The knight. My ledger says you\'ve killed a lot of my coworkers. That\'s a lot of paperwork.', 'Halt! Do you have a receipt for that sword? No? We\'ll call it a donation.'],
         ['Back again? I\'ve opened a file on you. It\'s thick. Mostly complaints.', 'You again! Your file\'s getting thicker. Congratulations, I suppose.'],
       ),
       to('You\'re a goblin.', 'gob'),
@@ -1404,7 +1434,7 @@ const SCRIPTS: Record<string, Script> = {
     s.node(
       'start',
       s.open(
-        ['Behold! Mortimer the Mostly Magnificent! I can turn anything into a toad. Just not on purpose. Or into a toad.', 'Ah! A visitor! Stand back. I\'m about to do magic. ...Any minute now.'],
+        ['Behold! Mortimer the Mostly Magnificent! I can turn anything into a toad. Not on purpose.', 'Ah! A visitor! Stand back. I\'m about to do magic. ...Any minute now.'],
         ['Ah, you again! I tried to summon you. Got a goat. Close enough.', 'Back for more magic? I\'ve learned a new spell. It makes soup lukewarm.'],
       ),
       to('Do some magic.', 'magic'),
@@ -1423,7 +1453,7 @@ const SCRIPTS: Record<string, Script> = {
     s.node(
       'start',
       s.open(
-        ['Ah! Fresh meat! ...I mean, hello, customer. Welcome to my kitchen. It is the whole dungeon.', 'Welcome, welcome! Hungry? Of course you\'re hungry. Everyone\'s hungry down here. Mostly the monsters.'],
+        ['Ah! Fresh meat! ...I mean, hello, customer. Welcome to my kitchen. It is the whole dungeon.', 'Welcome! Hungry? Of course you\'re hungry. Everyone\'s hungry down here. Mostly the monsters.'],
         ['Back for seconds? Nobody comes back for seconds. You\'re very brave.', 'Ah, my favorite customer! My only customer. Hungry?'],
       ),
       to('What\'s cooking?', 'cook'),
@@ -1433,7 +1463,7 @@ const SCRIPTS: Record<string, Script> = {
     );
     s.node('cook', 'Stew. What kind? Don\'t ask. What\'s in it? Don\'t ask. Is it good? ...Don\'t ask.', to('Can I taste it?', 'taste'), to('I won\'t ask.', 'start'));
     if (s.npc.gifted) s.node('taste', 'One bottle per customer. Health and safety. Mostly safety.', to('Fair.', 'start'));
-    else s.node('taste', 'Bravely spoken! Here. It\'s a "luck potion". It\'s the stew, in a bottle. You\'re lucky if you survive it.', gift('Bottoms up!', { potion: true }));
+    else s.node('taste', 'A "luck potion". It\'s the stew, in a bottle. You\'re lucky if you survive it.', gift('Bottoms up!', { potion: true }));
     s.node('accuse', 'The only demon in this kitchen is my sous-chef, and he\'s a raccoon. Lovely knife work, though.', to('Good to know.', 'start'));
   },
 
@@ -1450,7 +1480,7 @@ const SCRIPTS: Record<string, Script> = {
       to('Are you a demon?', 'accuse'),
       bye('Long live the king.'),
     );
-    s.node('king', 'This hallway. From that rock to that other rock. A modest kingdom. No taxes. No subjects. No dentist.', to('Long live the king.', 'start'));
+    s.node('king', 'This hallway. From that rock to that other rock. No taxes. No subjects. No dentist.', to('Long live the king.', 'start'));
     if (s.npc.gifted) s.node('knight', 'You can\'t be triple-knighted. That\'s a different thing. That\'s juggling.', to('Fair.', 'start'));
     else s.node('knight', 'You already are one. Fine. I knight you AGAIN. Double-knighted! It comes with a royal blessing.', gift('Arise, me!', { gold: s.gold(4), luckSpins: 1 }));
     s.node('accuse', 'A demon? I\'m royalty. We\'re much, much worse.', to('Your Majesty.', 'start'));
@@ -1460,38 +1490,39 @@ const SCRIPTS: Record<string, Script> = {
     const d = s.def.demon!;
     revealNodes(s, d, 'UGH. FINE. Yes! Demon! Gary, Demon of Mild Inconvenience! Couldn\'t you let me have ONE nice floor?', 'Can\'t we talk this out?', 'We WERE talking it out! Then you said "demon". Now it\'s a whole thing. Ugh. Fine.');
     if (s.ctx.cleared) {
-      s.node('start', 'So... everyone else on this floor is gone. Just you and me. And I\'m a... normal guy. ...You know what? Forget it.', to('Forget what?', 'reveal'));
+      s.node('start', 'So... everyone else is gone. Just you and me. And I\'m a... normal guy. ...Forget it.', to('Forget what?', 'reveal'));
       return;
     }
     if (s.npc.talkedTo >= 2) {
-      s.node('start', 'You keep COMING BACK. Do you know how hard it is to act normal? It\'s SO hard. That\'s it. Gary\'s done.', fight('Have at you!'), to('Gary, wait...', 'reveal'));
+      s.node('start', 'You keep COMING BACK. Acting normal is SO hard. That\'s it. Gary\'s done.', fight('Have at you!'), to('Gary, wait...', 'reveal'));
       return;
     }
     s.node(
       'start',
       s.open(
-        [`Oh! Hello, fellow human. Lovely weather in ${s.biome}. Very normal weather. For humans. Like me. Gary. Hi.`, `Hey there! Gary. Normal guy. Just standing here on floor ${s.floor}, being normal. Super chill.`],
+        [`Hello, fellow human. Lovely weather in ${s.biome}. Normal weather. For humans. Like me. Gary.`, `Hey there! Gary. Normal guy. Just standing here on floor ${s.floor}, being normal. Super chill.`],
         ['Oh. You again. Hi. Still Gary. Still normal. You\'re very... thorough.', 'Back already? Gary\'s still here. Being chill. Are YOU chill? You seem tense.'],
       ),
       to('What\'s with the tail?', 'tail'),
       to('Your hat is smoking.', 'hat'),
-      to('Got any work?', 'deal'),
+      { ...to('Got any work?', 'deal'), job: true },
       to('Are you a demon?', 'accuse'),
       bye('Bye, Gary.'),
     );
     s.node('tail', `Tail? That\'s a belt. A long, swishy, pointy belt. Everyone on floor ${s.floor} wears one. Relax.`, to('Belts don\'t swish.', 'sus'), to('Nice belt.', 'start'));
     s.node('hat', 'That\'s not smoke, that\'s steam. I\'m very warm-blooded. Human warm. Normal warm. Chill out.', to('And the horns?', 'horns'), to('Okay, Gary.', 'start'));
-    s.node('horns', 'Definitely not horns. It\'s a hat. A hat with two pointy... hat bits. It\'s trendy. Can we just relax?', to('Hats don\'t grow.', 'sus'), to('Sorry. Nice hat.', 'start'));
-    s.node('deal', 'Since you\'re so chill: a deal! Sign here and I\'ll give you three hourglasses. Tiny signature. In ink. Red ink. It\'s ink.', to('Sign it.', 'signed'), to('Let me read it first.', 'fine'), to('No thanks.', 'start'));
+    s.node('horns', 'Not horns. A hat. A hat with two pointy... hat bits. It\'s trendy. Can we just relax?', to('Hats don\'t grow.', 'sus'), to('Sorry. Nice hat.', 'start'));
+    s.node('deal', 'Since you\'re so chill: a deal! Sign here. Tiny signature. In ink. Red ink. It\'s ink.', to('Sign it.', 'signed'), to('Let me read it first.', 'fine'), to('No thanks.', 'start'));
+    s.g.deal.job = { stage: 'contract', title: 'A Totally Normal Deal', goal: 'Sign here. In ink. Red ink.', aim: { kind: 'sign', n: 1 }, reward: { hourglasses: 3 }, fine: 'The signer agrees to every clause on page nine. There is no page nine. There is a page nine.' };
     if (s.npc.gifted) {
       s.node('signed', 'You already signed! One soul per customer. I mean ONE SIGNATURE. Relax.', to('Soul?!', 'reveal'), to('Right.', 'start'));
     } else {
-      s.node('signed', 'Pleasure doing business! Here\'s your three hourglasses. It\'s one. The other two are in the fine print.', gift('What fine print?', { hourglasses: 1 }, 'fine2'));
+      s.node('signed', 'Pleasure doing business! Here\'s your three hourglasses. It\'s one. The rest is fine print.', gift('What fine print?', { hourglasses: 1 }, 'fine2'));
       s.node('fine2', 'Page nine: "Signer agrees to fight Gary." Sorry. It\'s the law. Demon law. Normal-guy law! Ugh.', to('Demon law?', 'reveal'));
     }
-    s.node('fine', 'There\'s no fine print. (slaps a hand over the fine print) Look at me. Is this the face of fine print?', to('Move your hand.', 'reveal'), to('Never mind.', 'start'));
+    s.node('fine', 'There\'s no fine print. (covers the fine print) Is this the face of fine print?', to('Move your hand.', 'reveal'), to('Never mind.', 'start'));
     s.node('accuse', 'A demon? Pfft. No. What? Who said that? Do I look like a demon? Don\'t answer that.', to('You have horns.', 'horns'), to('You look like a demon.', 'sus'), to('Sorry, Gary.', 'start'));
-    s.node('sus', 'Okay. Hypothetically. If I WERE a demon, which I\'m not, would you be cool about it? Chill? No stabbing?', to('No. Demon.', 'reveal'), to('Totally chill.', 'chill'));
+    s.node('sus', 'Hypothetically. If I WERE a demon, which I\'m not, would you be chill? No stabbing?', to('No. Demon.', 'reveal'), to('Totally chill.', 'chill'));
     s.node('chill', 'Great! Great. Then I\'m... still not a demon. Bye now. Nothing to see here. (tail swish)', to('Your tail swished.', 'reveal'), bye('Bye, Gary.'));
   },
 
@@ -1499,7 +1530,7 @@ const SCRIPTS: Record<string, Script> = {
     const d = s.def.demon!;
     revealNodes(s, d, 'Oh, FINE. Grizelda, Matron of Burnt Cookies! Nobody ever stays for tea! NOBODY!', 'I\'d have stayed for tea.', '...Really? That\'s so sweet. Nana is still going to fight you. But it\'s sweet.');
     if (s.ctx.cleared) {
-      s.node('start', 'Oh dear. Everyone\'s gone, dearie. Just you and Nana now. Nana\'s been SO patient. Nana\'s done being patient.', to('Nana?', 'reveal'));
+      s.node('start', 'Everyone\'s gone, dearie. Just you and Nana. Nana\'s been SO patient. Nana\'s done being patient.', to('Nana?', 'reveal'));
       return;
     }
     if (s.npc.talkedTo >= 2) {
@@ -1517,40 +1548,41 @@ const SCRIPTS: Record<string, Script> = {
       to('What big teeth you have.', 'teeth'),
       bye('Bye, Nana.'),
     );
-    s.node('eyes', 'That\'s cataracts, dearie. Red, glowing cataracts. Very common at my age. Which is nine thousand. Sixty! Sixty.', to('Nine thousand?', 'sus'), to('Okay, Nana.', 'start'));
-    s.node('cookies', 'Fresh from the oven! The oven is a lake of fire. A normal oven! A normal, fiery lake. Take one, dearie.', to('Eat the cookie.', 'cookie'), to('I\'m not hungry.', 'start'));
+    s.node('eyes', 'Cataracts, dearie. Red, glowing ones. Common at my age. Nine thousand. Sixty! Sixty.', to('Nine thousand?', 'sus'), to('Okay, Nana.', 'start'));
+    s.node('cookies', 'Fresh from the oven! The oven is a lake of fire. A normal, fiery lake. Take one.', to('Eat the cookie.', 'cookie'), to('I\'m not hungry.', 'start'));
     if (s.npc.gifted) s.node('cookie', 'Only one cookie per grandchild, dearie. Nana counts. Nana ALWAYS counts.', to('Grandchild?', 'sus'), to('Okay, Nana.', 'start'));
-    else s.node('cookie', 'There! Now you\'re bound to Nana. For tea. FOREVER. ...Is it spicy? It\'s a little spicy. You feel lucky, though.', gift('Bound?!', { potion: true }, 'reveal'), gift('Delicious! Bye!', { potion: true }));
+    else s.node('cookie', 'Now you\'re bound to Nana. For tea. FOREVER. ...Spicy? You feel lucky, though.', gift('Bound?!', { potion: true }, 'reveal'), gift('Delicious! Bye!', { potion: true }));
     s.node('teeth', 'All the better to... no. No, Nana\'s not doing that one. Chill, dearie. Have some tea.', to('Are those fangs?', 'sus'), to('Sorry, Nana.', 'start'));
-    s.node('sus', 'Now, dearie. If Nana WERE a demon, hypothetically, you\'d still love Nana, wouldn\'t you? You\'d be chill?', to('You\'re a demon.', 'reveal'), to('Of course, Nana.', 'chill'));
+    s.node('sus', 'If Nana WERE a demon, hypothetically, you\'d still love Nana? You\'d be chill?', to('You\'re a demon.', 'reveal'), to('Of course, Nana.', 'chill'));
     s.node('chill', 'That\'s Nana\'s favorite. Run along now. Nana will just... be here. Watching. Normally.', to('Your tail is showing.', 'reveal'), bye('Bye, Nana.'));
   },
 
   lou(s) {
     const d = s.def.demon!;
-    revealNodes(s, d, 'Okay, you got me. Lou Cifer, Archfiend of Fine Print. In my defense, you never asked to read page nine.', 'Can I still get a deal?', 'Sure! Step one: survive. Step two: there is no step two.');
+    revealNodes(s, d, 'Okay, you got me. Lou Cifer, Archfiend of Fine Print. You never read page nine.', 'Can I still get a deal?', 'Sure! Step one: survive. Step two: there is no step two.');
     if (s.ctx.cleared) {
-      s.node('start', 'Well, well. Floor\'s empty. No witnesses. Not that I need witnesses. For business. Legitimate business. Oh, who am I kidding.', to('Kidding about what?', 'reveal'));
+      s.node('start', 'Well, well. Floor\'s empty. No witnesses. For business. Legitimate business. Who am I kidding.', to('Kidding about what?', 'reveal'));
       return;
     }
     if (s.npc.talkedTo >= 2) {
-      s.node('start', 'You keep browsing and never BUY. Know what we do with window shoppers? Neither do you. You\'re about to find out.', fight('Have at you!'), to('Lou, wait...', 'reveal'));
+      s.node('start', 'You keep browsing and never BUY. Know what we do to window shoppers? You\'re about to find out.', fight('Have at you!'), to('Lou, wait...', 'reveal'));
       return;
     }
     s.node(
       'start',
       s.open(
-        ['Psst. Knight. You look like someone who appreciates a deal. Lou C. Fur, licensed merchant. Very licensed.', 'Step right up! Lou C. Fur\'s Discount Destiny! Everything must go! Including you, eventually.'],
+        ['Psst. Knight. You look like you appreciate a deal. Lou C. Fur, licensed merchant. Very licensed.', 'Step right up! Lou C. Fur\'s Discount Destiny! Everything must go! Including you, eventually.'],
         ['My favorite customer! Ready to talk business? Your business. Your soul\'s business.', `Back for a deal? Smart. Lou\'s deals are the hottest on floor ${s.floor}. Literally.`],
       ),
-      to('What are you selling?', 'sell'),
+      { ...to('What are you selling?', 'sell'), job: true },
       to('Is that a tail?', 'tail'),
       to('Lou C. Fur?', 'name'),
       bye('Just browsing.'),
     );
-    s.node('sell', 'Luck! Power! Hourglasses! All yours for one small, tiny, barely-used soul. Or a firm handshake. Mostly souls.', to('How about a handshake?', 'shake'), to('Let me see your license.', 'license'), to('Pass.', 'start'));
+    s.node('sell', 'Luck! Power! All yours for one tiny, barely-used soul. Or a handshake. Mostly souls.', to('How about a handshake?', 'shake'), to('Let me see your license.', 'license'), to('Pass.', 'start'));
+    s.g.sell.job = { stage: 'contract', title: 'Discount Destiny', goal: 'Price: one soul, barely used', aim: { kind: 'sign', n: 1 }, reward: { luckSpins: 2 }, fine: 'All sales final. Souls are not refundable. Lou C. Fur is a licensed merchant (license pending).' };
     if (s.npc.gifted) s.node('shake', 'Already shook on it. One handshake per soul. I mean per customer. Customer!', to('Soul?', 'reveal'), to('Right.', 'start'));
-    else s.node('shake', 'Deal! (shakes) ...Your hand is on fire. That\'s normal. That\'s how deals are sealed. In the merchant guild. Here, some luck.', gift('My HAND is on fire!', { luckSpins: 2 }, 'reveal'), gift('Pleasure doing business.', { luckSpins: 2 }));
+    else s.node('shake', 'Deal! (shakes) ...Your hand\'s on fire. That\'s normal. That\'s how deals are sealed. Some luck.', gift('My HAND is on fire!', { luckSpins: 2 }, 'reveal'), gift('Pleasure doing business.', { luckSpins: 2 }));
     s.node('license', 'Here\'s my license. Don\'t read the bottom. Or the middle. The top\'s fine. The top says "License".', to('It says "Archfiend".', 'reveal'), to('Looks legit.', 'start'));
     s.node('tail', 'That\'s a rope. For tying up deals. Business rope. Relax. Everybody relax. Chill.', to('Ropes don\'t wag.', 'sus'), to('Okay.', 'start'));
     s.node('name', 'Lou C. Fur. Common name! There\'s dozens of us. Lou C. Fur the baker. Lou C. Fur the fishmonger...', to('Say it faster.', 'sus'), to('Okay, Lou.', 'start'));
@@ -1584,6 +1616,9 @@ export function dialogFor(npc: Npc, ctx: DialogCtx): Record<string, DialogNode> 
   const script = SCRIPTS[def.id];
   if (script) script(s);
   else s.node('start', s.open(['Hello there.'], ['Hello again.']), ...s.questChoice('Need a hand?'), bye());
+  // A reminder of their job under way opens with its card.
+  const mine = ctx.activeQuests.find((q) => q.giver === def.id && !q.done && !q.turnedIn);
+  if (s.reminded && mine && s.g.start) s.g.start.job = jobOf(mine, 'progress');
   return s.g;
 }
 

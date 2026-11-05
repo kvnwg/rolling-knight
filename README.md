@@ -11,7 +11,8 @@ the Oracle's altar, the smith, the junk dealer, the quartermaster, the tinker's 
 (with chance upgrades like Ricochet and Double or Nothing), the sage, the rebirth shrine, the notice
 board, and the warden by the steps down: walk down them to dive. Duplicates become shards or gold; shards level your knights. Rebirth
 for permanent luck and power; perks from the first rebirth change how a run plays. Folk on the floors
-hand out jobs, and one of them may be a demon in disguise.
+keep a set-up of their own off the fighting (a market stall, a tent by a campfire, a candlelit shrine)
+and hand out jobs, and one of them may be a demon in disguise.
 
 How every system works, with its numbers: [`DESIGN.md`](DESIGN.md). Art sources and licenses:
 [`CREDITS.md`](CREDITS.md).

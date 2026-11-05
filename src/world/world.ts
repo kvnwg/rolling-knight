@@ -12,7 +12,7 @@ import { heroAi, heroAutoRoll, mobAi } from './ai';
 import type { Biome } from './biomes';
 import { dist, lineOfSight, moveUnit, norm, type Area, type FloatText, type Fx, type Pickup, type Shot, type Unit, type View } from './entities';
 import { flowFrom, type Flow } from './flow';
-import { TILE, tileAt, type FloorMap } from './mapgen';
+import { FLOOR, TILE, tileAt, type FloorMap } from './mapgen';
 import { type MobType } from './mobgen';
 import { TALK_RANGE, type HubStation } from './hubWorld';
 import { demonDeathLines, demonEnrageLines, demonMobType, demonTauntsFor, type Npc, type NpcDef } from './npcs';
@@ -606,14 +606,15 @@ export class World {
     this.refreshFlows();
   }
 
-  /** The person on this floor you're close enough to talk to, or null. */
+  /** The person on this floor you're close enough to talk to (or to the spot before their set-up), or null. */
   nearNpc(): Npc | null {
     const h = this.leader();
     if (!h || this.hub) return null;
     let best: Npc | null = null;
     let bd = TALK_RANGE;
     for (const n of this.npcs) {
-      const d = dist(h.x, h.y, n.x, n.y);
+      const t = n.camp?.talk;
+      const d = Math.min(dist(h.x, h.y, n.x, n.y), t ? dist(h.x, h.y, t.x, t.y) + 4 : Infinity);
       if (d < bd) {
         bd = d;
         best = n;
@@ -629,7 +630,9 @@ export class World {
   unmaskDemon(npc: Npc): void {
     this.npcs = this.npcs.filter((n) => n !== npc);
     const t = demonMobType(this.floor, this.biome.id, npc.seed);
-    const m = this.makeMob(t, npc.x, npc.y, false, true);
+    // Behind a counter it vaults over it, onto the open floor in front.
+    const at = npc.camp && tileAt(this.map, Math.floor(npc.x / TILE), Math.floor(npc.y / TILE)) !== FLOOR ? npc.camp.talk : npc;
+    const m = this.makeMob(t, at.x, at.y, false, true);
     m.awake = true;
     // Built like a boss of this floor, but a little gentler (it's a side show).
     m.maxHp *= 0.6;
