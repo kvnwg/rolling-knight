@@ -39,6 +39,7 @@ export const SCENES: Record<MusicScene, SceneDef> = {
   graveyard: { song: 'gloom', lead: 'celesta', tempo: 0.9, ambience: ['wind', 'toll'] },
   tundra: { song: 'frost', ambience: ['wind'] },
   crystal: { song: 'frost', lead: 'bell', tempo: 1.08, ambience: ['glints'] },
+  dungeon: { song: 'deep', lead: 'organ', tempo: 0.86, ambience: ['drips'] },
   crypt: { song: 'deep', lead: 'organ', tempo: 0.9, ambience: ['drips'] },
   ember: { song: 'deep', lead: 'horn', tempo: 1.12, ambience: ['lava'] },
   shrine: { song: 'shrine', ambience: ['chimes'] },

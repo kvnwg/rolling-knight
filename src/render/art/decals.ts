@@ -71,6 +71,14 @@ export const DECALS: Record<BiomeId, DecalTable> = {
     water: [['iceCrack', 3]],
     density: { ground: 22, path: 12, edge: 40, water: 10 },
   },
+  // The dungeon's floors come from the packs' tiles (cracks and all): only a little on top.
+  dungeon: {
+    ground: [['bones', 3], ['rubble', 3], ['blood', 1]],
+    path: [['rubble', 2], ['bones', 1]],
+    edge: [['rubble', 4], ['bones', 2]],
+    water: [],
+    density: { ground: 5, path: 3, edge: 10, water: 0 },
+  },
   crypt: {
     ground: [['crack', 6], ['bones', 3], ['rubble', 4], ['moss', 3], ['blood', 1], ['cobweb', 1]],
     path: [['crack', 5], ['rubble', 2], ['moss', 2], ['bones', 1]],

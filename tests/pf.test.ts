@@ -8,7 +8,7 @@ import { hexToOklch, oklchToHex, ramp } from '../src/render/pf/color';
 import { attackAnim, dodgeAnim, heroPose, travelDir, travelDir8 } from '../src/render/pf/heroAnim';
 import { KNIGHT_SHEET, KNIGHT_SHEET_BY_ID, knightPaint, knightSheet, paintStep, PRIMORDIAL_STEPS, tierRamps } from '../src/render/pf/knightLook';
 import { BOSS_ANIM, kitOf, mobPose, moveAnim } from '../src/render/pf/mobAnim';
-import { MONSTER_SHEET, mobPaint, monsterFor, type MonsterId } from '../src/render/pf/mobLook';
+import { MONSTER_SHEET, mobPaint, monsterFor, undeadFor, type MonsterId } from '../src/render/pf/mobLook';
 import { DIRS, DIRS8, eventFrame, facing, facing8, PFSheet, type Dir, type PFMeta } from '../src/render/pf/sheet';
 import { readPng } from '../tools/knights/lib/png';
 import { BIOME_ORDER, BIOMES, isBossFloor, biomeForFloor } from '../src/world/biomes';
@@ -115,13 +115,13 @@ describe('PixelForge sheets', () => {
     expect(attackAnim('guardian', 'groundPound', 0, SHEETS.rk_guardian)).toBe('attack_heavy');
   });
 
-  it('give every monster its kit in s, e, n and w, and the Stone Warden all six boss moves', () => {
+  it('give every monster its kit in every facing it draws (s, e, n and w; e and w for the packs\' side views), and the Stone Warden all six boss moves', () => {
     for (const [m, name] of Object.entries(MONSTER_SHEET) as Array<[MonsterId, keyof typeof SHEETS]>) {
       const kit = kitOf(m);
       const sheet = SHEETS[name];
       for (const a of [kit.walk, kit.melee, kit.ranged, kit.bomb, kit.death, kit.stun, kit.run, 'idle', 'hurt']) {
         if (!a) continue;
-        for (const d of DIRS) expect(sheet.has(a, d), `${m} ${a}_${d}`).toBe(true);
+        for (const d of sheet.meta.dirs ?? DIRS) expect(sheet.has(a, d), `${m} ${a}_${d}`).toBe(true);
       }
     }
     for (const a of [...Object.values(BOSS_ANIM), 'enrage']) for (const d of DIRS) expect(SHEETS.stone_warden.has(a, d), a).toBe(true);
@@ -209,8 +209,9 @@ describe('knight looks', () => {
 
 describe('mobs as PixelForge monsters', () => {
   it('map body plans to monsters, keeping the game art where PixelForge has none', () => {
-    expect(monsterFor(mob('hamlet', 'slime', 'chaser'), false, false)).toBe('slime');
-    expect(monsterFor(mob('swamp', 'slime', 'bomber'), false, false)).toBe('slime');
+    // The supplied pack's slime everywhere; the dark biomes' humanoids are the pack's undead.
+    expect(monsterFor(mob('hamlet', 'slime', 'chaser'), false, false)).toBe('pk_slime');
+    expect(monsterFor(mob('swamp', 'slime', 'bomber'), false, false)).toBe('pk_slime');
     expect(monsterFor(mob('hamlet', 'flyer', 'swarm'), false, false)).toBe('bat');
     expect(monsterFor(mob('farmland', 'flyer', 'swarm'), false, false)).toBeNull();
     expect(monsterFor(mob('forest', 'beast', 'chaser'), false, false)).toBe('wolf');
@@ -219,8 +220,9 @@ describe('mobs as PixelForge monsters', () => {
     expect(monsterFor(mob('hamlet', 'humanoid', 'chaser'), true, false)).toBe('goblin_chief');
     expect(monsterFor(mob('hamlet', 'humanoid', 'chaser', true), false, false)).toBe('orc');
     expect(monsterFor(mob('tundra', 'humanoid', 'chaser'), false, false)).toBe('orc');
-    expect(monsterFor(mob('crypt', 'humanoid', 'chaser'), false, false)).toBe('skeleton');
-    expect(monsterFor(mob('graveyard', 'humanoid', 'chaser'), false, false)).toBe('skeleton');
+    for (const b of ['dungeon', 'crypt', 'graveyard']) expect(monsterFor(mob(b, 'humanoid', 'chaser'), false, false)).toBe(undeadFor(mob(b, 'humanoid', 'chaser')));
+    expect(['pk_skeleton', 'pk_reaper', 'pk_vampire']).toContain(undeadFor(mob('crypt', 'humanoid', 'chaser')));
+    expect(monsterFor(mob('desert', 'humanoid', 'chaser'), false, false)).toBe('skeleton');
     expect(monsterFor(mob('forest', 'humanoid', 'ranged'), false, false)).toBe('goblin_archer');
     expect(monsterFor(mob('forest', 'humanoid', 'caster'), false, false)).toBeNull();
     expect(monsterFor(mob('farmland', 'humanoid', 'chaser'), false, false)).toBeNull();

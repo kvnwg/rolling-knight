@@ -120,14 +120,26 @@ fights (or spend anything) you head back up, or fall.
 
 ## 7. The dungeon
 
-Endless floors, a new biome every 5 floors (a boss on every 5th): Mossy Hamlet, Gloomwood, Frostfang
-Tundra, Sunken Crypt, Mirewater Bog, Sunscorch Ruins, Hollow Graves, Ember Depths, Prism Grotto,
-Moonlit Shrine; after the first lap the order is reshuffled. Each floor is a chain of rooms from the
+Endless floors, a new biome every 5 floors (a boss on every 5th): Mossy Hamlet, Old MacMayhem's Farm,
+Gloomwood, Frostfang Tundra, Grimstone Dungeon, Sunken Crypt, Mirewater Bog, Sunscorch Ruins, Hollow
+Graves, Ember Depths, Prism Grotto, Moonlit Shrine; after the first lap the order is reshuffled. Each floor is a chain of rooms from the
 start to the exit with side rooms, pools and props, checked to be fully connected. Mobs are designed
 per floor: body plan, behavior (chaser, archer, charger, bomber, caster, tank, swarm), colors, size,
 features and name; bosses have three of ring, fan, charge, slam, summon and rain, and enrage at
 half HP. Clearing a floor opens the portal. A wiped squad is carried back to the hub, and the run
 goes back to the biome's first floor (on Auto it heads back down by itself unless you move).
+
+**Traps** (`src/world/traps.ts`), on the Dungeon's floors and a few in the crypt's: each room may get
+a set and some halls a line across, never in the start room or by the exit, never under a prop.
+Every trap shows a tell before it strikes (and glows red), a knight mid-roll passes untouched, flyers
+float over, and mobs walking in get hurt too (bosses barely):
+
+| Trap | Cycle | The tell | Hurts | Knights lose | Mobs lose |
+| --- | --- | --- | --- | --- | --- |
+| Spikes | 3 s (a patch's columns a beat apart) | the tips show, 0.6 s | 0.9 s, once | 7% HP | 18% |
+| Fire vent | 3.6 s (every other vent half a cycle apart) | a spark and a small flame, 0.6 s | 0.7 s, every 0.3 s | 3.5% a tick | 9% a tick |
+| Saw | 2.6 s to and fro along a 3-tile slot | always out, running | where the blade is | 8% | 20% |
+| Pressure plate | stepped on, then rests 0.9 s | it turns over, 0.36 s | 0.84 s, once | 9% | 22% |
 
 Folk turn up on some floors (`src/world/npcs.ts`): farmers, guards, a bard, a goblin accountant, a
 ghost who is three hundred years late, a chicken who is not a chicken. Talk to them for jobs (slay,

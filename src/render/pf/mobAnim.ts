@@ -6,6 +6,12 @@
  * its rush (the Stone Warden's charge frames, a wolf's run) while chargeT lasts. Bosses play the
  * move they wind up (ring, fan, charge, slam, summon, rain) and roar when they enrage. Deaths play
  * out after the sim has let go of the mob (see the renderer's corpses).
+ *
+ * The supplied packs' monsters (the dark biomes' skeletons and vampire, the slime) are side views:
+ * their sheets draw east and west only, so a mob going up or down keeps facing the way the sim says
+ * it faces (toward its target). Their attacks bring their own slash smears, and the strike (the hit's
+ * tick) is the frame the smear lands on. Their deaths end lying on the floor (a heap of bones, ash, a
+ * puddle), held a moment before they fade, with no puff of smoke.
  */
 import type { Unit } from '../../world/entities';
 import type { World } from '../../world/world';
@@ -26,6 +32,10 @@ interface Kit {
   bomb?: string;
   death: string;
   stun?: string;
+  /** ms the death's last frame is held before it fades. */
+  linger?: number;
+  /** The FX at the death's end (PixelForge's), or null for none; default by monster. */
+  poof?: SheetName | null;
 }
 
 const KITS: Record<MonsterId, Kit> = {
@@ -40,6 +50,10 @@ const KITS: Record<MonsterId, Kit> = {
   skeleton: { walk: 'walk', cycle: 10, melee: 'attack_slash', death: 'death_crumble', stun: 'stun' },
   ogre: { walk: 'walk', cycle: 15, melee: 'attack_heavy', death: 'death' },
   stone_warden: { walk: 'walk', cycle: 16, melee: 'attack_slam', death: 'death' },
+  pk_skeleton: { walk: 'walk', cycle: 22, melee: 'attack', death: 'death', linger: 1100, poof: null },
+  pk_reaper: { walk: 'walk', cycle: 22, melee: 'attack', death: 'death', linger: 1100, poof: null },
+  pk_vampire: { walk: 'walk', cycle: 18, melee: 'attack', death: 'death', linger: 500, poof: null },
+  pk_slime: { walk: 'move', cycle: 18, melee: 'attack', ranged: 'attack', bomb: 'attack', death: 'death', poof: null },
 };
 
 /** The gait a mob moves in at `speed` px/s: its walk, or its run once it's quick. */
@@ -219,11 +233,14 @@ export function mobPose(w: World, m: Unit, monster: MonsterId, sheetName: SheetN
   const gap = m.boss ? 0.9 : m.elite ? 0.3 : 0;
   if (hit === 0 && now - s.flashAt >= gap) s.flashAt = now;
   const flash = now - s.flashAt < (m.boss ? 0.05 : 0.08);
+  // A side-view sheet draws east and west only: north and south keep the way the sim faces the mob.
+  const side = sheet.meta.dirs?.length === 2;
+  const D = (d: Dir): Dir => (!side ? d : d === 'e' || d === 'ne' || d === 'se' ? 'e' : d === 'w' || d === 'nw' || d === 'sw' ? 'w' : m.dir < 0 ? 'w' : 'e');
   const out = (anim: string, dir: Dir, k: number, extra: Partial<MobPose> = {}): MobPose => {
-    s!.dir = dir;
-    return { sheet: sheetName, anim, dir, k, flash, alpha: 1, stunned: false, ...extra };
+    s!.dir = D(dir);
+    return { sheet: sheetName, anim, dir: D(dir), k, flash, alpha: 1, stunned: false, ...extra };
   };
-  const clip = (anim: string, dir: Dir) => sheet.clip(anim, dir);
+  const clip = (anim: string, dir: Dir) => sheet.clip(anim, D(dir));
   const loop = (anim: string, dir: Dir, ms: number) => {
     const f = clip(anim, dir);
     const total = clipMs(f);
@@ -234,7 +251,7 @@ export function mobPose(w: World, m: Unit, monster: MonsterId, sheetName: SheetN
     if (kit.stun && sheet.has(kit.stun)) return out(kit.stun, s.dir, loop(kit.stun, s.dir, now * 1000), { stunned: true });
     // No stun drawn: a dazed recoil (the hurt's middle frame), or, for a squashy slime or a hovering
     // bat, its rest pose held still.
-    if (monster === 'slime' || monster === 'bat') return out('idle', s.dir, clip('idle', s.dir)[0][0], { stunned: true });
+    if (monster === 'slime' || monster === 'bat' || monster === 'pk_slime') return out('idle', s.dir, clip('idle', s.dir)[0][0], { stunned: true });
     const f = clip('hurt', s.dir);
     return out('hurt', s.dir, f[Math.min(1, f.length - 1)][0], { stunned: true });
   }
@@ -304,10 +321,18 @@ export function deathPose(monster: MonsterId, sheetName: SheetName, dir: Dir, ms
   const anim = KITS[monster].death;
   const f = sheet.clip(anim, dir);
   const total = clipMs(f);
+  const held = total + (KITS[monster].linger ?? 0);
   const fade = 260;
-  if (ms >= total + fade) return null;
-  const alpha = ms <= total ? 1 : Math.round((1 - (ms - total) / fade) * 6) / 6;
+  if (ms >= held + fade) return null;
+  const alpha = ms <= held ? 1 : Math.round((1 - (ms - held) / fade) * 6) / 6;
   return { k: f[at(f, Math.min(ms, total - 1))][0], alpha, anim };
+}
+
+/** The PixelForge FX a death ends in (a skeleton crumbles, the rest go up in smoke), or null (the packs' own deaths). */
+export function deathFx(monster: MonsterId): SheetName | null {
+  const k = KITS[monster];
+  if (k.poof !== undefined) return k.poof;
+  return monster === 'skeleton' ? 'fx_bone_crumble' : 'fx_poof_smoke';
 }
 
 /** When in a death the poof (PixelForge's vfx event, or the end) comes, in ms. */

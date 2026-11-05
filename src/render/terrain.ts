@@ -15,6 +15,7 @@ import { makeCanvas, mixHex, shade } from './art/draw';
 import { DECALS, drawDecal, type DecalCtx, type DecalKind } from './art/decals';
 import { castShadows } from './castShadows';
 import { frontDecor } from './art/village';
+import { stampDungeon } from './packs/dungeonTiles';
 
 // ------------------------------------------------------------------ noise
 
@@ -447,7 +448,10 @@ export function paintTerrainPixels(m: FloorMap, biome: Biome): Omit<Terrain, 'ca
     return null;
   };
 
-  for (let y = 0; y < H; y++) {
+  // A tiled biome stamps its ground from a pack's tileset instead (walls, floors, their edges).
+  const tiled = biome.tiles === 'dungeon';
+  if (tiled) stampDungeon(m, px, surf);
+  for (let y = 0; y < H && !tiled; y++) {
     const ty = Math.floor(y / TILE);
     const ly = y - ty * TILE;
     for (let x = 0; x < W; x++) {

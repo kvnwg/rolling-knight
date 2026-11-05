@@ -5,7 +5,7 @@
  * flavor of the mobs that live there (mobgen.ts builds them).
  */
 
-export type BiomeId = 'hamlet' | 'farmland' | 'forest' | 'tundra' | 'crypt' | 'swamp' | 'desert' | 'graveyard' | 'ember' | 'crystal' | 'shrine';
+export type BiomeId = 'hamlet' | 'farmland' | 'forest' | 'tundra' | 'dungeon' | 'crypt' | 'swamp' | 'desert' | 'graveyard' | 'ember' | 'crystal' | 'shrine';
 
 export type GroundKind = 'grass' | 'cobble' | 'dirt' | 'snow' | 'flagstone' | 'sand' | 'mud' | 'basalt' | 'crystalStone' | 'moss' | 'ice' | 'tilled';
 export type SolidKind = 'trees' | 'wall' | 'cliff';
@@ -20,7 +20,14 @@ export type PropKind =
   // The wilds and their ruins (art/wild.ts).
   | 'lanternPost' | 'stringLights' | 'roughFence' | 'fern' | 'mossRock' | 'log' | 'brokenPillar' | 'stoneBlock' | 'ruinWall' | 'stairs'
   // The town (art/town.ts).
-  | 'picket' | 'picketSide' | 'hedge' | 'fountain' | 'cafeTable' | 'stringPost' | 'bridgeRail';
+  | 'picket' | 'picketSide' | 'hedge' | 'fountain' | 'cafeTable' | 'stringPost' | 'bridgeRail'
+  // The dungeon (pack art: render/packs/dungeonProps.ts).
+  | DungeonPropKind;
+
+/** The dungeon's own props, drawn from the supplied packs (world/dungeonDecor.ts places them). */
+export type DungeonPropKind =
+  | 'wallBanner' | 'hangingBanner' | 'wallRing' | 'cellDoor' | 'blueDoor' | 'sideTorch' | 'cobweb' | 'chest' | 'candles' | 'candlestick'
+  | 'flask' | 'pedestal' | 'armor' | 'dragonSkull' | 'cabinet' | 'rubble' | 'coins' | 'sword';
 export type Weather = 'fireflies' | 'snow' | 'embers' | 'dust' | 'spores' | 'petals' | 'leaves' | 'ash' | 'motes' | 'rain';
 export type BodyPlan = 'slime' | 'beast' | 'humanoid' | 'flyer' | 'plant' | 'golem' | 'bug' | 'pumpkin' | 'ghost' | 'pig' | 'ram' | 'chicken';
 
@@ -31,6 +38,11 @@ export interface Biome {
   id: BiomeId;
   name: string;
   layout: 'cave' | 'rooms';
+  /**
+   * The ground is stamped from a pack's tileset instead of painted per pixel (render/packs/dungeonTiles.ts):
+   * its walls, floors and doors. `ground`, `path` and `solid` stay the colors the rest of the art reads.
+   */
+  tiles?: 'dungeon';
   ground: { kind: GroundKind; ramp: Ramp; accent?: Ramp };
   /** `dirt`: the packed earth a cobbled road wears down to at its edges. `wide`: extra tiles of road
    * each side of the corridors' middle line. `plaza`: how big rooms' plazas are (1 = as big as fits).
@@ -190,6 +202,31 @@ export const BIOMES: Record<BiomeId, Biome> = {
     weather: ['snow'],
     mobs: { plans: ['beast', 'golem', 'slime', 'humanoid'], adjectives: ['Frost', 'Rime', 'Glacial', 'Snowbound', 'Hoarfrost'], palettes: [['#3a4a66', '#6a84a8', '#a8c4e0', '#e8f4ff'], ['#2a3a4a', '#4a6a7a', '#7aa0b0', '#c0e0e8']], eye: '#7ae0ff' },
   },
+  dungeon: {
+    // Built from the supplied packs: each floor is either the purple-brown stone or the blue stone
+    // (render/packs/dungeonTiles.ts), lit by torches and candles, with traps on its floors.
+    id: 'dungeon',
+    name: 'Grimstone Dungeon',
+    layout: 'rooms',
+    tiles: 'dungeon',
+    ground: { kind: 'flagstone', ramp: ['#25131a', '#362030', '#3d253b', '#4c2f49', '#593756'] },
+    path: { kind: 'flagstone', ramp: ['#25131a', '#362030', '#3d253b', '#4c2f49', '#593756'] },
+    solid: { kind: 'wall', top: ['#25131a', '#2c1824'], face: ['#25131a', '#4c2f49', '#6e4a48', '#78514f', '#9a7068'] },
+    trees: [],
+    treeRamp: ['#25131a', '#3d253b', '#4c2f49', '#6e4a48', '#78514f'],
+    liquid: null,
+    // (Its rooms are furnished by world/dungeonDecor.ts; the floor generator puts these in its halls.)
+    props: [['barrel', 3], ['crate', 3], ['pot', 3], ['chest', 1]],
+    light: { ambient: '#76689a', hero: '#ffd8a8', heroRadius: 52, fire: '#ff9a3a', gradeTop: '#a07ad8', gradeBottom: '#140e22', vignette: 0.46 },
+    weather: ['dust'],
+    mobs: {
+      plans: ['humanoid', 'slime', 'humanoid', 'flyer', 'golem'],
+      core: ['humanoid'],
+      adjectives: ['Dungeon', 'Chained', 'Rusted', 'Forsaken', 'Jailbroken'],
+      palettes: [['#2a1a2a', '#4a2e48', '#6e4a6a', '#9a7090'], ['#3a2420', '#6a3e30', '#9a6048', '#c88a68']],
+      eye: '#ff6a3a',
+    },
+  },
   crypt: {
     id: 'crypt',
     name: 'Sunken Crypt',
@@ -305,7 +342,8 @@ export const CAMP_BIOME: Biome = {
   weather: ['fireflies', 'embers'],
 };
 
-export const BIOME_ORDER: BiomeId[] = ['hamlet', 'farmland', 'forest', 'tundra', 'crypt', 'swamp', 'desert', 'graveyard', 'ember', 'crystal', 'shrine'];
+/** The order of the first lap. The dungeon comes before the crypt: down from the tundra into a keep's cells, then deeper. */
+export const BIOME_ORDER: BiomeId[] = ['hamlet', 'farmland', 'forest', 'tundra', 'dungeon', 'crypt', 'swamp', 'desert', 'graveyard', 'ember', 'crystal', 'shrine'];
 
 /** The biome for a floor: each runs for 5 floors; after the first lap the order is reshuffled by seed. */
 export function biomeForFloor(floor: number, seed: number): Biome {

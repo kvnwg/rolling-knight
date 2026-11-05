@@ -12,6 +12,7 @@ import { outlineTinted } from './ink';
 import { townArt } from './town';
 import { villageArt } from './village';
 import { wildArt } from './wild';
+import { dungeonPropArt, isDungeonProp } from '../packs/dungeonProps';
 
 export interface PropArt {
   buf: PixelBuf;
@@ -22,6 +23,11 @@ export interface PropArt {
   light?: { dx: number; dy: number; color: string; r: number; flicker: boolean };
   /** A fire to animate on top (torches, braziers): offset from the base. */
   flame?: { dx: number; dy: number; size: number };
+  /** Pack props that move (a torch's flame, a banner, a flask): every frame (the first is `buf`), at `fps`. */
+  frames?: PixelBuf[];
+  fps?: number;
+  /** Their flames, frame by frame, drawn again on the light-emitting layer. */
+  glow?: PixelBuf[];
 }
 
 const BARK = ['#24160e', '#3e2a1a', '#5a3e28', '#7a5838'];
@@ -236,6 +242,12 @@ function stoneRamp(biome: Biome): string[] {
 }
 
 export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {
+  // The dungeon's props come from the supplied packs, and so do the shared ones on its floors.
+  if (isDungeonProp(kind)) return dungeonPropArt(kind, biome, seed)!;
+  if (biome.tiles === 'dungeon') {
+    const pack = dungeonPropArt(kind, biome, seed);
+    if (pack) return pack;
+  }
   const fire = biome.light.fire;
   const stone = stoneRamp(biome);
   switch (kind) {
