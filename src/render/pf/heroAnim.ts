@@ -26,8 +26,8 @@ import type { SkillId } from '../../core/skillbook';
 import type { Unit, View } from '../../world/entities';
 import type { World } from '../../world/world';
 import { SHEETS } from './assets';
-import { KNIGHT_SHEET } from './knightLook';
-import { eventFrame, facing, walkPace, type Dir, type FrameRef, type PFSheet } from './sheet';
+import { KNIGHT_SHEET, knightSheet } from './knightLook';
+import { eventFrame, facing, facing8, walkPace, type Dir, type FrameRef, type PFSheet } from './sheet';
 
 export interface HeroPose {
   anim: string;
@@ -104,6 +104,16 @@ export function travelDir(vx: number, vy: number, cur: Dir): Dir {
   // Same axis, other way: turn at once. Switching axis needs a clear lead.
   if (curH === wantH) return want;
   return (wantH ? ax > ay * 1.3 : ay > ax * 1.3) ? want : (curH ? (vx >= 0 ? 'e' : 'w') : vy >= 0 ? 's' : 'n');
+}
+
+const DIR_ANGLE: Record<Dir, number> = { e: 0, se: 45, s: 90, sw: 135, w: 180, nw: 225, n: 270, ne: 315 };
+
+/** The travel facing among eight, keeping the current one until the heading is well into another sector. */
+export function travelDir8(vx: number, vy: number, cur: Dir): Dir {
+  if (Math.abs(vx) < 1e-3 && Math.abs(vy) < 1e-3) return cur;
+  const a = ((Math.atan2(vy, vx) * 180) / Math.PI + 360) % 360;
+  const off = Math.abs(((a - DIR_ANGLE[cur] + 540) % 360) - 180);
+  return off <= 30 ? cur : facing8(vx, vy);
 }
 
 const HEAVY_SKILLS: ReadonlySet<SkillId> = new Set(['shieldSlam', 'groundPound', 'titansWrath', 'excalibur']);
@@ -210,7 +220,9 @@ export function pruneHeroes(live: ReadonlySet<number>): void {
 
 /** The pose for knight `h` now (call once per drawn frame; it remembers what it saw). */
 export function heroPose(w: World, h: Unit): HeroPose {
-  const sheet = SHEETS[KNIGHT_SHEET[h.cls!]];
+  const sheet = SHEETS[h.knightId ? knightSheet(h.knightId) : KNIGHT_SHEET[h.cls!]];
+  // Sheets that draw the diagonals face eight ways; the rest face the dominant axis.
+  const face = (dx: number, dy: number): Dir => (sheet.eightWay ? facing8(dx, dy) : facing(dx, dy));
   let m = mems.get(h.uid);
   if (!m || m.world !== w || w.time < m.t) {
     m = fresh(w, h);
@@ -259,7 +271,7 @@ export function heroPose(w: World, h: Unit): HeroPose {
   m.roll = h.rolling ?? null;
   if (w.cleared && !m.cleared && !w.hub && !w.camp) m.victoryAt = now;
   m.cleared = w.cleared;
-  const aimDir = facing(h.aimX, h.aimY);
+  const aimDir = face(h.aimX, h.aimY);
   if (h.swingT > m.swingT + 1e-4) {
     // A swing: the sim dealt the hit (or loosed the shot) this tick.
     const skill = m.skill && Math.abs(m.skillAt - now) < 0.05 ? m.skill : null;
@@ -301,7 +313,7 @@ export function heroPose(w: World, h: Unit): HeroPose {
   if (h.rolling) {
     const r = h.rolling;
     const { anim, away } = dodgeAnim(r.kind, sheet);
-    const dir = away ? facing(-r.dx, -r.dy) : facing(r.dx, r.dy);
+    const dir = away ? face(-r.dx, -r.dy) : face(r.dx, r.dy);
     const f = clip(anim, dir);
     const p = Math.min(0.999, Math.max(0, 1 - r.t / r.dur));
     const k = f[at(f, p * sum(f))][0];
@@ -326,7 +338,7 @@ export function heroPose(w: World, h: Unit): HeroPose {
     return pose(anim, dir, f[strikeFrame(sheet, anim)][0]);
   }
   if (h.channel?.kind === 'lunge') {
-    const dir = facing(h.channel.dx, h.channel.dy);
+    const dir = face(h.channel.dx, h.channel.dy);
     const anim = 'attack_slash';
     return pose(anim, dir, clip(anim, dir)[strikeFrame(sheet, anim)][0]);
   }
@@ -342,7 +354,7 @@ export function heroPose(w: World, h: Unit): HeroPose {
     if (toFire <= wind) {
       const reach = h.range! + (h.cls === 'guardian' || h.cls === 'blade' || h.cls === 'lancer' ? 6 : 0);
       const t = w.nearestEnemy(h, reach, true);
-      if (t) m.atk = { anim, dir: facing(t.x - h.x, t.y - h.y), strikeAt: now + toFire, scale, predicted: true };
+      if (t) m.atk = { anim, dir: face(t.x - h.x, t.y - h.y), strikeAt: now + toFire, scale, predicted: true };
     }
   }
   if (m.atk?.predicted) {
@@ -378,7 +390,7 @@ export function heroPose(w: World, h: Unit): HeroPose {
   }
   // --- walking: frames stepped by the distance walked, so planted feet stay planted
   if (walking) {
-    const dir = travelDir(m.vx, m.vy, m.dir);
+    const dir = sheet.eightWay ? travelDir8(m.vx, m.vy, m.dir) : travelDir(m.vx, m.vy, m.dir);
     const a = sheet.meta.anims.walk;
     const f = clip('walk', dir);
     const stride = a.stride ?? f.map(() => 2.5);

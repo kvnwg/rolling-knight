@@ -1,17 +1,36 @@
 /**
- * PixelForge sheets in the game (made by tools/packs/pixelforge.py from PixelForge's exports): the
- * animations as frames and durations per direction, each distinct frame once in an indexed PNG, and
- * the palette with the material and shade of every color.
+ * Character sheets in the game (PixelForge exports packed by tools/packs/pixelforge.py, or the game's
+ * own tools/knights): the animations as frames and durations per direction, each distinct frame once
+ * in an indexed PNG, and the palette with the material and shade of every color.
+ *
+ * Any cell size and pivot work: everything that places a frame reads `cell` and `pivot`. Sheets draw
+ * the four facings s, e, n, w and may add the diagonals se, sw, ne, nw (listed in `dirs`); a facing
+ * a sheet doesn't draw falls back to the nearest one it does (a diagonal to its side view).
  *
  * Recoloring is a palette swap per frame: a frame's pixels are read once as palette indices, then
  * any recolor (rarity armor, a mutation, a biome's monster) is a lookup per pixel into that recolor's
  * palette, done the first time that frame is drawn in that recolor and cached. Nothing is scaled,
- * rotated or flipped: west is PixelForge's own drawing.
+ * rotated or flipped: west is the sheet's own drawing.
  */
 import { blank, type PixelBuf } from '../pixel/buf';
 
-export type Dir = 's' | 'e' | 'n' | 'w';
+export type Dir = 's' | 'e' | 'n' | 'w' | 'se' | 'sw' | 'ne' | 'nw';
+/** The four facings every sheet draws. */
 export const DIRS: readonly Dir[] = ['s', 'e', 'n', 'w'];
+/** All eight, for sheets that draw the diagonals too. */
+export const DIRS8: readonly Dir[] = ['s', 'se', 'e', 'ne', 'n', 'nw', 'w', 'sw'];
+
+/** Where a facing a sheet doesn't draw falls back to, nearest first. */
+const FALLBACK: Record<Dir, readonly Dir[]> = {
+  s: ['s'],
+  e: ['e'],
+  n: ['n'],
+  w: ['w', 'e'],
+  se: ['se', 'e', 's'],
+  sw: ['sw', 'w', 'e', 's'],
+  ne: ['ne', 'e', 'n'],
+  nw: ['nw', 'w', 'e', 'n'],
+};
 
 /** [frame index, ms] */
 export type FrameRef = [number, number];
@@ -32,17 +51,31 @@ export interface PFAnim {
 
 export interface PFMeta {
   name: string;
+  /** Cell size (frames are cell x cell) and the pivot (the feet, on the ground) in a cell. */
   cell: number;
   pivot: [number, number];
   cols: number;
   count: number;
-  /** [hex, alpha, material, shade]; palette index = position + 1 (0 is transparent). */
-  colors: Array<[string, number, string, number]>;
-  /** Per frame: the topmost solid row and the middle of it (-1 when empty). */
+  /**
+   * [hex, alpha, material, shade, role?]; palette index = position + 1 (0 is transparent). A role of
+   * 'line' marks an outline color: it stays dark in a hit flash, like the 'outline' material.
+   */
+  colors: Array<[string, number, string, number] | [string, number, string, number, string]>;
+  /** Per frame: the top of the head (the topmost solid row) and the middle of it (-1 when empty). */
   tops: Array<[number, number]>;
   anims: Record<string, PFAnim>;
-  /** Knights, per frame: chin x, y, back x, y, hip x, y (the rig's anchors). */
+  /**
+   * Knights, per frame: chin x, y, back x, y, hip x, y (the rig's anchors), optionally followed by the
+   * head's top x, y (halos and stun stars go there; `tops` when it's missing).
+   */
   anchors?: Array<number[] | null>;
+  /** The facings drawn (default s, e, n, w). */
+  dirs?: Dir[];
+  /**
+   * Knights that draw their own capes: per frame, the distinct frames of the cape behind the body and
+   * in front of it (-1 for none). Without this the game hangs a cape from the anchors.
+   */
+  capes?: Array<[number, number] | null>;
 }
 
 /**
@@ -102,11 +135,23 @@ export class PFSheet {
     return !!a && (!dir || !!a.dirs[dir]);
   }
 
-  /** The frames of `anim` facing `dir` (falls back to another drawn direction, never flips). */
+  /** True when the sheet draws the diagonal facings. */
+  get eightWay(): boolean {
+    return !!this.meta.dirs?.includes('se');
+  }
+
+  /** The facing `anim` shows for `dir`: `dir` itself when drawn, else the nearest drawn one. */
+  drawnDir(anim: string, dir: Dir): Dir {
+    const a = this.meta.anims[anim];
+    if (!a) return dir;
+    return FALLBACK[dir].find((d) => a.dirs[d]) ?? (a.dirs.s ? 's' : (Object.keys(a.dirs)[0] as Dir));
+  }
+
+  /** The frames of `anim` facing `dir` (falls back to the nearest drawn direction, never flips). */
   clip(anim: string, dir: Dir): FrameRef[] {
     const a = this.meta.anims[anim];
     if (!a) throw new Error(`${this.meta.name}: no ${anim}`);
-    return a.dirs[dir] ?? a.dirs.s ?? a.dirs.e ?? (Object.values(a.dirs)[0] as FrameRef[]);
+    return a.dirs[this.drawnDir(anim, dir)] ?? (Object.values(a.dirs)[0] as FrameRef[]);
   }
 
   /** A frame's palette indices (cell x cell), read from the image the first time. */
@@ -163,11 +208,11 @@ export class PFSheet {
   palette(recolor: Recolor = {}, flash?: string): Uint8ClampedArray {
     const pal = new Uint8ClampedArray((this.meta.colors.length + 1) * 4);
     const fl = flash ? rgbOf(flash) : null;
-    this.meta.colors.forEach(([hex, a, mat, shade], i) => {
+    this.meta.colors.forEach(([hex, a, mat, shade, role], i) => {
       let rgb = rgbOf(hex);
       const r = recolor[mat];
       if (r && r.length) rgb = rgbOf(r[Math.min(shade, r.length - 1)]);
-      if (fl && mat !== 'outline' && mat !== 'shadow') rgb = fl;
+      if (fl && mat !== 'outline' && mat !== 'shadow' && role !== 'line') rgb = fl;
       pal.set([rgb[0], rgb[1], rgb[2], a], (i + 1) * 4);
     });
     return pal;
@@ -216,4 +261,11 @@ export function eventFrame(anim: PFAnim, ...types: string[]): number {
 export function facing(dx: number, dy: number): Dir {
   if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? 'e' : 'w';
   return dy >= 0 ? 's' : 'n';
+}
+
+/** The facing for a vector among eight (45 degree sectors). */
+export function facing8(dx: number, dy: number): Dir {
+  if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) return 's';
+  const i = ((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8;
+  return (['e', 'se', 's', 'sw', 'w', 'nw', 'n', 'ne'] as const)[i];
 }

@@ -66,9 +66,7 @@ function orbFill(luck: number): number {
 
 // ------------------------------------------------------------------ shared
 
-/** Knight pictures are KNIGHT_PIC_W x KNIGHT_PIC_H image pixels (sprites.tsx knightUrl). */
-const KW = KNIGHT_PIC_W;
-const KH = KNIGHT_PIC_H;
+/** Knight pictures are KNIGHT_PIC_W x KNIGHT_PIC_H image pixels (sprites.tsx knightUrl), measured once the sheets load: read them live. */
 /** A token's pop out of its reel and its flight into the reel's stack (ms). */
 const FLIGHT = { pop: 90, fly: 300 } as const;
 const FLIGHT_MS = FLIGHT.pop + FLIGHT.fly;
@@ -141,8 +139,8 @@ function layoutFor(count: number, widthPx: number, u: number, frame: number = FR
   const reelW = Math.max(12, Math.floor((inner - (n - 1) * gap) / n));
   const side = n <= 2;
   const k = side ? (reelW >= (n === 1 ? 150 : 112) ? 2 : 1) : reelW >= 64 ? 2 : 1;
-  const artW = KW * k;
-  const artH = KH * k;
+  const artW = KNIGHT_PIC_W * k;
+  const artH = KNIGHT_PIC_H * k;
   const lab = side ? 0 : k === 2 ? 8 : 6;
   const even = (v: number) => v + (v % 2);
   const cell = even(side ? artH + 4 : artH + lab + 2);
@@ -1434,8 +1432,8 @@ function MiniReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
               top: c.y * u,
               width: c.w * u,
               height: c.h * u,
-              ['--kx' as string]: `${Math.floor((c.w - KW) / 2) * u}px`,
-              ['--ky' as string]: `${Math.floor((c.h - KH) / 2) * u}px`,
+              ['--kx' as string]: `${Math.floor((c.w - KNIGHT_PIC_W) / 2) * u}px`,
+              ['--ky' as string]: `${Math.floor((c.h - KNIGHT_PIC_H) / 2) * u}px`,
               ['--tx' as string]: `${Math.floor((c.w - 16) / 2) * u}px`,
               ['--ty' as string]: `${Math.floor((c.h - 16) / 2) * u}px`,
             } as CSSProperties)
