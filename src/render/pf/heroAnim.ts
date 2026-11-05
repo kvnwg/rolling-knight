@@ -318,7 +318,9 @@ export function heroPose(w: World, h: Unit): HeroPose {
   // --- skills that take a moment
   if (h.channel?.kind === 'whirlwind') {
     const spin: Dir[] = ['s', 'e', 'n', 'w'];
-    const dir = spin[Math.floor(now / 0.07) % 4];
+    // A quarter turn every 0.12 s (about two turns a second): fast enough to read as a spin, slow
+    // enough not to strobe.
+    const dir = spin[Math.floor(now / 0.12) % 4];
     const anim = 'attack_slash';
     const f = clip(anim, dir);
     return pose(anim, dir, f[strikeFrame(sheet, anim)][0]);

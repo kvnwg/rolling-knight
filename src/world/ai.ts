@@ -161,7 +161,8 @@ function autoRoll(w: World, h: Unit, target: Unit | null, foes: readonly Unit[],
  */
 export function heroAutoRoll(w: World, h: Unit, dt: number): void {
   if (!h.ai) return;
-  const foes = fightFoes(w, h);
+  // Only in combat: an awake foe close by (on screen), not just one awake somewhere on the floor.
+  const foes = fightFoes(w, h).filter((m) => m.awake && dist(m.x, m.y, h.x, h.y) < 140);
   autoRoll(w, h, foes.length ? w.nearestEnemy(h, 160, true) : null, foes, dt);
 }
 

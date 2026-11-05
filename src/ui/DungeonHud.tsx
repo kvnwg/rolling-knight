@@ -103,8 +103,6 @@ export function DungeonHud({ game, controls, press, onCamp, onSettings, onLuck, 
           const def = knightDef(id);
           const h = w?.heroes.find((x) => x.slot === slot);
           const hp = h ? h.hp / h.maxHp : 1;
-          const spT = h ? Math.max(0, h.specialT ?? 0) : 0;
-          const spCd = h?.specialCd ?? 1;
           return (
             <button
               key={slot}
@@ -113,12 +111,8 @@ export function DungeonHud({ game, controls, press, onCamp, onSettings, onLuck, 
               onClick={() => (uiSound('tap'), game.switchTo(slot))}
             >
               <img className="px face" src={knightFaceUrl(id, s.roster[id].mutation)} alt="" draggable={false} />
-              <span className="nm outlined">
-                {!touch && <span className="key">{slot + 1} </span>}
-                {def.name}
-              </span>
+              <span className="nm outlined">{def.name}</span>
               <Bar value={hp} kind="hp" />
-              <Bar value={h?.downed ? 0 : 1 - spT / spCd} kind="sp" />
             </button>
           );
         })}
