@@ -47,7 +47,15 @@ interface Recording {
   buf: AudioBuffer;
   /** Where the sound starts (s), past the silence an MP3 encoder puts in front. */
   from: number;
+  /** Its loudest sample (0 to 1): a recording with no level in levels.json is brought to AUTO_PEAK by it. */
+  peak: number;
 }
+
+/**
+ * Where a recording without a levels.json entry peaks: about where the synthesized sounds it stands in
+ * for do, so a file dropped into src/assets/sounds plays at a sensible loudness before it's tuned.
+ */
+const AUTO_PEAK = 0.3;
 
 export interface RecOpts {
   /** Semitones up (playback rate). */
@@ -97,6 +105,16 @@ function decode(ctx: BaseAudioContext, bytes: ArrayBuffer): Promise<AudioBuffer>
     const p = ctx.decodeAudioData(bytes, resolve, reject) as Promise<AudioBuffer> | undefined;
     p?.then(resolve, reject);
   });
+}
+
+/** A decoded recording's loudest sample (every 4th sample is plenty). */
+function peakOf(buf: AudioBuffer): number {
+  let p = 0;
+  for (let c = 0; c < buf.numberOfChannels; c++) {
+    const d = buf.getChannelData(c);
+    for (let i = 0; i < d.length; i += 4) p = Math.max(p, Math.abs(d[i]));
+  }
+  return p;
 }
 
 /** Seconds of near-silence at the start of a decoded recording (up to 0.1 s). */
@@ -212,7 +230,7 @@ class Engine {
       names.map(async (name) => {
         try {
           const buf = await decode(dec, await bytesOf(SOUND_FILES[name]));
-          this.recs.set(name, { buf, from: leadIn(buf) });
+          this.recs.set(name, { buf, from: leadIn(buf), peak: peakOf(buf) });
         } catch {
           /* stays synthesized */
         }
@@ -224,17 +242,36 @@ class Engine {
     return this.recs.has(name);
   }
 
+  /** How long the recording of `name` plays (s, past its lead-in) at `semis` semitones up, if there is one. */
+  recLength(name: string, semis = 0): number | undefined {
+    const r = this.recs.get(name);
+    return r ? (r.buf.duration - r.from) / Math.pow(2, semis / 12) : undefined;
+  }
+
+  /** The gain a recording plays at: its levels.json entry, else brought to AUTO_PEAK. */
+  private levelOf(name: string, r: Recording): number {
+    const set = SOUND_LEVELS[name];
+    if (set !== undefined) return set;
+    return r.peak > 1e-4 ? Math.min(4, AUTO_PEAK / r.peak) : 1;
+  }
+
   /** The sound effect voice cap is reached: new sounds are dropped. */
   get full(): boolean {
     return this.sfxVoices >= MAX_SFX_VOICES;
   }
 
-  /** Counts a sound effect's voice while it plays (MAX_SFX_VOICES). */
-  voice(src: AudioScheduledSourceNode): void {
+  /** Sound effect voices playing right now (out of MAX_SFX_VOICES). */
+  get voices(): number {
+    return this.sfxVoices;
+  }
+
+  /** Counts a sound effect's voice while it plays (MAX_SFX_VOICES); as it ends it and `nodes` (its filter, its gain) let go. */
+  voice(src: AudioScheduledSourceNode, ...nodes: AudioNode[]): void {
     this.sfxVoices++;
     src.onended = () => {
       this.sfxVoices = Math.max(0, this.sfxVoices - 1);
       src.disconnect();
+      for (const n of nodes) n.disconnect();
     };
   }
 
@@ -250,7 +287,7 @@ class Engine {
     if (this.full) return true;
     const ctx = g.ctx;
     const rate = Math.pow(2, (o.semis ?? 0) / 12);
-    const level = (SOUND_LEVELS[name] ?? 1) * (o.gain ?? 1);
+    const level = this.levelOf(name, r) * (o.gain ?? 1);
     let start = at;
     let from = r.from;
     const src = ctx.createBufferSource();
@@ -269,7 +306,7 @@ class Engine {
     src.connect(gn);
     gn.connect(o.bus ?? g.sfx);
     src.start(start, from);
-    this.voice(src);
+    this.voice(src, gn);
     return true;
   }
 

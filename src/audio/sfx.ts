@@ -7,8 +7,17 @@
  * The altar: every spin clacks off, its reels tick past the line (only while the altar is on screen:
  * `setAltarFocus`) and thud down by rarity; luck tokens chime a step higher for each in a chain; a
  * find the core judged worth a reveal builds up (rattle, riser, a silence drop) as its reel nears
- * the line, a teased one a little (rattle, glow climbing, short riser). The fight: hits climb in
- * pitch through a flurry, kills climb the scale through a wave, coins stack.
+ * the line, a teased one a little (rattle, glow climbing, short riser). Kills climb the scale
+ * through a wave, coins stack.
+ *
+ * The fight (`world`, every frame of the dungeon): fight.ts hears what happens on the floor and the
+ * skill rolls (onSkillRoll), and plays each moment's sound (catalog.ts names them all, recipes.ts
+ * synthesizes them) through the fight's mix (mixer.ts: limits per sound and overall, the key moments
+ * cutting through, each sound where it happened).
+ *
+ * Every sound has a name (catalog.ts, docs/SOUNDS.md), and a recording of that name
+ * (src/assets/sounds/<name>.mp3) plays in its place. `play` takes those names, and the older ones the
+ * UI calls by.
  *
  * Silent until `unlock` (the first tap), and throttled so a big fight doesn't turn to mush. Nothing
  * here touches the browser at import (Node tests import it).
@@ -16,11 +25,19 @@
 import type { CoreEvent } from '../core/events';
 import { rarityIndex, tierOrBetterOneIn } from '../core/rarity';
 import type { RollDrama, Spin } from '../core/state';
+import { onSkillRoll } from '../world/skills';
+import type { World } from '../world/world';
+import { isCue, isFightCue, type Cue, type FightCue, type LegacyCue } from './catalog';
 import { engine, guarded, midi, type NoiseOpts, type ToneOpts } from './engine';
+import { FightObserver } from './fight';
+import { mixer, type CueOpts } from './mixer';
 import { music } from './music';
 
-export type SoundName =
-  // the fight
+export { SOUNDS, SOUND_NAMES, landCue, skillCue, type Cue } from './catalog';
+
+/** The names the UI has always called sounds by (each plays one of the sounds in catalog.ts). */
+type OldName =
+  // the fight (now the fight's own sounds: OLD_FIGHT)
   | 'hit' | 'crit' | 'hurt' | 'block' | 'mobDeath' | 'heroDown' | 'dodge' | 'special' | 'arrow' | 'bolt' | 'fireball' | 'blast' | 'zap'
   | 'heal' | 'coin' | 'pickup' | 'potion' | 'xp' | 'levelUp' | 'rewind'
   // the dungeon
@@ -33,6 +50,47 @@ export type SoundName =
   // knights and menus
   | 'stamp' | 'newHero' | 'dupe' | 'mutation' | 'breakDown' | 'sell' | 'haul' | 'buy' | 'equip' | 'perk' | 'unlock' | 'collect'
   | 'jingle' | 'jingleLong' | 'ding' | 'tap' | 'open' | 'close';
+
+const OLD_NAMES: ReadonlySet<string> = new Set<OldName>([
+  'hit', 'crit', 'hurt', 'block', 'mobDeath', 'heroDown', 'dodge', 'special', 'arrow', 'bolt', 'fireball', 'blast', 'zap', 'heal', 'coin',
+  'pickup', 'potion', 'xp', 'levelUp', 'rewind', 'portal', 'floorStart', 'bossWarn', 'bossRoar', 'bossDown', 'wipe', 'treasure', 'lockTap',
+  'lockBreak', 'embark', 'rebirth', 'reelStart', 'reelTick', 'creep', 'reelLand', 'glowUp', 'rattle', 'riser', 'token', 'respin', 'combo',
+  'blackout', 'heartbeat', 'emerge', 'countTick', 'tierPass', 'revealBig', 'revealHuge', 'revealInsane', 'revealHyper', 'firework',
+  'fanfare', 'stamp', 'newHero', 'dupe', 'mutation', 'breakDown', 'sell', 'haul', 'buy', 'equip', 'perk', 'unlock', 'collect', 'jingle',
+  'jingleLong', 'ding', 'tap', 'open', 'close',
+]);
+const isOld = (name: string): name is OldName => OLD_NAMES.has(name);
+
+/** A sound to play: any name in catalog.ts (its file name), or one of the older names. */
+export type SoundName = OldName | Cue;
+
+/** The old fight names, and the fight sounds they play now. */
+const OLD_FIGHT: Partial<Record<OldName, FightCue>> = {
+  hit: 'hit_flesh',
+  crit: 'crit',
+  hurt: 'knight_hurt',
+  block: 'knight_block',
+  mobDeath: 'death_flesh',
+  heroDown: 'knight_down',
+  dodge: 'knight_dodge',
+  special: 'skill_roll_land_rare',
+  arrow: 'atk_bow',
+  bolt: 'atk_arcane',
+  fireball: 'boom_bomb',
+  blast: 'boom_small',
+  zap: 'zap',
+  heal: 'heal',
+  rewind: 'skill_rewind',
+};
+
+/** The sound file each old name with a different one plays first (for the dev stats; the rest share their name). */
+const OLD_FILE: Partial<Record<OldName, LegacyCue>> = {
+  levelUp: 'level_up', floorStart: 'floor_start', bossWarn: 'boss_warn', bossRoar: 'boss_roar', bossDown: 'boss_down', lockTap: 'lock_tap',
+  lockBreak: 'lock_break', embark: 'title_start', reelStart: 'reel_start', reelTick: 'reel_tick', creep: 'reel_creep', reelLand: 'reel_land',
+  glowUp: 'glow_up', riser: 'riser_short', countTick: 'count_tick', tierPass: 'tier_pass', revealBig: 'slam', revealHuge: 'slam',
+  revealInsane: 'slam', revealHyper: 'reveal_sting', fanfare: 'slam', newHero: 'jingle', breakDown: 'break_down', jingleLong: 'jingle_long',
+  open: 'panel_open', close: 'panel_close',
+};
 
 type LandEvent = Extract<CoreEvent, { type: 'land' }>;
 type TokenEvent = Extract<CoreEvent, { type: 'token' }>;
@@ -91,10 +149,6 @@ class Sfx {
   private lastPlayed = new Map<string, number>();
   private coinStack = 0;
   private lastCoinAt = 0;
-  private hitStreak = 0;
-  private lastHitAt = 0;
-  private killStreak = 0;
-  private lastKillAt = 0;
   private tapStreak = 0;
   private lastTapAt = 0;
   /** What a build-up's sounds play through, so they all stop as its find lands (endRamp). */
@@ -108,6 +162,11 @@ class Sfx {
   private tickTimer: ReturnType<typeof setInterval> | null = null;
   private lands: LandEvent[] = [];
   private hooked = false;
+  /** Hears the fight (fight.ts) and plays it through the fight's mix. */
+  private fight = new FightObserver((cue, o) => {
+    mixer.fire(cue, o);
+  });
+  private rollsHooked = false;
 
   // ------------------------------------------------------------------ the API
   /** Call on the first user gesture (safe to call on every one): starts the audio at this volume. */
@@ -142,14 +201,52 @@ class Sfx {
     this.focus = on;
   }
 
-  /** Plays one sound. `level` is a rarity index (0 Common to 12 Primordial) where a sound has a rarity; see each. */
+  /**
+   * Plays one sound: any name in catalog.ts, or an older one. `level` is a rarity index (0 Common to
+   * 12 Primordial) where an altar or menu sound has a rarity; for a fight sound it's how hard (0 to 1).
+   */
   play(name: SoundName, level = 0): void {
     if (engine.sfxVolume <= 0) return;
-    if (!engine.live) {
-      if (engine.graph && WAKE_FOR.has(name)) engine.whenRunning(() => this.sound(name, level));
+    const fight = OLD_FIGHT[name as OldName] ?? (isFightCue(name) ? name : null);
+    if (fight) {
+      mixer.fire(fight, { level: Math.max(0, Math.min(1, level)) });
       return;
     }
-    this.sound(name, level);
+    const run = () => (isCue(name) && !isOld(name) ? this.legacyCue(name as LegacyCue, level) : this.sound(name as OldName, level));
+    if (!engine.live) {
+      if (engine.graph && WAKE_FOR.has(name)) engine.whenRunning(run);
+      return;
+    }
+    run();
+  }
+
+  /** A fight sound at a spot in the world (where it happened, as the fight plays them). */
+  fire(cue: FightCue, o: CueOpts = {}): void {
+    mixer.fire(cue, o);
+  }
+
+  /**
+   * Every frame of the dungeon, after the game's update and before the frame is drawn (null away
+   * from the dungeon): the fight's sounds, from what happened on the floor `w` since the last frame.
+   */
+  world(w: World | null): void {
+    if (!this.rollsHooked) {
+      this.rollsHooked = true;
+      onSkillRoll((e) => {
+        try {
+          if (engine.sfxVolume > 0) this.fight.skill(e);
+        } catch (err) {
+          if (import.meta.env?.DEV) console.warn('audio', 'skill roll', err);
+        }
+      });
+    }
+    mixer.listen(w?.leader() ?? null);
+    this.fight.frame(w);
+  }
+
+  /** What has played and been dropped (and why), by name, since the start (for playtests: window.__sfx in dev). */
+  stats(): { played: Record<string, number>; dropped: Record<string, number>; peakVoices: number } {
+    return mixer.stats();
   }
 
   /** The sounds for a core event. */
@@ -218,44 +315,15 @@ class Sfx {
   }
 
   // ------------------------------------------------------------------ names to sounds
-  private sound(name: SoundName, level: number): void {
+  private sound(name: OldName, level: number): void {
+    const fight = OLD_FIGHT[name];
+    if (fight) {
+      mixer.fire(fight, { level: Math.max(0, Math.min(1, level)) });
+      return;
+    }
+    mixer.count(OLD_FILE[name] ?? name);
     const tier = clampTier(level);
     switch (name) {
-      case 'hit':
-      case 'crit': {
-        const now = performance.now();
-        this.hitStreak = now - this.lastHitAt < 450 ? Math.min(12, this.hitStreak + 1) : 0;
-        this.lastHitAt = now;
-        return this.hit(name === 'crit', this.hitStreak);
-      }
-      case 'hurt':
-        return this.hurt(level > 0);
-      case 'block':
-        return this.heistBlock();
-      case 'mobDeath': {
-        const now = performance.now();
-        this.killStreak = now - this.lastKillAt < 2500 ? Math.min(7, this.killStreak + 1) : 0;
-        this.lastKillAt = now;
-        return this.kill(level > 0, this.killStreak);
-      }
-      case 'heroDown':
-        return this.heroDown();
-      case 'dodge':
-        return this.dodge();
-      case 'special':
-        return this.special();
-      case 'arrow':
-        return this.arrow();
-      case 'bolt':
-        return this.bolt();
-      case 'fireball':
-        return this.fireball();
-      case 'blast':
-        return this.blast();
-      case 'zap':
-        return this.zap();
-      case 'heal':
-        return this.heal();
       case 'coin':
         return this.coin();
       case 'pickup':
@@ -266,8 +334,6 @@ class Sfx {
         return this.xpTick();
       case 'levelUp':
         return this.levelUp(level);
-      case 'rewind':
-        return this.rewind();
       case 'portal':
         return this.portal();
       case 'floorStart':
@@ -372,6 +438,100 @@ class Sfx {
         return this.panel(true);
       case 'close':
         return this.panel(false);
+    }
+  }
+
+  /** An altar, reveal or menu sound by its file name (catalog.ts): each one's own sound, at `level` where it has one. */
+  private legacyCue(cue: LegacyCue, level: number): void {
+    const tier = clampTier(level);
+    switch (cue) {
+      case 'coin':
+      case 'pickup':
+      case 'potion':
+      case 'xp':
+      case 'portal':
+      case 'wipe':
+      case 'rebirth':
+      case 'treasure':
+      case 'rattle':
+      case 'token':
+      case 'respin':
+      case 'combo':
+      case 'blackout':
+      case 'heartbeat':
+      case 'emerge':
+      case 'firework':
+      case 'stamp':
+      case 'jingle':
+      case 'dupe':
+      case 'mutation':
+      case 'sell':
+      case 'haul':
+      case 'buy':
+      case 'equip':
+      case 'perk':
+      case 'unlock':
+      case 'collect':
+      case 'ding':
+      case 'tap':
+        return this.sound(cue, level);
+      case 'level_up':
+        return this.sound('levelUp', level);
+      case 'floor_start':
+        return this.sound('floorStart', level);
+      case 'boss_warn':
+        return this.sound('bossWarn', level);
+      case 'boss_roar':
+        return this.sound('bossRoar', level);
+      case 'boss_down':
+        return this.sound('bossDown', level);
+      case 'lock_tap':
+        return this.sound('lockTap', level);
+      case 'lock_break':
+        return this.sound('lockBreak', level);
+      case 'title_start':
+        return this.sound('embark', level);
+      case 'reel_start':
+        return this.sound('reelStart', level);
+      case 'reel_tick':
+        return this.sound('reelTick', level);
+      case 'reel_creep':
+        return this.sound('creep', level);
+      case 'reel_land':
+        return this.sound('reelLand', level);
+      case 'glow_up':
+        return this.sound('glowUp', level);
+      case 'riser_short':
+        return this.sound('riser', Math.min(4, tier));
+      case 'riser_long':
+        return this.sound('riser', Math.max(5, tier));
+      case 'count_tick':
+        return this.sound('countTick', level);
+      case 'tier_pass':
+        return this.sound('tierPass', level);
+      case 'break_down':
+        return this.sound('breakDown', level);
+      case 'jingle_long':
+        return this.sound('jingleLong', level);
+      case 'panel_open':
+        return this.sound('open', level);
+      case 'panel_close':
+        return this.sound('close', level);
+      case 'find_pop':
+        mixer.count(cue);
+        return this.autoPop(Math.max(1, tier));
+      case 'slam':
+        mixer.count(cue);
+        return this.slam(Math.min(3, level));
+      case 'reveal_sting':
+        mixer.count(cue);
+        return this.reveal(tier);
+      case 'hyper_intro':
+        mixer.count(cue);
+        return this.hyperIntro(2.4);
+      case 'hyper_boom':
+        mixer.count(cue);
+        return this.hyperBoom();
     }
   }
 
@@ -719,6 +879,7 @@ class Sfx {
     if (!this.gate('reelStart', 250)) return;
     const at = this.ctx.currentTime;
     const v = this.focus ? 1 : 0.55;
+    if (this.rec('reel_start', at, { gain: v })) return;
     this.noise(at, 0.035, { freq: 1800, q: 3, gain: 0.04 * v });
     this.tone(150, at, 0.07, { type: 'square', gain: 0.025 * v, filter: 900, freqEnd: 95 });
     this.noise(at + 0.04, 0.22, { type: 'bandpass', freq: 500, freqEnd: 1500, q: 1.2, gain: 0.025 * v, attack: 0.05 });
@@ -727,6 +888,7 @@ class Sfx {
   /** A cell clicking past a reel's line. `rise` (0 to 1) climbs as the reel slows; `loud` (0 to 1) for the last reel's. */
   private reelTick(at: number, rise: number, loud: number): void {
     const r = Math.max(0, Math.min(1, rise));
+    if (this.rec('reel_tick', at, { semis: r * 12, gain: 0.7 + 0.3 * loud })) return;
     const v = 1.4;
     this.tone(this.vary(1000 * Math.pow(2, r * 1.25), 0.02), at, 0.03, { type: 'square', gain: (0.018 + 0.03 * r * (0.5 + loud)) * v, filter: 3800 });
     this.noise(at, 0.012, { freq: 3800, q: 4, gain: (0.015 + 0.02 * r) * v });
@@ -828,6 +990,7 @@ class Sfx {
   private respin(): void {
     if (!this.gate('respin', 120)) return;
     const at = this.ctx.currentTime;
+    if (this.rec('respin', at)) return;
     this.noise(at, 0.22, { type: 'bandpass', freq: 900, q: 0.8, gain: 0.09, attack: 0.03 });
     this.tone(260, at, 0.2, { type: 'triangle', gain: 0.04, freqEnd: 720 });
   }
@@ -836,6 +999,7 @@ class Sfx {
   private combo(reels: number, fly: number): void {
     if (!this.gate('combo', 200)) return;
     const at = this.ctx.currentTime;
+    if (this.rec('combo', at)) return;
     const zip = Math.max(0.08, fly - 0.09);
     this.tone(330, at + 0.09, zip, { type: 'triangle', gain: 0.05, freqEnd: 880 });
     this.tone(1760, at + 0.09, zip, { type: 'triangle', gain: 0.035, freqEnd: 880 });
@@ -851,6 +1015,7 @@ class Sfx {
     if (!this.gate('autopop', 120)) return;
     const at = this.ctx.currentTime;
     const i = clampTier(tier);
+    if (this.rec('find_pop', at, { semis: climb(Math.round(i / 2)) })) return;
     this.tone(320 + i * 60, at, 0.06, { gain: 0.06, freqEnd: 520 + i * 90 });
     if (i >= 1) this.bell(midi(LADDER[Math.min(LADDER.length - 1, 3 + i)]), at + 0.03, 0.25, 0.035 + i * 0.008);
   }
@@ -860,6 +1025,7 @@ class Sfx {
   private blackout(): void {
     const at = this.ctx.currentTime;
     this.duck(0.04, 3);
+    if (this.rec('blackout', at)) return;
     this.tone(48, at, 1.4, { gain: 0.5, freqEnd: 28 });
     this.noise(at, 0.9, { type: 'lowpass', freq: 500, freqEnd: 120, gain: 0.16, attack: 0.01 });
   }
@@ -876,6 +1042,7 @@ class Sfx {
   /** The knight rising out of the dark: a shimmering swell. */
   private emerge(seconds: number): void {
     const at = this.ctx.currentTime;
+    if (this.rec('emerge', at, { fit: seconds })) return;
     for (const [n, det] of [[72, -6], [76, 6], [79, 0], [84, 4]] as const) {
       this.tone(midi(n), at, seconds, { type: 'triangle', gain: 0.035, attack: seconds * 0.8, detune: det, vibrato: 4 });
     }
@@ -886,12 +1053,14 @@ class Sfx {
   private countTick(progress: number): void {
     if (!this.gate('count', 40)) return;
     const p = Math.max(0, Math.min(1, progress));
+    if (this.rec('count_tick', this.ctx.currentTime, { semis: Math.round(p * 24) })) return;
     this.tone(midi(64 + Math.round(p * 30)), this.ctx.currentTime, 0.05, { type: 'square', gain: 0.025, filter: 3200 });
   }
 
   /** The counter climbs past a rarity tier's odds: a bright chime, higher for rarer tiers. */
   private tierPass(tier: number): void {
     const at = this.ctx.currentTime;
+    if (this.rec('tier_pass', at, { semis: climb(Math.round(tier / 2)) })) return;
     const n = LADDER[Math.min(LADDER.length - 1, 3 + tier)];
     this.bell(midi(n), at, 0.5, 0.065);
     this.bell(midi(n) * 2, at + 0.04, 0.3, 0.03);
@@ -919,6 +1088,7 @@ class Sfx {
   private hyperIntro(seconds: number): void {
     const at = this.ctx.currentTime;
     this.duck(0.02, seconds + 5);
+    if (this.rec('hyper_intro', at, { fit: seconds })) return;
     this.tone(46, at, 1.2, { gain: 0.45, freqEnd: 30 });
     this.tone(34, at, seconds + 0.15, { gain: 0.42, attack: seconds * 0.85, freqEnd: 62, vibrato: 2 });
     this.noise(at, seconds, { type: 'lowpass', freq: 160, freqEnd: 1400, gain: 0.2, attack: seconds * 0.9 });
@@ -934,19 +1104,11 @@ class Sfx {
     }
   }
 
-  /** Lightning: a crackle and a snap (HYPER RARE's core, a mage's chain lightning). */
-  private zap(): void {
-    if (!this.gate('zap', 70)) return;
-    const at = this.ctx.currentTime;
-    this.noise(at, 0.05, { type: 'highpass', freq: 2600, gain: 0.07 });
-    this.noise(at + 0.03, 0.12, { type: 'bandpass', freq: 1400, q: 0.7, gain: 0.05, freqEnd: 500 });
-    this.tone(this.vary(1900, 0.2), at, 0.06, { type: 'square', gain: 0.018, freqEnd: 300, filter: 4000 });
-  }
-
   /** HYPER RARE bursts open: a huge boom and crash, the slam at its loudest, a big chord and sparkles flying up, a long sizzle under it. */
   private hyperBoom(): void {
     const at = this.ctx.currentTime;
     this.duck(0.02, 5);
+    if (this.rec('hyper_boom', at)) return;
     this.rec('slam', at, { gain: 1.68 });
     this.tone(96, at, 2.2, { gain: 0.7, freqEnd: 24 });
     this.noise(at, 1.6, { type: 'lowpass', freq: 3600, freqEnd: 110, gain: 0.42, attack: 0.004 });
@@ -959,6 +1121,7 @@ class Sfx {
   private firework(): void {
     if (!this.gate('firework', 140)) return;
     const at = this.ctx.currentTime;
+    if (this.rec('firework', at)) return;
     this.noise(at, 0.09, { type: 'lowpass', freq: 1800, gain: 0.16 });
     this.tone(this.vary(140), at, 0.12, { gain: 0.14, freqEnd: 60 });
     for (let i = 0; i < 6; i++) this.noise(at + 0.12 + this.rnd() * 0.45, 0.02, { type: 'highpass', freq: 4200, gain: 0.03 + this.rnd() * 0.03 });
@@ -969,6 +1132,7 @@ class Sfx {
     const at = this.ctx.currentTime;
     const i = clampTier(tier);
     if (i >= 3) this.duck(0.35, 0.4 + i * 0.35);
+    if (this.rec('reveal_sting', at, { gain: 1 + 0.05 * i })) return;
     switch (i) {
       case 0:
         this.noise(at, 0.14, { type: 'lowpass', freq: 1100, gain: 0.08 });
@@ -1034,123 +1198,7 @@ class Sfx {
     }
   }
 
-  // ------------------------------------------------------------------ the fight
-  /** A blow lands; `combo` (blows in a flurry) raises it a semitone a blow, so a flurry climbs. A crit is the same whack, harder, with a ring on top. */
-  private hit(crit: boolean, combo: number): void {
-    if (!this.gate(crit ? 'crit' : 'hit', 45)) return;
-    const at = this.ctx.currentTime;
-    const c = Math.min(12, Math.max(0, combo));
-    const up = Math.pow(2, c / 12);
-    if (this.rec('hit', at, { semis: c / 2 + (this.rnd() * 2 - 1) * 0.3, gain: crit ? 1.4 : 1 })) {
-      if (crit) this.bell(this.vary(1900, 0.04) * up, at + 0.01, 0.25, 0.05);
-      return;
-    }
-    this.noise(at, 0.05, { freq: this.vary(1500, 0.15) * up, q: 1.2, gain: crit ? 0.16 : 0.1 });
-    this.tone(this.vary(150) * up, at, 0.09, { gain: crit ? 0.24 : 0.16, freqEnd: 70 * up });
-    if (crit) this.bell(this.vary(1900, 0.04) * up, at + 0.01, 0.25, 0.05);
-  }
-
-  private hurt(heavy: boolean): void {
-    if (!this.gate('hurt', 60)) return;
-    const at = this.ctx.currentTime;
-    this.tone(this.vary(115), at, heavy ? 0.3 : 0.14, { gain: heavy ? 0.32 : 0.16, freqEnd: 55 });
-    this.noise(at, heavy ? 0.2 : 0.07, { type: 'lowpass', freq: 500, gain: heavy ? 0.16 : 0.07 });
-  }
-
-  /** A blow on a shield: a clang. */
-  private heistBlock(): void {
-    if (!this.gate('block', 90)) return;
-    const at = this.ctx.currentTime;
-    this.noise(at, 0.08, { freq: 3400, q: 6, gain: 0.09 });
-    this.tone(1180, at, 0.25, { type: 'square', gain: 0.025, filter: 4000, freqEnd: 1100 });
-    this.tone(1720, at, 0.2, { gain: 0.03 });
-  }
-
-  private dodge(): void {
-    if (!this.gate('dodge', 80)) return;
-    this.noise(this.ctx.currentTime, 0.16, { freq: 500, freqEnd: 3200, q: 1.5, gain: 0.07, attack: 0.03 });
-  }
-
-  /** A mob falls: a pop, lifted up the scale by `streak` (kills in a row), a bell a step higher each; a big one booms. */
-  private kill(big: boolean, streak: number): void {
-    const at = this.ctx.currentTime;
-    const s = Math.min(7, Math.max(0, streak));
-    // Several at once (a blast) pop once.
-    if (this.gate('kill', 40)) {
-      const up = Math.pow(2, (LADDER[Math.min(5, s)] - LADDER[0]) / 12);
-      this.tone(this.vary(320) * up, at, 0.09, { gain: 0.1, freqEnd: 950 * up });
-      this.noise(at, 0.06, { type: 'lowpass', freq: 1400, gain: 0.05 });
-      if (streak > 0) this.bell(midi(LADDER[3 + s]), at + 0.03, 0.3, 0.04);
-    }
-    if (big) {
-      this.tone(50, at, 0.8, { gain: 0.4, freqEnd: 32 });
-      this.noise(at, 0.5, { type: 'lowpass', freq: 900, gain: 0.18 });
-    }
-  }
-
-  /** A knight falls: a long slide down and a heavy thud. */
-  private heroDown(): void {
-    if (!this.gate('heroDown', 200)) return;
-    const at = this.ctx.currentTime;
-    this.tone(440, at, 0.7, { type: 'triangle', gain: 0.08, freqEnd: 110 });
-    this.hurt(true);
-    this.material('metal', true);
-  }
-
-  /** A knight's skill: a rising whoosh into a bright fifth. */
-  private special(): void {
-    if (!this.gate('special', 120)) return;
-    const at = this.ctx.currentTime;
-    this.noise(at, 0.25, { type: 'bandpass', freq: 400, freqEnd: 2400, q: 1.1, gain: 0.06, attack: 0.08 });
-    this.tone(330, at, 0.2, { type: 'triangle', gain: 0.06, freqEnd: 660 });
-    this.bell(midi(79), at + 0.14, 0.4, 0.04);
-    this.bell(midi(84), at + 0.18, 0.4, 0.035);
-  }
-
-  /** An arrow: the bowstring's twang and the shaft's whistle away. */
-  private arrow(): void {
-    if (!this.gate('arrow', 50)) return;
-    const at = this.ctx.currentTime;
-    this.tone(this.vary(220, 0.06), at, 0.12, { type: 'triangle', gain: 0.07, freqEnd: 165 });
-    this.tone(this.vary(110), at, 0.08, { type: 'square', gain: 0.02, filter: 700, freqEnd: 90 });
-    this.noise(at + 0.01, 0.16, { type: 'bandpass', freq: 2600, freqEnd: 900, q: 2.5, gain: 0.05, attack: 0.02 });
-  }
-
-  /** A magic bolt: a rising zing with a sizzle. */
-  private bolt(): void {
-    if (!this.gate('bolt', 60)) return;
-    const at = this.ctx.currentTime;
-    this.tone(this.vary(660), at, 0.18, { type: 'sawtooth', gain: 0.022, filter: 2400, freqEnd: 1320 });
-    this.tone(this.vary(1320), at, 0.14, { gain: 0.04, freqEnd: 1980, vibrato: 60 });
-    this.noise(at, 0.1, { type: 'highpass', freq: 3800, gain: 0.03 });
-  }
-
-  /** A fireball: a roaring whoosh. */
-  private fireball(): void {
-    if (!this.gate('fireball', 80)) return;
-    const at = this.ctx.currentTime;
-    this.noise(at, 0.32, { type: 'bandpass', freq: 380, freqEnd: 1300, q: 0.9, gain: 0.16, attack: 0.05 });
-    this.tone(95, at, 0.3, { type: 'sawtooth', gain: 0.05, filter: 500, freqEnd: 60 });
-  }
-
-  /** An explosion (a meteor, a bomb, a blast): a boom and a crackle. */
-  private blast(): void {
-    if (!this.gate('blast', 90)) return;
-    const at = this.ctx.currentTime;
-    this.tone(60, at, 0.6, { gain: 0.34, freqEnd: 32 });
-    this.noise(at, 0.4, { type: 'lowpass', freq: 1200, freqEnd: 200, gain: 0.2 });
-    for (let i = 0; i < 4; i++) this.noise(at + 0.08 + this.rnd() * 0.3, 0.02, { type: 'highpass', freq: 3500, gain: 0.025 });
-  }
-
-  /** A heal: a harp's run up the ladder and a shimmer. */
-  private heal(): void {
-    if (!this.gate('heal', 150)) return;
-    const at = this.ctx.currentTime;
-    [72, 76, 79, 84].forEach((n, k) => this.bell(midi(n), at + k * 0.05, 0.4, 0.035));
-    this.tone(midi(72), at, 0.5, { type: 'triangle', gain: 0.03, attack: 0.1 });
-    this.noise(at + 0.05, 0.4, { type: 'highpass', freq: 6000, gain: 0.02, attack: 0.1 });
-  }
-
+  // ------------------------------------------------------------------ coins, pickups, levels (the fight's own sounds: recipes.ts)
   /** Pitch stacking: each coin in a chain plays one step higher, then resets after a pause. */
   private coin(): void {
     if (!this.gate('coin', 50)) return;
@@ -1159,6 +1207,7 @@ class Sfx {
     this.lastCoinAt = now;
     const note = LADDER[Math.min(LADDER.length - 1, 5 + this.coinStack)];
     this.coinStack = Math.min(this.coinStack + 1, 10);
+    if (this.rec('coin', this.ctx.currentTime + 0.02, { semis: climb(this.coinStack - 1) })) return;
     this.bell(midi(note) * 2, this.ctx.currentTime + 0.02, 0.18, 0.035);
   }
 
@@ -1177,6 +1226,7 @@ class Sfx {
   private pickup(): void {
     if (!this.gate('pickup', 100)) return;
     const at = this.ctx.currentTime;
+    if (this.rec('pickup', at)) return;
     this.tone(170, at, 0.12, { gain: 0.12, freqEnd: 95 });
     for (let i = 0; i < 3; i++) this.noise(at + 0.02 + i * 0.03, 0.03, { type: 'highpass', freq: 3000, gain: 0.03 });
     this.bell(midi(84), at + 0.06, 0.3, 0.04);
@@ -1186,6 +1236,7 @@ class Sfx {
   private potion(): void {
     if (!this.gate('potion', 400)) return;
     const at = this.ctx.currentTime;
+    if (this.rec('potion', at)) return;
     for (let k = 0; k < 3; k++) this.tone(this.vary(300 + k * 60), at + k * 0.08, 0.07, { gain: 0.08, freqEnd: 620 + k * 80 });
     this.later(300, () => this.jingle(5));
   }
@@ -1193,26 +1244,14 @@ class Sfx {
   /** XP reaches a bar: a soft upward blip. */
   private xpTick(): void {
     if (!this.gate('xp', 80)) return;
+    if (this.rec('xp', this.ctx.currentTime)) return;
     this.tone(midi(79), this.ctx.currentTime, 0.09, { type: 'triangle', gain: 0.035, freqEnd: midi(91) });
   }
 
   private levelUp(level: number): void {
     this.duck(0.5, 0.5);
+    if (this.rec('level_up', this.ctx.currentTime)) return;
     this.jingle(level > 0 && level % 10 === 0 ? 5 : 3);
-  }
-
-  /** Time runs backwards (Rewind): a falling warble, a clock ticking back, a reversed swell landing in the past. */
-  private rewind(): void {
-    if (!this.gate('rewind', 400)) return;
-    const at = this.ctx.currentTime;
-    const dur = 0.8;
-    this.duck(0.5, 0.9);
-    this.tone(880, at, dur, { type: 'triangle', gain: 0.04, freqEnd: 220, vibrato: 25, attack: 0.05 });
-    this.tone(1320, at, dur, { gain: 0.02, freqEnd: 330, vibrato: 30, attack: 0.05 });
-    for (let k = 0; k < 10; k++) this.tone(2400 - k * 120, at + k * 0.075, 0.02, { type: 'square', gain: 0.018, filter: 4000 });
-    this.noise(at, dur, { type: 'highpass', freq: 4000, gain: 0.05, attack: dur * 0.95 });
-    this.bell(midi(84), at + dur, 0.5, 0.05);
-    this.bell(midi(72), at + dur + 0.02, 0.6, 0.04);
   }
 
   // ------------------------------------------------------------------ the dungeon
@@ -1220,6 +1259,7 @@ class Sfx {
   private portal(): void {
     if (!this.gate('portal', 300)) return;
     const at = this.ctx.currentTime;
+    if (this.rec('portal', at)) return;
     [72, 76, 79].forEach((n, k) => this.bell(midi(n), at + k * 0.06, 0.35, 0.045));
     this.noise(at, 0.8, { type: 'bandpass', freq: 600, freqEnd: 3000, q: 1.2, gain: 0.05, attack: 0.3 });
     this.tone(midi(72), at, 0.7, { gain: 0.03, freqEnd: midi(84), vibrato: 8, attack: 0.2 });
@@ -1230,6 +1270,7 @@ class Sfx {
   private floorStart(): void {
     if (!this.gate('floorStart', 500)) return;
     const at = this.ctx.currentTime;
+    if (this.rec('floor_start', at)) return;
     this.noise(at, 0.4, { type: 'bandpass', freq: 400, freqEnd: 2600, q: 0.9, gain: 0.05, attack: 0.06 });
     this.tone(midi(67), at + 0.12, 0.16, { type: 'sawtooth', gain: 0.035, filter: 1800, attack: 0.02 });
     this.tone(midi(72), at + 0.3, 0.45, { type: 'sawtooth', gain: 0.04, filter: 1900, attack: 0.03, vibrato: 3 });
@@ -1240,6 +1281,7 @@ class Sfx {
   private bossWarn(): void {
     if (!this.gate('warn', 300)) return;
     const at = this.ctx.currentTime;
+    if (this.rec('boss_warn', at)) return;
     this.tone(220, at, 0.14, { type: 'square', gain: 0.05, filter: 1200 });
     this.tone(220, at + 0.18, 0.14, { type: 'square', gain: 0.05, filter: 1200 });
   }
@@ -1249,6 +1291,7 @@ class Sfx {
     if (!this.gate('bossRoar', 800)) return;
     const at = this.ctx.currentTime;
     this.duck(0.4, 1);
+    if (this.rec('boss_roar', at)) return;
     this.tone(48, at, 0.9, { gain: 0.4, freqEnd: 36 });
     this.noise(at, 0.6, { type: 'lowpass', freq: 700, gain: 0.15 });
     this.tone(midi(45), at + 0.05, 0.8, { type: 'sawtooth', gain: 0.04, filter: 900 });
@@ -1262,12 +1305,13 @@ class Sfx {
    */
   private bossDown(jingle: boolean): void {
     const at = this.ctx.currentTime;
-    this.tone(50, at, 0.8, { gain: 0.4, freqEnd: 32 });
-    this.noise(at, 0.5, { type: 'lowpass', freq: 900, gain: 0.18 });
     if (jingle) {
       this.duck(0.4, 1);
       this.jingle(5);
     }
+    if (this.rec('boss_down', at)) return;
+    this.tone(50, at, 0.8, { gain: 0.4, freqEnd: 32 });
+    this.noise(at, 0.5, { type: 'lowpass', freq: 900, gain: 0.18 });
     this.coinCascade(at + 0.4, 14);
   }
 
@@ -1275,6 +1319,7 @@ class Sfx {
   private heistLose(): void {
     const at = this.ctx.currentTime;
     this.duck(0.3, 2);
+    if (this.rec('wipe', at)) return;
     this.tone(70, at, 0.6, { gain: 0.3, freqEnd: 38 });
     [55, 54, 53, 52].forEach((n, k) => {
       const last = k === 3;
@@ -1288,6 +1333,7 @@ class Sfx {
   private treasure(golden: boolean): void {
     if (!this.gate('treasure', 150)) return;
     const at = this.ctx.currentTime;
+    if (this.rec('treasure', at, { gain: golden ? 1.2 : 1 })) return;
     this.noise(at, 0.05, { type: 'bandpass', freq: 2400, freqEnd: 900, q: 1.2, gain: 0.06 });
     [76, 79, 84, 88].forEach((n, k) => this.bell(midi(n), at + 0.06 + k * 0.05, 0.4, golden ? 0.07 : 0.05));
     if (golden) this.coinCascade(at + 0.3, 8);
@@ -1336,6 +1382,7 @@ class Sfx {
   private rebirth(): void {
     const at = this.ctx.currentTime;
     this.duck(0.3, 2);
+    if (this.rec('rebirth', at)) return;
     this.tone(midi(67), at, 0.12, { type: 'square', gain: 0.05, filter: 2200 });
     this.tone(midi(67), at + 0.13, 0.12, { type: 'square', gain: 0.05, filter: 2200 });
     for (const n of [72, 76, 79, 84]) this.tone(midi(n), at + 0.28, 0.9, { type: 'sawtooth', gain: 0.03, filter: 2600, attack: 0.01 });
@@ -1350,6 +1397,7 @@ class Sfx {
   private stamp(): void {
     if (!this.gate('stamp', 120)) return;
     const at = this.ctx.currentTime;
+    if (this.rec('stamp', at)) return;
     this.tone(95, at, 0.18, { gain: 0.3, freqEnd: 50 });
     this.noise(at, 0.06, { type: 'lowpass', freq: 1800, gain: 0.14 });
     this.noise(at, 0.03, { type: 'highpass', freq: 2500, gain: 0.06 });
@@ -1366,6 +1414,7 @@ class Sfx {
   private dupe(): void {
     if (!this.gate('dupe', 150)) return;
     const at = this.ctx.currentTime;
+    if (this.rec('dupe', at)) return;
     this.tone(this.vary(380), at, 0.06, { gain: 0.04, freqEnd: 560 });
     this.noise(at + 0.03, 0.14, { freq: 1200, freqEnd: 300, q: 1, gain: 0.03, attack: 0.02 });
   }
@@ -1374,6 +1423,7 @@ class Sfx {
   private mutation(): void {
     if (!this.gate('mutation', 300)) return;
     const at = this.ctx.currentTime;
+    if (this.rec('mutation', at)) return;
     [79, 84, 88, 91].forEach((n, k) => this.bell(midi(n), at + k * 0.06, 0.5, 0.045));
     for (const [n, det] of [[72, -7], [79, 7]] as const) this.tone(midi(n), at, 0.6, { type: 'triangle', gain: 0.03, attack: 0.3, detune: det, vibrato: 5 });
     this.noise(at, 0.6, { type: 'highpass', freq: 5500, gain: 0.04, attack: 0.4 });
@@ -1383,6 +1433,7 @@ class Sfx {
   private breakDown(): void {
     if (!this.gate('breakDown', 120)) return;
     const at = this.ctx.currentTime;
+    if (this.rec('break_down', at)) return;
     this.tone(140, at, 0.12, { gain: 0.16, freqEnd: 70 });
     this.noise(at, 0.08, { type: 'highpass', freq: 2500, gain: 0.1 });
     this.noise(at, 0.25, { type: 'bandpass', freq: 3500, freqEnd: 1800, q: 0.8, gain: 0.05 });
@@ -1394,6 +1445,7 @@ class Sfx {
   private sell(level: number): void {
     if (!this.gate('sell', 120)) return;
     const at = this.ctx.currentTime;
+    if (this.rec('sell', at, { gain: 1 + 0.1 * Math.max(0, Math.min(2, level)) })) return;
     this.noise(at, 0.05, { type: 'highpass', freq: 3000, gain: 0.08 });
     this.bell(midi(88), at + 0.04, 0.5, 0.06);
     this.bell(midi(93), at + 0.1, 0.6, 0.05);
@@ -1420,6 +1472,7 @@ class Sfx {
   private buy(): void {
     if (!this.gate('buy', 80)) return;
     const at = this.ctx.currentTime;
+    if (this.rec('buy', at)) return;
     this.noise(at, 0.04, { type: 'highpass', freq: 3000, gain: 0.06 });
     this.bell(midi(88) * 2, at, 0.2, 0.03);
     [72, 76, 79, 84, 88].forEach((n, k) => this.bell(midi(n), at + 0.04 + k * 0.055, 0.5, 0.055));
@@ -1429,6 +1482,7 @@ class Sfx {
   /** A knight takes its place in the squad: a thump and a clank, a chime climbing with its rarity; Legendary and up add a chord and a shimmer. */
   private equipImpact(tier: number): void {
     const at = this.ctx.currentTime;
+    if (this.rec('equip', at, { gain: 1 + Math.min(12, tier) * 0.03 })) return;
     this.tone(110, at, 0.22, { gain: 0.32 + Math.min(0.2, tier * 0.02), freqEnd: 42 });
     this.noise(at, 0.07, { type: 'highpass', freq: 2200, gain: 0.12 + tier * 0.006 });
     this.noise(at, 0.12, { freq: 900, q: 1.4, gain: 0.08 });
@@ -1445,6 +1499,7 @@ class Sfx {
   /** A perk picked: a sweep up into a chord; a big one adds a shimmer and a run of bells. */
   private heistPerk(big: boolean): void {
     const at = this.ctx.currentTime;
+    if (this.rec('perk', at, { gain: big ? 1.2 : 1 })) return;
     this.tone(midi(60), at, 0.25, { type: 'triangle', gain: 0.05, freqEnd: midi(84) });
     for (const n of [72, 76, 79]) this.tone(midi(n), at + 0.12, 0.45, { type: 'sawtooth', gain: 0.025, filter: 2400, attack: 0.01 });
     this.bell(midi(84), at + 0.14, 0.5, 0.06);
@@ -1459,11 +1514,13 @@ class Sfx {
   private featureOpen(): void {
     if (!this.gate('featureOpen', 300)) return;
     const at = this.ctx.currentTime;
+    if (this.rec('unlock', at)) return;
     [72, 76, 79, 84].forEach((n, i) => this.bell(midi(n), at + i * 0.07, 0.35, 0.07));
   }
 
   /** Earnings collected (offline gold): a cascade of coins and a ka-ching. */
   private collect(): void {
+    if (this.rec('collect', this.ctx.currentTime)) return;
     this.coinCascade(this.ctx.currentTime, 12);
   }
 
@@ -1483,6 +1540,7 @@ class Sfx {
   private ding(): void {
     if (!this.gate('ding', 200)) return;
     const at = this.ctx.currentTime;
+    if (this.rec('ding', at)) return;
     this.bell(midi(84), at, 0.8, 0.07);
     this.bell(midi(88), at + 0.08, 0.8, 0.06);
   }
@@ -1502,6 +1560,7 @@ class Sfx {
   private panel(open: boolean): void {
     if (!this.gate('panel', 120)) return;
     const at = this.ctx.currentTime;
+    if (this.rec(open ? 'panel_open' : 'panel_close', at)) return;
     if (open) {
       this.noise(at, 0.18, { type: 'bandpass', freq: 500, freqEnd: 2200, q: 0.9, gain: 0.035, attack: 0.04 });
       this.tone(this.vary(230), at + 0.05, 0.08, { gain: 0.08, freqEnd: 180 });
@@ -1516,3 +1575,6 @@ class Sfx {
 }
 
 export const sfx = guarded(new Sfx());
+
+// Playtests read what has played and what the mix dropped (window.__sfx.stats(), dev builds only).
+if (import.meta.env?.DEV && typeof window !== 'undefined') (window as unknown as { __sfx?: Sfx }).__sfx = sfx;

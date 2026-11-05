@@ -16,7 +16,8 @@ for permanent luck and power; perks from the first rebirth change how a run play
 hand out jobs, and one of them may be a demon in disguise.
 
 How every system works, with its numbers: [`DESIGN.md`](DESIGN.md). Art sources and licenses:
-[`CREDITS.md`](CREDITS.md).
+[`CREDITS.md`](CREDITS.md). Every sound by name, when it plays, and how to replace it with a
+recording: [`docs/SOUNDS.md`](docs/SOUNDS.md).
 
 ## The look
 

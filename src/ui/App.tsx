@@ -221,6 +221,8 @@ export function App() {
         c.toggleAuto = false;
       }
       game.tick(dt);
+      // The fight's sounds, from what the update just did (before the renderer takes its effects).
+      sfx.world(game.inDungeon ? game.world : null);
       r.render(game, game.paused ? 0 : dt, game.inDungeon ? game.world : game.hub);
       hudT += dt;
       if (hudT > 0.1) {
