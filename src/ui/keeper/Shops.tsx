@@ -15,9 +15,9 @@ import { canRebirth, rebirthFloor } from '../../core/newGame';
 import { PERKS, PERK_TREES, buyPerk, canBuyPerk, hasPerk, perksOpen, type PerkDef, type PerkTree } from '../../core/perks';
 import { CHALLENGE, floorDifficulty, knightRating, squadPower } from '../../core/power';
 import { activeQuests, MAX_ACTIVE_QUESTS, mobNoun, plural, questGoal, rewardText, type Quest } from '../../core/quests';
-import { RARITIES, RARITY_COLOR, RARITY_NAME, RARITY_ODDS, rarityChances } from '../../core/rarity';
+import { RARITIES, RARITY_COLOR, RARITY_NAME, RARITY_ODDS, rarityChances, rarityIndex } from '../../core/rarity';
 import { drySpell, reelCount, spinCycle, tokenChance } from '../../core/roller';
-import { bestSquad, canLevel, levelCost, levelUp, maxedLevel, rankedKnights, rebirthStatMult, reforge, reforgeCost, setSquadSlot } from '../../core/roster';
+import { bestSquad, canLevel, isBestSquad, levelCost, levelUp, maxedLevel, rankedKnights, rebirthStatMult, reforge, reforgeCost, sellKnight, sellValue, setSquadSlot } from '../../core/roster';
 import type { Game } from '../../game';
 import { biomeForFloor } from '../../world/biomes';
 import type { HubStation } from '../../world/hubWorld';
@@ -557,8 +557,10 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
   const [tab, setTabState] = useState(wardenMemory.tab);
   const [pick, setPickState] = useState(wardenMemory.slot);
   const [msg, setMsg] = useState<Record<string, string>>({});
+  const [sure, setSure] = useState<string | null>(null);
+  const [sold, setSold] = useState<string | null>(null);
   const [, bump] = useState(0);
-  const setTab = (t: string) => ((wardenMemory.tab = t), setTabState(t));
+  const setTab = (t: string) => ((wardenMemory.tab = t), setTabState(t), setSure(null));
   const setPick = (i: number) => ((wardenMemory.slot = i), setPickState(i));
   const floor = st.run.floor;
   const biome = biomeForFloor(floor, st.run.biomeSeed);
@@ -596,6 +598,31 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
     refresh();
     return true;
   };
+  // Rare and up ask twice before they go.
+  const sell = (id: string): boolean => {
+    const ri = rarityIndex(knightDef(id).rarity);
+    if (ri >= rarityIndex('rare') && sure !== id) {
+      setSure(id);
+      uiSound('tap');
+      return false;
+    }
+    const name = knightDef(id).name;
+    const g = sellKnight(st, id);
+    if (!g) return false;
+    uiSound('sell', Math.min(6, ri));
+    setSure(null);
+    setSold(`Sold ${name} for ${fmt(g)} gold`);
+    refresh();
+    return true;
+  };
+  const best = isBestSquad(st);
+  const putBest = () => {
+    bestSquad(st);
+    if (!st.squad[st.controlled]) st.controlled = Math.max(0, st.squad.findIndex(Boolean));
+    uiSound('equip', 3);
+    setPick(-1);
+    refresh();
+  };
   return (
     <KeeperScreen
       game={game}
@@ -603,6 +630,7 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
       tabs={[
         { id: 'squad', label: 'SQUAD', icon: 'helm10', badge: st.squad.filter((id) => id && canLevel(st, id)).length },
         { id: 'reforge', label: 'REFORGE', icon: 'gem' },
+        { id: 'sell', label: 'SELL', icon: 'coin' },
       ]}
       tab={tab}
       onTab={setTab}
@@ -615,6 +643,9 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
             <Stat icon="stairs" label="Floor" title={`Floor ${floor}, ${biome.name}`}>
               {floor}
             </Stat>
+            <Stat icon="sword" label="Power" title={`Your squad's power; floor ${floor} wants about ${fmt(diff.par)}`}>
+              {fmt(power)}
+            </Stat>
             <span className="dchip" style={{ ['--cc' as string]: ch.color, ['--seal' as string]: `var(--sk-seal-${diff.challenge})`, color: '#2b170c', textShadow: 'none' } as CSSProperties} title={ch.text}>
               {ch.name.toUpperCase()}
             </span>
@@ -626,9 +657,17 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
           <>
             Who goes down? Tap a slot, then <b>ADD</b> a knight to it; <b>LEAD</b> is the one you play. <b>LEVEL UP</b> makes a knight stronger for gold.
           </>
-        ) : (
+        ) : tab === 'reforge' ? (
           <>
             <b>Reforge</b> rolls for a <b>mutation</b> (a big power boost) for gold. A better one replaces the old; a worse one changes nothing.
+          </>
+        ) : sold ? (
+          <b className={s.goodLine}>
+            <Px icon="coin" size="xs" /> {sold}
+          </b>
+        ) : (
+          <>
+            <b>Sell</b> knights you don't need for gold (weakest first). Knights in your squad stay; Rare and up ask twice.
           </>
         )}
       </ShopHint>
@@ -676,10 +715,41 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
           </div>
         ) : (
           <ShopGrid>
-            {all.map((id) => {
+            {(tab === 'sell' ? [...all].reverse() : all).map((id) => {
               const rec = st.roster[id];
               const def = knightDef(id);
               const inSquad = st.squad.includes(id);
+              if (tab === 'sell') {
+                const value = sellValue(st, id);
+                return (
+                  <OfferCard
+                    key={id}
+                    level={`Lv ${rec.level}`}
+                    levelRight={<Px icon={CLASS_ICON[def.cls]} size="xs" />}
+                    art={<HeroArt id={id} mutation={rec.mutation} s={1} />}
+                    tall
+                    tag={rarityTag(id)}
+                    name={def.name}
+                    onArt={() => (uiSound('tap'), onOpen(id))}
+                    lines={[{ icon: 'sword', text: `Power ${fmt(knightRating(st, id))}` }]}
+                    button={
+                      inSquad
+                        ? { kind: 'done', label: 'IN SQUAD' }
+                        : {
+                            kind: 'buy',
+                            verb: sure === id ? 'SURE? SELL' : 'SELL',
+                            label: `+${fmt(value)}`,
+                            icon: 'coin',
+                            ready: true,
+                            gold: true,
+                            onPress: () => sell(id),
+                            paid: `+${fmt(value)}`,
+                            short: 'tap again to sell',
+                          }
+                    }
+                  />
+                );
+              }
               if (tab === 'squad') {
                 const maxed = maxedLevel(st, id);
                 const cost = levelCost(st, id);
@@ -762,16 +832,20 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
         )}
       </ShopBody>
       <ShopFoot>
-        <button className={`btn ${s.smallBtn}`} onClick={() => (bestSquad(st), uiSound('equip', 3), refresh())} title="Put your 3 strongest knights in the squad">
-          <Px icon="star" size="sm" />
-          BEST
+        <button
+          className={`btn ${s.bestBtn}`}
+          data-hot={!best || undefined}
+          disabled={all.length === 0}
+          onClick={putBest}
+          title="Put your 3 strongest knights in the squad"
+        >
+          <Px icon="star" size="md" />
+          <span>
+            BEST SQUAD
+            <small>{best ? 'all set' : 'swap in stronger'}</small>
+          </span>
         </button>
-        <span style={{ flex: 1, minWidth: 0 }}>
-          Power <b>{fmt(power)}</b>
-          <br />
-          floor {floor} wants {fmt(diff.par)}
-        </span>
-        <button className={`btn ${s.bigBtn}`} style={{ flex: 'none' }} disabled={!st.squad.some(Boolean)} onClick={() => (uiSound('embark'), onClose(), game.enterDungeon())}>
+        <button className={`btn ${s.bigBtn}`} disabled={!st.squad.some(Boolean)} onClick={() => (uiSound('embark'), onClose(), game.enterDungeon())}>
           <Px icon="swords" size="md" />
           {game.world ? 'CONTINUE' : 'DESCEND'}
         </button>

@@ -8,10 +8,11 @@
  *   ?camp             stay at camp (the home screen) after ?floor's setup
  *   ?sky=rain         every floor's weather (clear, overcast, rain)
  *   ?design=maze      the next floor's design (world/designs.ts), then the deck as usual
+ *   ?bench=common,rare  extra knights on the bench (not in the squad), one per rarity listed
  * The game is also on window.__game.
  */
 import { isDesign } from './core/deck';
-import { knightId, type ClassId } from './core/knights';
+import { CLASSES, knightId, type ClassId } from './core/knights';
 import { RARITIES, type Rarity } from './core/rarity';
 import { addKnight } from './core/roster';
 import { Game } from './game';
@@ -37,6 +38,13 @@ export function devGame(): Game {
     s.squad = classes.slice(0, 3).map((c) => knightId(rarity, c));
     for (const id of s.squad) if (id && s.roster[id]) s.roster[id].level = Math.max(1, Math.floor(floor * 0.8));
     game.inDungeon = true;
+  }
+  const bench = q.get('bench');
+  if (bench) {
+    const all = Object.keys(CLASSES) as ClassId[];
+    bench.split(',').forEach((r, i) => {
+      if (RARITIES.includes(r as Rarity)) addKnight(s, knightId(r as Rarity, all[(i * 3 + 1) % all.length]), null);
+    });
   }
   const design = q.get('design');
   if (isDesign(design)) s.run.designDeck = [design, ...s.run.designDeck.filter((d) => d !== design)];

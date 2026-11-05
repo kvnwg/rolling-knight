@@ -177,6 +177,43 @@ export function levelUp(state: GameState, id: string): boolean {
   return true;
 }
 
+// ------------------------------------------------------------------ selling
+
+/**
+ * Gold for selling a knight outright: what a duplicate of it pays (twice that with a mutation), plus
+ * half the gold its levels cost.
+ */
+export function sellValue(state: GameState, id: string): number {
+  const rec = state.roster[id];
+  if (!rec) return 0;
+  const R = BAL.roster;
+  const rarity = knightDef(id).rarity;
+  let levels = 0;
+  for (let L = 1; L < rec.level; L++) levels += R.goldBase * Math.pow(R.goldGrowth, L - 1) * Math.pow(R.rarityGrowth, rarityIndex(rarity));
+  if (hasPerk(state, 'handMeDowns') && isUnderdog(rarity)) levels *= 0.5;
+  return Math.max(1, Math.round(dupeGold(state, id) * (rec.mutation ? 2 : 1) + levels * 0.5));
+}
+
+/** A knight can be sold when it isn't in the squad. */
+export function canSell(state: GameState, id: string): boolean {
+  return !!state.roster[id] && !state.squad.includes(id);
+}
+
+/** Sells a knight (gone from the roster; the codex still remembers it). Returns the gold, 0 if it can't be sold. */
+export function sellKnight(state: GameState, id: string): number {
+  if (!canSell(state, id)) return 0;
+  const g = sellValue(state, id);
+  delete state.roster[id];
+  state.gold += g;
+  return g;
+}
+
+/** True when the squad already holds your three strongest knights (or every knight you have). */
+export function isBestSquad(state: GameState): boolean {
+  const top = rankedKnights(state).slice(0, 3);
+  return top.every((id) => state.squad.includes(id));
+}
+
 // ------------------------------------------------------------------ adding knights
 
 /** How long a knight wears its NEW tag after it first joins your roster (real time). */

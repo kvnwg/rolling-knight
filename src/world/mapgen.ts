@@ -335,6 +335,10 @@ export function generateFloor(opts: GenOptions): FloorMap {
   /** Is the floor still all one piece? (Pass the one tile just closed, if that was the only change.) */
   const whole = new Reach(m, start.cx, start.cy);
   const connected = (closed?: number) => (closed === undefined ? whole.all() : whole.closed(closed));
+  // --- the way down: an archway at the back of the exit room (on a boss floor, the arena's far wall)
+  const door = placeDoor(m, exit, boss, () => whole.all());
+  m.exit = { x: door.tx * TILE + 8, y: door.ty * TILE + 8 };
+  const byDoor = (x: number, yy: number) => Math.abs(x - door.tx) <= 2 && yy >= door.ty - 4 && yy <= door.ty + 1;
 
   // --- room plazas on the path material
   for (const r of rooms) {
@@ -365,7 +369,7 @@ export function generateFloor(opts: GenOptions): FloorMap {
 
   // --- pools (never cutting the floor in two)
   const ends = rooms.filter((r) => r.kind === 'start' || r.kind === 'exit' || r.kind === 'arena');
-  const dryAt = (x: number, yy: number) => ends.some((r) => Math.abs(x - r.cx) <= 2 && (Math.abs(yy - r.cy) <= 2 || (r.kind === 'arena' && Math.abs(yy - (r.cy - 3)) <= 1)));
+  const dryAt = (x: number, yy: number) => byDoor(x, yy) || ends.some((r) => Math.abs(x - r.cx) <= 2 && (Math.abs(yy - r.cy) <= 2 || (r.kind === 'arena' && Math.abs(yy - (r.cy - 3)) <= 1)));
   // (A paved town keeps its water in canals, not in pools on the street.)
   if (biome.liquid && !biome.path.everywhere) {
     for (const r of rooms) {
@@ -400,7 +404,7 @@ export function generateFloor(opts: GenOptions): FloorMap {
   // --- props
   const propRng = rng.fork(1);
   const occupied = new Set<number>();
-  const nearCenter = (x: number, yy: number) => rooms.some((r) => (r.kind === 'start' || r.kind === 'exit' || r.kind === 'arena') && Math.abs(x - r.cx) <= 2 && Math.abs(yy - r.cy) <= 2);
+  const nearCenter = (x: number, yy: number) => byDoor(x, yy) || rooms.some((r) => (r.kind === 'start' || r.kind === 'exit' || r.kind === 'arena') && Math.abs(x - r.cx) <= 2 && Math.abs(yy - r.cy) <= 2);
   const floorTiles: number[] = [];
   for (let i = 0; i < m.tiles.length; i++) if (m.tiles[i] === FLOOR) floorTiles.push(i);
   // Wall torches over room walls (rooms layout): on solid tiles with floor right below.
@@ -411,6 +415,7 @@ export function generateFloor(opts: GenOptions): FloorMap {
         if (m.tiles[yy * W + x] !== SOLID || m.tiles[(yy + 1) * W + x] !== FLOOR) continue;
         if (m.tiles[yy * W + x - 1] !== SOLID || m.tiles[yy * W + x + 1] !== SOLID) continue;
         if ((x * 7 + yy * 13) % 9 !== 0 || !propRng.chance(0.55)) continue;
+        if (Math.abs(x - door.tx) <= 2 && yy >= door.ty - 4 && yy <= door.ty) continue;
         m.props.push({ kind: 'torch', x: x * TILE + 8, y: yy * TILE + 15, solid: false, seed: propRng.int(0, 1 << 30), edge: true });
       }
     }
@@ -466,9 +471,6 @@ export function generateFloor(opts: GenOptions): FloorMap {
     const yy = (i / W) | 0;
     m.props.push({ kind: propRng.weighted(pick), x: x * TILE + 8 + propRng.int(-5, 5), y: yy * TILE + 8 + propRng.int(-4, 5), solid: false, seed: propRng.int(0, 1 << 30) });
   }
-  // Lanterns by the exit.
-  m.props.push({ kind: biome.id === 'shrine' ? 'stoneLantern' : biome.layout === 'rooms' ? 'brazier' : 'lantern', x: exit.cx * TILE - 24, y: exit.cy * TILE + 4, solid: false, seed: 1 });
-  m.props.push({ kind: biome.id === 'shrine' ? 'stoneLantern' : biome.layout === 'rooms' ? 'brazier' : 'lantern', x: exit.cx * TILE + 40, y: exit.cy * TILE + 4, solid: false, seed: 2 });
 
   // --- spawns
   const spawnRng = rng.fork(2);
@@ -496,8 +498,42 @@ export function generateFloor(opts: GenOptions): FloorMap {
   });
 
   m.start = { x: start.cx * TILE + 8, y: start.cy * TILE + 8 };
-  m.exit = { x: exit.cx * TILE + 8, y: (exit.cy - (boss ? 0 : 1)) * TILE + 8 };
   return m;
+}
+
+/**
+ * Where the way down's archway stands: three tiles wide, its doorway the middle one (the exit), with
+ * open floor in front for its steps. Best against the back wall of the exit room (the arena's far wall
+ * on a boss floor, well clear of where the boss stands); else anywhere along the room's top half. Its
+ * pillars block, and so does the tile behind the doorway, so you walk into the doorway and stop; a
+ * block that would cut the floor in two stays open. With nowhere that fits, the doorway is just
+ * above the room's middle.
+ */
+function placeDoor(m: FloorMap, room: Room, boss: boolean, whole: () => boolean): { tx: number; ty: number } {
+  const open = (x: number, y: number) => tileAt(m, x, y) === FLOOR;
+  const fits = (x: number, y: number) => [-1, 0, 1].every((d) => open(x + d, y) && open(x + d, y + 1));
+  const backed = (x: number, y: number) => [-1, 0, 1].every((d) => !open(x + d, y - 1));
+  const lo = room.cy - room.ry - 2;
+  const hi = boss ? room.cy - 6 : room.cy - 1;
+  let at: { tx: number; ty: number } | null = null;
+  for (const needBack of [true, false]) {
+    for (const dx of [0, -1, 1, -2, 2, -3, 3]) {
+      for (let y = lo; y <= hi && !at; y++) if (fits(room.cx + dx, y) && (!needBack || backed(room.cx + dx, y))) at = { tx: room.cx + dx, ty: y };
+      if (at) break;
+    }
+    if (at) break;
+  }
+  at ??= { tx: room.cx, ty: room.cy - (boss ? 0 : 1) };
+  const block = (x: number, y: number) => {
+    const i = y * m.w + x;
+    if (m.tiles[i] !== FLOOR) return;
+    m.tiles[i] = BLOCKED;
+    if (!whole()) m.tiles[i] = FLOOR;
+  };
+  block(at.tx - 1, at.ty);
+  block(at.tx + 1, at.ty);
+  block(at.tx, at.ty - 1);
+  return at;
 }
 
 /**

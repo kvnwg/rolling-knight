@@ -260,3 +260,32 @@ describe('a squad on Auto', () => {
     });
   }
 });
+
+describe('the way down', () => {
+  it('stands as an archway: a walkable doorway with room for its steps, blocked pillars and back, reached from the start', () => {
+    let backed = 0;
+    let total = 0;
+    for (const design of FLOOR_DESIGNS) {
+      BIOME_ORDER.forEach((id, bi) => {
+        for (const floor of [3, 5, 10, 22]) {
+          const m = build(design, id, floor, 4321 + floor * 11 + bi);
+          const tag = `${design} ${id} ${floor}`;
+          const [tx, ty] = at(m.exit);
+          expect(tileAt(m, tx, ty), tag).toBe(FLOOR);
+          for (const d of [-1, 0, 1]) expect(tileAt(m, tx + d, ty + 1), `${tag}: steps`).toBe(FLOOR);
+          const [sx, sy] = at(m.start);
+          expect(bfs(m, sx, sy)[ty * m.w + tx], `${tag}: reachable`).toBeGreaterThanOrEqual(0);
+          total++;
+          if (tileAt(m, tx - 1, ty) !== FLOOR && tileAt(m, tx + 1, ty) !== FLOOR && tileAt(m, tx, ty - 1) !== FLOOR) backed++;
+          if (isBossFloor(floor)) {
+            // At the arena's far end, well clear of where the boss stands.
+            const boss = m.spawns.find((s) => s.boss)!;
+            expect(boss.y - m.exit.y, tag).toBeGreaterThanOrEqual(3 * TILE);
+          }
+        }
+      });
+    }
+    // Nearly always a proper doorway (pillars and back blocked).
+    expect(backed / total).toBeGreaterThan(0.9);
+  });
+});

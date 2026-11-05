@@ -13,6 +13,7 @@ import { flash, makeCanvas, mixHex, shade, toCanvas } from './art/draw';
 import { CLASS_HAS_SHIELD, KNIGHT_ANCHOR, knightFrame, knightGlow, knightLook, shieldArt, weaponArt, type KnightLook, type View } from './art/knights';
 import { mobFrame, poseFrames, type MobPose } from './art/mobs';
 import { flameArt, type PropArt } from './art/props';
+import { BAR_STEPS, DOOR_AX, DOOR_AY, DOOR_FRAMES, DOOR_OPENING, LIT_STEPS, doorArt } from './art/exitDoor';
 import { artKey, artOf } from './art/artOf';
 import type { TreeArt } from './art/trees';
 import { Camera } from './camera';
@@ -293,7 +294,7 @@ const PHONE_SHORT_SIDE = 230;
  * At the hub the view comes in much closer (a phone held upright shows about 170 art px across, and
  * a desktop the same from its short side): the hub is one cozy shop front, painted to fill the screen.
  */
-const HUB_SHORT_SIDE = 172;
+const HUB_SHORT_SIDE = 196;
 /** Where your knight sits on the hub's screen, top to bottom: a little below the middle. */
 const HUB_FOCUS_Y = 0.55;
 
@@ -410,7 +411,7 @@ export class Renderer {
     let P = Math.max(2, Math.round(Math.min(cw, ch) / (this.hubZoom ? HUB_SHORT_SIDE : phone ? PHONE_SHORT_SIDE : SHORT_SIDE)));
     // The hub is one painting: closer still where the view would reach far past its edges (a little
     // past is fine: the painting fades into the dark round it).
-    if (this.hubZoom) P = Math.max(P, Math.ceil(cw / (HUB_W * 1.14)), Math.ceil(ch / (HUB_H * 1.14)));
+    if (this.hubZoom) P = Math.max(P, Math.ceil(cw / (HUB_W * 1.3)), Math.ceil(ch / (HUB_H * 1.3)));
     this.P = P;
     this.W = Math.ceil(cw / this.P);
     this.H = Math.ceil(ch / this.P);
@@ -588,8 +589,6 @@ export class Renderer {
       }
     }
     if (!shader && game.state.settings.tiltShift && lead) this.tiltShift(g, sy(lead.y) - 6, w.biome.layout === 'rooms' ? 0.5 : 1);
-    // (The hub paints its own way down: its steps, and the glow at their foot.)
-    if (!hub) this.drawPortal(g, em, w, sx, sy);
     for (const a of w.areas) this.drawArea(g, em, a, sx, sy);
     // Lunges' tells on the ground: a dash's lane, a leap's landing ring.
     for (const m of w.mobs) if (!m.dead && visible(m.x, m.y, 160)) this.drawTell(g, m, sx, sy);
@@ -682,6 +681,8 @@ export class Renderer {
         },
       });
     }
+    // (The hub paints its own way down: its steps, and the glow at their foot.)
+    if (!hub && visible(w.map.exit.x, w.map.exit.y, 80)) list.push({ y: w.map.exit.y - 7, draw: () => this.drawDoor(st, em, w, sx, sy, lead ?? null) });
     for (const m of w.mobs) {
       if (!visible(m.x, m.y)) continue;
       list.push({ y: m.y, draw: () => this.drawMob(st, w, m, sx, sy) });
@@ -696,6 +697,12 @@ export class Renderer {
         y: h.y,
         draw: () => {
           this.drawHero(st, w, h, sx, sy);
+          if (!hub && w.portalOpen && Math.abs(h.x - w.map.exit.x) < 18 && h.y > w.map.exit.y - 8 && h.y < w.map.exit.y + 34) {
+            // Standing in front of the vortex: the knight hides its glow.
+            em.globalCompositeOperation = 'destination-out';
+            this.drawHero(em, w, h, sx, sy, true);
+            em.globalCompositeOperation = 'source-over';
+          }
           if (hub) {
             // Walking in front of a lit window covers it.
             em.globalCompositeOperation = 'destination-out';
@@ -1730,35 +1737,67 @@ export class Renderer {
     ctx.globalAlpha = 1;
   }
 
-  private drawPortal(ctx: Ctx, em: Ctx, w: World, sx: (x: number) => number, sy: (y: number) => number): void {
-    const x = sx(w.map.exit.x);
-    const y = sy(w.map.exit.y);
-    // The stone ring is always there; it lights up while the way down is open.
-    ctx.fillStyle = '#2a2830';
-    this.ellipse(ctx, x, y, 11, 5);
-    ctx.fillStyle = '#5a5866';
-    this.ellipse(ctx, x, y - 1, 10, 4);
-    ctx.fillStyle = w.portalOpen ? '#1a0a3a' : '#16141c';
-    this.ellipse(ctx, x, y - 1, 8, 3);
-    if (!w.portalOpen) return;
-    const t = this.time;
-    for (let i = 0; i < 18; i++) {
-      const a = (i / 18) * Math.PI * 2 + t * 3;
-      const r = 7 - ((i + Math.floor(t * 10)) % 4);
-      em.fillStyle = i % 3 === 0 ? '#ffffff' : i % 3 === 1 ? '#b08aff' : '#7ad8ff';
-      em.fillRect(x + Math.round(Math.cos(a) * r), y - 1 + Math.round(Math.sin(a) * r * 0.45), 1, 1);
+  /** The way down's archway: the doorway (vortex, or dark behind the portcullis), the frame, its rim light and the stones you light by standing in it. */
+  private doorAnim: { world: World | null; open: boolean; at: number } = { world: null, open: false, at: -1 };
+  private doorCanvas(key: string, buf: PixelBuf): HTMLCanvasElement {
+    return this.cached(`door|${key}`, () => toCanvas(buf));
+  }
+  private drawDoor(st: Ctx, em: Ctx, w: World, sx: (x: number) => number, sy: (y: number) => number, lead: Unit | null): void {
+    const art = doorArt();
+    const a = this.doorAnim;
+    // A floor that starts open shows it open; one that opens while you watch winds its portcullis up.
+    if (a.world !== w) {
+      a.world = w;
+      a.open = w.portalOpen;
+      a.at = w.portalOpen ? -1e9 : -1;
     }
-    if (Math.random() < 0.4) this.particles.push(this.p('mote', w.map.exit.x + (Math.random() - 0.5) * 14, w.map.exit.y, '#c8a8ff', 1.2, -18));
-    // Standing in it: a white ring fills round the stone, clockwise from the top, until you go down.
-    const k = Math.min(1, w.exitHold / EXIT_HOLD);
-    if (k > 0) {
-      const n = 28;
-      em.fillStyle = '#ffffff';
-      for (let i = 0; i < Math.round(n * k); i++) {
-        const a = -Math.PI / 2 + (i / n) * Math.PI * 2;
-        em.fillRect(x + Math.round(Math.cos(a) * 12), y - 1 + Math.round(Math.sin(a) * 6), 1, 1);
+    if (w.portalOpen && !a.open) {
+      a.open = true;
+      a.at = this.time;
+    }
+    const lift = !w.portalOpen ? 0 : Math.min(1, (this.time - a.at) / 1.2);
+    const x = sx(w.map.exit.x) - DOOR_AX;
+    const y = sy(w.map.exit.y + 8) - DOOR_AY;
+    // Your knight behind it: the arch turns see-through.
+    const behind = !!lead && lead.y < w.map.exit.y - 8 && lead.y > w.map.exit.y - 70 && Math.abs(lead.x - w.map.exit.x) < 30;
+    st.globalAlpha = behind ? 0.45 : 1;
+    const fr = Math.floor(this.time * 10) % DOOR_FRAMES;
+    const vortex = Math.max(0, Math.min(1, (lift - 0.35) / 0.65));
+    if (vortex < 1) st.drawImage(this.doorCanvas('sealed', art.sealed.buf), x, y);
+    if (vortex > 0) {
+      st.globalAlpha *= vortex;
+      st.drawImage(this.doorCanvas(`open${fr}`, art.open[fr].buf), x, y);
+      st.globalAlpha = behind ? 0.45 : 1;
+      em.globalAlpha = vortex * (behind ? 0.45 : 1);
+      em.drawImage(this.doorCanvas(`open${fr}g`, art.open[fr].glow), x, y);
+      em.globalAlpha = 1;
+    }
+    if (lift < 1) {
+      const k = Math.round(lift * BAR_STEPS);
+      st.drawImage(this.doorCanvas(`bars${k}`, art.bars[k].buf), x, y);
+    }
+    st.drawImage(this.doorCanvas('frame', art.frame.buf), x, y);
+    if (vortex > 0) {
+      st.globalAlpha *= vortex;
+      st.drawImage(this.doorCanvas('rim', art.rim.buf), x, y);
+      st.globalAlpha = behind ? 0.45 : 1;
+      em.globalAlpha = vortex;
+      em.drawImage(this.doorCanvas('rimg', art.rim.glow), x, y);
+      em.globalAlpha = 1;
+      // Standing in it: the inner ring's stones light up from both ends to the keystone, then down you go.
+      const n = Math.min(LIT_STEPS, Math.ceil((w.exitHold / EXIT_HOLD) * LIT_STEPS));
+      if (n > 0) {
+        st.drawImage(this.doorCanvas(`lit${n}`, art.lit[n].buf), x, y);
+        em.drawImage(this.doorCanvas(`lit${n}g`, art.lit[n].glow), x, y);
+      }
+      // Sparks drifting out of the doorway.
+      if (Math.random() < 0.35 * vortex) {
+        const px = w.map.exit.x - DOOR_AX + DOOR_OPENING.x + 2 + Math.random() * (DOOR_OPENING.w - 4);
+        const py = w.map.exit.y + 8 - DOOR_AY + DOOR_OPENING.y + DOOR_OPENING.h * (0.35 + Math.random() * 0.6);
+        this.particles.push(this.p('mote', px, py, Math.random() < 0.5 ? '#ffe484' : '#ffc040', 1.3, -14));
       }
     }
+    st.globalAlpha = 1;
   }
 
   private drawLiquidShimmer(ctx: Ctx, w: World, cx: number, cy: number): void {
@@ -1881,7 +1920,10 @@ export class Renderer {
         out.push({ x: sx(m.x + (m.moveX * L.reach) / 2), y: sy(m.y + (m.moveY * L.reach) / 2), r: L.reach * 0.55, color: '#ff4a3a', intensity: 0.3 });
       }
     }
-    if (w.portalOpen) out.push({ x: sx(w.map.exit.x), y: sy(w.map.exit.y) - 4, r: 60, color: '#b08aff', intensity: 1, bloom: true });
+    if (!w.hub) {
+      if (w.portalOpen) out.push({ x: sx(w.map.exit.x), y: sy(w.map.exit.y) - 14, r: 78, color: '#ffc45a', intensity: 1.05, bloom: true });
+      else out.push({ x: sx(w.map.exit.x), y: sy(w.map.exit.y) - 14, r: 30, color: '#8a7aa8', intensity: 0.3 });
+    }
     // Traps: a red glow on one about to strike (the game's telegraph color), and a fire vent lights
     // the room while it burns.
     for (const tr of w.traps) {
@@ -2019,7 +2061,7 @@ export class Renderer {
         break;
       case 'portal':
         this.flashT = 0.35;
-        add(24, (i) => ({ ...this.p('mote', f.x + Math.cos(i) * 10, f.y + Math.sin(i) * 5, '#c8a8ff', 1.4), vz: 26 + Math.random() * 20 }));
+        add(28, (i) => ({ ...this.p('mote', f.x + Math.cos(i) * 12, f.y - 10 + Math.sin(i) * 14, i % 3 ? '#ffd27a' : '#fff3bc', 1.5), vz: 26 + Math.random() * 20 }));
         break;
       case 'land': {
         // A lunge comes down: a ring of dust thrown out along the ground, and a shock ring for a big one.
@@ -2208,7 +2250,7 @@ export class Renderer {
     const lead = w.leader();
     if (!lead) return;
     const living = w.livingMobs();
-    const targets = [...(w.portalOpen ? [{ x: w.map.exit.x, y: w.map.exit.y, color: '#c8a8ff' }] : []), ...(living.length <= 3 ? living.map((m) => ({ x: m.x, y: m.y, color: '#ff6a5a' })) : [])];
+    const targets = [...(w.portalOpen ? [{ x: w.map.exit.x, y: w.map.exit.y, color: '#ffd27a' }] : []), ...(living.length <= 3 ? living.map((m) => ({ x: m.x, y: m.y, color: '#ff6a5a' })) : [])];
     for (const t of targets) {
       const x = sx(t.x);
       const y = sy(t.y);
