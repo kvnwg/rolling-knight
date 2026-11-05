@@ -88,7 +88,7 @@ export const BAL = {
     /** Gold for selling a duplicate, in kills' worth of gold at your best floor. */
     sellKills: {
       common: 1, uncommon: 2, rare: 5, epic: 15, legendary: 80, mythic: 600, ancient: 900, exalted: 1400,
-      celestial: 2200, astral: 3500, divine: 6000, eternal: 10000, primordial: 20000,
+      celestial: 2200, astral: 3500, divine: 6000, eternal: 10000, primordial: 20000, absolute: 100000,
     },
   },
   /**

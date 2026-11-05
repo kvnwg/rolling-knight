@@ -85,6 +85,8 @@ const TIERS: Record<Rarity, Tier> = {
   eternal: { metal: ramp([0.32, 0.4, 0.49, 0.6], 0.035, 296, 3), cloth: ramp(clothL(0.5), 0.08, 296), accent: ramp([0.66, 0.75], 0.05, 300), leather: ramp([0.31, 0.35, 0.4], 0.02, 300) },
   // Cycling (see primordialTier); this is its look at step 0.
   primordial: { metal: PF.gold, cloth: PF.accentGold, accent: PF.accentGold, leather: PF.leatherDark },
+  // Kevin: no shining armor, just plain dark clothes (he doesn't need it).
+  absolute: { metal: ramp([0.3, 0.38, 0.47, 0.56], 0.01, 260, 4), cloth: ramp(clothL(0.3), 0.01, 260), accent: ramp([0.5, 0.58], 0.01, 260), leather: PF.leatherDark },
 };
 
 /** Hue steps a Primordial knight's colors cycle through (palettes are cached per step). */

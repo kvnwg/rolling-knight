@@ -158,7 +158,8 @@ export function startSpin(state: GameState, rng: Rng, nowMs: number, emit: Event
       const pity = tut === 'done' && dry >= drySpell(state) ? BAL.roll.pity.rarity : null;
       const floor = higherRarity(higherRarity(chainFloor(mult), pity), rigged ? 'legendary' : null) ?? 'common';
       const rarity = scriptedSpin || tut !== 'done' ? rollRarity(Math.min(luck, 2), rng) : rollRarity(luck * mult, rng, floor);
-      pick = { rarity, cls: rng.pick(classes), mutation: rollMutation(rng, fx.mutationMult) };
+      // (The Absolute tier has one knight, whatever classes are unlocked: Kevin.)
+      pick = { rarity, cls: rarity === 'absolute' ? 'blade' : rng.pick(classes), mutation: rollMutation(rng, fx.mutationMult) };
     }
     dry = rarityAtLeast(pick.rarity, BAL.roll.pity.rarity) ? 0 : dry + 1;
     picks.push(pick);

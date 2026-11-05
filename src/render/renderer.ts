@@ -687,6 +687,12 @@ export class Renderer {
           offY: this.sub.y,
           focusY,
           dof: settings.tiltShift && biome ? (biome.layout === 'rooms' ? 0.5 : 1) : 0,
+          // The lens over the whole picture: a miniature's tilt-shift (soft above and below the band
+          // your knight is in) and a soft glow; the hub is softer and glowier still, its shop front
+          // (the far end) kept fairly crisp.
+          ...(hubLook
+            ? { tiltFar: settings.tiltShift ? 0.35 : 0, tiltNear: settings.tiltShift ? 0.85 : 0, soft: 0.5 }
+            : { tiltFar: settings.tiltShift ? (biome?.layout === 'rooms' ? 0.45 : 0.75) : 0, tiltNear: settings.tiltShift ? 0.6 : 0, soft: 0.3 }),
           ...grade,
           clouds: biome ? cloudShadows(biome, sky) : 0,
           camX: this.origin.x,

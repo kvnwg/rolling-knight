@@ -9,7 +9,9 @@ class's list and fires it. Between dives
 you walk round the hub, a lamplit square before the Gilded Reel, where each keeper runs one counter:
 the Oracle's altar, the smith, the junk dealer, the quartermaster, the tinker's hex map of upgrades
 (with chance upgrades like Ricochet and Double or Nothing), the sage, the rebirth shrine, the notice
-board, and the warden by the steps down: walk down them to dive. Duplicates become shards or gold; shards level your knights. Rebirth
+board, and the warden by the steps down: walk down them to dive. Above all of them, at 1 in 2.5 billion, sits the Absolute tier and its one knight: Kevin, a
+black-haired normal guy and the strongest in the game by far. Duplicates become shards or gold;
+shards level your knights. Rebirth
 for permanent luck and power; perks from the first rebirth change how a run plays. Folk on the floors
 hand out jobs, and one of them may be a demon in disguise.
 
@@ -40,9 +42,10 @@ How every system works, with its numbers: [`DESIGN.md`](DESIGN.md). Art sources 
   with bloom, then a grade and a vignette. Daylight is lifted near white; out in the open each floor
   rolls its weather (clear, overcast, or rain with splashes, rings on water and a rain sound), and
   cloud shadows drift over sunny floors. Weather per biome too: fireflies, snow, embers, petals, fog.
-- Tilt-shift: the ground goes soft the further past your knight it lies, and a little at the bottom
-  edge, so the dungeon looks like a miniature; anything standing (trees, props, characters) stays
-  crisp. Half strength indoors (crypts, lava caves). A switch in Settings turns it off.
+- Tilt-shift: the picture goes soft above and below the band your knight stands in (trees, props and
+  all, the ground most), so the dungeon looks like a miniature; a soft glow lets every light bleed a
+  little into the shadows round it. Gentler indoors (crypts, lava caves); the hub is softer and
+  glowier still. A switch in Settings turns the tilt-shift off.
 - One pixel size: everything is drawn at art resolution (about 270 art pixels on the screen's short
   side) and scaled up by a whole number. The camera follows on a critically damped spring and scrolls
   by sub-pixels in the shader, so the world glides while every sprite stays on the grid.

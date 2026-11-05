@@ -4,7 +4,7 @@ import { KNIGHTS, knightId } from '../src/core/knights';
 import { currentLuck, oneInFor } from '../src/core/luck';
 import { canRebirth, newGame, rebirth } from '../src/core/newGame';
 import { buyPerk } from '../src/core/perks';
-import { RARITIES, RARITY_ODDS, rarityAtLeast, rarityChances, rollRarity } from '../src/core/rarity';
+import { RARITIES, RARITY_ODDS, RARITY_STAT, rarityAtLeast, rarityChances, rollRarity } from '../src/core/rarity';
 import { Rng } from '../src/core/rng';
 import { chainFloor, comboSteps, performSpin, reelCount, rollTokens, spinCycle, tokenMult } from '../src/core/roller';
 import { addKnight, knightPower, levelMult, levelUp, sellDupes, shardDupes } from '../src/core/roster';
@@ -18,7 +18,7 @@ function done(seed = 1): GameState {
 
 describe('rarity', () => {
   it('has 13 tiers, each rarer than the last', () => {
-    expect(RARITIES.length).toBe(13);
+    expect(RARITIES.length).toBe(14);
     for (let i = 2; i < RARITIES.length; i++) expect(RARITY_ODDS[RARITIES[i]]).toBeGreaterThan(RARITY_ODDS[RARITIES[i - 1]]);
   });
 
@@ -133,8 +133,11 @@ describe('reels', () => {
 });
 
 describe('roster', () => {
-  it('has a knight per class per tier', () => {
-    expect(KNIGHTS.length).toBe(13 * 6);
+  it('has a knight per class per tier, and one Absolute knight: Kevin', () => {
+    expect(KNIGHTS.length).toBe(13 * 6 + 1);
+    const top = KNIGHTS.filter((k) => k.rarity === 'absolute');
+    expect(top.map((k) => k.name)).toEqual(['Kevin']);
+    expect(RARITY_STAT.absolute).toBeGreaterThan(RARITY_STAT.primordial * 3);
   });
 
   it('turns repeats into duplicates you can shard or sell', () => {

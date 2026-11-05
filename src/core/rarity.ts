@@ -6,7 +6,7 @@
 import type { Rng } from './rng';
 
 export const RARITIES = [
-  'common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'ancient', 'exalted', 'celestial', 'astral', 'divine', 'eternal', 'primordial',
+  'common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'ancient', 'exalted', 'celestial', 'astral', 'divine', 'eternal', 'primordial', 'absolute',
 ] as const;
 export type Rarity = (typeof RARITIES)[number];
 
@@ -24,11 +24,14 @@ export const RARITY_ODDS: Record<Rarity, number> = {
   divine: 5_000_000,
   eternal: 25_000_000,
   primordial: 250_000_000,
+  // One knight lives here: Kevin.
+  absolute: 2_500_000_000,
 };
 
 export const RARITY_NAME: Record<Rarity, string> = {
   common: 'Common', uncommon: 'Uncommon', rare: 'Rare', epic: 'Epic', legendary: 'Legendary', mythic: 'Mythic', ancient: 'Ancient',
   exalted: 'Exalted', celestial: 'Celestial', astral: 'Astral', divine: 'Divine', eternal: 'Eternal', primordial: 'Primordial',
+  absolute: 'Absolute',
 };
 
 /** UI color per tier (Dumpster Legend's ladder: gray, green, blue, purple, gold, pink...). */
@@ -46,12 +49,15 @@ export const RARITY_COLOR: Record<Rarity, string> = {
   divine: '#fff4d6',
   eternal: '#c9b3ff',
   primordial: '#fff07a',
+  absolute: '#ffffff',
 };
 
 /** Base stat multiplier per tier (Dumpster Legend's rarity mults). */
 export const RARITY_STAT: Record<Rarity, number> = {
   common: 1, uncommon: 1.4, rare: 2, epic: 3, legendary: 4.8, mythic: 8, ancient: 9.5, exalted: 11,
   celestial: 12.5, astral: 14, divine: 18, eternal: 23, primordial: 30,
+  // Kevin: the strongest in the game by far.
+  absolute: 100,
 };
 
 export function rarityIndex(r: Rarity): number {

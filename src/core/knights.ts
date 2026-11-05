@@ -90,21 +90,24 @@ export const CLASSES: Record<ClassId, ClassDef> = {
 };
 
 /** One knight per class per tier, in CLASS_IDS order. */
-const NAMES: Record<Rarity, readonly string[]> = {
-  common: ['Bucket Bob', 'Squire Tam', 'Pip Fletcher', 'Brother Mott', 'Wick the Apprentice', 'Pitchfork Pete'],
-  uncommon: ['Sir Brannoc', 'Sir Edric', 'Wren Ashwood', 'Sister Maude', 'Corvin Inkfinger', 'Sir Harlan'],
-  rare: ['Dame Ironhold', 'Sir Kestrel', 'Lyra Swiftwind', 'Father Aldous', 'Morwen Starling', 'Sir Valen'],
-  epic: ['Grimwald the Bastion', 'Seraphine Duskblade', 'Thorne Nightquill', 'Abbess Ylva', 'Zephyrine Hexweaver', 'Draven Stormspear'],
-  legendary: ['Aurelion Goldwall', 'Lancelyn the Radiant', 'Sylvaris Dawnbow', 'Saint Benedra', 'Archmage Orlanth', 'Sir Gideon Sunlance'],
-  mythic: ['Brakkus Dragonhide', 'Kaida Bloodmoon', 'Ysolde Moonshadow', 'Oracle Celestine', 'Chronomancer Aeon', 'Valkyr Skyrender'],
-  ancient: ['The Stone Warden', 'Rhovan the Undying', 'Elder Fennwick', 'High Priestess Anwe', 'Thalgrim Elder Rune', 'Tarsus Bronzehelm'],
-  exalted: ['Exarch Corin', 'Sir Aethelstan', 'Vael Starfletch', 'Hierophant Lumen', 'Magister Ozymand', 'Halberdier Seraph'],
-  celestial: ['Atlas Skyward', 'Orion Stellarblade', 'Vega Comet-Eye', 'Lumina of the Spheres', 'Nebulon Starwright', 'Polaris Spearstar'],
-  astral: ['Bulwark of Aeons', 'Riven Astralis', 'Quasar Huntress', 'Aurora Mender', 'Cosmara Riftmind', 'Zenith Lancer'],
-  divine: ['Godshield Theron', 'Excalibrant', 'Artemisia', 'Saint Solenne', 'Merlinus Prime', 'Michael of the Spear'],
-  eternal: ['The Unbroken', 'Eternblade Kairo', 'Everbow Nyx', 'Mother of Mercy', 'Malakar Voidcaller', 'Infinity Pike'],
-  primordial: ['Titan of First Dawn', 'The Origin Blade', 'Genesis Archer', 'The First Light', 'Primarch Arcanum', 'Worldspear Ymir'],
+const NAMES: Record<Exclude<Rarity, 'absolute'>, readonly string[]> = {
+  common: ['Bucket Bob', 'Tam', 'Pip', 'Mott', 'Wick', 'Pete'],
+  uncommon: ['Brannoc', 'Edric', 'Wren', 'Maude', 'Corvin', 'Harlan'],
+  rare: ['Ironhold', 'Kestrel', 'Lyra', 'Aldous', 'Morwen', 'Valen'],
+  epic: ['Grimwald', 'Seraphine', 'Thorne', 'Ylva', 'Zephyra', 'Draven'],
+  legendary: ['Aurelion', 'Lancelyn', 'Sylvaris', 'Benedra', 'Orlanth', 'Gideon'],
+  mythic: ['Brakkus', 'Kaida', 'Ysolde', 'Celestine', 'Aeon', 'Valkyr'],
+  ancient: ['Stonewall', 'Rhovan', 'Fennwick', 'Anwe', 'Thalgrim', 'Tarsus'],
+  exalted: ['Corin', 'Aethel', 'Vael', 'Lumen', 'Ozymand', 'Halvard'],
+  celestial: ['Atlas', 'Orion', 'Vega', 'Lumina', 'Nebulon', 'Polaris'],
+  astral: ['Bastion', 'Riven', 'Quasar', 'Aurora', 'Cosmara', 'Zenith'],
+  divine: ['Theron', 'Caliburn', 'Artemis', 'Solenne', 'Merlin', 'Michael'],
+  eternal: ['Unbroken', 'Kairo', 'Nyx', 'Mercy', 'Malakar', 'Kael'],
+  primordial: ['Titan', 'Origin', 'Genesis', 'Dawn', 'Arcanum', 'Ymir'],
 };
+
+/** The Absolute tier's one knight: a black-haired normal guy, the strongest in the game by far. */
+export const KEVIN_ID = 'absolute-blade';
 
 export interface KnightDef {
   id: string;
@@ -116,20 +119,22 @@ export interface KnightDef {
 }
 
 export const KNIGHTS: KnightDef[] = RARITIES.flatMap((rarity, ri) =>
-  CLASS_IDS.map((cls, ci) => ({
-    id: `${rarity}-${cls}`,
-    name: NAMES[rarity][ci],
-    cls,
-    rarity,
-    hue: ((ri * 7 + ci * 3) % 13) / 13,
-  })),
+  rarity === 'absolute'
+    ? [{ id: KEVIN_ID, name: 'Kevin', cls: 'blade' as ClassId, rarity: rarity as Rarity, hue: 0 }]
+    : CLASS_IDS.map((cls, ci): KnightDef => ({
+        id: `${rarity}-${cls}`,
+        name: NAMES[rarity][ci],
+        cls,
+        rarity,
+        hue: ((ri * 7 + ci * 3) % 13) / 13,
+      })),
 );
 
 export const KNIGHTS_BY_ID = new Map(KNIGHTS.map((k) => [k.id, k]));
 
 /**
  * Signature specials: a few rare knights replace their class's special with one of their own.
- * Chronomancer Aeon (Mythic Arcanist) rewinds time.
+ * Aeon (the Mythic Arcanist) rewinds time.
  */
 export interface Signature extends SkillDef {
   id: 'rewind';

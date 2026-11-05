@@ -13,7 +13,7 @@ import type { Game } from '../game';
 import { KNIGHT_PIC_H, KNIGHT_PIC_W, knightUrl } from './sprites';
 
 const FILLER: Record<Rarity, number> = {
-  common: 12, uncommon: 16, rare: 18, epic: 20, legendary: 18, mythic: 10, ancient: 8, exalted: 7, celestial: 6, astral: 6, divine: 4, eternal: 3, primordial: 2,
+  common: 12, uncommon: 16, rare: 18, epic: 20, legendary: 18, mythic: 10, ancient: 8, exalted: 7, celestial: 6, astral: 6, divine: 4, eternal: 3, primordial: 2, absolute: 1,
 };
 
 const imgCache = new Map<string, HTMLImageElement>();

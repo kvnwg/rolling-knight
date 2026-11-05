@@ -547,7 +547,7 @@ export class World {
     };
   }
 
-  /** Rewind (Chronomancer Aeon): time runs backwards to 4 seconds ago, for the squad. */
+  /** Rewind (Aeon, the Mythic Arcanist): time runs backwards to 4 seconds ago, for the squad. */
   startRewind(): boolean {
     if (this.rewind || this.history.length < 5) return false;
     const back = Math.min(this.history.length, 40);

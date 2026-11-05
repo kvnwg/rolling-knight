@@ -33,6 +33,7 @@ export const METAL: Record<Rarity, readonly string[]> = {
   divine: ['#5a3a14', '#a8783a', '#e8c06a', '#fff0b8', '#ffffff'],
   eternal: ['#0a0612', '#1e1430', '#3a2860', '#6a4ab0', '#c0a8ff'],
   primordial: ['#3a1450', '#a03a8a', '#f07a5a', '#ffd25a', '#ffffff'],
+  absolute: ['#1a1a1e', '#34343c', '#55555e', '#8a8a94', '#d0d0d8'],
 };
 
 const SKINS: ReadonlyArray<readonly string[]> = [

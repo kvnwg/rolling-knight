@@ -6,6 +6,9 @@
  *  - light is a smooth light map (sampled with linear filtering) that can push past white, so torches
  *    and lava really glow; emissive things (fire, magic, sparks) are added after the light;
  *  - bloom: the brightest parts are blurred at quarter resolution and added back;
+ *  - a lens: the whole lit picture blurred twice (half and quarter resolution); the final pass blends
+ *    toward them away from the focus row (tilt-shift: a miniature's sharp band), and lets the wide
+ *    blur bleed into darker pixels (a soft glow round every light);
  *  - height haze with drifting noise (fog that thickens toward the top of the view), soft light shafts
  *    outdoors, a color grade (shadows pushed cool, highlights warm, a little extra saturation), a
  *    smooth vignette and a whisper of film grain;
@@ -57,6 +60,14 @@ export interface PostParams {
   rewind: number;
   /** The least and most light on the `cap` layer's pixels (the rest of the scene is lit as is). */
   capRange?: [number, number];
+  /**
+   * Tilt-shift over the whole picture, standing things included: how soft it gets above the focus
+   * row (further away) and below it (nearer), 0 off; and the soft glow (light bleeding into the
+   * shadows round it, a diffusion filter), 0 off.
+   */
+  tiltFar?: number;
+  tiltNear?: number;
+  soft?: number;
 }
 
 const VERT = `#version 300 es
@@ -178,6 +189,12 @@ in vec2 v_uv;
 out vec4 o;
 uniform sampler2D u_lit;
 uniform sampler2D u_bloom;
+uniform sampler2D u_lens1;
+uniform sampler2D u_lens2;
+uniform float u_focus;
+uniform float u_tiltFar;
+uniform float u_tiltNear;
+uniform float u_soft;
 uniform sampler2D u_ui;
 uniform vec2 u_artScale;
 uniform vec2 u_artOff;
@@ -197,6 +214,19 @@ float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.545
 
 void main() {
   vec3 c = texture(u_lit, v_uv).rgb;
+  vec3 l1 = texture(u_lens1, v_uv).rgb;
+  vec3 l2 = texture(u_lens2, v_uv).rgb;
+  // Tilt-shift: a sharp band round the focus row; the picture goes soft above it (further away) and
+  // below it (nearer), more toward the edges, through the light blur and then the wide one.
+  float sy = 1.0 - v_uv.y;
+  float far = smoothstep(u_focus - 0.08, u_focus - 0.62, sy) * u_tiltFar;
+  float near = smoothstep(u_focus + 0.16, u_focus + 0.6, sy) * u_tiltNear;
+  float dof = clamp(max(far, near), 0.0, 1.0);
+  c = dof < 0.5 ? mix(c, l1, dof * 2.0) : mix(l1, l2, dof * 2.0 - 1.0);
+  // Soft glow: the wide blur bleeds into pixels darker than it (light spills into the shadows round
+  // it), and every edge softens a touch.
+  c = mix(c, l1, u_soft * 0.18);
+  c += max(vec3(0.0), l2 - c) * u_soft;
   vec3 b = texture(u_bloom, v_uv).rgb;
   c += b * u_bloomAmt;
   // Filmic shoulder so the glows roll off instead of clipping.
@@ -244,7 +274,7 @@ export class Post {
   private tex: Record<keyof PostLayers, WebGLTexture> | null = null;
   private nearest: WebGLSampler | null = null;
   private linear: WebGLSampler | null = null;
-  private targets: Record<'lit' | 'dofA' | 'dofB' | 'bloomA' | 'bloomB', Target> | null = null;
+  private targets: Record<'lit' | 'dofA' | 'dofB' | 'bloomA' | 'bloomB' | 'lensA' | 'lensB' | 'lensC' | 'lensD', Target> | null = null;
   private w = 0;
   private h = 0;
   private vao: WebGLVertexArrayObject | null = null;
@@ -357,6 +387,10 @@ export class Post {
       dofB: this.target(hw, hh),
       bloomA: this.target(qw, qh),
       bloomB: this.target(qw, qh),
+      lensA: this.target(hw, hh),
+      lensB: this.target(hw, hh),
+      lensC: this.target(qw, qh),
+      lensD: this.target(qw, qh),
     };
   }
 
@@ -409,10 +443,11 @@ export class Post {
     const artScale: [number, number] = [W / (p.artW * p.scale), H / (p.artH * p.scale)];
     const artOff: [number, number] = [(p.offX ?? 0) / p.artW, (p.offY ?? 0) / p.artH];
     // 1. The ground blurred (for depth of field), at half resolution. Canvas textures are top-down.
+    // Several narrow passes rather than one wide one: a wide pass's taps fall several art pixels apart
+    // and beat against the pixel grid (a screen-door pattern); narrow ones stack into a smooth blur.
     const blurPx = Math.max(1, p.scale * 0.9);
-    this.blur(this.tex!.ground, p.artW * p.scale * 0.5, p.artH * p.scale * 0.5, true, t.dofA, t.dofB, blurPx * 0.5);
-    // Twice, wider the second time: a deep, smooth blur (one half-strength pass leaves stones smeared, not soft).
-    this.blur(t.dofB.tex, t.dofB.w, t.dofB.h, false, t.dofA, t.dofB, blurPx * 1.3);
+    this.blur(this.tex!.ground, p.artW * p.scale * 0.5, p.artH * p.scale * 0.5, true, t.dofA, t.dofB, blurPx * 0.4);
+    for (const k of [0.55, 0.7, 0.85]) this.blur(t.dofB.tex, t.dofB.w, t.dofB.h, false, t.dofA, t.dofB, blurPx * k);
     // The blurred copy covers the whole texture (bottom-up), so the composite samples it through the
     // same crop and slide as the sharp layers.
     // 2. Composite.
@@ -438,6 +473,19 @@ export class Post {
     gl.uniform2f(gl.getUniformLocation(c, 'u_cam'), p.camX ?? 0, p.camY ?? 0);
     gl.uniform2f(gl.getUniformLocation(c, 'u_artSize'), p.artW, p.artH);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+    // 2b. The lens: the lit picture blurred lightly at half resolution (lensB), then widely at
+    // quarter resolution (lensD), for the tilt-shift and the soft glow.
+    const lensOn = (p.tiltFar ?? 0) > 0 || (p.tiltNear ?? 0) > 0 || (p.soft ?? 0) > 0;
+    if (lensOn) {
+      // Narrow passes only (taps a texel or two apart at each level), so nothing beats against the
+      // pixel grid: full to half resolution, once more at half; then down to quarter and twice more.
+      const k = Math.max(1, p.scale / 4);
+      this.blur(t.lit.tex, W, H, false, t.lensA, t.lensB, k);
+      this.blur(t.lensB.tex, t.lensB.w, t.lensB.h, false, t.lensA, t.lensB, k);
+      this.blur(t.lensB.tex, t.lensB.w, t.lensB.h, false, t.lensC, t.lensD, k);
+      this.blur(t.lensD.tex, t.lensD.w, t.lensD.h, false, t.lensC, t.lensD, k);
+      this.blur(t.lensD.tex, t.lensD.w, t.lensD.h, false, t.lensC, t.lensD, k * 1.3);
+    }
     // 3. Bloom: bright pass at quarter resolution, then a wide blur, twice.
     const br = this.progs!.bright;
     this.pass(br, t.bloomA);
@@ -451,6 +499,12 @@ export class Post {
     this.bind(0, t.lit.tex, this.linear!, f, 'u_lit');
     this.bind(1, t.bloomA.tex, this.linear!, f, 'u_bloom');
     this.bind(2, this.tex!.ui, this.nearest!, f, 'u_ui');
+    this.bind(3, lensOn ? t.lensB.tex : t.lit.tex, this.linear!, f, 'u_lens1');
+    this.bind(4, lensOn ? t.lensD.tex : t.lit.tex, this.linear!, f, 'u_lens2');
+    gl.uniform1f(gl.getUniformLocation(f, 'u_focus'), p.focusY);
+    gl.uniform1f(gl.getUniformLocation(f, 'u_tiltFar'), lensOn ? (p.tiltFar ?? 0) : 0);
+    gl.uniform1f(gl.getUniformLocation(f, 'u_tiltNear'), lensOn ? (p.tiltNear ?? 0) : 0);
+    gl.uniform1f(gl.getUniformLocation(f, 'u_soft'), lensOn ? (p.soft ?? 0) : 0);
     gl.uniform2f(gl.getUniformLocation(f, 'u_artScale'), artScale[0], artScale[1]);
     gl.uniform2f(gl.getUniformLocation(f, 'u_artOff'), artOff[0], artOff[1]);
     gl.uniform1f(gl.getUniformLocation(f, 'u_bloomAmt'), p.bloom);
