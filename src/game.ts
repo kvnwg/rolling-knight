@@ -14,6 +14,10 @@ import { floorDifficulty, squadPower, type Difficulty } from './core/power';
 import { Rng } from './core/rng';
 import { rollTick } from './core/roller';
 import { fillSquad, goldMult, killGold, knightStats, soloBonus, squadSize } from './core/roster';
+import { RUN_ITEMS, canStack, runMults, type RunItemId } from './core/runItems';
+import { CLASS_SKILLS, SKILLS, tierStep } from './core/skillbook';
+import { placeShop, type Ware } from './world/shop';
+import { rigSkill } from './world/skills';
 import { clearSave, loadGame, saveGame } from './core/save';
 import type { GameState } from './core/state';
 import { CAMP_BIOME, biomeForFloor, isBossFloor, type Biome } from './world/biomes';
@@ -105,7 +109,13 @@ export class Game {
   };
 
   get luck(): number {
-    return currentLuck(this.state, Date.now());
+    return currentLuck(this.state, Date.now()) * runMults(this.state.run.items).luck;
+  }
+
+  /** A knight's stats with the run's merchant items on top (Whetstone Oil, Iron Tonic, Swift Tonic). */
+  private runStats<T extends { atk: number; hp: number; atkCd: number }>(st: T): T {
+    const m = runMults(this.state.run.items);
+    return { ...st, atk: st.atk * m.dmg, hp: st.hp * m.hp, atkCd: st.atkCd / m.atkSpd };
   }
 
   squadSpecs(): HeroSpec[] {
@@ -119,7 +129,7 @@ export class Game {
         cls: def.cls,
         rarity: def.rarity,
         mutation: s.roster[id].mutation,
-        stats: knightStats(s, id),
+        stats: this.runStats(knightStats(s, id)),
         slot,
         hpShare: this.hpShare.get(id) ?? 1,
       });
@@ -151,6 +161,9 @@ export class Game {
     this.difficulty = floorDifficulty(floor, squadPower(s), squadSize(s));
     s.quests ??= [];
     const npcs = placeNpcs(map, floor, biome.id, seed, s.quests);
+    // Now and then a room is a merchant's (world/shop.ts): her wares priced by this floor's gold.
+    const shop = placeShop(map, floor, biome.id, seed, killGold(floor) * goldMult(s), npcs.flatMap((n) => (n.camp ? [n.camp] : [])));
+    if (shop) npcs.push(shop.merchant);
     this.world = new World({
       map,
       biome,
@@ -162,11 +175,13 @@ export class Game {
       perks: s.perks,
       controlled: s.controlled,
       seed,
-      goldPerKill: killGold(floor) * goldMult(s) * soloBonus(s),
+      goldPerKill: killGold(floor) * goldMult(s) * soloBonus(s) * runMults(s.run.items).gold,
       difficulty: this.difficulty.value,
       size: squadSize(s),
       npcs,
     });
+    this.world.wares = shop?.wares ?? [];
+    this.applyRunItems();
     this.questEvent({ type: 'floor', floor });
     this.world.auto = s.settings.autoPlay;
     this.world.bot = this.bot;
@@ -285,6 +300,7 @@ export class Game {
   private returnToHub(): void {
     const s = this.state;
     s.run.floor = s.run.checkpoint;
+    s.run.items = {};
     this.hpShare.clear();
     this.world = null;
     this.inDungeon = false;
@@ -329,10 +345,77 @@ export class Game {
   /** Back to camp: the floor waits as it is. */
   leaveDungeon(): void {
     this.inDungeon = false;
+    // A merchant's goods are for one run: heading back to camp ends it.
+    this.state.run.items = {};
     this.fade = 1;
     this.fadeDir = -1;
     this.save();
     this.version++;
+  }
+
+  /** The run's merchant items that the world plays out (lifesteal, thorns, revives left). */
+  private applyRunItems(): void {
+    const w = this.world;
+    if (!w) return;
+    const m = runMults(this.state.run.items);
+    w.lifesteal = m.lifesteal;
+    w.thorns = m.thorns;
+    w.phoenix = m.phoenix;
+  }
+
+  /**
+   * Buys a ware off a merchant's display: 'ok' (paid; heals and scrolls work at once, the rest stay
+   * with the squad for the run), 'short' (not enough gold), 'max' (that one stacks no higher), or
+   * 'gone' (sold, or not on this floor).
+   */
+  buyWare(ware: Ware): 'ok' | 'short' | 'max' | 'gone' {
+    const w = this.world;
+    const s = this.state;
+    if (!w || ware.sold || !w.wares.includes(ware)) return 'gone';
+    if (!canStack(s.run.items, ware.item)) return 'max';
+    if (s.gold < ware.price) return 'short';
+    s.gold -= ware.price;
+    ware.sold = true;
+    this.useRunItem(ware.item);
+    this.emit({ type: 'bought', item: ware.item, price: ware.price });
+    this.version++;
+    return 'ok';
+  }
+
+  private useRunItem(id: RunItemId): void {
+    const w = this.world!;
+    const s = this.state;
+    const before = runMults(s.run.items);
+    if (id === 'draught') {
+      for (const h of w.livingHeroes()) {
+        w.heal(h, h.maxHp * 0.6);
+        w.fx.push({ kind: 'heal', x: h.x, y: h.y });
+      }
+      return;
+    }
+    if (id === 'scroll') {
+      // The next roll of the knight you play lands on one of its Epic or Legendary skills.
+      const h = w.heroes.find((x) => x.slot === w.controlled);
+      const pool = h?.cls ? CLASS_SKILLS[h.cls].filter((k) => tierStep(SKILLS[k].tier) >= 3) : [];
+      if (h && pool.length) {
+        rigSkill(h, pool[w.rng.int(0, pool.length - 1)]);
+        w.text(h.x, h.y - 30, 'NEXT ROLL: EPIC+', '#c88aff', true);
+      }
+      return;
+    }
+    const items = (s.run.items ??= {});
+    items[id] = Math.min(RUN_ITEMS[id].max, (items[id] ?? 0) + 1);
+    const after = runMults(items);
+    // The squad on this floor gets it now (new floors build it in: runStats).
+    for (const h of w.heroes) {
+      h.atk *= after.dmg / before.dmg;
+      const hp = after.hp / before.hp;
+      h.maxHp *= hp;
+      if (!h.downed) h.hp *= hp;
+      if (h.atkCd !== undefined) h.atkCd /= after.atkSpd / before.atkSpd;
+    }
+    w.goldPerKill *= after.gold / before.gold;
+    this.applyRunItems();
   }
 
   switchTo(slot: number): void {
@@ -482,6 +565,12 @@ export class Game {
         case 'switch':
           s.controlled = e.slot;
           break;
+        case 'phoenix': {
+          const items = (s.run.items ??= {});
+          items.phoenix = Math.max(0, (items.phoenix ?? 0) - 1);
+          this.emit({ type: 'toast', text: 'A Phoenix Feather caught your knight!', tone: 'gold' });
+          break;
+        }
         case 'perfect':
           this.emit({ type: 'perfectRoll', mine: e.mine });
           break;

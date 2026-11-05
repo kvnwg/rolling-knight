@@ -14,6 +14,9 @@ import { CLASS_HAS_SHIELD, KNIGHT_ANCHOR, knightFrame, knightGlow, knightLook, s
 import { mobFrame, poseFrames, type MobPose } from './art/mobs';
 import { flameArt, type PropArt } from './art/props';
 import { BAR_STEPS, DOOR_AX, DOOR_AY, DOOR_FRAMES, DOOR_OPENING, LIT_STEPS, doorArt } from './art/exitDoor';
+import { tagCoin, wareIcon, wareTable } from './art/wares';
+import { RUN_ITEMS } from '../core/runItems';
+import type { Ware } from '../world/shop';
 import { artKey, artOf } from './art/artOf';
 import type { TreeArt } from './art/trees';
 import { Camera } from './camera';
@@ -724,6 +727,12 @@ export class Renderer {
     }
     // (The hub paints its own way down: its steps, and the glow at their foot.)
     if (!hub && visible(w.map.exit.x, w.map.exit.y, 80)) list.push({ y: w.map.exit.y - 7, draw: () => this.drawDoor(st, em, w, sx, sy, lead ?? null) });
+    // A merchant's wares on their tables, price tags underneath.
+    const atWare = hub ? null : w.nearWare();
+    for (const wa of w.wares) {
+      if (wa.sold || !visible(wa.x, wa.y)) continue;
+      list.push({ y: wa.y, draw: () => this.drawWare(st, em, ui, wa, sx, sy, wa === atWare, game.state.gold >= wa.price) });
+    }
     for (const m of w.mobs) {
       if (!visible(m.x, m.y)) continue;
       list.push({ y: m.y, draw: () => this.drawMob(st, w, m, sx, sy) });
@@ -2034,6 +2043,39 @@ export class Renderer {
       }
     }
     st.globalAlpha = 1;
+  }
+
+  /** A ware on its table: the ware floating over it (bobbing, glowing), its price on a tag underneath. */
+  private drawWare(st: Ctx, em: Ctx, ui: Ctx, wa: Ware, sx: (x: number) => number, sy: (y: number) => number, near: boolean, afford: boolean): void {
+    const x = sx(wa.x);
+    const y = sy(wa.y);
+    const table = this.cached('ware|table', () => toCanvas(wareTable()));
+    st.fillStyle = 'rgba(8,6,16,0.35)';
+    this.ellipse(st, x, y, 8, 2);
+    st.drawImage(table, x - (table.width >> 1), y - table.height + 1);
+    const icon = this.cached(`ware|${wa.item}`, () => toCanvas(wareIcon(RUN_ITEMS[wa.item].icon)));
+    const bob = Math.round(Math.sin(this.time * 2.6 + wa.uid * 1.7) * 1.5);
+    const ix = x - (icon.width >> 1);
+    const iy = y - table.height - icon.height - 1 + bob;
+    // A warm glow under it (brighter while you stand at it).
+    em.globalAlpha = near ? 0.75 : 0.4;
+    em.fillStyle = '#ffd27a';
+    this.ellipse(em, x, y - table.height - 1, near ? 7 : 5, 2);
+    em.globalAlpha = 1;
+    st.drawImage(icon, ix, iy);
+    if (near) {
+      em.globalAlpha = 0.35;
+      em.drawImage(icon, ix, iy);
+      em.globalAlpha = 1;
+    }
+    // The tag: a coin and the price (red while you can't afford it), on the unlit top layer.
+    const tag = this.textCanvas(String(wa.price), { face: 'small', fill: afford ? (near ? '#fff4c0' : '#ffd86a') : '#ff8a7a', ink: '#1a1326' });
+    const coin = this.cached('ware|coin', () => toCanvas(tagCoin()));
+    const tw = coin.width + 1 + tag.width;
+    const tx = x - (tw >> 1);
+    const ty = y + 2;
+    ui.drawImage(coin, tx, ty + Math.round((tag.height - coin.height) / 2));
+    ui.drawImage(tag, tx + coin.width + 1, ty);
   }
 
   private drawLiquidShimmer(ctx: Ctx, w: World, cx: number, cy: number): void {

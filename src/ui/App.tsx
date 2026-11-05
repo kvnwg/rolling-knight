@@ -6,6 +6,7 @@
  * luck card open: changing your squad or spending means going back up (or falling). The game runs
  * every animation frame; the React UI re-renders ten times a second.
  */
+import { RUN_ITEMS } from '../core/runItems';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { music } from '../audio/music';
 import { rainSound } from '../audio/rain';
@@ -168,6 +169,9 @@ export function App() {
         case 'bossDown':
           show({ title: 'BOSS DEFEATED', sub: e.first && game.state.rebirths > 0 ? '+1 Sigil' : undefined, grad: 'gold' });
           break;
+        case 'bought':
+          toast({ text: `Bought ${RUN_ITEMS[e.item].name}: ${RUN_ITEMS[e.item].short.toLowerCase()}`, color: '#ffcf4a' });
+          break;
         case 'checkpoint':
           toast({ text: `Checkpoint: floor ${e.floor} saved`, color: '#ffcf4a' });
           break;
@@ -317,6 +321,12 @@ export function App() {
         }
       }
       if ((k === 'f' || k === 'enter') && game.inDungeon && !sheetRef.current && !talkRef.current && !e.repeat) {
+        // At a merchant's ware: buy it.
+        const ware = game.world?.nearWare();
+        if (ware) {
+          uiSound(game.buyWare(ware) === 'ok' ? 'buy' : 'lockTap');
+          return;
+        }
         const npc = game.world?.nearNpc();
         if (npc) {
           uiSound('open');

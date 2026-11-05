@@ -804,6 +804,35 @@ export const NPC_DEFS: readonly NpcDef[] = [
   },
 ];
 
+/**
+ * The floors' shopkeeper (world/shop.ts): she keeps a merchant's room, wares set out in front of her
+ * stall. No jobs; never one of the floor's random locals.
+ */
+export const SHOPKEEPER: NpcDef = {
+  id: 'shopkeeper',
+  name: 'Madame Thrift',
+  title: 'a travelling merchant',
+  kind: 'folk',
+  weight: 0,
+  look: {
+    skin: SKIN.light,
+    hair: HAIR.ginger,
+    hairStyle: 'bun',
+    shirt: ['#1e3a4a', '#2e5a6e', '#4a8296'],
+    sleeves: ['#a89a7a', '#d4c8a4', '#f0e8cc'],
+    pants: ['#3a2a1e', '#5a4230', '#7a5a40'],
+    shoes: SHOES,
+    dress: true,
+    panel: { kind: 'apron', ramp: ['#c8902a', '#ffd86a'] },
+    hat: { kind: 'kerchief', ramp: ['#6a1e2a', '#a8323e', '#d85a5a'] },
+    glasses: true,
+    pack: ['#3a2414', '#5e3c22', '#8a5c34'],
+    item: 'ledger',
+  },
+  barks: ['Wares for coin!', 'Potions! Tonics! Charms!', 'Everything must go!', 'Coin first, friend.', 'No refunds. No haggling.'],
+  quests: [],
+};
+
 export const NPC_BY_ID: ReadonlyMap<string, NpcDef> = new Map(NPC_DEFS.map((d) => [d.id, d]));
 const DEMONS = NPC_DEFS.filter((d) => d.kind === 'demon');
 const LOCALS = NPC_DEFS.filter((d) => d.kind !== 'demon');
@@ -1240,6 +1269,17 @@ function turnInGraph(s: S, q: Quest): Graph {
 type Script = (s: S) => void;
 
 const SCRIPTS: Record<string, Script> = {
+  shopkeeper(s) {
+    s.node(
+      'start',
+      s.open(
+        ['Madame Thrift, travelling merchant. Walk up to anything you fancy: the price is on the tag.', 'Coin for wares, friend! Potions, tonics, charms. Step up to the one you want.'],
+        ['Back for more? Step right up to the counter.', 'Still browsing? The tags don\'t bite.'],
+      ),
+      bye('Just looking.'),
+    );
+  },
+
   farmer(s) {
     s.node(
       'start',

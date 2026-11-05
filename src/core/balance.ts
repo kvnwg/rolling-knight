@@ -121,6 +121,17 @@ export const BAL = {
     minBand: 0.5,
     maxBand: 50,
   },
+  /** The floors' merchants (core/runItems.ts, world/shop.ts). */
+  shop: {
+    /** Every price, times this. */
+    priceMult: 1,
+    /** Chance a floor has a shop (not boss floors; floor 1 never). */
+    chance: 0.4,
+    /** Before a boss (the floor before one): a better chance to stock up. */
+    chanceBeforeBoss: 0.85,
+    /** Wares on the counter. */
+    wares: 3,
+  },
   dungeon: {
     /** Progress is saved every this many floors: a wipe on floor 25 sends the squad back to floor 20. */
     checkpointEvery: 10,

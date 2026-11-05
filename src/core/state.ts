@@ -123,6 +123,8 @@ export interface GameState {
     bosses: number;
     /** First floor of the current biome stretch: where a wiped squad starts again. */
     checkpoint: number;
+    /** What you bought from merchants this run (core/runItems.ts): gone when you head back to camp. */
+    items?: Partial<Record<import('./runItems').RunItemId, number>>;
     biomeSeed: number;
     deaths: number;
     /**

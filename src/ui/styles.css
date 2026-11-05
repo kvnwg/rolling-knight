@@ -3005,6 +3005,106 @@ body,
   bottom: auto;
   top: 70%;
 }
+/* A merchant's ware you stand at: its picture, name and what it does, and the price as a button. */
+.buy-prompt {
+  position: absolute;
+  left: 50%;
+  top: 68%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: calc(2.5 * var(--px));
+  max-width: calc(100vw - 16px);
+  padding: calc(1.5 * var(--px)) calc(2 * var(--px));
+  animation: bannerIn 0.2s steps(4) both;
+  pointer-events: auto;
+}
+.buy-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: calc(26 * var(--px));
+  height: calc(26 * var(--px));
+  border: 0 solid transparent;
+  border-image: var(--sk-slot-sm-brass-dark) 8 fill / calc(8 * var(--px)) stretch;
+  image-rendering: pixelated;
+}
+.buy-what {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: calc(0.5 * var(--px));
+  font-size: calc(4.6 * var(--px));
+  line-height: 1.15;
+  color: #fff3d8;
+}
+.buy-what b {
+  font-size: calc(5.4 * var(--px));
+  color: #ffd86a;
+}
+.buy-what small {
+  font-size: calc(4.2 * var(--px));
+  color: #e8dcc0;
+}
+.buy-btn {
+  flex: none;
+  min-height: calc(16 * var(--px)) !important;
+  font-size: calc(5.6 * var(--px)) !important;
+  gap: calc(1 * var(--px)) !important;
+}
+/* What you bought from merchants this run, under the squad. */
+.run-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(1 * var(--px));
+  pointer-events: auto;
+}
+.run-item {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: calc(12 * var(--px));
+  height: calc(12 * var(--px));
+  border: 0 solid transparent;
+  border-image: var(--sk-slim-gold) 4 fill / calc(3 * var(--px)) stretch;
+  image-rendering: pixelated;
+}
+.run-item b {
+  position: absolute;
+  right: calc(-1 * var(--px));
+  bottom: calc(-1.5 * var(--px));
+  font-size: calc(3.6 * var(--px));
+  color: #fff;
+  text-shadow: 1px 0 0 #1a1326, -1px 0 0 #1a1326, 0 1px 0 #1a1326, 0 -1px 0 #1a1326;
+}
+@media (max-aspect-ratio: 1/1) {
+  .buy-prompt {
+    top: auto;
+    bottom: calc(92 * var(--px) + env(safe-area-inset-bottom, 0px));
+    left: calc(3 * var(--px));
+    transform: none;
+    /* (Clear of the spell reel on the right.) */
+    max-width: calc(100vw - 42 * var(--px));
+    gap: calc(1.5 * var(--px));
+    padding: calc(1 * var(--px)) calc(1.5 * var(--px));
+  }
+  .buy-icon {
+    width: calc(18 * var(--px));
+    height: calc(18 * var(--px));
+  }
+  .buy-what b {
+    font-size: calc(4.8 * var(--px));
+  }
+  .buy-what small {
+    font-size: calc(3.7 * var(--px));
+  }
+  .buy-btn {
+    min-height: calc(13 * var(--px)) !important;
+    font-size: calc(4.8 * var(--px)) !important;
+    padding-left: calc(2 * var(--px)) !important;
+    padding-right: calc(2 * var(--px)) !important;
+  }
+}
 /* On tall screens the boss's name plate gets its own band across the screen under the top bar, and
    everything below the top bar (the squad and jobs on the left, the little altar on the right) steps
    down under it. The talk button sits above the action keys. */

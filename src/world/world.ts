@@ -16,6 +16,7 @@ import { FLOOR, TILE, tileAt, type FloorMap } from './mapgen';
 import { type MobType } from './mobgen';
 import { TALK_RANGE, type HubStation } from './hubWorld';
 import { demonDeathLines, demonEnrageLines, demonMobType, demonTauntsFor, type Npc, type NpcDef } from './npcs';
+import type { Ware } from './shop';
 import { floorPar, foeStats } from '../core/power';
 import { heroDodge, heroSpecial, heroTick } from './skills';
 import { CLEAR, skyOf, type Sky } from './sky';
@@ -43,6 +44,8 @@ export type WorldEvent =
   | { type: 'exit' }
   | { type: 'wipe' }
   | { type: 'heroDown'; slot: number }
+  /** A Phoenix Feather (a merchant's) caught a knight as it fell: it's back up, the feather spent. */
+  | { type: 'phoenix'; slot: number }
   | { type: 'switch'; slot: number }
   | { type: 'bossPhase' }
   /** A knight's dodge roll made something miss that would have hit it (once per roll); `mine`: the knight you control. */
@@ -181,6 +184,12 @@ export class World {
   stations: HubStation[] = [];
   /** Folk standing about on this floor. */
   npcs: Npc[] = [];
+  /** A merchant's wares set out on the floor (world/shop.ts); Game.buyWare sells them. */
+  wares: Ware[] = [];
+  /** The run's merchant items (Game sets them, core/runItems.ts): lifesteal and thorns shares, revives left. */
+  lifesteal = 0;
+  thorns = 0;
+  phoenix = 0;
   /** An unmasked demon (fought like a boss, but it doesn't take the floor with it), and its banter clock. */
   demon: { unit: Unit; def: NpcDef; tauntT: number; enraged: boolean } | null = null;
 
@@ -546,6 +555,12 @@ export class World {
       this.fx.push({ kind: opts.crit ? 'crit' : 'hit', x: target.x, y: target.y - 6, color: target.team === 'mob' ? target.type!.ramp[2] : '#ff5a5a' });
     }
     if (from && from.team === 'hero' && this.perks.has('bloodPact')) this.heal(from, amount * 0.05);
+    // A merchant's Vampire Fang: the hitter drinks a little of it (quietly: it's every hit).
+    if (from && from.team === 'hero' && target.team === 'mob' && this.lifesteal > 0 && !from.downed) from.hp = Math.min(from.maxHp, from.hp + amount * this.lifesteal);
+    // Thorn Mail: a foe that hits a knight up close takes some of it back.
+    if (target.team === 'hero' && from && from.team === 'mob' && !from.dead && this.thorns > 0 && dist(from.x, from.y, target.x, target.y) < 40) {
+      this.damage(from, amount * this.thorns, target, { color: '#b8e07a' });
+    }
     if (target.team === 'mob') {
       if (!target.awake) this.wake(target);
       if (from && from.team === 'hero' && from.slot === this.controlled && this.perks.has('warBanner')) {
@@ -620,6 +635,15 @@ export class World {
   downHero(h: Unit): void {
     h.hp = 0;
     h.downed = true;
+    // A Phoenix Feather catches it as it falls.
+    if (this.phoenix > 0) {
+      this.phoenix--;
+      this.revive(h, 0.5);
+      this.fx.push({ kind: 'levelup', x: h.x, y: h.y, color: '#ff9a3a' });
+      this.text(h.x, h.y - 36, 'PHOENIX!', '#ffb050', true);
+      this.events.push({ type: 'phoenix', slot: h.slot! });
+      return;
+    }
     h.rolling = undefined;
     h.channel = undefined;
     this.fx.push({ kind: 'death', x: h.x, y: h.y - 6, color: '#c8c8d8', size: 1, src: 'hero' });
@@ -724,6 +748,23 @@ export class World {
     this.rewind = null;
     this.wiped = false;
     this.refreshFlows();
+  }
+
+  /** The ware on display the knight you play stands at (not yet sold), or null. */
+  nearWare(): Ware | null {
+    const h = this.leader();
+    if (!h || this.hub) return null;
+    let best: Ware | null = null;
+    let bd = 15;
+    for (const w of this.wares) {
+      if (w.sold) continue;
+      const d = dist(h.x, h.y, w.x, w.y);
+      if (d < bd) {
+        bd = d;
+        best = w;
+      }
+    }
+    return best;
   }
 
   /** The person on this floor you're close enough to talk to (or to the spot before their set-up), or null. */

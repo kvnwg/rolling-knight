@@ -16,6 +16,8 @@ import { Bar, Chunky } from './common';
 import { Px } from './px';
 import { SkillRoll, skillSlotLabel, skillSlotState } from './SkillRoll';
 import { SpellSlam } from './SpellSlam';
+import { RUN_ITEMS, RUN_ITEM_IDS, canStack } from '../core/runItems';
+import { fmt } from './format';
 import { AltarReels } from './fx/AltarReels';
 import daggerUrl from '../assets/ui/dagger.png';
 import { uiSound } from './sound';
@@ -160,7 +162,9 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
   const roll = me ? skillSlotState(me) : 'off';
   const boss = w?.bossUnit && !w.bossUnit.dead ? w.bossUnit : null;
   const ch = game.difficulty ? CHALLENGE[game.difficulty.challenge] : null;
-  const npc = w?.nearNpc() ?? null;
+  const ware = w?.nearWare() ?? null;
+  const npc = ware ? null : (w?.nearNpc() ?? null);
+  const items = RUN_ITEM_IDS.filter((id) => (s.run.items?.[id] ?? 0) > 0);
   const jobs = activeQuests(s.quests ?? []);
   const flash = useKeyFlash();
   // The big spell reel: 30 art px wide on a phone (its icons 2x), 46 on a desktop (3x); the window
@@ -261,6 +265,16 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
         })}
       </div>
 
+        {items.length > 0 && (
+          <div className="run-items" title="Bought from merchants: they last until you head back to camp">
+            {items.map((id) => (
+              <span key={id} className="run-item" title={`${RUN_ITEMS[id].name}: ${RUN_ITEMS[id].text}`}>
+                <Px icon={RUN_ITEMS[id].icon} size="sm" />
+                {(s.run.items?.[id] ?? 0) > 1 && <b>{s.run.items?.[id]}</b>}
+              </span>
+            ))}
+          </div>
+        )}
         {jobs.length > 0 && (
           <div className="quests">
             {jobs.map((q) => {
@@ -325,6 +339,34 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
         </Key>
       </div>
 
+      {ware && (() => {
+        const it = RUN_ITEMS[ware.item];
+        const full = !canStack(s.run.items, ware.item);
+        const short = s.gold < ware.price;
+        return (
+          <div className="buy-prompt plate">
+            <span className="buy-icon">
+              <Px icon={it.icon} size="md" s={touch ? 1 : 2} />
+            </span>
+            <span className="buy-what">
+              <b>{it.name}</b>
+              <small>{it.short}</small>
+            </span>
+            <button
+              className={`btn ${full || short ? '' : 'gold'} buy-btn`}
+              disabled={full}
+              onClick={() => {
+                const r = game.buyWare(ware);
+                uiSound(r === 'ok' ? 'buy' : 'lockTap');
+              }}
+              title={full ? 'You carry as many as you can' : short ? `You need ${fmt(ware.price - s.gold)} more gold` : touch ? 'Buy it' : 'Buy it (Enter or F)'}
+            >
+              <Px icon="coin" size="sm" />
+              <span>{full ? 'FULL' : fmt(ware.price)}</span>
+            </button>
+          </div>
+        );
+      })()}
       {npc && (
         <div className="talk-prompt dungeon">
           <button className="btn gold" onClick={() => onTalk(npc)}>

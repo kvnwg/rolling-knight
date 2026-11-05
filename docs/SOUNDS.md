@@ -47,7 +47,7 @@ Your squad.
 | `dash_shot` | The Ranger’s dash at a foe: the Power Shot it looses as the roll ends. | A heavy bowstring crack and a rising whistle. | fight, 2 at once, 80 ms apart |
 | `dash_snare` | The Ranger’s dash away from the foes: the snare it leaves where it started. | A backflip’s whoosh and a trap set with a clack. | background, 2 at once, 80 ms apart |
 | `snare_snap` | A Ranger’s snare snapping shut on a foe. | Iron jaws snapping shut and a rope’s creak. | fight, 2 at once, 80 ms apart |
-| `dash_shadow` | The Blade’s dash, Shadowstep (Kevin’s too). | A dark, breathy swish. | background, 2 at once, 50 ms apart |
+| `dash_shadow` | The Blade’s dash, Phantom Dash (Kevin’s too). | A dark, breathy swish. | background, 2 at once, 50 ms apart |
 | `dash_bless` | The Cleric’s dash, Blessed Step: the holy circle it leaves. | A soft whoosh into a warm chime. | background, 2 at once, 80 ms apart |
 | `dash_blink` | The Arcanist’s dash, Blink, and the arcane burst where it left. | A quick zip, a sparkle and a soft arcane pop. | background, 2 at once, 60 ms apart |
 | `dash_lunge` | The Lancer’s dash, Spear Lunge. | A fast rising rush and the spear’s sharp fwip. | fight, 2 at once, 80 ms apart |

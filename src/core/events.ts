@@ -31,6 +31,8 @@ export type CoreEvent =
   | { type: 'bossDown'; floor: number; first: boolean }
   /** A checkpoint floor (every 10th) reached: a wipe from here on comes back to it. */
   | { type: 'checkpoint'; floor: number }
+  /** A ware bought off a merchant's display (core/runItems.ts). */
+  | { type: 'bought'; item: import('./runItems').RunItemId; price: number }
   | { type: 'wipe'; floor: number; back: number }
   | { type: 'rebirth'; count: number }
   /** A knight's dodge roll made something miss it (once per roll); `mine`: the knight you control. */
