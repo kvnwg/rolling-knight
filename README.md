@@ -128,17 +128,24 @@ as usual). `?fresh` starts a new game. The game is on
 npm test
 ```
 
-256 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
+277 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
 timing, extra reels, the tutorial's scripted rolls, bad-luck protection, Lucky Spins, duplicates,
 shards, selling, levels and reforging, Humble Beginnings' 3x, rebirth; every biome's floors fully
 connected with spawns reachable and deterministic by seed, mob and boss design, a squad clearing a
 floor on Auto, auto attacks, dodge invulnerability, skill rolls and their odds, Rewind, the balance
-curve, the camera, the weather, the hub's map and keepers, folk and quests, the two upgrade maps, Quick Roll and every
-chance upgrade in a fight, the keepers' scenes and cards, a full game starting up; and the PixelForge art: every sheet holding what
-the game plays in four directions, the body plan to monster mapping, the material recolors, every
-rarity's and mutation's ramps, and the animations the sim's state picks (attacks on the hit's tick,
-windups over the mobs' telegraphs, dodges, walks stepped by distance, deaths and revives); and the
-music: a track for every scene and floor, each one's file, credit and loop points, the 5 MB budget.
+curve and the first floors' edge; how monsters fight: every kind with a lunge or a gun, their
+bullets slower than a knight's, each volley's pattern (aimed, fans, bursts, rings, curving shots)
+and the tell before it, dashes and leaps that hit a knight standing in them and go straight through
+one rolling, an ogre throwing a boulder across water at a knight it can't reach (and at one that
+keeps away) onto the ring it marked, quake rings, the spawn-in, perfect rolls marked once per roll,
+the squad's AI seeing a lunge's lane or landing ring, the lunges' crouch, arc and squash and the red
+wind-up warning; the camera, the weather, the hub's map and keepers, folk and quests, the two upgrade
+maps, Quick Roll and every chance upgrade in a fight, the keepers' scenes and cards, a full game
+starting up; and the PixelForge art: every sheet holding what the game plays in four directions, the
+body plan to monster mapping, the material recolors, every rarity's and mutation's ramps, and the
+animations the sim's state picks (attacks on the hit's tick, windups over the mobs' telegraphs,
+dodges, walks stepped by distance, deaths and revives); and the music: a track for every scene and
+floor, each one's file, credit and loop points, the 5 MB budget.
 
 ```bash
 npx tsx tools/music.ts
@@ -151,7 +158,9 @@ npm run sim -- --minutes 40
 ```
 
 The real game logic on Auto with a bot that shards, levels, buys upgrades and perks and rebirths.
-Current result: floor 10 at about 7 minutes, the first rebirth at about 12.
+Current result over seeds 1 to 8 (`--seed N`): floor 5 at about 4 minutes (3 to 5), floor 10 at about
+13 (10 to 19), the first rebirth at about 24 (15 to 31; one seed of the eight not yet by 40 minutes),
+with three or so wipes (none on floors 1 to 5) and about 160 perfect rolls in 40 minutes.
 
 ```bash
 npx tsx tools/preview.ts knights shots/knights.png

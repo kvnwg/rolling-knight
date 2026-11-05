@@ -288,6 +288,10 @@ class Sfx {
       case 'rebirth':
         this.rebirth();
         break;
+      case 'perfectRoll':
+        // Yours cuts through the fight; a squadmate's is a soft chime under it.
+        mixer.fire('perfect_roll', e.mine ? { level: 1 } : { level: 0, gain: 0.6, prio: 0 });
+        break;
       default:
         break;
     }

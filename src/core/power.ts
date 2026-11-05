@@ -18,6 +18,7 @@
  * seconds of the damage of a squad of Power D to kill, and each of its hits takes `hit.mob` of an
  * average knight's HP in that squad; elites and bosses have their own targets. Each foe type keeps its
  * own shape against the plain chaser (a tank has three times its HP, a bomber hits more than twice as hard).
+ * The first floors get an edge on top (BAL.balance.early: earlyBoost), fading out by floor 10.
  */
 import { BAL } from './balance';
 import { CLASSES, knightDef } from './knights';
@@ -100,15 +101,29 @@ export function floorDifficulty(floor: number, power: number): Difficulty {
 
 export type FoeTier = 'mob' | 'elite' | 'boss';
 
-/** A foe's HP and hit at difficulty `d` (in Squad Power), for its type's shape and its tier. */
-export function foeStats(shape: { hp: number; atk: number }, d: number, tier: FoeTier): { hp: number; atk: number } {
+/**
+ * The first floors' edge (BAL.balance.early): how much harder foes hit and how much longer they take
+ * to kill on `floor`, from the full boost on floor 1 down to none (1, 1) by `until`.
+ */
+export function earlyBoost(floor: number): { hit: number; ttk: number } {
+  const e = B.early;
+  const k = Math.max(0, Math.min(1, (e.until - floor) / (e.until - 1)));
+  return { hit: 1 + e.hit * k, ttk: 1 + e.ttk * k };
+}
+
+/**
+ * A foe's HP and hit at difficulty `d` (in Squad Power), for its type's shape and its tier, on
+ * `floor` (the first floors' edge; left out, none).
+ */
+export function foeStats(shape: { hp: number; atk: number }, d: number, tier: FoeTier, floor = Infinity): { hp: number; atk: number } {
   const k = d / REF_POWER;
   const dps = REF_DPS * k;
   const hp = REF_HP * k;
-  if (tier === 'boss') return { hp: B.ttk.boss * dps, atk: B.hit.boss * hp };
+  const e = earlyBoost(floor);
+  if (tier === 'boss') return { hp: B.ttk.boss * dps * e.ttk, atk: B.hit.boss * hp * e.hit };
   const sh = shape.hp / REF_FOE.hp;
   const sa = shape.atk / REF_FOE.atk;
-  return { hp: B.ttk[tier] * dps * sh, atk: B.hit[tier] * hp * sa };
+  return { hp: B.ttk[tier] * dps * sh * e.ttk, atk: B.hit[tier] * hp * sa * e.hit };
 }
 
 /**
@@ -121,7 +136,7 @@ export function fightReport(floor: number, power: number) {
   const squadDps = REF_DPS * (power / REF_POWER);
   const knightHp = REF_HP * (power / REF_POWER);
   const at = (tier: FoeTier) => {
-    const f = foeStats(REF_FOE, d.value, tier);
+    const f = foeStats(REF_FOE, d.value, tier, floor);
     return { ttk: f.hp / squadDps, hit: f.atk / knightHp };
   };
   return { ...d, mob: at('mob'), elite: at('elite'), boss: at('boss') };

@@ -14,7 +14,7 @@ A recording plays with the same mix as its placeholder: where it happened (quiet
 
 **Mix**: *background* sounds are dropped first in a crowded fight, then *fight* sounds; *key* moments cut through: they play on their own bus and duck the rest of the fight under them for a moment (the biggest dip the music too); *always* sounds are never dropped. “N at once” is how many of that sound can ring together; “ms apart” the least time between two starting. Several of one sound in the same frame play once, a little louder. The everyday fight sits under the music at the default volumes; the Sound slider (0 is silence) sets all of it.
 
-150 sounds.
+151 sounds.
 
 ## Hits
 
@@ -43,6 +43,7 @@ Your squad.
 | `knight_down` | A knight falls. | A long slide down, a heavy thud and armor clattering. | always, 1 at once, 250 ms apart, ducks the fight to 40%, dips the music |
 | `knight_dodge` | A dodge: a roll, the Ranger’s backflip, the Lancer’s vault. | A cloth whoosh and a soft landing. | background, 2 at once, 60 ms apart |
 | `knight_blink` | The Arcanist’s Blink. | A quick zip and a sparkle. | background, 2 at once, 60 ms apart |
+| `perfect_roll` | A PERFECT! roll: a hit (a bullet, a lunge, a blast, a boulder) goes through a rolling knight, once a roll. Yours cuts through the fight; a squadmate’s is a soft chime. | A quick zip up into three bright bells and a sparkle (a squadmate’s: one soft bell). | key, 1 at once, 90 ms apart, ducks the fight to 80% |
 | `revive` | A knight gets back up: revived, Second Wind, the end of a Rewind. | A rising chime. | key, 1 at once, 300 ms apart |
 | `heal` | HP healed (Holy Orbs, Sanctuary’s glow, Blessing): one every 0.14 s at most. | A soft shimmer. | background, 1 at once, 140 ms apart |
 
@@ -71,7 +72,7 @@ Blasts by kind and size: the boom carries a low thump (with a soft clip, for pho
 | `boom_big` | A big blast: a bomber blowing itself up, the demon unmasked, Excalibur’s last blast, Singularity’s burst. | A boom: a low thump, a roar and debris. | key, 2 at once, 90 ms apart, ducks the fight to 60% |
 | `boom_bomb` | A bomb: Kamikaze’s, Wild Magic’s fireball. | A pop, a boom, a fizz and debris. | key, 2 at once, 80 ms apart, ducks the fight to 70% |
 | `boom_meteor` | A meteor lands (Meteor, Meteor Storm, Wild Magic), or a Lancer comes down from Skyfall. | A crash, a deep thump, a rumble, debris and crackling fire. | key, 3 at once, 70 ms apart, ducks the fight to 60% |
-| `boom_slam` | A slam: a golem’s or a boss’s, Titan’s Wrath’s aftershocks, Snare’s net landing. (A skill’s own slam as it fires, Ground Pound’s say, is that skill’s sound.) | A ground thump, a rumble and gravel. | fight, 2 at once, 70 ms apart |
+| `boom_slam` | A slam: a golem’s or a boss’s, an ogre’s boulder or its leap coming down, a boss landing a leap, Titan’s Wrath’s aftershocks, Snare’s net landing. (A skill’s own slam as it fires, Ground Pound’s say, is that skill’s sound.) | A ground thump, a rumble and gravel. | fight, 2 at once, 70 ms apart |
 | `shockwave` | A shockwave ring that isn’t a skill’s own: Wild Magic’s Shockwave (the upgrade map). | A deep whoomp. | fight, 2 at once, 90 ms apart |
 | `zap` | Lightning: each of Chain Lightning’s jumps on from its first foe. | An electric crackle and a snap. | fight, 3 at once, 45 ms apart |
 
@@ -89,13 +90,13 @@ Foes falling and attacking: their wind-ups (the telegraph to dodge by) and their
 | `death_wood` | A plant, a pumpkin or a scarecrow is felled. | A crack and a rustle. | fight, 3 at once, 40 ms apart |
 | `death_ghost` | A ghost fades away. | A fading wail. | fight, 3 at once, 40 ms apart |
 | `kill_chime` | Each kill after the first in a wave (2.5 s or less since the last): a step up the scale each time. | A bell climbing the scale. | background, 2 at once, 60 ms apart |
-| `mob_bite` | A beast, a slime, a bug, a bat or a farm animal bites (hit or miss). | A snapping bite. | background, 3 at once, 45 ms apart |
-| `mob_swipe` | A goblin, a skeleton, an orc or a ghost swings at a knight (and any new kind of attack without a sound of its own). | A weapon whoosh. | background, 3 at once, 45 ms apart |
-| `mob_shot` | A foe shoots or spits: archers, spitters, plants; a boss’s ring or fan of shots (bigger). | A spit and a puff. | background, 3 at once, 50 ms apart |
+| `mob_bite` | A beast, a slime, a bug, a bat or a farm animal bites (hit or miss), or pounces or hops at a knight. | A snapping bite. | background, 3 at once, 45 ms apart |
+| `mob_swipe` | A goblin, a skeleton, an orc or a ghost swings at a knight; any foe dashes at one (a goblin’s stab, an orc’s shoulder charge, a bat’s swoop); an ogre hurls a boulder (and any new kind of attack without a sound of its own). | A weapon whoosh. | background, 3 at once, 45 ms apart |
+| `mob_shot` | A foe shoots or spits: a volley’s aimed shot, fan, burst, ring or curving pair (bigger for three or more); a boss’s ring or fan of shots (bigger). | A spit and a puff. | background, 3 at once, 50 ms apart |
 | `mob_cast` | A caster raises its circle (its 0.5 s wind-up; the circle bursts later, as boom_small). | A rising magic hum ending in a whomp. | fight, 2 at once, 120 ms apart |
 | `mob_charge_windup` | A charger (a boar, a rhino, a ram, a hog) paws the ground before it charges. | A snort, hooves scraping, a growl. | fight, 2 at once, 150 ms apart |
-| `mob_charge` | A charger, or a boss, charges. | Galloping thuds and rushing air. | fight, 2 at once, 120 ms apart |
-| `mob_slam_windup` | A golem raises its fists before a slam (the slam itself is boom_slam). | A heavy creak and a strain. | fight, 2 at once, 150 ms apart |
+| `mob_charge` | A charger, or a boss, charges; a boss leaps. | Galloping thuds and rushing air. | fight, 2 at once, 120 ms apart |
+| `mob_slam_windup` | A golem raises its fists before a slam, crouches to leap and slam, or heaves up a boulder to throw (the slam and the boulder coming down are boom_slam). | A heavy creak and a strain. | fight, 2 at once, 150 ms apart |
 | `mob_fuse` | A bomber lights up, 0.6 s before it blows. | A fuse hissing, ticking faster. | fight, 2 at once, 120 ms apart |
 | `boss_windup` | A boss winds up a move: a ring or a fan of shots, a charge, a slam, a summons, a rain of circles. | A deep growl. | key, 1 at once, 300 ms apart |
 | `boss_summon` | A boss calls up minions. | A dark whoosh and a drone. | key, 1 at once, 400 ms apart |

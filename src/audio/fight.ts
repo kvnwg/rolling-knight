@@ -4,10 +4,11 @@
  * it happened:
  *
  * - The effects the world asked the renderer for (World.fx): hits and crits (the foe's sound by what
- *   it's made of; a knight's hurt), blasts (by their kind and size), lightning, shockwaves, heals.
+ *   it's made of; a knight's hurt), blasts (by their kind and size; a boulder and a big leap's landing
+ *   thump like a slam), lightning, shockwaves, heals.
  * - What changed about each knight and foe since the last frame: an attack (each class its own), a
- *   dodge, a fall, getting back up; a foe winding up, its move going off, a charge, a death, a boss's
- *   rage.
+ *   dodge, a fall, getting back up; a foe winding up, its move going off, a dash, a leap or a charge
+ *   going, a death, a boss's rage.
  * - Shots appearing (a foe's shot or spit) and stopping (an arrow's thunk, an arcane bolt's pop).
  * - The skill rolls (`skill`, from onSkillRoll): the reel's ticks as it spins and brakes, its landing
  *   by tier, the skill's own sound. What the skill draws as it fires is its sound's (no blast on top);
@@ -114,7 +115,8 @@ interface Memo {
   windT: number;
   move?: string;
   swingT: number;
-  chargeT: number;
+  /** Mid-dash or mid-leap (a charge is a dash). */
+  rush: boolean;
   phase: number;
 }
 
@@ -135,7 +137,7 @@ const memoOf = (u: Unit): Memo => ({
   windT: u.windT ?? 0,
   move: u.move,
   swingT: u.swingT,
-  chargeT: u.chargeT ?? 0,
+  rush: !!u.rush,
   phase: u.bossPhase ?? 0,
 });
 
@@ -272,6 +274,8 @@ export class FightObserver {
         if (f.src === 'meteor') return this.add('boom_meteor', f, { level: clamp01((size - 1.5) / 3) });
         if (f.src === 'bomb') return this.add('boom_bomb', f, { level: clamp01((size - 1) / 2) });
         if (f.src === 'slam') return this.add('boom_slam', f, { level: clamp01((size - 1) / 3), ...(size >= 3 ? { prio: 2 as Prio } : {}) });
+        // An ogre's boulder coming down.
+        if (f.src === 'boulder') return this.add('boom_slam', f, { level: clamp01((size - 1) / 3) });
         // An arcane bolt bursting where it stopped.
         if (bolts.some((s) => Math.abs(s.x - f.x) < 0.5 && Math.abs(s.y - f.y) < 0.5)) return this.add('arcane_pop', f);
         if (size >= 2) return this.add('boom_big', f, { level: clamp01((size - 2) / 2) });
@@ -282,6 +286,10 @@ export class FightObserver {
         return this.add('heal', f);
       case 'revive':
         return this.add('revive', f);
+      case 'land':
+        // A big leap coming down (an ogre's slam, a boss's): the ground thumps.
+        if (size >= 2) return this.add('boom_slam', f, { level: clamp01((size - 2) / 3) });
+        return;
       default:
         return;
     }
@@ -353,7 +361,7 @@ export class FightObserver {
     if (was.windT <= 0 && windT > 0) this.windup(m, pitch);
     // The move going off (it swings; a wind-up cut short by a stun or a fumble doesn't).
     if (was.windT > 0 && windT <= 0 && m.swingT > was.swingT + 1e-6) this.move(m, was.move, pitch);
-    if (was.chargeT <= 0 && (m.chargeT ?? 0) > 0) this.add('mob_charge', m, { pitch, level: m.boss ? 1 : 0.4, ...(m.boss ? { prio: 2 as Prio } : {}) });
+    if (!was.rush && m.rush) this.lunge(m, pitch);
     if (m.boss && was.phase === 0 && (m.bossPhase ?? 0) > 0) this.add('boss_enrage', m, { pitch: Math.max(0.7, pitch) });
   }
 
@@ -363,7 +371,13 @@ export class FightObserver {
       case 'charge':
         return this.add('mob_charge_windup', m, { pitch });
       case 'slam':
+      // (An ogre heaving up a boulder, or crouching to leap and slam.)
+      case 'throw':
         return this.add('mob_slam_windup', m, { pitch });
+      case 'leap':
+        if (m.type?.behavior === 'tank') return this.add('mob_slam_windup', m, { pitch });
+        // A pounce or a hop sounds as it goes (lunge below).
+        return;
       case 'bomb':
         return this.add('mob_fuse', m);
       case 'cast':
@@ -380,21 +394,37 @@ export class FightObserver {
         return this.add(SWINGERS.has(m.type?.plan ?? '') ? 'mob_swipe' : 'mob_bite', m, { pitch });
       case 'summon':
         return this.add('boss_summon', m, { pitch: Math.max(0.6, pitch * 1.3) });
+      case 'throw':
+        // (The boulder sounds as it comes down: boom_slam.)
+        return this.add('mob_swipe', m, { pitch: pitch * 0.8 });
       case undefined:
       case 'shoot':
       case 'cast':
       case 'charge':
+      case 'dash':
+      case 'leap':
       case 'bomb':
       case 'slam':
       case 'ring':
       case 'fan':
       case 'rain':
-        // Their shots, circles, rushes and blasts sound on their own.
+        // Their shots, circles, rushes (lunge below) and blasts sound on their own.
         return;
       default:
         // A kind of attack without a sound of its own yet.
         return this.add('mob_swipe', m, { pitch });
     }
+  }
+
+  /**
+   * A dash or a leap going (mobgen.ts LUNGES): a charge gallops, a boss's rush the loudest; the rest
+   * swipe or snap as they go, like the bite or the swing they are.
+   */
+  private lunge(m: Unit, pitch: number): void {
+    const r = m.rush!;
+    if (r.move === 'charge') return this.add('mob_charge', m, { pitch, level: m.boss ? 1 : 0.4, ...(m.boss ? { prio: 2 as Prio } : {}) });
+    if (m.boss) return this.add('mob_charge', m, { pitch, level: 0.8, prio: 2 });
+    this.add(SWINGERS.has(m.type?.plan ?? '') || r.kind === 'dash' ? 'mob_swipe' : 'mob_bite', m, { pitch });
   }
 
   private death(w: World, m: Unit, was: Memo | null): void {

@@ -476,6 +476,9 @@ export class Game {
         case 'switch':
           s.controlled = e.slot;
           break;
+        case 'perfect':
+          this.emit({ type: 'perfectRoll', mine: e.mine });
+          break;
         default:
           break;
       }

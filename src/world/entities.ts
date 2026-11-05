@@ -4,7 +4,7 @@ import type { Rarity } from '../core/rarity';
 import type { SkillId } from '../core/skillbook';
 import type { MutationId } from '../core/state';
 import { BLOCKED, FLOOR, LIQUID, TILE, tileAt, type FloorMap } from './mapgen';
-import type { MobType } from './mobgen';
+import type { MobType, Volley } from './mobgen';
 
 export type Team = 'hero' | 'mob';
 export type View = 'down' | 'up' | 'side';
@@ -63,6 +63,11 @@ export interface Unit {
   /** An active dodge: direction, time left, speed. */
   rolling?: { dx: number; dy: number; t: number; dur: number; speed: number; kind: 'roll' | 'blink' | 'vault' | 'flip'; hit: Set<number> };
   /**
+   * The last dodge roll (skills.ts heroDodge): the world time its untouchable window ends, and whether
+   * something has already missed the knight because of it (a perfect roll is marked once per roll).
+   */
+  dodge?: { until: number; perfect: boolean };
+  /**
    * An active skill that takes a moment (Whirlwind, a lunge). `dmg` (× attack), `r`, `speed` and
    * `knock` are the skill's own numbers (Whirlwind's and Dragon Lunge's when left out).
    */
@@ -101,6 +106,8 @@ export interface Unit {
     lastY?: number;
     checkT?: number;
     detourT?: number;
+    /** Mobs: whether a body its size can walk straight to its target (checked every `think` seconds). */
+    direct?: boolean;
   };
   // --- mobs
   type?: MobType;
@@ -112,14 +119,58 @@ export interface Unit {
   windT?: number;
   windDur?: number;
   move?: string;
+  /** A dash's (or a charge's) heading, or a shot's target point. */
   moveX?: number;
   moveY?: number;
-  chargeT?: number;
+  /** Where a leap will land or a throw will come down (it follows the target until halfway through the wind-up, then holds). */
+  spotX?: number;
+  spotY?: number;
+  /** A dash or a leap in flight (ai.ts); then `recoverT` seconds (of `recoverDur`) standing spent. */
+  rush?: Rush;
+  recoverT?: number;
+  recoverDur?: number;
+  /** Seconds until it can lunge (dash or leap) again, and throw again. */
+  lungeT?: number;
+  throwT?: number;
+  /** Seconds it has been after its target without getting there (an ogre that can't reach throws). */
+  chaseT?: number;
+  /** Volleys loosed (an archer fans every third one out), the one it's winding up, seconds until its gun is ready again, and a burst still firing. */
+  volley?: number;
+  gunKind?: Volley;
+  gunT?: number;
+  burst?: { n: number; t: number; tx: number; ty: number };
   tauntBy?: number | null;
   tauntT?: number;
   bossT?: number;
   bossPhase?: number;
   spawnT?: number;
+}
+
+/**
+ * A mob's dash or leap in flight: which move it is ('dash', 'charge', 'leap'), the lunge's look
+ * (mobgen's LungeName, or 'boss'), where it left from and where it's headed, seconds in and its length,
+ * a leap's height, its hit (x attack), knockback and reach (a dash's contact past the body, a leap's
+ * landing ring), whether it runs on through whoever it hits, the seconds it stands spent after, a big
+ * one (it shakes the ground), and who it has already hit (or missed).
+ */
+export interface Rush {
+  kind: 'dash' | 'leap';
+  move: string;
+  name: string;
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  t: number;
+  dur: number;
+  height: number;
+  dmg: number;
+  knock: number;
+  r: number;
+  through: boolean;
+  recover: number;
+  big: boolean;
+  hit: Set<number>;
 }
 
 export interface Shot {
@@ -140,6 +191,8 @@ export interface Shot {
   heal?: number;
   from: number;
   hit?: Set<number>;
+  /** A foe's bullet that bends as it flies (radians a second; a 'curve' volley). */
+  curve?: number;
 }
 
 export interface Area {
@@ -155,11 +208,17 @@ export interface Area {
   tickT: number;
   dmg: number;
   heal?: number;
-  kind: 'meteor' | 'fire' | 'rain' | 'slam' | 'blast' | 'sanctuary' | 'glow' | 'bomb' | 'poison';
+  /** ('boulder': an ogre's thrown rock coming down; 'rubble': what's left of it, for show.) */
+  kind: 'meteor' | 'fire' | 'rain' | 'slam' | 'blast' | 'sanctuary' | 'glow' | 'bomb' | 'poison' | 'boulder' | 'rubble';
   from: number;
   color: string;
   done?: boolean;
   t: number;
+  /** A thrown boulder: where it left the thrower's hands (and how high above the ground), and its whole flight (s). */
+  x0?: number;
+  y0?: number;
+  z0?: number;
+  flight?: number;
 }
 
 export interface FloatText {
@@ -169,6 +228,8 @@ export interface FloatText {
   color: string;
   t: number;
   big: boolean;
+  /** Drawn its own way: 'perfect' pops in gold over a knight that rolled through a hit. */
+  style?: 'perfect';
 }
 
 export interface Pickup {
@@ -187,18 +248,34 @@ export interface Pickup {
 
 /** Things the renderer should burst into particles (hits, deaths, spells). */
 export interface Fx {
-  kind: 'hit' | 'crit' | 'death' | 'heal' | 'dust' | 'blast' | 'spark' | 'levelup' | 'portal' | 'shock' | 'revive' | 'coin';
+  /** ('land': a dash or a leap coming down, a ring of dust; 'perfect': a knight rolled through a hit.) */
+  kind: 'hit' | 'crit' | 'death' | 'heal' | 'dust' | 'blast' | 'spark' | 'levelup' | 'portal' | 'shock' | 'revive' | 'coin' | 'land' | 'perfect';
   x: number;
   y: number;
   color?: string;
   size?: number;
   dir?: number;
   /** What made it, so the renderer can pick the right effect (a slime pops, a knight falls, a slam shakes the ground). */
-  src?: 'slime' | 'hero' | 'boss' | 'slam' | 'bomb' | 'meteor' | 'taunt';
+  src?: 'slime' | 'hero' | 'boss' | 'slam' | 'bomb' | 'meteor' | 'taunt' | 'boulder';
+  /** The unit it belongs to (a perfect roll's knight). */
+  uid?: number;
 }
 
 export function dist(ax: number, ay: number, bx: number, by: number): number {
   return Math.hypot(bx - ax, by - ay);
+}
+
+/** Rings on the ground are drawn r wide and this share of r tall (the 3/4 view). */
+export const RING_Y = 0.6;
+
+/**
+ * Is a body of radius `br` standing at (x, y) inside a ring of radius `r` round (cx, cy), as the ring
+ * is drawn on the ground? (What a landing or a boulder hits: what you see is what you get.)
+ */
+export function inRing(x: number, y: number, br: number, cx: number, cy: number, r: number): boolean {
+  const dx = (x - cx) / (r + br);
+  const dy = (y - cy) / (r * RING_Y + br);
+  return dx * dx + dy * dy <= 1;
 }
 
 export function norm(x: number, y: number): [number, number] {

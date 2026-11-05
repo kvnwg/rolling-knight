@@ -8,9 +8,9 @@ import type { Rarity } from '../core/rarity';
 import { Rng } from '../core/rng';
 import type { KnightStats } from '../core/roster';
 import type { MutationId } from '../core/state';
-import { heroAi, heroAutoRoll, mobAi } from './ai';
+import { heroAi, heroAutoRoll, mobAi, quakeRing } from './ai';
 import type { Biome } from './biomes';
-import { dist, lineOfSight, moveUnit, norm, type Area, type FloatText, type Fx, type Pickup, type Shot, type Unit, type View } from './entities';
+import { dist, inRing, lineOfSight, moveUnit, norm, type Area, type FloatText, type Fx, type Pickup, type Shot, type Unit, type View } from './entities';
 import { flowFrom, type Flow } from './flow';
 import { FLOOR, TILE, tileAt, type FloorMap } from './mapgen';
 import { type MobType } from './mobgen';
@@ -40,7 +40,9 @@ export type WorldEvent =
   | { type: 'wipe' }
   | { type: 'heroDown'; slot: number }
   | { type: 'switch'; slot: number }
-  | { type: 'bossPhase' };
+  | { type: 'bossPhase' }
+  /** A knight's dodge roll made something miss that would have hit it (once per roll); `mine`: the knight you control. */
+  | { type: 'perfect'; slot: number; mine: boolean };
 
 interface Snapshot {
   heroes: Map<number, { x: number; y: number; hp: number; downed: boolean; view: Unit['view']; dir: 1 | -1 }>;
@@ -86,6 +88,9 @@ let nextUid = 1;
 export function uid(): number {
   return nextUid++;
 }
+
+/** Seconds a foe takes to rise into a fight once it wakes (or is summoned), before it may attack. */
+export const SPAWN_IN = 0.6;
 
 export class World {
   map: FloorMap;
@@ -277,7 +282,7 @@ export class World {
 
   /** A foe of type `t`, built for this floor's difficulty (its HP and hit come from power.ts's targets). */
   makeMob(t: MobType, x: number, y: number, elite: boolean, boss: boolean): Unit {
-    const st = foeStats(t, this.difficulty, boss ? 'boss' : elite ? 'elite' : 'mob');
+    const st = foeStats(t, this.difficulty, boss ? 'boss' : elite ? 'elite' : 'mob', this.floor);
     const maxHp = st.hp;
     return {
       uid: uid(),
@@ -317,6 +322,11 @@ export class World {
       atkT: this.rng.float(0.5, t.atkCd),
       windT: 0,
       windDur: 0,
+      // (A room's pack doesn't all lunge on the same beat.)
+      lungeT: this.rng.float(0.4, 1.6),
+      throwT: this.rng.float(0.5, 1.5),
+      gunT: this.rng.float(0.6, 2.2),
+      chaseT: 0,
       tauntBy: null,
       tauntT: 0,
       bossT: 2,
@@ -365,6 +375,46 @@ export class World {
       if (dist(x, y, e.x, e.y) <= r + e.r) out.push(e);
     }
     return out;
+  }
+
+  /** Foes of `team` standing inside a ring of radius `r` on the ground round (x, y), as rings are drawn. */
+  enemiesInRing(team: Unit['team'], x: number, y: number, r: number): Unit[] {
+    const list = team === 'hero' ? this.mobs : this.heroes;
+    return list.filter((e) => !e.dead && !e.downed && inRing(e.x, e.y, e.r, x, y, r));
+  }
+
+  /** Can't `u` be touched right now (untouchable, or mid-roll)? Asks only: marks nothing. */
+  untouchable(u: Unit): boolean {
+    return u.invuln > 0 || !!u.rolling;
+  }
+
+  /**
+   * A hit that would land on knight `h` now: does it miss? (It's untouchable, or rolling.) When it's
+   * the knight's dodge roll that makes it miss, that's a perfect roll, marked once per roll. Call it
+   * only for a hit that really would have landed (a shot touching, a bite in reach, a knight inside a
+   * ring as it goes off).
+   */
+  evades(h: Unit): boolean {
+    if (!this.untouchable(h)) return false;
+    const d = h.dodge;
+    if (h.team === 'hero' && d && !d.perfect && this.time <= d.until) {
+      d.perfect = true;
+      this.perfectRoll(h);
+    }
+    return true;
+  }
+
+  /**
+   * A perfect roll: PERFECT! pops over the knight, it flashes and leaves an afterimage, a bright sound
+   * plays (the event), and for the knight you're steering yourself the fight holds its breath for a beat.
+   * Squadmates' are smaller and quieter.
+   */
+  private perfectRoll(h: Unit): void {
+    const mine = h.slot === this.controlled;
+    this.texts.push({ x: h.x, y: h.y - 30, text: mine ? 'PERFECT!' : 'PERFECT', color: '#ffe27a', t: 0, big: mine, style: 'perfect' });
+    this.fx.push({ kind: 'perfect', x: h.x, y: h.y - 8, size: mine ? 1 : 0.5, uid: h.uid });
+    this.events.push({ type: 'perfect', slot: h.slot!, mine });
+    if (mine && !this.auto) this.hitStop = Math.max(this.hitStop, 0.07);
   }
 
   /** The spot within `range` of u that would catch the most foes in a circle of radius `r`. */
@@ -460,9 +510,20 @@ export class World {
   }
 
   wake(m: Unit): void {
-    m.awake = true;
-    // Its roommates hear it.
-    for (const o of this.mobs) if (!o.awake && !o.dead && (o.room === m.room || dist(o.x, o.y, m.x, m.y) < 90)) o.awake = true;
+    // Its roommates hear it. Each one that wakes rises into the fight (a puff, a moment before it attacks).
+    const rouse = (o: Unit) => {
+      if (o.awake || o.dead) return;
+      o.awake = true;
+      this.spawnIn(o);
+    };
+    rouse(m);
+    for (const o of this.mobs) if (!o.awake && !o.dead && (o.room === m.room || dist(o.x, o.y, m.x, m.y) < 90)) rouse(o);
+  }
+
+  /** A foe rising into a fight: a puff of dust, and `SPAWN_IN` seconds before it may attack (mobMotion draws it rising). */
+  spawnIn(o: Unit): void {
+    o.spawnT = SPAWN_IN;
+    this.fx.push({ kind: 'land', x: o.x, y: o.y, size: 0.7 });
   }
 
   killMob(m: Unit): void {
@@ -603,7 +664,8 @@ export class World {
     this.areas = this.areas.filter((a) => a.team === 'hero');
     for (const m of this.mobs) {
       m.windT = 0;
-      m.chargeT = 0;
+      m.rush = undefined;
+      m.recoverT = 0;
       m.move = undefined;
     }
     this.history = [];
@@ -820,12 +882,12 @@ function tickStatus(w: World, u: Unit, dt: number): void {
 }
 
 /**
- * Units push each other apart a little (heroes and mobs alike). The knight in the lead shoulders its
- * squadmates aside and they barely push it back: turning back through a corridor, it's never pinned
- * by the squad trailing it.
+ * Units push each other apart a little (heroes and mobs alike; not a knight mid-roll or a mob mid-dash
+ * or mid-leap). The knight in the lead shoulders its squadmates aside and they barely push it back:
+ * turning back through a corridor, it's never pinned by the squad trailing it.
  */
 function separate(w: World): void {
-  const all = [...w.heroes.filter((h) => !h.downed && !h.rolling), ...w.mobs.filter((m) => !m.dead)];
+  const all = [...w.heroes.filter((h) => !h.downed && !h.rolling), ...w.mobs.filter((m) => !m.dead && !m.rush)];
   const lead = w.leader();
   const give = (u: Unit, other: Unit) => (u.boss ? 0.1 : u === lead && other.team === 'hero' ? 0.15 : 1);
   for (let i = 0; i < all.length; i++) {
@@ -870,6 +932,14 @@ function updateShots(w: World, dt: number): void {
         s.vy += (ny * sp - s.vy) * Math.min(1, s.homing * dt);
       }
     }
+    if (s.curve) {
+      // A curving bullet: its heading turns as it flies.
+      const c = Math.cos(s.curve * dt);
+      const n = Math.sin(s.curve * dt);
+      const vx = s.vx * c - s.vy * n;
+      s.vy = s.vx * n + s.vy * c;
+      s.vx = vx;
+    }
     s.x += s.vx * dt;
     s.y += s.vy * dt;
     if (tileAt(w.map, Math.floor(s.x / TILE), Math.floor((s.y + 6) / TILE)) === 0) {
@@ -884,7 +954,7 @@ function updateShots(w: World, dt: number): void {
       if (s.hit?.has(t.uid)) continue;
       if (dist(s.x, s.y, t.x, t.y - 6) > s.r + t.r + 2) continue;
       const from = [...w.heroes, ...w.mobs].find((u) => u.uid === s.from) ?? null;
-      if (t.team === 'hero' && (t.invuln > 0 || t.rolling)) continue;
+      if (t.team === 'hero' && w.evades(t)) continue;
       const crit = s.team === 'hero' && w.rng.chance(0.1);
       w.damage(t, s.dmg * (crit ? 1.6 : 1), from, { crit, knock: s.kind === 'arrow' ? 3 : 2, kx: s.vx, ky: s.vy });
       onShotHit(w, s, t);
@@ -916,11 +986,26 @@ function updateAreas(w: World, dt: number): void {
     a.t += dt;
     if (a.delay > 0) {
       a.delay -= dt;
-      if (a.delay <= 0 && (a.kind === 'meteor' || a.kind === 'slam' || a.kind === 'blast' || a.kind === 'bomb')) {
+      if (a.delay <= 0 && a.kind === 'boulder') {
+        // A thrown boulder comes down: everyone under its ring is hit and knocked off the spot, and
+        // the rock breaks into rubble.
+        const from = [...w.heroes, ...w.mobs].find((u) => u.uid === a.from) ?? null;
+        for (const e of w.enemiesInRing(a.team, a.x, a.y, a.r)) {
+          if (e.team === 'hero' && w.evades(e)) continue;
+          w.damage(e, a.dmg, from, { knock: 12, kx: e.x - a.x, ky: e.y - a.y });
+        }
+        w.fx.push({ kind: 'blast', x: a.x, y: a.y, color: a.color, size: a.r / 12, src: 'boulder' });
+        w.fx.push({ kind: 'land', x: a.x, y: a.y, size: a.r / 10 });
+        w.shakeIt(3, 0.25);
+        w.areas.push({ uid: uid(), team: a.team, x: a.x, y: a.y, r: a.r * 0.6, delay: 0, dur: 1.6, tick: 9, tickT: 9, dmg: 0, kind: 'rubble', from: a.from, color: a.color, t: 0 });
+        // ...and shards of it fly off all round.
+        if (from && from.team === 'mob') quakeRing(w, from, a.x, a.y, 6, a.r);
+        a.done = true;
+      } else if (a.delay <= 0 && (a.kind === 'meteor' || a.kind === 'slam' || a.kind === 'blast' || a.kind === 'bomb')) {
         // It goes off: one big hit.
         const from = [...w.heroes, ...w.mobs].find((u) => u.uid === a.from) ?? null;
         for (const e of w.enemiesIn(a.team, a.x, a.y, a.r)) {
-          if (e.team === 'hero' && (e.invuln > 0 || e.rolling)) continue;
+          if (e.team === 'hero' && w.evades(e)) continue;
           w.damage(e, a.dmg, from, { knock: 10, crit: a.kind === 'meteor' });
         }
         w.fx.push({ kind: 'blast', x: a.x, y: a.y, color: a.color, size: a.r / 12, src: a.kind === 'slam' ? 'slam' : a.kind === 'bomb' ? 'bomb' : a.kind === 'meteor' ? 'meteor' : undefined });
@@ -943,7 +1028,8 @@ function updateAreas(w: World, dt: number): void {
       }
       if (a.dmg > 0) {
         for (const e of w.enemiesIn(a.team, a.x, a.y, a.r)) {
-          if (e.team === 'hero' && (e.invuln > 0 || e.rolling)) continue;
+          // (Lingering ground, fire and the like: a roll keeps a knight out of it, but that's no perfect roll.)
+          if (e.team === 'hero' && w.untouchable(e)) continue;
           w.damage(e, a.dmg, from, { silent: a.kind === 'fire' && w.rng.chance(0.5) });
         }
         if (a.kind === 'rain') {

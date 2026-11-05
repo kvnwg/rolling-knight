@@ -114,11 +114,18 @@ and Mythic or better.
 
 Three slots. You control one (switch any time); the other two run their role's AI: tanks wade in and
 taunt when the squad is pressed, fighters chase, archers and mages kite, healers stay by whoever is
-hurt and save Sanctuary for when it counts. Everyone dodges what they see coming, most of the time.
+hurt and save Sanctuary for when it counts. Everyone dodges what they see coming, most of the time
+(shots, blasts and boulders about to land, a lunge's lane or landing ring once its aim has locked).
 Auto hands your knight to the AI too (and it is on while a menu is open). Empty slots fill with your
 strongest free knight; anything else is your call (or Best squad), at the quartermaster in the hub.
 The squad is locked in the dungeon: knights rolled during a dive wait at the hub, and to change who
 fights (or spend anything) you head back up, or fall.
+
+**Perfect rolls.** When a dodge roll makes something miss that would have hit (a shot through the
+knight, a blast or a boulder going off on it, a bite, a charge, a dash or a leap coming down), PERFECT!
+pops over it in the big pixel font, it flashes and leaves an afterimage, a bright chime plays
+(`perfect_roll`), and if you're steering it yourself the fight holds its breath for a beat. Once per
+roll, for show only; squadmates' are smaller and quieter.
 
 ## 6b. The tinker's upgrades
 
@@ -143,9 +150,38 @@ never repeats the last one, and a floor you come back to is a new map to the nex
 floors keep the same arena with a different approach. Every floor has side rooms, pools and props,
 and is checked to be fully connected. Mobs are designed
 per floor: body plan, behavior (chaser, archer, charger, bomber, caster, tank, swarm), colors, size,
-features and name; bosses have three of ring, fan, charge, slam, summon and rain, and enrage at
-half HP. Clearing a floor opens the portal. A wiped squad is carried back to the hub, and the run
-goes back to the biome's first floor (on Auto it heads back down by itself unless you move).
+features and name; bosses have three of ring, fan, charge, slam, summon, rain and leap (always a
+charge or a leap among them), and enrage at half HP. Clearing a floor opens the portal. A wiped squad
+is carried back to the hub, and the run goes back to the biome's first floor (on Auto it heads back
+down by itself unless you move).
+
+**How monsters fight** (after Enter the Gungeon; `src/world/ai.ts`, `src/world/mobgen.ts`). They come
+with intent: chasers at nearly a knight's pace (sprinting when they're far off), swarms faster than
+you, even ogres at a jog; they find their way round water and props, close in at an angle rather than
+straight, and those that fight from range keep their distance and circle you. Every attack has a tell:
+through its wind-up the monster pulses red (a couple of frames on, a couple off) inside a crisp red
+outline, and big moves add a red ! over its head. Every kind has a lunge or a gun, many both:
+
+- Lunges (LUNGES): wolves and spiders pounce, slimes, pumpkins and chickens hop, goblins dash in and
+  stab, orcs shoulder-charge, skeletons thrust, bats and spirits swoop, beetles skitter, boars, pigs and
+  rams charge, bombers hop in before they go off, ogres leap and slam. On the ground a red lane (a dash)
+  or a red ring (a leap) fills up over the wind-up, following you for its first half and then holding;
+  then one hit, and the monster stands spent for a moment. A roll goes straight through any of them.
+- Bullets, slow (60 to 100 px/s, slower than any knight's shot), big and high-contrast (the effects'
+  danger balls: a glossy ball in danger red or orange with a white-hot heart and an ink outline,
+  throbbing and dragging a short tail; `src/render/vfx/art.ts`), in a pattern each kind is known by
+  (`gunFor`): archers aim and fan out every third volley, flying shooters spit bursts, spore pods
+  ring, casters curve theirs in; chasers shoot between lunges (goblins aimed shots, skeletons short
+  bursts, orcs and spiders fans), swarms the odd slow shot (spirits curving ones). Slimes, pumpkins,
+  bombers and ogres shake a ring loose as they land, slam or go off, from the edge of the ring that
+  came down. The first ten floors fire the plain patterns (and a little slower); from floor 11 and
+  again from 21, and from elites and bosses, they're denser.
+- Ogres that can't get to you (no way round, the way round far longer than straight across, or kited
+  for a few seconds) tear up a chunk of the floor and throw it: a red ring where it will land from the
+  start of the throw, its shadow growing as it falls, shards flying off as it breaks.
+- Slams and blasts show their red ring from the start of the wind-up too. Bosses charge and leap bigger.
+
+A monster that wakes (or is summoned) rises into the fight in a puff of dust and does nothing for 0.6 s.
 
 Folk turn up on some floors (`src/world/npcs.ts`): farmers, guards, a bard, a goblin accountant, a
 ghost who is three hundred years late, a chicken who is not a chicken. Each keeps a set-up of their
@@ -174,10 +210,14 @@ there: 750 on floor 1, then x1.1 a floor). When a floor starts, its foes are bui
 par at par; above par they grow by (power / par)^0.6, so a squad four times par clears about 1.7x
 faster, not four times, and nothing folds in one hit; below par they shrink only by (power / par)^0.2,
 so the wall is real. Foes come from targets, not raw numbers: at their difficulty a plain foe takes
-1.4 s of the squad's damage and each hit takes 5% of a knight's HP (elites 5.5 s and 7.5%, bosses
+1.3 s of the squad's damage and each hit takes 4% of a knight's HP (elites 5.2 s and 6.4%, bosses
 28 s and 10%), and each foe type keeps its shape against the plain chaser (a tank has three times
-its HP). The camp and the gate show Power against par with a wax seal: Deadly, Hard, Fair, Easy,
-Trivial. `npm run sim` plays the real game on Auto and logs power against par floor by floor.
+its HP). (Each blow is lighter than it used to be because monsters now land many more: lunges,
+volleys, quicker feet.) The first floors bite harder than par alone would say (a new squad is usually
+well ahead of it there): on floor 1 foes hit 25% harder and take 15% longer to kill, fading to the
+plain targets by floor 10 (`BAL.balance.early`). The camp and the gate show Power against par with a
+wax seal: Deadly, Hard, Fair, Easy, Trivial. `npm run sim` plays the real game on Auto and logs power
+against par floor by floor.
 
 ## 8. Rebirth and perks
 
