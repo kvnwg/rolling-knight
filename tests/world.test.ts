@@ -41,8 +41,10 @@ describe('floors', () => {
   });
 
   it('never let a prop block the way', () => {
-    const m = generateFloor({ floor: 9, biome: BIOMES.hamlet, seed: 77, boss: false });
-    for (const p of m.props) if (p.solid && p.kind !== 'tree') expect([BLOCKED, FLOOR]).toContain(tileAt(m, Math.floor(p.x / TILE), Math.floor((p.y - 1) / TILE)));
+    for (const biome of [BIOMES.hamlet, BIOMES.farmland]) {
+      const m = generateFloor({ floor: 9, biome, seed: 77, boss: false });
+      for (const p of m.props) if (p.solid && p.kind !== 'tree') expect([BLOCKED, FLOOR]).toContain(tileAt(m, Math.floor(p.x / TILE), Math.floor((p.y - 1) / TILE)));
+    }
   });
 
   it('are the same for the same seed', () => {
@@ -53,7 +55,9 @@ describe('floors', () => {
 
   it('change biome every five floors and never end', () => {
     expect(biomeForFloor(1, 1).id).toBe('hamlet');
-    expect(biomeForFloor(6, 1).id).toBe('forest');
+    expect(biomeForFloor(6, 1).id).toBe('farmland');
+    expect(biomeForFloor(10, 1).id).toBe('farmland');
+    expect(biomeForFloor(11, 1).id).toBe('forest');
     expect(biomeForFloor(500, 1)).toBeDefined();
   });
 });
@@ -71,6 +75,76 @@ describe('mobs', () => {
       expect(boss.boss?.moves.length).toBe(3);
       expect(boss.hp).toBeGreaterThan(types[0].hp * 20);
     }
+  });
+});
+
+describe('the farm', () => {
+  const farm = BIOMES.farmland;
+  const isFarmName = (plan: string, name: string) => (farm.mobs.names?.[plan as keyof typeof farm.mobs.names] ?? []).includes(name);
+
+  it('has pigs and rams on every floor, with names from its joke tables', () => {
+    for (let floor = 6; floor <= 9; floor++) {
+      for (const seed of [1, 2, 3, 99, 1234]) {
+        const types = floorMobs(farm, floor, seed);
+        const plans = types.map((t) => t.plan);
+        expect(plans).toContain('pig');
+        expect(plans).toContain('ram');
+        for (const t of types) {
+          expect(isFarmName(t.plan, t.name), `${t.plan}: ${t.name}`).toBe(true);
+          expect(farm.mobs.adjectives.some((a) => t.name.startsWith(`${a} `))).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('is ruled by a huge pig with a name and title of its own', () => {
+    const titles = new Set<string>();
+    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+      const boss = floorBoss(farm, 10, seed);
+      expect(boss.plan).toBe('pig');
+      expect(farm.mobs.boss!.names.some(([n, t]) => n === boss.name && t === boss.boss!.title)).toBe(true);
+      expect(boss.boss!.moves).toContain('ring');
+      expect(boss.boss!.moves).toContain('charge');
+      expect(new Set(boss.boss!.moves).size).toBe(3);
+      titles.add(boss.boss!.title);
+    }
+    expect(titles.size).toBeGreaterThan(1);
+  });
+
+  it('plows fields off the tracks, with crops standing on them that never block the way', () => {
+    let fields = 0;
+    let crops = 0;
+    for (const seed of [5, 77, 1234]) {
+      const m = generateFloor({ floor: 7, biome: farm, seed, boss: false });
+      expect(m.field).toBeDefined();
+      for (let i = 0; i < m.tiles.length; i++) {
+        if (!m.field![i]) continue;
+        fields++;
+        expect(m.tiles[i]).toBe(FLOOR);
+        expect(m.path[i]).toBe(0);
+      }
+      for (const p of m.props) {
+        if (p.kind !== 'cabbage' && p.kind !== 'wheat' && !(p.kind === 'pumpkin' && !p.solid)) continue;
+        crops++;
+        const i = Math.floor(p.y / TILE) * m.w + Math.floor(p.x / TILE);
+        expect(p.solid).toBe(false);
+        expect(m.tiles[i]).toBe(FLOOR);
+      }
+    }
+    expect(fields).toBeGreaterThan(20);
+    expect(crops).toBeGreaterThan(20);
+  });
+
+  it('took the pigs and rams away from the hamlet, whose mobs keep their plain names', () => {
+    expect(BIOMES.hamlet.mobs.plans).not.toContain('pig');
+    expect(BIOMES.hamlet.mobs.plans).not.toContain('ram');
+    for (const floor of [1, 2, 3, 4, 14]) {
+      for (const t of floorMobs(BIOMES.hamlet, floor, 7)) {
+        expect(['pig', 'ram', 'chicken']).not.toContain(t.plan);
+        expect(BIOMES.hamlet.mobs.adjectives.some((a) => t.name.startsWith(`${a} `))).toBe(true);
+      }
+    }
+    expect(generateFloor({ floor: 3, biome: BIOMES.hamlet, seed: 9, boss: false }).field).toBeUndefined();
   });
 });
 
@@ -133,12 +207,20 @@ describe('the squad in a fight', () => {
 });
 
 describe('the game', () => {
-  it('rolls a squad, starts floor 1 and keeps going', () => {
+  it('rolls a squad at camp, then heads into floor 1 and keeps going', () => {
     const g = new Game(true);
     g.setAuto(true);
+    // At camp the altar rolls and the squad fills itself, but no floor starts until you set out.
     for (let t = 0; t < 30; t += 1 / 30) g.tick(1 / 30);
     expect(g.state.squad.filter(Boolean).length).toBe(3);
-    expect(g.world).not.toBeNull();
+    expect(g.inDungeon).toBe(false);
     expect(g.state.records.spins).toBeGreaterThanOrEqual(4);
+    g.enterDungeon();
+    for (let t = 0; t < 10; t += 1 / 30) g.tick(1 / 30);
+    expect(g.inDungeon).toBe(true);
+    expect(g.world).not.toBeNull();
+    expect(g.world!.heroes.length).toBe(3);
+    g.leaveDungeon();
+    expect(g.inDungeon).toBe(false);
   });
 });

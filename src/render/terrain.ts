@@ -1,9 +1,9 @@
 /**
  * Paints a floor's ground once, when the floor is built: the biome's ground and path materials
- * (grass, cobbles, flagstones, snow, sand...) with organic edges between them, pools of water or lava
- * with banks and foam, walls and cliffs drawn with their front faces (the 3/4 view), and ambient
- * occlusion where floor meets wall. Trees, props and everything that moves are drawn on top each
- * frame (renderer.ts).
+ * (grass, cobbles, flagstones, snow, sand...) with organic edges between them, the farm's tilled
+ * fields (plowed soil in furrows), pools of water or lava with banks and foam, walls and cliffs drawn
+ * with their front faces (the 3/4 view), and ambient occlusion where floor meets wall. Trees, props
+ * and everything that moves are drawn on top each frame (renderer.ts).
  */
 import type { Biome, GroundKind, Ramp } from '../world/biomes';
 import { BLOCKED, FLOOR, LIQUID, SOLID, TILE, type FloorMap } from '../world/mapgen';
@@ -197,6 +197,8 @@ function paint(kind: GroundKind, x: number, y: number, m: MatCtx): string {
       if (m.accent && h2(Math.floor(x / 6), Math.floor(y / 6), s + 2) < 0.12 && h2(x, y, s + 3) < 0.35) return m.accent[0];
       return r[clampK(k, r.length)];
     }
+    case 'tilled':
+      return tilled(x, y, m, 1);
     case 'basalt':
     case 'crystalStone': {
       const [d1, d2, id] = voronoi(x, y, 11, s);
@@ -209,6 +211,40 @@ function paint(kind: GroundKind, x: number, y: number, m: MatCtx): string {
       return r[clampK(k, r.length)];
     }
   }
+}
+
+/**
+ * Plowed soil: a ridge every 8 px with its slope lit from the top left and the furrow between in
+ * shade, clods along the ridges and, if `field` says so, rows of seedlings. `field` is the field mask
+ * value (mapgen.ts): 1 rows run east-west, 2 north-south, +4 seedlings.
+ */
+function tilled(x: number, y: number, m: MatCtx, field: number): string {
+  const r = m.ramp;
+  const s = m.seed;
+  const ns = (field & 3) === 2;
+  const along = ns ? y : x;
+  const across = ns ? x : y;
+  const p = across & 7;
+  let k = [3.3, 2.9, 2.5, 2.2, 1.8, 1.05, 0.45, 1.25][p] + (vnoise(x, y, 22, s) - 0.5) * 0.8;
+  const row = across >> 3;
+  // Clods on the ridges: a lit lump with a shadow under it.
+  const cell = Math.floor(along / 6);
+  if (h2(cell, row, s + 1) < 0.45) {
+    const c = cell * 6 + 1 + Math.floor(h2(cell, row, s + 2) * 4);
+    const cp = 1 + Math.floor(h2(cell, row, s + 3) * 2);
+    if (along === c && p === cp) k = 3.9;
+    else if (along === c && p === cp + 1) k = 1.1;
+  }
+  if (field & 4 && m.accent) {
+    // Seedlings along the ridge tops: two leaves over a stem.
+    const sc = Math.floor(along / 5);
+    if (h2(sc, row, s + 4) < 0.8) {
+      const c = sc * 5 + 1 + Math.floor(h2(sc, row, s + 5) * 3);
+      if (p === 2 && (along === c - 1 || along === c + 1)) return m.accent[1];
+      if (p === 3 && along === c) return m.accent[0];
+    }
+  }
+  return r[clampK(k, r.length)];
 }
 
 // ------------------------------------------------------------------ the floor
@@ -226,17 +262,31 @@ function hexToRgb(hex: string): [number, number, number] {
 }
 
 export function paintTerrain(m: FloorMap, biome: Biome): Terrain {
+  const t = paintTerrainPixels(m, biome);
+  const canvas = makeCanvas(t.w, t.h) as HTMLCanvasElement;
+  const ctx = canvas.getContext('2d')!;
+  const img = ctx.createImageData(t.w, t.h);
+  img.data.set(t.px);
+  ctx.putImageData(img, 0, 0);
+  return { canvas, glows: t.glows, liquid: t.liquid };
+}
+
+/** The floor's ground as RGBA pixels (no canvas: tools/preview.ts paints floors in Node with it). */
+export function paintTerrainPixels(m: FloorMap, biome: Biome): Omit<Terrain, 'canvas'> & { w: number; h: number; px: Uint8ClampedArray } {
   const W = m.w * TILE;
   const H = m.h * TILE;
-  const canvas = makeCanvas(W, H) as HTMLCanvasElement;
-  const ctx = canvas.getContext('2d')!;
-  const img = ctx.createImageData(W, H);
-  const px = img.data;
+  const px = new Uint8ClampedArray(W * H * 4);
   const seed = m.seed & 0xffff;
   const tile = (tx: number, ty: number) => (tx < 0 || ty < 0 || tx >= m.w || ty >= m.h ? SOLID : m.tiles[ty * m.w + tx]);
   const pathAt = (tx: number, ty: number) => (tx < 0 || ty < 0 || tx >= m.w || ty >= m.h ? 0 : m.path[ty * m.w + tx]);
   const ground: MatCtx = { seed, ramp: biome.ground.ramp, accent: biome.ground.accent };
   const path: MatCtx = { seed: seed + 101, ramp: biome.path.ramp, accent: biome.path.accent };
+  const fieldMat: MatCtx | null = biome.fields && m.field ? { seed: seed + 202, ramp: biome.fields.ramp, accent: biome.fields.accent } : null;
+  const fieldAt = (tx: number, ty: number) => (!m.field || tx < 0 || ty < 0 || tx >= m.w || ty >= m.h ? 0 : m.field[ty * m.w + tx]);
+  const isField = (tx: number, ty: number) => (fieldAt(tx, ty) ? 1 : 0);
+  // A field pixel just past its tile's edge takes the furrows of the field it belongs to.
+  const fieldOf = (tx: number, ty: number) => fieldAt(tx, ty) || fieldAt(tx, ty - 1) || fieldAt(tx, ty + 1) || fieldAt(tx - 1, ty) || fieldAt(tx + 1, ty) || 1;
+
   for (const mc of [[ground, biome.ground.kind], [path, biome.path.kind]] as const) {
     if (mc[1] === 'cobble') mc[0].courses = new Courses(mc[0].seed, 5, 4, 8);
     if (mc[1] === 'flagstone') mc[0].courses = new Courses(mc[0].seed, 9, 9, 15);
@@ -263,6 +313,8 @@ export function paintTerrain(m: FloorMap, biome: Biome): Terrain {
   const isLiquid = (tx: number, ty: number) => (tile(tx, ty) === LIQUID ? 1 : 0);
   const isPath = (tx: number, ty: number) => pathAt(tx, ty);
   const isOpen = (tx: number, ty: number) => (tile(tx, ty) === SOLID ? 0 : 1);
+  // Fields keep neat edges (less raggedness than paths).
+  const fieldMask = (x: number, y: number) => bil(isField, x, y) + (vnoise(x, y, 5, seed + 90) - 0.5) * 0.22;
   const set = (i: number, hex: string, dark = 0) => {
     const [r, g, b] = hexToRgb(hex);
     const f = 1 - dark;
@@ -361,12 +413,18 @@ export function paintTerrain(m: FloorMap, biome: Biome): Terrain {
       // Ground or path, blending with a ragged edge.
       const pm = bil(isPath, x, y) + (vnoise(x, y, 6, seed + 80) - 0.5) * 0.45;
       const onPath = pm > 0.5;
-      let col = onPath ? paint(biome.path.kind, x, y, path) : paint(biome.ground.kind, x, y, ground);
+      const onField = !onPath && fieldMat !== null && fieldMask(x, y) > 0.5;
+      let col = onPath ? paint(biome.path.kind, x, y, path) : onField ? tilled(x, y, fieldMat!, fieldOf(tx, ty)) : paint(biome.ground.kind, x, y, ground);
       let dark = 0;
       // The ground's edge throws a little shadow onto the path below it.
       if (onPath) {
         const pmAbove = bil(isPath, x, y - 2) + (vnoise(x, y - 2, 6, seed + 80) - 0.5) * 0.45;
         if (pmAbove <= 0.5) dark += 0.28;
+      }
+      // A field lies a step below the grass: the grass edge shades its top and left rows.
+      if (onField) {
+        if (fieldMask(x, y - 2) <= 0.5) dark += 0.3;
+        else if (fieldMask(x - 2, y) <= 0.5) dark += 0.18;
       }
       // A bank under the edge of water: the ground drops to the water line.
       if (liquid && liquid.kind !== 'lava') {
@@ -386,8 +444,7 @@ export function paintTerrain(m: FloorMap, biome: Biome): Terrain {
     }
   }
   for (let ty = 0; ty < m.h; ty++) for (let tx = 0; tx < m.w; tx++) if (m.tiles[ty * m.w + tx] === LIQUID) liquidTiles.push({ x: tx * TILE + 8, y: ty * TILE + 8 });
-  ctx.putImageData(img, 0, 0);
-  return { canvas, glows, liquid: liquidTiles };
+  return { w: W, h: H, px, glows, liquid: liquidTiles };
 }
 
 export { FLOOR };

@@ -1,0 +1,28 @@
+/* Chunky lettering (Chunky.tsx): ink outline and drop, the bands clipped to the letters on top. */
+.chunky {
+  --ink: #1a1326;
+  position: relative;
+  display: inline-block;
+  font-family: 'Pixelify Sans', 'Courier New', monospace;
+  /* (Pixelify Sans joins "fl" into one glyph: names like Starfletch read wrong.) */
+  font-variant-ligatures: none;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  -webkit-text-stroke: 0.2em var(--ink);
+  text-shadow: 0 0.1em 0 var(--ink);
+  white-space: nowrap;
+}
+.chunky::after {
+  content: attr(data-text);
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: transparent;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+  background: var(--fill);
+  -webkit-background-clip: text;
+  background-clip: text;
+}

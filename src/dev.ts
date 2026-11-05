@@ -5,6 +5,7 @@
  *   ?squad=legendary  the squad's rarity for ?floor (default epic)
  *   ?auto             the knight you control plays itself
  *   ?gold=1e6         some gold
+ *   ?camp             stay at camp (the home screen) after ?floor's setup
  * The game is also on window.__game.
  */
 import { knightId, type ClassId } from './core/knights';
@@ -29,7 +30,9 @@ export function devGame(): Game {
     classes.slice(0, 3).forEach((c) => addKnight(s, knightId(rarity, c), null));
     s.squad = classes.slice(0, 3).map((c) => knightId(rarity, c));
     for (const id of s.squad) if (id && s.roster[id]) s.roster[id].level = Math.max(1, Math.floor(floor * 0.8));
+    game.inDungeon = true;
   }
+  if (q.has('camp')) game.inDungeon = false;
   if (q.has('gold')) s.gold = Number(q.get('gold'));
   if (q.has('auto')) s.settings.autoPlay = true;
   (window as unknown as { __game: Game }).__game = game;

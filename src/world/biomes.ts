@@ -1,21 +1,22 @@
 /**
- * Biomes: every 5 floors the dungeon changes setting, from hamlets and dark forests to tundra, crypts
+ * Biomes: every 5 floors the dungeon changes setting, from hamlets, farms and dark forests to tundra, crypts
  * and lava caves, endlessly. A biome sets the floor's layout style, its materials and palettes, its
  * light (a cool ambient the scene is multiplied by, warm point lights on top), its weather, and the
  * flavor of the mobs that live there (mobgen.ts builds them).
  */
 
-export type BiomeId = 'hamlet' | 'forest' | 'tundra' | 'crypt' | 'swamp' | 'desert' | 'graveyard' | 'ember' | 'crystal' | 'shrine';
+export type BiomeId = 'hamlet' | 'farmland' | 'forest' | 'tundra' | 'crypt' | 'swamp' | 'desert' | 'graveyard' | 'ember' | 'crystal' | 'shrine';
 
-export type GroundKind = 'grass' | 'cobble' | 'dirt' | 'snow' | 'flagstone' | 'sand' | 'mud' | 'basalt' | 'crystalStone' | 'moss' | 'ice';
+export type GroundKind = 'grass' | 'cobble' | 'dirt' | 'snow' | 'flagstone' | 'sand' | 'mud' | 'basalt' | 'crystalStone' | 'moss' | 'ice' | 'tilled';
 export type SolidKind = 'trees' | 'wall' | 'cliff';
-export type TreeKind = 'oak' | 'pine' | 'snowPine' | 'dead' | 'willow' | 'mushroom' | 'crystal' | 'cactus' | 'maple';
+export type TreeKind = 'oak' | 'pine' | 'snowPine' | 'dead' | 'willow' | 'mushroom' | 'crystal' | 'cactus' | 'maple' | 'apple';
 export type LiquidKind = 'water' | 'lava' | 'swampWater' | 'iceWater' | 'spiritWater' | 'chasm';
 export type PropKind =
   | 'rock' | 'bush' | 'flowers' | 'barrel' | 'crate' | 'bones' | 'torch' | 'lantern' | 'brazier' | 'gravestone' | 'crystalSmall'
-  | 'reeds' | 'mushroomSmall' | 'pumpkin' | 'stump' | 'pillar' | 'statue' | 'well' | 'fence' | 'skull' | 'cart' | 'stoneLantern' | 'banner';
+  | 'reeds' | 'mushroomSmall' | 'pumpkin' | 'stump' | 'pillar' | 'statue' | 'well' | 'fence' | 'skull' | 'cart' | 'stoneLantern' | 'banner'
+  | 'campfire' | 'tent' | 'hayBale' | 'cabbage' | 'wheat' | 'scarecrow' | 'trough' | 'sunflower';
 export type Weather = 'fireflies' | 'snow' | 'embers' | 'dust' | 'spores' | 'petals' | 'leaves' | 'ash' | 'motes' | 'rain';
-export type BodyPlan = 'slime' | 'beast' | 'humanoid' | 'flyer' | 'plant' | 'golem' | 'bug' | 'pumpkin' | 'ghost' | 'pig' | 'ram';
+export type BodyPlan = 'slime' | 'beast' | 'humanoid' | 'flyer' | 'plant' | 'golem' | 'bug' | 'pumpkin' | 'ghost' | 'pig' | 'ram' | 'chicken';
 
 /** A color ramp, darkest first. */
 export type Ramp = readonly string[];
@@ -48,8 +49,65 @@ export interface Biome {
     fog?: string;
   };
   weather: Weather[];
-  mobs: { plans: BodyPlan[]; adjectives: string[]; palettes: Ramp[]; eye: string };
+  /**
+   * Tilled crop fields (the farm): plowed soil in furrows, painted in this ramp (accent: seedlings),
+   * planted with a crop per field (or only seedlings).
+   */
+  fields?: { ramp: Ramp; accent?: Ramp; crops: Array<[FieldCrop, number]> };
+  mobs: {
+    plans: BodyPlan[];
+    adjectives: string[];
+    palettes: Ramp[];
+    eye: string;
+    /** Plans every floor of the biome has (its signature mobs), ahead of the shuffled rest. */
+    core?: BodyPlan[];
+    /** Names per plan that replace the "Adjective Noun" names. */
+    names?: Partial<Record<BodyPlan, string[]>>;
+    /** The biome's own boss: always this plan, with a name and title picked as a pair. */
+    boss?: { plan: BodyPlan; names: Array<readonly [name: string, title: string]> };
+  };
 }
+
+/** What grows in a tilled field. */
+export type FieldCrop = 'cabbage' | 'wheat' | 'pumpkin' | 'sprouts';
+
+/** The farm's mobs don't do "Adjective Noun". */
+const FARM_NAMES: Partial<Record<BodyPlan, string[]>> = {
+  pig: [
+    'Sir Loin', 'Hamageddon', 'Squealer of Souls', 'Porkchop Supreme', 'The Unbaconable', 'Trotter of Doom', 'Oinkmageddon',
+    'Lord Porkington', 'Snoutlaw', 'Prosciutto Bandito', 'Swine of the Times', 'Rasher Than Thou', 'Chorizo Furioso',
+    'Hamurai', 'Count Chopula', 'Bacon-Wrapped Menace', 'Snoutrageous', 'Mudwallow the Unwashed', 'Hogwash', 'Snortimer',
+  ],
+  ram: [
+    'Ramsay the Unbaa-lievable', 'Lamb Chopper', 'Baa-rbarian', 'Woolverine', 'Headbutt Harold', 'Ewe-nited Front',
+    'Ram-bunctious', 'Shear Terror', 'Baa-d Influence', 'The Fleecer', 'Ram Dunk', 'Knitpicker', 'Horns of Plenty',
+    'Not Remotely Sheepish', 'Muttonchops', 'Ramshackle',
+  ],
+  chicken: [
+    'Poultrygeist', 'Fowl Play', 'Eggsecutioner', 'Peckish', 'Beak Performance', 'Murder Nugget', 'Free-Range Menace',
+    "Coop d'Etat", 'Henrietta the Unhinged', 'Cockadoodle-Doom', 'Eggstinction Event', 'Fowl Temper',
+  ],
+  flyer: [
+    'Caw-tastrophe', 'Crowbar', 'Murder Most Fowl', 'Crowpocalypse', 'Not Scared, Actually', 'Corn Thief', 'Crowd Control',
+    'Sir Caws-a-lot', 'Raven Mad', 'Seedy Character',
+  ],
+  humanoid: [
+    'Strawman Argument', 'Hay Fever', 'The Last Straw', 'Stuffed Shirt', 'Corn-elius', 'Brains Not Included',
+    'Scared of Crows', 'Outstanding in His Field', 'Sackface McStitches', 'Mister Burlap',
+  ],
+  pumpkin: ['Squashbuckler', 'Pumpkin Spite', 'Gourd Almighty', 'Gourdian Angel', 'Rind Over Matter', 'Orange You Scared?', 'Vine and Dandy'],
+};
+
+/** The farm's boss: a pig that kept eating, and its billing. */
+const FARM_BOSSES: Array<readonly [string, string]> = [
+  ['Lord Hamsworth', 'Exceeds Recommended Serving Size'],
+  ['Chonkus Maximus', 'Has Its Own Gravity'],
+  ['The Hamperor', 'Outgrew the Breakfast Menu'],
+  ['Baron Von Bacon', 'Banned From Every Butcher'],
+  ['Sir Hamsalot', 'Too Ham to Fry'],
+  ['Lady Lardington', 'Legally a Landmass'],
+  ['Porkules', 'Serves Twelve Thousand'],
+];
 
 export const BIOMES: Record<BiomeId, Biome> = {
   hamlet: {
@@ -65,7 +123,31 @@ export const BIOMES: Record<BiomeId, Biome> = {
     props: [['flowers', 6], ['bush', 5], ['rock', 3], ['barrel', 2], ['crate', 2], ['fence', 2], ['lantern', 2], ['well', 1], ['cart', 1], ['stump', 2], ['pumpkin', 1]],
     light: { ambient: '#d9c2a3', hero: '#ffd9a0', heroRadius: 40, fire: '#ffb35a', gradeTop: '#ffcf8a', gradeBottom: '#3a4a6a', vignette: 0.35 },
     weather: ['petals', 'motes'],
-    mobs: { plans: ['pig', 'ram', 'slime', 'humanoid', 'flyer'], adjectives: ['Feral', 'Rabid', 'Grumpy', 'Mangy', 'Rowdy'], palettes: [['#3b2a1e', '#6a4a2c', '#9a6d3e', '#c99a5a'], ['#2f3d22', '#4f6a2e', '#7a9a3e', '#a8c864']], eye: '#ffe066' },
+    mobs: { plans: ['slime', 'humanoid', 'beast', 'flyer'], adjectives: ['Feral', 'Rabid', 'Grumpy', 'Mangy', 'Rowdy'], palettes: [['#3b2a1e', '#6a4a2c', '#9a6d3e', '#c99a5a'], ['#2f3d22', '#4f6a2e', '#7a9a3e', '#a8c864']], eye: '#ffe066' },
+  },
+  farmland: {
+    id: 'farmland',
+    name: "Old MacMayhem's Farm",
+    layout: 'cave',
+    ground: { kind: 'grass', ramp: ['#2f3b1b', '#465626', '#61732f', '#83923b', '#aab25a'], accent: ['#f4d65a', '#fbf4e0', '#e8904a', '#d88aa0'] },
+    path: { kind: 'dirt', ramp: ['#3c2c1e', '#5a432c', '#79603e', '#9a7c52', '#bc9c6a'] },
+    solid: { kind: 'trees', top: ['#141e10', '#1a2814'], face: ['#2a2016', '#3e3222', '#54442e'], trees: ['apple', 'apple', 'oak'], underRamp: ['#18240f', '#1e2c14'] },
+    trees: ['apple'],
+    treeRamp: ['#1c3416', '#2c4e1e', '#43702a', '#62913a', '#93b855'],
+    liquid: { kind: 'water', ramp: ['#1a3a3e', '#235855', '#2f7a6c', '#5aa28a', '#a6d6b4'] },
+    props: [['hayBale', 5], ['wheat', 5], ['flowers', 4], ['fence', 2], ['barrel', 2], ['trough', 2], ['scarecrow', 2], ['pumpkin', 2], ['crate', 1], ['cart', 1], ['well', 1], ['sunflower', 1], ['bush', 2], ['stump', 1]],
+    light: { ambient: '#f0c898', hero: '#ffe2a8', heroRadius: 38, fire: '#ffb35a', gradeTop: '#ffb664', gradeBottom: '#34386a', vignette: 0.38 },
+    weather: ['motes', 'leaves'],
+    fields: { ramp: ['#24160e', '#3a2416', '#53361f', '#6e4a2b', '#8a6038'], accent: ['#5e8a2c', '#8ab83e'], crops: [['cabbage', 3], ['wheat', 3], ['pumpkin', 2], ['sprouts', 2]] },
+    mobs: {
+      plans: ['pig', 'ram', 'chicken', 'flyer', 'humanoid', 'pumpkin'],
+      core: ['pig', 'ram'],
+      adjectives: ['Barnyard', 'Hayseed', 'Muddy', 'Ornery', 'Corn-fed'],
+      palettes: [['#3e1a16', '#72281f', '#a83e2c', '#d8694a'], ['#1c2640', '#2c3e62', '#46608e', '#7090bc'], ['#4a3618', '#7a5c2a', '#b08a42', '#e0c070']],
+      eye: '#ffd23a',
+      names: FARM_NAMES,
+      boss: { plan: 'pig', names: FARM_BOSSES },
+    },
   },
   forest: {
     id: 'forest',
@@ -204,7 +286,15 @@ export const BIOMES: Record<BiomeId, Biome> = {
   },
 };
 
-export const BIOME_ORDER: BiomeId[] = ['hamlet', 'forest', 'tundra', 'crypt', 'swamp', 'desert', 'graveyard', 'ember', 'crystal', 'shrine'];
+/** The camp (the home screen): the hamlet's woods at night, lit by a campfire and lanterns. */
+export const CAMP_BIOME: Biome = {
+  ...BIOMES.hamlet,
+  name: 'Camp',
+  light: { ambient: '#4a5682', hero: '#ffd9a0', heroRadius: 30, fire: '#ffa24a', gradeTop: '#3a4a8a', gradeBottom: '#120c20', vignette: 0.6, fog: '#2a3a5a' },
+  weather: ['fireflies', 'embers'],
+};
+
+export const BIOME_ORDER: BiomeId[] = ['hamlet', 'farmland', 'forest', 'tundra', 'crypt', 'swamp', 'desert', 'graveyard', 'ember', 'crystal', 'shrine'];
 
 /** The biome for a floor: each runs for 5 floors; after the first lap the order is reshuffled by seed. */
 export function biomeForFloor(floor: number, seed: number): Biome {

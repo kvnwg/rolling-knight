@@ -13,7 +13,10 @@ import { flash, makeCanvas, mixHex, shade, toCanvas } from './art/draw';
 import { CLASS_HAS_SHIELD, KNIGHT_ANCHOR, knightFrame, knightGlow, knightLook, shieldArt, weaponArt, type KnightLook, type View } from './art/knights';
 import { mobFrame, poseFrames, type MobPose } from './art/mobs';
 import { flameArt, propArt, treeArt, type PropArt } from './art/props';
+import { Camera } from './camera';
 import { Lighting, type Light } from './lighting';
+import { Post, type PostParams } from './post';
+import { rgb } from './pixel/buf';
 import { flipX } from './pixel/buf';
 import { frameBuf } from './pixel/indexed';
 import { FX_SHEETS, type FxName } from './packs/fx';
@@ -53,19 +56,41 @@ const FX_LIGHT: Partial<Record<FxName, [string, number]>> = {
 };
 
 /** Target art pixels on the screen's short side. */
-const SHORT_SIDE = 216;
+const SHORT_SIDE = 270;
 
 export class Renderer {
   canvas: HTMLCanvasElement;
-  ctx: Ctx;
+  /** The 2D context of the visible canvas (only when WebGL isn't available). */
+  ctx: Ctx | null = null;
+  /** The shader pipeline (WebGL2), when available. */
+  post: Post | null = null;
+  /** Art-resolution layers: the ground, standing things, glowing things, the light map, the HUD. */
   scene: HTMLCanvasElement;
   sctx: Ctx;
+  private layers: Record<'stand' | 'emit' | 'light' | 'ui', { c: HTMLCanvasElement; x: Ctx }>;
+  /** The view's focus for menus that cover part of the screen (0..1). */
+  focus = { x: 0.5, y: 0.5 };
+  /** The view in whole art pixels (rounded up), and exactly. */
   W = 200;
   H = 300;
+  vw = 200;
+  vh = 300;
+  /** The layers' size: the view plus a pixel of margin each way, for sub-pixel scrolling. */
+  get LW(): number {
+    return this.W + 1;
+  }
+  get LH(): number {
+    return this.H + 1;
+  }
   P = 4;
   light: Lighting;
+  /** The camera's top-left in art pixels, unrounded. */
   camX = 0;
   camY = 0;
+  /** The camera's remainder below a whole pixel, slid in the final pass (0..1). */
+  private sub = { x: 0, y: 0 };
+  /** The follow: a damped spring with look-ahead and a lean toward the fight (see camera.ts). */
+  readonly camera = new Camera();
   private terrain: Terrain | null = null;
   private terrainMap: FloorMap | null = null;
   private props: Array<Prop & { art: PropArt; canvas: HTMLCanvasElement; ghost?: HTMLCanvasElement }> = [];
@@ -79,9 +104,16 @@ export class Renderer {
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d')!;
+    const post = new Post(canvas);
+    if (post.ok) this.post = post;
+    else this.ctx = canvas.getContext('2d')!;
     this.scene = makeCanvas(this.W, this.H) as HTMLCanvasElement;
     this.sctx = this.scene.getContext('2d')!;
+    const mk = () => {
+      const c = makeCanvas(this.W, this.H) as HTMLCanvasElement;
+      return { c, x: c.getContext('2d')! };
+    };
+    this.layers = { stand: mk(), emit: mk(), light: mk(), ui: mk() };
     this.light = new Lighting(this.W, this.H);
     this.resize();
   }
@@ -93,14 +125,21 @@ export class Renderer {
     this.P = Math.max(2, Math.round(Math.min(cw, ch) / SHORT_SIDE));
     this.W = Math.ceil(cw / this.P);
     this.H = Math.ceil(ch / this.P);
+    this.vw = cw / this.P;
+    this.vh = ch / this.P;
     this.canvas.width = cw;
     this.canvas.height = ch;
     this.canvas.style.width = `${window.innerWidth}px`;
     this.canvas.style.height = `${window.innerHeight}px`;
-    this.scene.width = this.W;
-    this.scene.height = this.H;
-    this.light.resize(this.W, this.H);
-    this.ctx.imageSmoothingEnabled = false;
+    this.scene.width = this.LW;
+    this.scene.height = this.LH;
+    for (const l of Object.values(this.layers)) {
+      l.c.width = this.LW;
+      l.c.height = this.LH;
+      l.x.imageSmoothingEnabled = false;
+    }
+    this.light.resize(this.LW, this.LH);
+    if (this.ctx) this.ctx.imageSmoothingEnabled = false;
     this.sctx.imageSmoothingEnabled = false;
   }
 
@@ -159,121 +198,145 @@ export class Renderer {
 
   render(game: Game, dt: number): void {
     this.time += dt;
-    const ctx = this.sctx;
+    const g = this.sctx;
+    const st = this.layers.stand.x;
+    const em = this.layers.emit.x;
+    const ui = this.layers.ui.x;
     const w = game.world;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = 'source-over';
+    for (const c of [g, st, em, ui]) {
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.globalAlpha = 1;
+      c.globalCompositeOperation = 'source-over';
+    }
+    st.clearRect(0, 0, this.LW, this.LH);
+    em.clearRect(0, 0, this.LW, this.LH);
+    ui.clearRect(0, 0, this.LW, this.LH);
     if (!w) {
-      ctx.fillStyle = '#0b0d16';
-      ctx.fillRect(0, 0, this.W, this.H);
-      this.present();
+      g.fillStyle = '#0b0d16';
+      g.fillRect(0, 0, this.LW, this.LH);
+      this.present(game, null, [], 0.5);
       return;
     }
     this.prepareFloor(w);
     const biome = w.biome;
-    // --- camera: on the leader, a little ahead of where they face, inside the map
     const lead = w.leader();
-    if (lead) {
-      const tx = lead.x + lead.aimX * 10 - this.W / 2;
-      const ty = lead.y - 10 + lead.aimY * 8 - this.H / 2;
-      const k = Math.min(1, dt * 6);
-      if (Math.abs(tx - this.camX) > 400 || Math.abs(ty - this.camY) > 400) {
-        this.camX = tx;
-        this.camY = ty;
-      } else {
-        this.camX += (tx - this.camX) * k;
-        this.camY += (ty - this.camY) * k;
-      }
-    }
-    const mapW = w.map.w * TILE;
-    const mapH = w.map.h * TILE;
-    this.camX = Math.max(0, Math.min(mapW - this.W, this.camX));
-    this.camY = Math.max(-8, Math.min(mapH - this.H, this.camY));
+    this.camera.update({
+      dt,
+      map: w.map,
+      mapW: w.map.w * TILE,
+      mapH: w.map.h * TILE,
+      viewW: this.vw,
+      viewH: this.vh,
+      focusX: this.focus.x,
+      focusY: this.focus.y,
+      lead,
+      foes: w.mobs,
+      rewinding: !!w.rewind,
+      calm: game.state.settings.reduceMotion,
+    });
+    this.camX = this.camera.x;
+    this.camY = this.camera.y;
+    // Shake: a smooth rumble (two detuned waves), not a fresh random jolt every frame.
     let shx = 0;
     let shy = 0;
     if (w.shake > 0 && !game.state.settings.reduceMotion) {
-      const p = Math.max(1, Math.round(w.shakePower * Math.min(1, w.shake * 4)));
-      shx = Math.round((Math.random() * 2 - 1) * p);
-      shy = Math.round((Math.random() * 2 - 1) * p);
+      const amp = w.shakePower * Math.min(1, w.shake * 4);
+      const t = this.time;
+      shx = amp * (Math.sin(t * 77) * 0.6 + Math.sin(t * 113 + 1.9) * 0.4);
+      shy = amp * 0.8 * (Math.sin(t * 89 + 0.7) * 0.6 + Math.sin(t * 131 + 2.6) * 0.4);
     }
-    const cx = Math.round(this.camX) + shx;
-    const cy = Math.round(this.camY) + shy;
+    // The frame is drawn at the whole-pixel origin; the shader slides it by the remainder, so the
+    // world scrolls smoothly while every sprite stays on the pixel grid.
+    const fx = this.camX + shx;
+    const fy = this.camY + shy;
+    const cx = Math.floor(fx);
+    const cy = Math.floor(fy);
+    this.sub.x = fx - cx;
+    this.sub.y = fy - cy;
     const sx = (x: number) => Math.round(x) - cx;
     const sy = (y: number) => Math.round(y) - cy;
     const visible = (x: number, y: number, m = 40) => x > cx - m && x < cx + this.W + m && y > cy - m && y < cy + this.H + m * 2;
+    const shader = !!this.post;
 
-    // --- ground
-    ctx.fillStyle = biome.solid.top[0];
-    ctx.fillRect(0, 0, this.W, this.H);
-    ctx.drawImage(this.terrain!.canvas, cx, cy, this.W, this.H, 0, 0, this.W, this.H);
-    this.drawLiquidShimmer(ctx, w, cx, cy);
-    // Tilt-shift: the ground goes soft the further past the leader it lies (and a little at the
-    // bottom edge), like a photo of a miniature. Only the ground: everything standing stays crisp.
-    if (game.state.settings.tiltShift && lead) this.tiltShift(ctx, sy(lead.y) - 6, w.biome.layout === 'rooms' ? 0.5 : 1);
-    this.drawPortal(ctx, w, sx, sy);
-    for (const a of w.areas) this.drawArea(ctx, a, sx, sy);
+    // --- ground (blurred by depth in the shader; on the canvas path, here)
+    g.fillStyle = biome.solid.top[0];
+    g.fillRect(0, 0, this.LW, this.LH);
+    g.drawImage(this.terrain!.canvas, cx, cy, this.LW, this.LH, 0, 0, this.LW, this.LH);
+    this.drawLiquidShimmer(g, w, cx, cy);
+    if (!shader && game.state.settings.tiltShift && lead) this.tiltShift(g, sy(lead.y) - 6, w.biome.layout === 'rooms' ? 0.5 : 1);
+    this.drawPortal(g, em, w, sx, sy);
+    for (const a of w.areas) this.drawArea(g, em, a, sx, sy);
 
-    // --- shadows
-    ctx.fillStyle = 'rgba(8,6,16,0.38)';
+    // --- shadows (soft ovals under everything standing)
+    g.fillStyle = 'rgba(8,6,16,0.38)';
     for (const p of this.props) {
       if (!visible(p.x, p.y)) continue;
-      if (p.kind === 'tree') this.ellipse(ctx, sx(p.x + 2), sy(p.y - 1), p.edge ? 9 : 10, 3);
-      else if (p.solid) this.ellipse(ctx, sx(p.x), sy(p.y), Math.max(3, p.art.buf.w / 2 - 1), 2);
+      if (p.kind === 'tree') this.ellipse(g, sx(p.x + 2), sy(p.y - 1), p.edge ? 9 : 10, 3);
+      else if (p.solid) this.ellipse(g, sx(p.x), sy(p.y), Math.max(3, p.art.buf.w / 2 - 1), 2);
     }
     for (const u of [...w.heroes, ...w.mobs]) {
       if (u.dead && u.hurtT < -0.3) continue;
       if (!visible(u.x, u.y)) continue;
       const big = u.boss ? 3 : u.elite ? 1.4 : 1;
-      this.ellipse(ctx, sx(u.x), sy(u.y), Math.round((u.r + 1) * big), Math.max(1, Math.round(2 * big)), u.flying ? 0.6 : 1);
+      this.ellipse(g, sx(u.x), sy(u.y), Math.round((u.r + 1) * big), Math.max(1, Math.round(2 * big)), u.flying ? 0.6 : 1);
     }
 
     // --- everything standing, sorted by feet
     type D = { y: number; draw: () => void };
     const list: D[] = [];
     const leadBox = lead ? { x: lead.x, y: lead.y } : null;
+    const outdoors = biome.layout === 'cave';
     for (const p of this.props) {
       if (!visible(p.x, p.y, 48)) continue;
       list.push({
         y: p.y,
         draw: () => {
+          // Trees sway in the wind, a pixel at a time, each on its own beat.
+          let canvas = p.canvas;
+          if (p.kind === 'tree' && outdoors) {
+            const gust = Math.sin(this.time * 0.35 + p.x * 0.004) > 0.6 ? 2 : 1;
+            const sway = Math.round(Math.sin(this.time * 1.3 + p.x * 0.07 + p.y * 0.031) * gust);
+            if (sway) canvas = this.swayed(p, sway);
+          }
           const x = sx(p.x) - p.art.ax;
           const y = sy(p.y) - p.art.ay;
           // Trees in front of the leader turn see-through, so you never lose your knight.
           let alpha = 1;
           if (leadBox && p.kind === 'tree' && p.y > leadBox.y && p.y - leadBox.y < 30 && Math.abs(p.x - leadBox.x) < 14) alpha = 0.45;
-          ctx.globalAlpha = alpha;
-          ctx.drawImage(p.canvas, x, y);
-          ctx.globalAlpha = 1;
+          st.globalAlpha = alpha;
+          st.drawImage(canvas, x, y);
+          st.globalAlpha = 1;
           if (p.art.flame) {
             const fr = Math.floor(this.time * 10 + p.seed) % 4;
             const f = this.cached(`flame|${p.art.flame.size}|${fr}|${biome.light.fire}`, () => toCanvas(flameArt(p.art.flame!.size, fr, biome.light.fire)));
-            ctx.drawImage(f, sx(p.x) + p.art.flame.dx - Math.floor(f.width / 2), sy(p.y) + p.art.flame.dy - f.height + 2);
+            em.drawImage(f, sx(p.x) + p.art.flame.dx - Math.floor(f.width / 2), sy(p.y) + p.art.flame.dy - f.height + 2);
           }
         },
       });
     }
     for (const m of w.mobs) {
       if (!visible(m.x, m.y)) continue;
-      list.push({ y: m.y, draw: () => this.drawMob(ctx, w, m, sx, sy) });
+      list.push({ y: m.y, draw: () => this.drawMob(st, w, m, sx, sy) });
     }
     for (const h of w.heroes) {
       if (!visible(h.x, h.y)) continue;
-      list.push({ y: h.y, draw: () => this.drawHero(ctx, w, h, sx, sy) });
+      list.push({ y: h.y, draw: () => this.drawHero(st, w, h, sx, sy) });
     }
     for (const p of w.pickups) {
-      list.push({ y: p.y, draw: () => this.drawPickup(ctx, p.kind, sx(p.x), sy(p.y - p.z)) });
+      list.push({ y: p.y, draw: () => this.drawPickup(em, p.kind, sx(p.x), sy(p.y - p.z)) });
     }
     list.sort((a, b) => a.y - b.y);
     for (const d of list) d.draw();
 
-    // --- shots and sparks
-    for (const s of w.shots) this.drawShot(ctx, s, sx, sy);
+    // --- shots, sparks, leaves and weather
+    for (const s of w.shots) this.drawShot(s.kind === 'arrow' ? st : em, s, sx, sy);
     this.spawnFx(w);
     this.weather(biome, dt, cx, cy);
-    this.updateParticles(ctx, dt, sx, sy);
+    if (outdoors) this.dropLeaves(biome, cx, cy, dt);
+    this.updateParticles(st, em, dt, sx, sy);
     this.advanceFx(dt);
-    this.drawFx(ctx, sx, sy, false);
+    this.drawFx(st, sx, sy, false);
+    this.drawFx(em, sx, sy, true);
 
     // --- light
     const lights = this.collectLights(w, biome, cx, cy, sx, sy);
@@ -281,24 +344,57 @@ export class Renderer {
       const l = FX_LIGHT[f.name];
       if (l) out_push(lights, { x: sx(f.x), y: sy(f.y), r: l[1], color: l[0], intensity: 0.9, bloom: true });
     }
-    if (w.cleared && !game.state.settings.reduceMotion) this.flashT = Math.max(0, this.flashT - dt);
-    this.light.apply(ctx, biome.light.ambient, lights, {
-      gradeTop: biome.light.gradeTop,
-      gradeBottom: biome.light.gradeBottom,
-      vignette: biome.light.vignette,
-      flash: this.flashT,
-    });
-    if (biome.light.fog) this.drawFog(ctx, biome.light.fog, cx, cy);
-    this.drawFx(ctx, sx, sy, true);
-    if (w.rewind) this.drawRewind(ctx, w.rewind.t / w.rewind.dur);
+    if (outdoors) this.sunFlecks(lights, w, cx, cy);
+    this.flashT = Math.max(0, this.flashT - dt);
 
-    // --- unlit overlay: health bars, numbers, pointers
-    this.drawOverlay(ctx, w, sx, sy);
-    if (game.fade > 0) {
-      ctx.fillStyle = `rgba(6,6,12,${Math.round(game.fade * 6) / 6})`;
-      ctx.fillRect(0, 0, this.W, this.H);
+    // --- the HUD layer: health bars, numbers, pointers (never lit or graded)
+    this.drawOverlay(ui, w, sx, sy);
+    this.present(game, w, lights, lead ? (sy(lead.y) - 6 - this.sub.y) / this.vh : 0.5);
+  }
+
+  /** A tree with its crown shifted by `dx` pixels, more toward the top (wind). */
+  private swayed(p: { canvas: HTMLCanvasElement; art: PropArt; seed: number; tree?: string }, dx: number): HTMLCanvasElement {
+    const key = `sway|${p.canvas.width}x${p.canvas.height}|${p.tree}|${p.seed % 5}|${dx}|${(p as unknown as { kind: string }).kind}`;
+    return this.cached(key, () => {
+      const src = p.canvas;
+      const c = makeCanvas(src.width, src.height) as HTMLCanvasElement;
+      const x = c.getContext('2d')!;
+      const trunk = Math.round(src.height * 0.62);
+      // Rows above the trunk lean with the wind; the higher, the more.
+      for (let y = 0; y < src.height; y++) {
+        const k = y < trunk ? Math.round(dx * (1 - y / trunk) + (dx > 0 ? 0.2 : -0.2)) : 0;
+        x.drawImage(src, 0, y, src.width, 1, k, y, src.width, 1);
+      }
+      return c;
+    });
+  }
+
+  private leafT = 0;
+  /** Leaves drift down from the crowns in view. */
+  private dropLeaves(b: Biome, cx: number, cy: number, dt: number): void {
+    this.leafT += dt;
+    if (this.leafT < 0.18) return;
+    this.leafT = 0;
+    const trees = this.props.filter((p) => p.kind === 'tree' && p.tree !== 'pine' && p.tree !== 'snowPine' && p.tree !== 'cactus' && p.tree !== 'crystal' && p.x > cx - 10 && p.x < cx + this.W + 10 && p.y > cy && p.y < cy + this.H + 30);
+    if (!trees.length) return;
+    const t = trees[Math.floor(Math.random() * trees.length)];
+    const ramp = b.treeRamp;
+    const autumn = ['#d8823a', '#c8502a', '#e8b84a'];
+    const color = Math.random() < 0.35 ? autumn[Math.floor(Math.random() * autumn.length)] : ramp[2 + Math.floor(Math.random() * 2)];
+    this.particles.push({ ...this.p('leaf', t.x + (Math.random() - 0.5) * 18, t.y - 18 - Math.random() * 10, color, 4.5), vx: 4 + Math.random() * 6, vy: 7 + Math.random() * 5 });
+  }
+
+  /** Sun flecks: soft spots of light that shimmer where the canopy lets the sun through. */
+  private sunFlecks(lights: Light[], w: World, cx: number, cy: number): void {
+    const b = w.biome;
+    const day = ['hamlet', 'farmland', 'desert', 'tundra', 'shrine'].includes(b.id);
+    if (!day) return;
+    for (const p of this.props) {
+      if (p.kind !== 'tree' || !p.edge || p.seed % 3 !== 0) continue;
+      if (p.x < cx - 30 || p.x > cx + this.W + 30 || p.y < cy - 10 || p.y > cy + this.H + 40) continue;
+      const k = 0.5 + 0.5 * Math.sin(this.time * 0.9 + p.seed * 0.37);
+      lights.push({ x: p.x - cx + ((p.seed % 13) - 6), y: p.y - cy + 6 + (p.seed % 7), r: 10 + (p.seed % 9), color: b.light.gradeTop, intensity: 0.18 + 0.22 * k });
     }
-    this.present();
   }
 
   private blurCopy: HTMLCanvasElement | null = null;
@@ -312,8 +408,8 @@ export class Renderer {
    * in whole bands, at art resolution, so it stays on the pixel grid.
    */
   private tiltShift(ctx: Ctx, focus: number, strength: number): void {
-    const W = this.W;
-    const H = this.H;
+    const W = this.LW;
+    const H = this.LH;
     if (!this.blurCopy || this.blurCopy.width !== W || this.blurCopy.height !== H) {
       this.blurCopy = makeCanvas(W, H) as HTMLCanvasElement;
       this.blurHalf = makeCanvas(Math.ceil(W / 2), Math.ceil(H / 2)) as HTMLCanvasElement;
@@ -373,31 +469,70 @@ export class Renderer {
     }
   }
 
-  /** Time running backwards: a cold tint, rolling scanlines, a jittering band and a big rewind sign. */
+  /** Time running backwards: a cold tint, rolling scanlines and a jittering band (the sign is in the HUD). */
   private drawRewind(ctx: Ctx, k: number): void {
     ctx.save();
     ctx.globalCompositeOperation = 'color';
     ctx.globalAlpha = 0.65;
     ctx.fillStyle = '#4a7aff';
-    ctx.fillRect(0, 0, this.W, this.H);
+    ctx.fillRect(0, 0, this.LW, this.LH);
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 0.18;
     ctx.fillStyle = '#000000';
     const roll = Math.floor(this.time * 40) % 3;
-    for (let y = roll; y < this.H; y += 3) ctx.fillRect(0, y, this.W, 1);
+    for (let y = roll; y < this.LH; y += 3) ctx.fillRect(0, y, this.LW, 1);
     // A band of the picture slipping sideways, like a tape running back.
     const by = Math.floor((1 - k) * this.H);
     ctx.globalAlpha = 0.9;
-    ctx.drawImage(this.scene, 0, by, this.W, 6, Math.round(Math.sin(this.time * 60) * 3), by, this.W, 6);
+    ctx.drawImage(this.scene, 0, by, this.LW, 6, Math.round(Math.sin(this.time * 60) * 3), by, this.LW, 6);
     ctx.globalAlpha = 1;
-    const sign = this.textCanvas('<< REWIND', { face: 'huge', fill: ['#e8f4ff', '#9ad8ff'], ink: '#0a1430' });
-    if (Math.floor(this.time * 6) % 2 === 0) ctx.drawImage(sign, Math.round(this.W / 2 - sign.width / 2), 40);
     ctx.restore();
   }
 
-  private present(): void {
-    this.ctx.imageSmoothingEnabled = false;
-    this.ctx.drawImage(this.scene, 0, 0, this.W * this.P, this.H * this.P);
+  /** Puts the frame on screen: through the shader pipeline, or composited on the canvas. */
+  private present(game: Game, w: World | null, lights: Light[], focusY: number): void {
+    const biome = w?.biome;
+    const settings = game.state.settings;
+    if (this.post) {
+      // The light map, smooth and at half strength (the shader doubles it, so lights can over-brighten).
+      const L = this.layers.light.x;
+      this.light.drawMap(L, biome ? biome.light.ambient : '#000000', lights);
+      const grade = biome ? gradeOf(biome) : DEFAULT_GRADE;
+      this.post.render(
+        { ground: this.scene, stand: this.layers.stand.c, emit: this.layers.emit.c, light: this.layers.light.c, ui: this.layers.ui.c },
+        {
+          time: this.time,
+          artW: this.LW,
+          artH: this.LH,
+          scale: this.P,
+          offX: this.sub.x,
+          offY: this.sub.y,
+          focusY,
+          dof: settings.tiltShift && biome ? (biome.layout === 'rooms' ? 0.5 : 1) : 0,
+          ...grade,
+          flash: this.flashT,
+          fade: Math.round(game.fade * 8) / 8,
+          rewind: w?.rewind ? Math.min(1, w.rewind.t * 6) : 0,
+        },
+      );
+      return;
+    }
+    // The canvas path: light, glow and HUD composited here, then scaled up.
+    const ctx = this.sctx;
+    if (biome) {
+      ctx.drawImage(this.layers.stand.c, 0, 0);
+      this.light.apply(ctx, biome.light.ambient, lights, { gradeTop: biome.light.gradeTop, gradeBottom: biome.light.gradeBottom, vignette: biome.light.vignette, flash: this.flashT });
+      if (biome.light.fog) this.drawFog(ctx, biome.light.fog, Math.floor(this.camX), Math.floor(this.camY));
+      ctx.drawImage(this.layers.emit.c, 0, 0);
+      if (w?.rewind) this.drawRewind(ctx, w.rewind.t / w.rewind.dur);
+    }
+    ctx.drawImage(this.layers.ui.c, 0, 0);
+    if (game.fade > 0) {
+      ctx.fillStyle = `rgba(6,6,12,${Math.round(game.fade * 6) / 6})`;
+      ctx.fillRect(0, 0, this.LW, this.LH);
+    }
+    this.ctx!.imageSmoothingEnabled = false;
+    this.ctx!.drawImage(this.scene, -Math.round(this.sub.x * this.P), -Math.round(this.sub.y * this.P), this.LW * this.P, this.LH * this.P);
   }
 
   private ellipse(ctx: Ctx, x: number, y: number, rx: number, ry: number, alpha = 1): void {
@@ -635,7 +770,7 @@ export class Renderer {
     ctx.globalAlpha = 1;
   }
 
-  private drawArea(ctx: Ctx, a: Area, sx: (x: number) => number, sy: (y: number) => number): void {
+  private drawArea(ctx: Ctx, em: Ctx, a: Area, sx: (x: number) => number, sy: (y: number) => number): void {
     const x = sx(a.x);
     const y = sy(a.y);
     const danger = a.team === 'mob';
@@ -652,10 +787,10 @@ export class Renderer {
       if (a.kind === 'meteor') {
         // The meteor itself, falling.
         const fy = y - Math.round((1 - t) * 90);
-        ctx.fillStyle = '#ffd86a';
-        ctx.fillRect(x - 2, fy - 2, 5, 5);
-        ctx.fillStyle = '#ff7a2a';
-        for (let k = 1; k < 6; k++) ctx.fillRect(x - 1 + k, fy - 2 - k * 2, 2, 2);
+        em.fillStyle = '#ffd86a';
+        em.fillRect(x - 2, fy - 2, 5, 5);
+        em.fillStyle = '#ff7a2a';
+        for (let k = 1; k < 6; k++) em.fillRect(x - 1 + k, fy - 2 - k * 2, 2, 2);
       }
       return;
     }
@@ -689,7 +824,7 @@ export class Renderer {
     ctx.globalAlpha = 1;
   }
 
-  private drawPortal(ctx: Ctx, w: World, sx: (x: number) => number, sy: (y: number) => number): void {
+  private drawPortal(ctx: Ctx, em: Ctx, w: World, sx: (x: number) => number, sy: (y: number) => number): void {
     const x = sx(w.map.exit.x);
     const y = sy(w.map.exit.y);
     // The stone ring is always there; it lights up when the floor is clear.
@@ -704,8 +839,8 @@ export class Renderer {
     for (let i = 0; i < 18; i++) {
       const a = (i / 18) * Math.PI * 2 + t * 3;
       const r = 7 - ((i + Math.floor(t * 10)) % 4);
-      ctx.fillStyle = i % 3 === 0 ? '#ffffff' : i % 3 === 1 ? '#b08aff' : '#7ad8ff';
-      ctx.fillRect(x + Math.round(Math.cos(a) * r), y - 1 + Math.round(Math.sin(a) * r * 0.45), 1, 1);
+      em.fillStyle = i % 3 === 0 ? '#ffffff' : i % 3 === 1 ? '#b08aff' : '#7ad8ff';
+      em.fillRect(x + Math.round(Math.cos(a) * r), y - 1 + Math.round(Math.sin(a) * r * 0.45), 1, 1);
     }
     if (Math.random() < 0.4) this.particles.push(this.p('mote', w.map.exit.x + (Math.random() - 0.5) * 14, w.map.exit.y, '#c8a8ff', 1.2, -18));
   }
@@ -760,7 +895,7 @@ export class Renderer {
     const ox = -((Math.floor(cx * 0.6 + this.time * 6) % 128) + 128) % 128;
     const oy = -((Math.floor(cy * 0.6) % 128) + 128) % 128;
     ctx.globalCompositeOperation = 'screen';
-    for (let y = oy; y < this.H; y += 128) for (let x = ox; x < this.W; x += 128) ctx.drawImage(tint, x, y);
+    for (let y = oy; y < this.LH; y += 128) for (let x = ox; x < this.LW; x += 128) ctx.drawImage(tint, x, y);
     ctx.restore();
   }
 
@@ -782,14 +917,18 @@ export class Renderer {
       if (g.x < cx - 60 || g.x > cx + this.W + 60 || g.y < cy - 60 || g.y > cy + this.H + 60) continue;
       out.push({ x: g.x - cx, y: g.y - cy, r: g.r, color: g.color, intensity: 0.7 + 0.1 * Math.sin(this.time * 2 + g.x), bloom: (g.x + g.y) % 48 === 0 });
     }
+    // The squad carries a little light; in bright places hardly any (it would wash the scene out).
+    const [ar, ag, ab] = rgb(biome.light.ambient);
+    const ambLum = (ar * 0.299 + ag * 0.587 + ab * 0.114) / 255;
+    const carry = Math.max(0.06, Math.min(0.75, (0.72 - ambLum) * 1.5));
     for (const h of w.heroes) {
       if (h.downed) continue;
       const mine = h.slot === w.controlled;
-      out.push({ x: sx(h.x), y: sy(h.y) - 6, r: biome.light.heroRadius * (mine ? 1.25 : 0.9), color: biome.light.hero, intensity: mine ? 0.85 : 0.6 });
+      out.push({ x: sx(h.x), y: sy(h.y) - 6, r: biome.light.heroRadius * (mine ? 1.2 : 0.9), color: biome.light.hero, intensity: carry * (mine ? 1 : 0.7) });
       const L = knightLook(h.knightId!, h.mutation ?? null, h.rarity === 'primordial' ? this.time : 0);
       const glow = knightGlow(L);
-      if (glow) out.push({ x: sx(h.x), y: sy(h.y) - 8, r: 22, color: glow, intensity: 0.7, bloom: true });
-      if (h.cls === 'arcanist') out.push({ x: sx(h.x) + h.dir * 4, y: sy(h.y) - 16, r: 14, color: L.plume[2], intensity: 0.8, bloom: true });
+      if (glow) out.push({ x: sx(h.x), y: sy(h.y) - 8, r: 16, color: glow, intensity: 0.2 + carry * 0.3, bloom: true });
+      if (h.cls === 'arcanist') out.push({ x: sx(h.x) + h.dir * 4, y: sy(h.y) - 16, r: 10, color: L.plume[2], intensity: 0.35, bloom: true });
     }
     for (const s of w.shots) {
       if (s.kind === 'arrow') continue;
@@ -978,7 +1117,7 @@ export class Renderer {
     }
   }
 
-  private updateParticles(ctx: Ctx, dt: number, sx: (x: number) => number, sy: (y: number) => number): void {
+  private updateParticles(stCtx: Ctx, emCtx: Ctx, dt: number, sx: (x: number) => number, sy: (y: number) => number): void {
     const keep: Particle[] = [];
     for (const p of this.particles) {
       p.life -= dt;
@@ -1004,6 +1143,7 @@ export class Renderer {
       const y = sy(p.y - p.z);
       if (x < -20 || y < -20 || x > this.W + 20 || y > this.H + 20) continue;
       const fade = p.life / p.max;
+      const ctx = p.glow || p.kind === 'spark' || p.kind === 'ring' ? emCtx : stCtx;
       if (p.kind === 'ring') {
         const r = Math.round(p.size * (1 + (1 - fade) * 1.4));
         this.ring(ctx, x, y, r, p.color, fade);
@@ -1015,15 +1155,15 @@ export class Renderer {
       if (p.kind === 'rain') ctx.fillRect(x, y, 1, 3);
       else if (p.kind === 'leaf' || p.kind === 'petal') ctx.fillRect(x, y, Math.floor(this.time * 4 + p.x) % 2 ? 2 : 1, Math.floor(this.time * 4 + p.x) % 2 ? 1 : 2);
       else ctx.fillRect(x, y, s, s);
+      ctx.globalAlpha = 1;
     }
-    ctx.globalAlpha = 1;
     this.particles = keep.length > 900 ? keep.slice(keep.length - 900) : keep;
   }
 
   // ------------------------------------------------------------------ overlay
 
   private drawOverlay(ctx: Ctx, w: World, sx: (x: number) => number, sy: (y: number) => number): void {
-    // Mob health bars (only when hurt), and the boss's at the top.
+    // Mob health bars (only when hurt). The boss's bar, like every screen-fixed thing, is in the HUD.
     for (const m of w.mobs) {
       if (m.dead || m.boss || m.hp >= m.maxHp) continue;
       const x = sx(m.x) - 6;
@@ -1034,24 +1174,6 @@ export class Renderer {
       ctx.fillRect(x, y, 12, 1);
       ctx.fillStyle = m.elite ? '#ffb84a' : '#e84a3a';
       ctx.fillRect(x, y, Math.max(1, Math.round((12 * m.hp) / m.maxHp)), 1);
-    }
-    const boss = w.bossUnit;
-    if (boss && !boss.dead) {
-      const bw = Math.min(150, this.W - 40);
-      const x = Math.round((this.W - bw) / 2);
-      const y = 30;
-      const name = this.textCanvas(`${boss.type!.name.toUpperCase()}`, { face: 'big', fill: ['#ffe8a0', '#ffb84a'], ink: '#140c14' });
-      ctx.drawImage(name, Math.round(this.W / 2 - name.width / 2), y - name.height - 1);
-      const sub = this.textCanvas(boss.type!.boss!.title.toUpperCase(), { face: 'small', fill: '#c8b8d8', ink: '#140c14' });
-      ctx.drawImage(sub, Math.round(this.W / 2 - sub.width / 2), y + 7);
-      ctx.fillStyle = '#140c14';
-      ctx.fillRect(x - 1, y - 1, bw + 2, 7);
-      ctx.fillStyle = '#3a1418';
-      ctx.fillRect(x, y, bw, 5);
-      ctx.fillStyle = boss.bossPhase ? '#ff4a2a' : '#c8283a';
-      ctx.fillRect(x, y, Math.round((bw * boss.hp) / boss.maxHp), 5);
-      ctx.fillStyle = 'rgba(255,255,255,0.35)';
-      ctx.fillRect(x, y, Math.round((bw * boss.hp) / boss.maxHp), 1);
     }
     // Damage and heal numbers.
     for (const t of w.texts) {
@@ -1082,8 +1204,44 @@ export class Renderer {
   }
 }
 
+type Grade = Pick<PostParams, 'haze' | 'hazeAmount' | 'rays' | 'rayColor' | 'shadowTint' | 'highlightTint' | 'saturation' | 'contrast' | 'vignette' | 'bloom'>;
+
+const v3 = (hex: string): [number, number, number] => {
+  const [r, g, b] = rgb(hex);
+  return [r / 255, g / 255, b / 255];
+};
+/** A tint around 1: the color's hue at `amount` strength, its brightness taken out. */
+const tint = (hex: string, amount: number): [number, number, number] => {
+  const c = v3(hex);
+  const avg = (c[0] + c[1] + c[2]) / 3 || 1;
+  return c.map((x) => 1 + (x / avg - 1) * amount) as [number, number, number];
+};
+
+const DEFAULT_GRADE: Grade = {
+  haze: [0.1, 0.1, 0.15], hazeAmount: 0, rays: 0, rayColor: [1, 0.85, 0.6], shadowTint: [1, 1, 1], highlightTint: [1, 1, 1], saturation: 1, contrast: 1, vignette: 0.4, bloom: 0.6,
+};
+
+/** Each biome's look in the shader: haze, shafts of light, split toning, saturation, bloom. */
+function gradeOf(b: Biome): Grade {
+  const sunny = ['hamlet', 'farmland', 'desert', 'tundra', 'shrine', 'forest'].includes(b.id);
+  const indoor = b.layout === 'rooms';
+  return {
+    haze: v3(b.light.fog ?? b.light.gradeTop),
+    hazeAmount: b.light.fog ? 0.2 : indoor ? 0.06 : 0.1,
+    rays: sunny ? (b.id === 'forest' ? 0.07 : 0.11) : b.id === 'crystal' ? 0.05 : 0,
+    rayColor: v3(b.light.gradeTop),
+    shadowTint: tint(b.light.gradeBottom, 0.35),
+    highlightTint: tint(b.light.gradeTop, 0.22),
+    saturation: 1.18,
+    contrast: 1.06,
+    vignette: Math.min(0.75, b.light.vignette + 0.1),
+    bloom: indoor ? 0.9 : 0.55,
+  };
+}
+
 function out_push(list: Light[], l: Light): void {
   list.push(l);
 }
 
 export { BIOMES, RARITY_COLOR };
+

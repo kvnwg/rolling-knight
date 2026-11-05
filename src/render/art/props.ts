@@ -1,8 +1,8 @@
 /**
  * Trees and props, painted from shapes in each biome's colors. Trees are built from rounded leaf
  * clumps, each lit from the top left with a few bright leaves on top (the look of the reference
- * village), then inked. Some props carry a light (torches, lanterns, braziers, crystals, glowing
- * mushrooms, jack-o'-lanterns) that the lighting pass picks up.
+ * village), then inked; the farm's orchard trees carry apples. Some props carry a light (torches,
+ * lanterns, braziers, crystals, glowing mushrooms, jack-o'-lanterns) that the lighting pass picks up.
  */
 import type { Biome, PropKind, TreeKind } from '../../world/biomes';
 import { blank, type PixelBuf } from '../pixel/buf';
@@ -23,12 +23,15 @@ export interface PropArt {
 const BARK = ['#24160e', '#3e2a1a', '#5a3e28', '#7a5838'];
 const WOOD = ['#3a2416', '#5e3e24', '#845a36', '#a8784a', '#c89a64'];
 const IRON = ['#1e1e24', '#3a3a44', '#5a5a66', '#8a8a96'];
+/** Straw: hay bales, wheat, the scarecrow's stuffing and hat. */
+const HAY = ['#6a4a1a', '#9a7228', '#c89e3e', '#e6c463', '#f6e09a'];
+const APPLES = ['#7a1a14', '#c0321e', '#f0684a'];
 
 function ink(ramp: readonly string[]): string {
   return mixHex(shade(ramp[0], -0.6), '#140c14', 0.5);
 }
 
-function clumpTree(ramp: readonly string[], seed: number, w: number, h: number, droop: boolean): PropArt {
+function clumpTree(ramp: readonly string[], seed: number, w: number, h: number, droop: boolean, fruit?: readonly string[]): PropArt {
   const W = w + 4;
   const H = h + 4;
   const b = blank(W, H);
@@ -66,6 +69,18 @@ function clumpTree(ramp: readonly string[], seed: number, w: number, h: number, 
     setRGB(b, lx, ly, ramp[4] ?? ramp[3]);
     setRGB(b, lx + 1, ly, ramp[3]);
     setRGB(b, lx + 1, ly - 1, ramp[4] ?? ramp[3]);
+  }
+  if (fruit) {
+    // Apples hanging in the leaves: a 2 x 2 fruit, lit on its top-left pixel.
+    clumps.forEach(([x, y, r], i) => {
+      if (hash(seed, i, 11) > 0.62) return;
+      const ax = Math.round(x + (hash(seed, i, 12) - 0.3) * r);
+      const ay = Math.round(y + (hash(seed, i, 13) - 0.2) * r * 0.8);
+      setRGB(b, ax, ay, fruit[2]);
+      setRGB(b, ax + 1, ay, fruit[1]);
+      setRGB(b, ax, ay + 1, fruit[1]);
+      setRGB(b, ax + 1, ay + 1, fruit[0]);
+    });
   }
   if (droop) {
     // Willow strands hanging from the canopy's edge.
@@ -186,6 +201,8 @@ export function treeArt(kind: TreeKind, biome: Biome, seed: number): PropArt {
       return clumpTree(r, seed, 26, 30, false);
     case 'maple':
       return clumpTree(r, seed, 24, 28, false);
+    case 'apple':
+      return clumpTree(r, seed, 24, 27, false, APPLES);
     case 'willow':
       return clumpTree(r, seed, 26, 28, true);
     case 'pine':
@@ -412,7 +429,11 @@ export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {
       rect(b, 1, 6, 15, 1, WOOD[1]);
       ball(b, 4, 8.5, 2.6, 2.6, [IRON[0], WOOD[1], WOOD[2], WOOD[3]]);
       ball(b, 13, 8.5, 2.6, 2.6, [IRON[0], WOOD[1], WOOD[2], WOOD[3]]);
-      ball(b, 8, 1, 4, 2, ['#6e2a12', '#a6451f', '#e0702a', '#ffa046']);
+      if (biome.id === 'farmland') {
+        // A load of hay, wisps poking out.
+        ball(b, 8, 1, 6, 2.4, [HAY[1], HAY[2], HAY[3], HAY[4]]);
+        for (const [x, y] of [[2, 0], [13, 1], [6, -1], [10, -1]] as const) setRGB(b, x, y + 1, HAY[3]);
+      } else ball(b, 8, 1, 4, 2, ['#6e2a12', '#a6451f', '#e0702a', '#ffa046']);
       return { buf: inkOutline(b, '#140c0a'), ax: 9, ay: 12 };
     }
     case 'stoneLantern': {
@@ -427,6 +448,48 @@ export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {
       rect(b, 2, 15, 7, 3, st[1]);
       return { buf: inkOutline(b, '#0e1412'), ax: 6, ay: 19, light: { dx: 0, dy: -13, color: fire, r: 50, flicker: true } };
     }
+    case 'campfire': {
+      // A ring of stones round crossed logs; the flame is animated on top.
+      const b = blank(17, 11);
+      const st = ['#2a2a30', '#4a4a54', '#6e6e7a', '#9090a0'];
+      for (let i = 0; i < 9; i++) {
+        const a = (i / 9) * Math.PI * 2;
+        ball(b, 8 + Math.cos(a) * 6.5, 6 + Math.sin(a) * 3.2, 1.6, 1.3, st);
+      }
+      line(b, 3, 8, 13, 4, WOOD[1]);
+      line(b, 3, 7, 13, 3, WOOD[2]);
+      line(b, 4, 3, 13, 8, WOOD[1]);
+      line(b, 4, 4, 12, 8, WOOD[3]);
+      rect(b, 6, 5, 5, 2, '#ff8a3a');
+      setRGB(b, 8, 5, '#ffe08a');
+      return { buf: inkOutline(b, '#100c10'), ax: 9, ay: 10, light: { dx: 0, dy: -8, color: fire, r: 110, flicker: true }, flame: { dx: 0, dy: -5, size: 3 } };
+    }
+    case 'tent': {
+      // A canvas tent in 3/4 view, the flap open.
+      const b = blank(26, 20);
+      const cloth = ['#5a3a2a', '#8a5a3e', '#b8845a', '#d8aa78'];
+      for (let y = 0; y < 18; y++) {
+        const half = Math.round(1 + y * 0.68);
+        for (let x = 13 - half; x <= 13 + half; x++) {
+          const k = x < 13 - 1 ? (x < 13 - half * 0.5 ? 3 : 2) : x > 13 ? 1 : 2;
+          setRGB(b, x, y + 1, cloth[k]);
+        }
+      }
+      for (let y = 9; y < 19; y++) {
+        const half = Math.round((y - 9) * 0.4);
+        for (let x = 13 - half; x <= 13 + half; x++) setRGB(b, x, y, '#1a1014');
+      }
+      line(b, 13, 0, 13, 18, cloth[0]);
+      rect(b, 12, 0, 3, 1, WOOD[2]);
+      return { buf: inkOutline(b, '#140c0a'), ax: 14, ay: 20 };
+    }
+    case 'hayBale':
+    case 'cabbage':
+    case 'wheat':
+    case 'scarecrow':
+    case 'trough':
+    case 'sunflower':
+      return farmProp(kind, seed);
     case 'banner': {
       const b = blank(9, 20);
       rect(b, 1, 0, 1, 20, WOOD[1]);
@@ -435,6 +498,163 @@ export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {
       setRGB(b, 4, 10, biome.mobs.palettes[0][1]);
       setRGB(b, 7, 10, biome.mobs.palettes[0][1]);
       return { buf: inkOutline(b, '#140c0a'), ax: 2, ay: 21 };
+    }
+  }
+}
+
+// ------------------------------------------------------------------ the farm
+
+/** A square hay bale in 3/4 view (top face, front face, two bands of twine) with its top-left at x, y. */
+function bale(b: PixelBuf, x: number, y: number, w: number, top: number, front: number, seed: number): void {
+  for (let yy = 0; yy < top + front; yy++) {
+    for (let xx = 0; xx < w; xx++) {
+      const onTop = yy < top;
+      let k = onTop ? (yy === 0 || xx === 0 ? 4 : 3) : yy === top + front - 1 ? 1 : xx < 2 ? 3 : xx > w - 3 ? 1 : 2;
+      // Straw: short strokes a shade darker (lighter on the shaded end).
+      if (hash(seed, xx >> 1, yy) < 0.2 && yy !== 0) k += onTop ? -1 : xx > w - 3 ? 1 : -1;
+      setRGB(b, x + xx, y + yy, HAY[Math.max(0, Math.min(4, k))]);
+    }
+  }
+  // The twine: on the top it runs front to back, on the front top to bottom.
+  for (const tx of [Math.round(w * 0.28), Math.round(w * 0.72) - 1]) {
+    for (let yy = 0; yy < top + front - 1; yy++) setRGB(b, x + tx, y + yy, yy < top ? '#a4442a' : '#7a2e1e');
+  }
+}
+
+/** Plaid flannel: a cloth ramp crossed by darker stripes every few pixels. */
+function plaid(x: number, y: number, k: number, cloth: readonly string[]): string {
+  const stripe = x % 4 === 1 || y % 4 === 2;
+  const both = x % 4 === 1 && y % 4 === 2;
+  return cloth[Math.max(0, k - (both ? 2 : stripe ? 1 : 0))];
+}
+
+function farmProp(kind: 'hayBale' | 'cabbage' | 'wheat' | 'scarecrow' | 'trough' | 'sunflower', seed: number): PropArt {
+  switch (kind) {
+    case 'hayBale': {
+      if (hash(seed, 1) < 0.4) {
+        // A little stack: two bales and one on top.
+        const b = blank(21, 15);
+        bale(b, 0, 6, 11, 3, 6, seed);
+        bale(b, 10, 6, 11, 3, 6, seed + 1);
+        bale(b, 5, 0, 11, 3, 6, seed + 2);
+        return { buf: inkOutline(b, '#1a1006'), ax: 11, ay: 16 };
+      }
+      const b = blank(15, 11);
+      bale(b, 0, 0, 15, 4, 7, seed);
+      return { buf: inkOutline(b, '#1a1006'), ax: 8, ay: 12 };
+    }
+    case 'cabbage': {
+      const b = blank(12, 9);
+      const leaf = ['#1c3e1c', '#2a5a26', '#3e7a30', '#5a9a3e'];
+      const head = ['#5a9a40', '#80ba50', '#a8d26c', '#d4eca0'];
+      // A rosette of loose outer leaves, each with a pale rib...
+      const lobes: Array<[number, number]> = [[-3.4, -0.6], [3.4, -0.6], [-2.4, 1.6], [2.4, 1.6], [0, 2.4], [0, -2.2]];
+      for (const [dx, dy] of lobes) ball(b, 6 + dx, 4.4 + dy, 2.5, 1.8, leaf);
+      for (const [dx, dy] of lobes) if (dy > -2) line(b, 6 + dx * 0.55, 4.4 + dy * 0.55, 6 + dx * 1.05, 4.4 + dy * 1.05, '#8ac05a');
+      // ...and the tight head in the middle, a wrapped leaf's edge curling across it.
+      ball(b, 6, 4, 3.3, 2.7, head);
+      setRGB(b, 7, 3, head[0]);
+      setRGB(b, 8, 4, head[0]);
+      setRGB(b, 7, 5, head[0]);
+      setRGB(b, 4, 2, '#eef8c8');
+      return { buf: inkOutline(b, '#0e1c0c'), ax: 7, ay: 10 };
+    }
+    case 'wheat': {
+      const b = blank(12, 14);
+      const n = 6 + Math.floor(hash(seed, 1) * 2);
+      for (let i = 0; i < n; i++) {
+        // Back stalks first (darker), the front ones over them, each with a plump ear on top.
+        const back = i % 2 === 0;
+        const x = 1 + Math.round(((i + 0.5) / n) * 9 + (hash(seed, i, 2) - 0.5) * 1.5);
+        const h = (back ? 8 : 6) + Math.floor(hash(seed, i, 3) * 4);
+        const lean = hash(seed, i, 4) < 0.3 ? -1 : hash(seed, i, 4) > 0.7 ? 1 : 0;
+        const top = 13 - h;
+        line(b, x, 13, x + lean, top + 4, back ? HAY[1] : HAY[2]);
+        const ex = x + lean;
+        const lit = back ? 3 : 4;
+        setRGB(b, ex, top, HAY[lit]);
+        for (let y = top + 1; y <= top + 3; y++) {
+          setRGB(b, ex, y, HAY[lit - (y === top + 3 ? 1 : 0)]);
+          setRGB(b, ex + 1, y, HAY[lit - 2]);
+        }
+        if (!back) setRGB(b, ex - 1, top - 1, HAY[2]);
+      }
+      // A little shade at the roots.
+      for (let x = 1; x < 11; x++) if (hash(seed, x, 5) < 0.6) setRGB(b, x, 13, '#4a3412');
+      return { buf: b, ax: 6, ay: 13 };
+    }
+    case 'scarecrow': {
+      const b = blank(15, 24);
+      const cloth = ['#4a1814', '#7a261c', '#a83a28', '#d0604a'];
+      const burlap = ['#5e4428', '#8c6c42', '#b89660', '#dcc08a'];
+      // The post and the cross-bar it hangs on.
+      rect(b, 7, 9, 1, 15, WOOD[2]);
+      rect(b, 8, 9, 1, 15, WOOD[1]);
+      rect(b, 1, 10, 13, 1, WOOD[3]);
+      // The flannel shirt: sleeves along the bar, the body hanging below, lit from the top left.
+      for (let y = 10; y < 18; y++) {
+        for (let x = 0; x < 15; x++) {
+          const sleeve = y <= 12 && x >= 1 && x <= 13;
+          const body = x >= 4 && x <= 10 && y <= 16 + (x % 3 === 0 ? 1 : 0);
+          if (!sleeve && !body) continue;
+          const k = y === 10 || x <= 5 ? 3 : x >= 9 || y >= 15 ? 1 : 2;
+          setRGB(b, x, y, plaid(x, y, k, cloth));
+        }
+      }
+      // Straw poking out of the cuffs and the hem.
+      for (const [x, y, c] of [[0, 11, 3], [0, 12, 2], [14, 11, 2], [14, 12, 1], [5, 17, 3], [7, 18, 2], [9, 17, 2], [6, 18, 3]] as const) setRGB(b, x, y, HAY[c]);
+      // The sack head, tied at the neck, with a stitched face.
+      ball(b, 7.5, 5.8, 3.4, 3.2, burlap);
+      rect(b, 6, 9, 3, 1, '#6a4a22');
+      setRGB(b, 6, 5, '#2a1a10');
+      setRGB(b, 9, 5, '#2a1a10');
+      for (let x = 5; x <= 9; x++) setRGB(b, x, 7, x % 2 ? '#2a1a10' : burlap[1]);
+      // A battered straw hat.
+      rect(b, 2, 3, 12, 1, HAY[2]);
+      rect(b, 2, 3, 4, 1, HAY[3]);
+      rect(b, 5, 0, 6, 3, HAY[2]);
+      rect(b, 5, 0, 2, 3, HAY[3]);
+      rect(b, 5, 0, 6, 1, HAY[4]);
+      rect(b, 5, 2, 6, 1, '#8a2a22');
+      setRGB(b, 13, 4, HAY[1]);
+      if (hash(seed, 3) < 0.45) {
+        // A crow sits on its arm, unimpressed.
+        rect(b, 11, 8, 3, 2, '#1c1c28');
+        setRGB(b, 11, 8, '#3a3e54');
+        setRGB(b, 13, 7, '#1c1c28');
+        setRGB(b, 14, 7, '#c8a050');
+        setRGB(b, 10, 9, '#1c1c28');
+      }
+      return { buf: inkOutline(b, '#160e0a'), ax: 8, ay: 25 };
+    }
+    case 'trough': {
+      const b = blank(16, 8);
+      // The box: a lit rim, slop inside, a planked front, stubby legs.
+      rect(b, 0, 1, 16, 6, WOOD[2]);
+      rect(b, 0, 1, 16, 1, WOOD[4]);
+      rect(b, 0, 1, 1, 6, WOOD[3]);
+      rect(b, 15, 1, 1, 6, WOOD[1]);
+      rect(b, 1, 2, 14, 2, '#4e4422');
+      rect(b, 1, 2, 14, 1, '#3a3218');
+      for (const [x, c] of [[3, '#8a7a3a'], [4, '#8a7a3a'], [8, '#c0321e'], [11, '#6aa040'], [12, '#8a7a3a']] as const) setRGB(b, x, 3, c);
+      rect(b, 1, 5, 14, 1, WOOD[1]);
+      rect(b, 0, 7, 2, 1, WOOD[0]);
+      rect(b, 14, 7, 2, 1, WOOD[0]);
+      return { buf: inkOutline(b, '#140c0a'), ax: 9, ay: 9 };
+    }
+    case 'sunflower': {
+      const b = blank(9, 18);
+      const tall = Math.floor(hash(seed, 1) * 3);
+      line(b, 4, 17, 4, 6 - tall, '#3e6a26');
+      // Leaves off the stem.
+      rect(b, 2, 12, 2, 1, '#5e8e32');
+      setRGB(b, 1, 11, '#7aaa3e');
+      rect(b, 5, 14, 2, 1, '#4a7a2a');
+      setRGB(b, 7, 13, '#5e8e32');
+      // The head, turned to the afternoon sun.
+      ball(b, 4.4, 4.2 - tall, 4, 3.8, ['#b8741a', '#e0a02a', '#f8cc3a', '#fff07a']);
+      ball(b, 4.2, 4.4 - tall, 2, 1.9, ['#3a2210', '#5a3618', '#7a4e22', '#9a6a30']);
+      return { buf: inkOutline(b, '#16100a'), ax: 5, ay: 19 };
     }
   }
 }

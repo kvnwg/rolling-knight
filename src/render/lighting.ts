@@ -54,7 +54,57 @@ function lightSprite(color: string, r: number, bands: number): HTMLCanvasElement
   return c;
 }
 
+const smoothCache = new Map<string, HTMLCanvasElement>();
+
+/** A light's disc for the shader path: a smooth falloff (the screen-resolution pass keeps it smooth). */
+function smoothSprite(color: string, r: number): HTMLCanvasElement {
+  const R = Math.max(2, Math.round(r));
+  const key = `${color}|${R}`;
+  let c = smoothCache.get(key);
+  if (c) return c;
+  c = makeCanvas(R * 2, R * 2) as HTMLCanvasElement;
+  const ctx = c.getContext('2d')!;
+  const [cr, cg, cb] = rgb(color);
+  const g = ctx.createRadialGradient(R, R, 0, R, R, R);
+  // Half strength (the shader doubles the light map so lights can push past white).
+  for (const [t, a] of [[0, 0.5], [0.25, 0.36], [0.5, 0.18], [0.75, 0.06], [1, 0]] as const) {
+    g.addColorStop(t, `rgba(${cr},${cg},${cb},${a * 2})`);
+  }
+  ctx.fillStyle = g;
+  ctx.save();
+  ctx.translate(R, R);
+  ctx.scale(1, 0.8);
+  ctx.beginPath();
+  ctx.arc(0, 0, R, 0, Math.PI * 2);
+  ctx.restore();
+  ctx.fill();
+  smoothCache.set(key, c);
+  if (smoothCache.size > 400) smoothCache.delete(smoothCache.keys().next().value!);
+  return c;
+}
+
 export class Lighting {
+  /**
+   * The light map for the shader path, at half strength: the ambient color halved, every light added
+   * on top with a smooth falloff. The shader doubles it, so where lights stack the scene over-brightens.
+   */
+  drawMap(m: CanvasRenderingContext2D, ambient: string, lights: Light[]): void {
+    const [r, g, b] = rgb(ambient);
+    m.globalCompositeOperation = 'source-over';
+    m.globalAlpha = 1;
+    m.fillStyle = `rgb(${r >> 1},${g >> 1},${b >> 1})`;
+    m.fillRect(0, 0, this.w, this.h);
+    m.globalCompositeOperation = 'lighter';
+    for (const l of lights) {
+      if (l.x < -l.r || l.y < -l.r || l.x > this.w + l.r || l.y > this.h + l.r) continue;
+      const s = smoothSprite(l.color, l.r);
+      m.globalAlpha = Math.min(1, l.intensity);
+      m.drawImage(s, Math.round(l.x - s.width / 2), Math.round(l.y - s.height / 2));
+    }
+    m.globalAlpha = 1;
+    m.globalCompositeOperation = 'source-over';
+  }
+
   private map: HTMLCanvasElement;
   private mctx: Ctx;
   private grade: HTMLCanvasElement | null = null;

@@ -1,9 +1,10 @@
 /**
  * Mob art, built from each floor's procedural mob designs (mobgen.ts). Humanoid mobs (goblins,
- * skeletons, cultists, brutes, mummies, imps), ghosts and pumpkin-heads are dressed on the same
- * Snoblin mannequin as the knights; slimes, beasts, flyers, plants, golems and bugs are painted
- * from shapes at their own size (bosses at 2.2x, natively, not scaled up). The farm's pig and ram are
- * the supplied pack sprites.
+ * skeletons, cultists, brutes, mummies, imps, the farm's scarecrows), ghosts and pumpkin-heads are
+ * dressed on the same Snoblin mannequin as the knights; slimes, beasts, flyers (crows on the farm),
+ * plants, golems, bugs and chickens are painted from shapes at their own size (bosses at 2.2x,
+ * natively, not scaled up). The farm's pig and ram are the supplied pack sprites (its boss pig wears
+ * a crown).
  */
 import { blank, blit, flipX, type PixelBuf } from '../pixel/buf';
 import { fromIndexed, type AnimSheet } from '../pixel/indexed';
@@ -106,7 +107,108 @@ function beast(t: MobType, s: number, pose: MobPose, f: number): MobFrame {
   return finish(b, t, Math.round(cx), groundY, Math.round(hx + 3 * s), Math.round(hy));
 }
 
+/** A filled triangle. */
+function tri(b: PixelBuf, ax: number, ay: number, bx: number, by: number, cx: number, cy: number, hex: string): void {
+  const x0 = Math.floor(Math.min(ax, bx, cx));
+  const x1 = Math.ceil(Math.max(ax, bx, cx));
+  const y0 = Math.floor(Math.min(ay, by, cy));
+  const y1 = Math.ceil(Math.max(ay, by, cy));
+  const area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+  if (Math.abs(area) < 0.01) return line(b, ax, ay, bx, by, hex);
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const px = x + 0.5;
+    const py = y + 0.5;
+    const w0 = ((bx - px) * (cy - py) - (by - py) * (cx - px)) / area;
+    const w1 = ((cx - px) * (ay - py) - (cy - py) * (ax - px)) / area;
+    const w2 = 1 - w0 - w1;
+    if (w0 >= -0.05 && w1 >= -0.05 && w2 >= -0.05) setRGB(b, x, y, hex);
+  }
+}
+
+const CROW = ['#0c0c16', '#1c1e2c', '#30344a', '#4e5674'];
+
+/** The farm's flyer: a crow, beak first, wings beating. */
+function crow(t: MobType, s: number, pose: MobPose, f: number): MobFrame {
+  const W = Math.round(18 * s) + 4;
+  const H = Math.round(16 * s) + 4;
+  const b = blank(W, H);
+  const cx = W / 2 - 0.5 * s;
+  const hover = Math.round(Math.sin(f * 1.6) * 1);
+  const cy = H - 1 - 6.5 * s + hover;
+  const up = pose === 'wind' || f % 2 === 0;
+  // The far wing behind the body, darker.
+  if (up) tri(b, cx - 1 * s, cy - 1 * s, cx + 1.5 * s, cy - 1 * s, cx + 1.5 * s, cy - 6.5 * s, CROW[0]);
+  else tri(b, cx - 1 * s, cy, cx + 1.5 * s, cy, cx + 2 * s, cy + 4 * s, CROW[0]);
+  // A fanned tail.
+  tri(b, cx - 2 * s, cy - 0.6 * s, cx - 2 * s, cy + 1 * s, cx - 6.5 * s, cy + 1.6 * s, CROW[1]);
+  line(b, cx - 6.5 * s, cy + 1.6 * s, cx - 5 * s, cy + 1.2 * s, CROW[2]);
+  ball(b, cx, cy, 3.4 * s, 2.5 * s, CROW);
+  // The head, a hooked beak and an angry eye.
+  const hx = cx + 3.2 * s;
+  const hy = cy - 1.8 * s + (pose === 'strike' ? 1 : 0);
+  ball(b, hx, hy, 2.1 * s, 1.9 * s, CROW);
+  const open = pose === 'wind' || pose === 'strike';
+  line(b, hx + 1.8 * s, hy, hx + 3.6 * s, hy + (open ? -0.5 : 0.4) * s, '#c8b078');
+  setRGB(b, hx + 1.8 * s, hy, '#8a7450');
+  if (open) line(b, hx + 1.8 * s, hy + 1, hx + 3 * s, hy + 1.2 * s, '#8a7450');
+  setRGB(b, hx + 0.6 * s, hy - 0.7 * s, t.eye);
+  setRGB(b, hx - 0.2 * s, hy - 1.3 * s, CROW[0]);
+  // The near wing over the body, its flight feathers catching the light.
+  const tipX = up ? cx - 2.5 * s : cx - 1.5 * s;
+  const tipY = up ? cy - 7.5 * s : cy + 4.5 * s;
+  tri(b, cx - 1.8 * s, cy - 0.6 * s, cx + 1.6 * s, cy - 0.6 * s, tipX, tipY, CROW[2]);
+  line(b, cx + 1.6 * s, cy - 0.6 * s, tipX, tipY, CROW[1]);
+  line(b, cx - 1.8 * s, cy - 0.6 * s, tipX, tipY, CROW[3]);
+  return finish(b, t, Math.round(cx), H - 1, Math.round(hx + 3 * s), Math.round(hy));
+}
+
+const HENS = [
+  ['#9a8e86', '#d0c8c0', '#f0ece6', '#ffffff'],
+  ['#5a3418', '#8a5428', '#b87a3a', '#dca666'],
+  ['#2a2a32', '#4a4a56', '#6e6e7e', '#a0a0b0'],
+];
+
+/** The farm's swarm: an angry chicken (white, brown or black), running beak first. */
+function chicken(t: MobType, _s: number, pose: MobPose, f: number): MobFrame {
+  const b = blank(15, 14);
+  const ramp = HENS[t.features.seed % 3 === 2 && t.features.spikes ? 2 : t.features.seed % 2];
+  const ground = 13;
+  const walk = pose === 'walk';
+  const bob = walk && f % 2 === 1 ? -1 : pose === 'wind' ? 1 : 0;
+  const peck = pose === 'strike' || (pose === 'idle' && f % 4 === 2);
+  // Legs, scissoring as it runs.
+  const legs = walk ? (f % 2 ? [[5, 0], [8, -1]] : [[6, -1], [7, 0]]) : [[5, 0], [8, 0]];
+  for (const [lx, lift] of legs) {
+    line(b, lx, ground - 3 + bob, lx, ground + lift, '#d8862a');
+    setRGB(b, lx + 1, ground + lift, '#d8862a');
+    setRGB(b, lx - 1, ground + lift, '#b86a1e');
+  }
+  // Tail feathers up at the back, the plump body, a wing folded on its side.
+  const by = 7.4 + bob;
+  tri(b, 1, by - 4.5, 2, by + 1, 5, by - 0.5, ramp[2]);
+  setRGB(b, 1, by - 4.5, ramp[3]);
+  setRGB(b, 2, by - 3, ramp[1]);
+  ball(b, 6.5, by, 4.8, 3.4, ramp);
+  ball(b, 6, by + 0.4, 2.8, 1.6, [ramp[0], ramp[1], ramp[2], ramp[2]], 0.4);
+  line(b, 4, by - 0.6, 7, by - 0.9, ramp[3]);
+  // The head (bobbing forward to peck), comb, wattle, beak and a furious little eye.
+  const hx = 10.5 + (peck ? 1.5 : pose === 'wind' ? -1 : 0);
+  const hy = 3.6 + bob + (peck ? 2 : 0);
+  ball(b, hx, hy, 2.2, 2.3, ramp);
+  rect(b, Math.round(hx - 1), Math.round(hy - 3), 2, 1, '#e0342a');
+  setRGB(b, hx, hy - 3.5, '#ff5a40');
+  setRGB(b, hx - 1.6, hy - 2.4, '#b0201c');
+  setRGB(b, hx + 2.2, hy, '#f0b030');
+  setRGB(b, hx + 3.2, hy, peck ? '#f0b030' : '#d8902a');
+  if (peck) setRGB(b, hx + 2.2, hy + 1, '#d8902a');
+  setRGB(b, hx + 1.2, hy + 2, '#c82a24');
+  setRGB(b, hx + 0.6, hy - 0.6, '#140a0a');
+  setRGB(b, hx - 0.2, hy - 1.4, ramp[0]);
+  return finish(b, t, 7, ground, Math.round(hx + 3), Math.round(hy));
+}
+
 function flyer(t: MobType, s: number, pose: MobPose, f: number): MobFrame {
+  if (t.id.startsWith('farmland-')) return crow(t, s, pose, f);
   const W = Math.round(18 * s) + 4;
   const H = Math.round(16 * s) + 4;
   const b = blank(W, H);
@@ -241,12 +343,13 @@ function bug(t: MobType, s: number, pose: MobPose, f: number): MobFrame {
 
 // ------------------------------------------------------------------ dressed mannequins
 
-type MannequinKind = 'goblin' | 'skeleton' | 'cultist' | 'brute' | 'mummy' | 'imp' | 'ghost' | 'pumpkin' | 'monk';
+type MannequinKind = 'goblin' | 'skeleton' | 'cultist' | 'brute' | 'mummy' | 'imp' | 'ghost' | 'pumpkin' | 'monk' | 'scarecrow';
 
 function mannequinKind(t: MobType): MannequinKind {
   if (t.plan === 'ghost') return 'ghost';
   if (t.plan === 'pumpkin') return 'pumpkin';
   const biome = t.id.split('-')[0];
+  if (biome === 'farmland') return 'scarecrow';
   if (t.behavior === 'caster') return biome === 'shrine' ? 'monk' : 'cultist';
   switch (biome) {
     case 'crypt':
@@ -267,6 +370,13 @@ function mannequinKind(t: MobType): MannequinKind {
 
 const BONE = ['#6a6250', '#a8a08a', '#d8d0b8', '#f4eedc'];
 const PUMPKIN = ['#6e2a12', '#a6451f', '#e0702a', '#ffa046'];
+const BURLAP = ['#5e4428', '#8c6c42', '#b89660', '#dcc08a'];
+/** Scarecrows wear red or green flannel. */
+const FLANNEL = [
+  ['#3a1410', '#6a2018', '#9a3424', '#c85a40'],
+  ['#16301a', '#244a24', '#386a30', '#5a8c44'],
+];
+const STRAW = ['#6a4a1a', '#9a7228', '#c89e3e', '#e6c463', '#f6e09a'];
 
 function dressed(t: MobType, _s: number, pose: MobPose, f: number, view: View): MobFrame {
   const kind = mannequinKind(t);
@@ -278,9 +388,10 @@ function dressed(t: MobType, _s: number, pose: MobPose, f: number, view: View): 
   const b = blank(W, H);
   const ox = 3;
   const oy = 6;
-  const skin = kind === 'skeleton' ? BONE : kind === 'mummy' ? ['#5a5040', '#8a7e64', '#bcb092', '#e0d6b8'] : kind === 'imp' ? ['#4a0e0e', '#8a1a14', '#c8321e', '#f05a3a'] : kind === 'ghost' ? ['#5a6a8a', '#8a9ac0', '#c0d0f0', '#eef4ff'] : t.ramp;
-  const cloth = kind === 'cultist' || kind === 'monk' ? [shade(t.ramp[0], -0.3), t.ramp[0], t.ramp[1], t.ramp[2]] : kind === 'brute' ? ['#3a3430', '#5a524a', '#7a7066', '#9a9084'] : [shade(t.ramp[1], -0.4), shade(t.ramp[1], -0.2), t.ramp[1], t.ramp[2]];
-  const legs = kind === 'ghost' ? null : [shade(cloth[0], -0.2), cloth[0], cloth[1]];
+  const skin = kind === 'scarecrow' ? BURLAP : kind === 'skeleton' ? BONE : kind === 'mummy' ? ['#5a5040', '#8a7e64', '#bcb092', '#e0d6b8'] : kind === 'imp' ? ['#4a0e0e', '#8a1a14', '#c8321e', '#f05a3a'] : kind === 'ghost' ? ['#5a6a8a', '#8a9ac0', '#c0d0f0', '#eef4ff'] : t.ramp;
+  const sleeves = kind === 'cultist' || kind === 'monk' || kind === 'scarecrow';
+  const cloth = kind === 'scarecrow' ? FLANNEL[t.features.seed % FLANNEL.length] : kind === 'cultist' || kind === 'monk' ? [shade(t.ramp[0], -0.3), t.ramp[0], t.ramp[1], t.ramp[2]] : kind === 'brute' ? ['#3a3430', '#5a524a', '#7a7066', '#9a9084'] : [shade(t.ramp[1], -0.4), shade(t.ramp[1], -0.2), t.ramp[1], t.ramp[2]];
+  const legs = kind === 'ghost' ? null : kind === 'scarecrow' ? ['#1c2236', '#2c3852', '#44567a'] : [shade(cloth[0], -0.2), cloth[0], cloth[1]];
   const cx = Math.round((fr.head[0] + fr.head[2]) / 2) + ox;
   for (let y = 0; y < fr.rows.length; y++) {
     for (let x = 0; x < fr.rows[y].length; x++) {
@@ -292,7 +403,9 @@ function dressed(t: MobType, _s: number, pose: MobPose, f: number, view: View): 
       else if (ch === 'e') col = kind === 'skeleton' || kind === 'cultist' || kind === 'monk' ? t.eye : '#140a10';
       else if ('hij'.includes(ch)) col = skin[lvl('h', 'i')];
       else if ('tuv'.includes(ch)) col = kind === 'skeleton' ? (y % 2 ? BONE[1] : BONE[0]) : kind === 'mummy' ? skin[(y + x) % 3 === 0 ? 1 : 2] : cloth[lvl('t', 'u')];
-      else if ('abc'.includes(ch)) col = kind === 'cultist' || kind === 'monk' ? cloth[lvl('a', 'b')] : skin[lvl('a', 'b')];
+      else if ('abc'.includes(ch)) col = sleeves ? cloth[lvl('a', 'b')] : skin[lvl('a', 'b')];
+      // A scarecrow's flannel: darker stripes across the shirt and sleeves.
+      if (kind === 'scarecrow' && col && 'tuvabc'.includes(ch) && (x % 3 === 1 || y % 3 === 0)) col = cloth[Math.max(0, cloth.indexOf(col) - 1)];
       else if ('lmn'.includes(ch)) col = legs ? (kind === 'skeleton' ? BONE[lvl('l', 'm') - 1] : legs[lvl('l', 'm') - 1]) : null;
       else if ('fg'.includes(ch)) col = legs ? shade(legs[0], -0.3) : null;
       if (kind === 'ghost' && y > fr.head[3] + 4) {
@@ -396,6 +509,29 @@ function dressed(t: MobType, _s: number, pose: MobPose, f: number, view: View): 
       setRGB(b, px0 + Math.floor(pw / 2) + 1, py0 - 2, '#5a8a30');
       break;
     }
+    case 'scarecrow': {
+      // A burlap sack head with stitches for a face and button eyes that glow, straw at the neck and
+      // cuffs, and a battered straw hat.
+      if (view !== 'up') {
+        const ex = view === 'side' ? [hx + 4, hx + 6] : [hx + 2, hx + 5];
+        for (const x of ex) setRGB(b, x, hy + 3, t.eye);
+        for (let x = ex[0]; x <= ex[1]; x++) setRGB(b, x, hy + 5, (x - ex[0]) % 2 ? skin[1] : '#2a1a10');
+      }
+      for (const x of [hx + 1, hx + hw - 1]) setRGB(b, x, hy + 7, STRAW[3]);
+      for (const [x, y] of [fr.handR, fr.handL]) {
+        setRGB(b, x + ox, y + oy + 1, STRAW[3]);
+        setRGB(b, x + ox + (x > cx - ox ? 1 : -1), y + oy + 1, STRAW[2]);
+      }
+      rect(b, hx - 2, hy, hw + 5, 1, STRAW[2]);
+      rect(b, hx - 2, hy, 4, 1, STRAW[3]);
+      rect(b, hx + 1, hy - 3, hw - 1, 3, STRAW[2]);
+      rect(b, hx + 1, hy - 3, 2, 3, STRAW[3]);
+      rect(b, hx + 1, hy - 3, hw - 1, 1, STRAW[4]);
+      rect(b, hx + 1, hy - 1, hw - 1, 1, '#8a2a22');
+      // Straw hair sticking out under the brim.
+      for (const [x, y, k] of [[hx - 1, hy + 1, 3], [hx - 1, hy + 2, 2], [hx, hy + 1, 2], [hx + hw, hy + 1, 2], [hx + hw + 1, hy + 1, 2], [hx + hw + 1, hy + 2, 1]] as const) setRGB(b, x, y, STRAW[k]);
+      break;
+    }
     case 'ghost':
       if (view !== 'up') {
         setRGB(b, hx + 2, hy + 3, '#1a1030');
@@ -415,6 +551,13 @@ function dressed(t: MobType, _s: number, pose: MobPose, f: number, view: View): 
     } else if (t.behavior === 'caster') {
       line(b, hrx + 1, hry + 2, hrx + 1, hry - 6, '#5a3a20');
       ball(b, hrx + 1, hry - 7, 1.5, 1.5, [shade(t.eye, -0.3), t.eye, mixHex(t.eye, '#ffffff', 0.5), '#ffffff'], 0.4);
+    } else if (kind === 'scarecrow') {
+      // A pitchfork.
+      const fx = hrx + 1 + (swing > 0 ? 1 : 0);
+      const top = hry - 8 + Math.max(0, swing);
+      line(b, hrx + 1, hry + 2, fx, top + 2, '#8a6a3a');
+      rect(b, fx - 1, top + 1, 3, 1, '#7a7a86');
+      for (const dx of [-1, 0, 1]) setRGB(b, fx + dx, top, '#b8b8c4');
     } else if (kind !== 'pumpkin' || t.behavior !== 'bomber') {
       // A club (or a hay fork for pumpkins).
       line(b, hrx + 1, hry + 1, hrx + 1 + (swing > 0 ? 2 : 0), hry - 5 + Math.max(0, swing), kind === 'pumpkin' ? '#8a6a3a' : '#6a4a2a');
@@ -431,6 +574,31 @@ function packFrame(sheet: AnimSheet, pose: MobPose, f: number): MobFrame {
   // Pack animals face left; the game draws everything facing right first.
   const buf = flipX(fromIndexed(sheet.frames[idx], sheet.pal));
   return { buf, ax: sheet.w - 1 - sheet.anchor.x, ay: sheet.anchor.y, mx: sheet.w - 4, my: Math.round(sheet.h * 0.4) };
+}
+
+const CROWN = ['#6a3e0a', '#b07a18', '#e8b830', '#fff0a0'];
+
+/** The farm's boss pig wears a little gold crown, set between its ears whichever way its head bobs. */
+function crowned(m: MobFrame): MobFrame {
+  const up = 5;
+  const b = blank(m.buf.w, m.buf.h + up);
+  blit(b, m.buf, 0, up);
+  // The head is at the front (the right, after the flip); find the top of it between the ears.
+  const cx = m.buf.w - 10;
+  let top = m.buf.h;
+  for (let x = cx - 2; x <= cx + 2; x++) for (let y = 0; y < m.buf.h; y++) if (m.buf.px[(y * m.buf.w + x) * 4 + 3]) {
+    top = Math.min(top, y);
+    break;
+  }
+  const c = blank(7, 4);
+  for (const x of [0, 2, 4, 6]) setRGB(c, x, 0, CROWN[x < 3 ? 3 : 2]);
+  rect(c, 0, 1, 7, 2, CROWN[2]);
+  rect(c, 0, 1, 2, 2, CROWN[3]);
+  rect(c, 0, 3, 7, 1, CROWN[1]);
+  setRGB(c, 3, 2, '#d0283a');
+  setRGB(c, 5, 2, '#3a8ad0');
+  blit(b, inkOutline(c, '#140404'), cx - 4, top + up - 4);
+  return { buf: b, ax: m.ax, ay: m.ay + up, mx: m.mx, my: m.my + up };
 }
 
 /** Integer upscale (bosses built on the mannequin or pack sprites are shown at twice the size). */
@@ -460,8 +628,10 @@ export function mobFrame(t: MobType, pose: MobPose, f: number, view: View, elite
       return golem(t, s, pose, f);
     case 'bug':
       return bug(t, s, pose, f);
+    case 'chicken':
+      return chicken(t, s, pose, f);
     case 'pig':
-      return scaleFrame(packFrame(PIG, pose, f), boss ? 2 : 1);
+      return boss ? scaleFrame(crowned(packFrame(PIG, pose, f)), 2) : packFrame(PIG, pose, f);
     case 'ram':
       return scaleFrame(packFrame(RAM, pose, f), boss ? 2 : 1);
     default:
@@ -472,6 +642,7 @@ export function mobFrame(t: MobType, pose: MobPose, f: number, view: View, elite
 /** How many frames a pose cycles through. */
 export function poseFrames(t: MobType, pose: MobPose): number {
   if (t.plan === 'pig' || t.plan === 'ram') return pose === 'walk' ? 4 : pose === 'idle' ? 16 : 1;
+  if (t.plan === 'chicken') return pose === 'walk' ? 2 : pose === 'idle' ? 4 : 1;
   return pose === 'walk' ? 4 : pose === 'idle' ? 4 : 1;
 }
 

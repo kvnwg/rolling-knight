@@ -1,0 +1,19 @@
+{
+  "glow_up": 0.06,
+  "haul": 0.136,
+  "heartbeat": 0.09,
+  "hit": 0.046,
+  "jingle": 0.198,
+  "jingle_long": 0.217,
+  "lock_break": 0.496,
+  "lock_tap": 0.384,
+  "rattle": 0.113,
+  "reel_creep": 0.1,
+  "reel_land": 0.018,
+  "riser_long": 0.114,
+  "riser_short": 0.064,
+  "slam": 0.229,
+  "tap": 0.15,
+  "title_start": 0.164,
+  "token": 0.102
+}

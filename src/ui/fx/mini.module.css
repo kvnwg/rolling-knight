@@ -1,0 +1,116 @@
+/*
+ * The small corner roller (AltarReels.tsx 'mini'), ported from Dumpster Legend's miniRoller.module.css:
+ * one window per reel, two to a row (an odd last one centred). Black silhouettes flick past while a
+ * reel spins (slower as it nears its stop), a luck token's clover holds in green, the find lands in
+ * color with a rim in its rarity's light. Sizes are art pixels (var(--u)).
+ */
+.mini {
+  --ink: #1a1326;
+  --glow: #ffc21a;
+  --edge: 0 calc(-1 * var(--u)) 0 0 var(--ink), 0 var(--u) 0 0 var(--ink), calc(-1 * var(--u)) 0 0 0 var(--ink), var(--u) 0 0 0 var(--ink);
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: flex-start;
+  gap: calc(2 * var(--u));
+  padding: calc(2 * var(--u));
+  box-sizing: border-box;
+  background: linear-gradient(180deg, #4a5180 0 var(--u), #2d3150 var(--u) calc(100% - var(--u)), #1d2036 calc(100% - var(--u)) 100%);
+  box-shadow: var(--edge), 0 calc(2 * var(--u)) 0 0 rgba(10, 6, 20, 0.55);
+  font-family: 'Pixelify Sans', 'Courier New', monospace;
+  /* (Pixelify Sans joins "fl" into one glyph: names like Starfletch read wrong.) */
+  font-variant-ligatures: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.mini img {
+  image-rendering: pixelated;
+}
+/* A build-up: a hard ring in the glow's color, climbing the tiers like the big reels'. */
+.mini[data-glow='1'] {
+  box-shadow: var(--edge), 0 0 0 calc(2 * var(--u)) var(--glow);
+}
+.mini[data-glow='2'] {
+  box-shadow: var(--edge), 0 0 0 calc(2 * var(--u)) var(--glow), 0 0 0 calc(3 * var(--u)) color-mix(in srgb, var(--glow) 50%, transparent);
+}
+.mini[data-glow='3'] {
+  box-shadow: var(--edge), 0 0 0 calc(2 * var(--u)) var(--glow), 0 0 0 calc(3 * var(--u)) color-mix(in srgb, var(--glow) 60%, transparent);
+  animation: miniBeat 0.24s steps(1) infinite;
+}
+@keyframes miniBeat {
+  50% { box-shadow: var(--edge), 0 0 0 calc(3 * var(--u)) var(--glow); }
+}
+.mini[data-golden] {
+  background: linear-gradient(180deg, #ffc21a 0 var(--u), #6b4a12 var(--u) calc(100% - var(--u)), #3a2608 calc(100% - var(--u)) 100%);
+}
+.win {
+  position: relative;
+  flex: none;
+  width: calc(32 * var(--u));
+  height: calc(23 * var(--u));
+  overflow: hidden;
+  background: #f2e3c4;
+}
+/* A rim in the find's rarity light (or a token's green), inside the window's edge. */
+.win::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 0 var(--u) var(--rim, #b9b1a6);
+  pointer-events: none;
+}
+.pic {
+  position: absolute;
+  left: var(--u);
+  top: var(--u);
+  width: calc(30 * var(--u));
+  height: calc(21 * var(--u));
+}
+.win[data-state='token'] .pic {
+  left: calc(8 * var(--u));
+  top: calc(3 * var(--u));
+  width: calc(16 * var(--u));
+  height: calc(16 * var(--u));
+}
+.win[data-state='spin'] .pic {
+  filter: brightness(0);
+  opacity: 0.8;
+}
+.win[data-state='spin'] {
+  background: #e3cfa6;
+}
+.win[data-state='token'] {
+  background: #d8f5c8;
+}
+.win[data-state='landed'] {
+  background: color-mix(in srgb, var(--rim, #b9b1a6) 30%, #f2e3c4);
+}
+/* The reel's stacked-up luck, on its top edge. */
+.chip {
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  right: 0;
+  top: 0;
+  text-align: center;
+  font-size: calc(5 * var(--u));
+  line-height: 1;
+  color: #7ef08f;
+  -webkit-text-stroke: var(--u) var(--ink);
+  paint-order: stroke fill;
+  pointer-events: none;
+}
+.chip:empty {
+  display: none;
+}
+.chip[data-tier='1'] { color: #6fd8ff; }
+.chip[data-tier='2'] { color: #d29bff; }
+.chip[data-tier='3'] { color: #ffd23f; }
+.chip[data-tier='4'] { color: #ff8a8a; }
+.chip[data-gold] { color: #ffd84a; }
+@media (prefers-reduced-motion: reduce) {
+  .mini[data-glow='3'] {
+    animation: none;
+  }
+}

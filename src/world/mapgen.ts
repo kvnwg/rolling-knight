@@ -2,7 +2,8 @@
  * Procedural floors. A floor is a chain of rooms from the start (bottom) to the exit (top), with a
  * side room or two, joined by corridors. Cave biomes get blobby rooms and winding passages smoothed
  * by a cellular pass; crypts and lava caves get rectangular rooms and straight halls. Then pools,
- * paths, props and lights, and the mob packs. Every floor is checked to be fully connected.
+ * paths, the farm's crop fields, props and lights, and the mob packs. Every floor is checked to be
+ * fully connected.
  */
 import { Rng } from '../core/rng';
 import type { Biome, PropKind, TreeKind } from './biomes';
@@ -49,6 +50,11 @@ export interface FloorMap {
   tiles: Uint8Array;
   /** 1 where the floor uses the biome's path material. */
   path: Uint8Array;
+  /**
+   * Tilled crop fields (biomes with `fields`): 0 none, else 1 furrows run east-west, 2 north-south,
+   * plus 4 where seedlings grow in them.
+   */
+  field?: Uint8Array;
   rooms: Room[];
   start: { x: number; y: number };
   exit: { x: number; y: number };
@@ -385,8 +391,9 @@ export function generateFloor(opts: GenOptions): FloorMap {
   }
   // Room props: trees, rocks, barrels... standing on the floor.
   const weights = biome.props;
-  const decor: PropKind[] = ['flowers', 'bones', 'mushroomSmall', 'reeds', 'skull'];
+  const decor: PropKind[] = ['flowers', 'bones', 'mushroomSmall', 'reeds', 'skull', 'wheat', 'cabbage', 'sunflower'];
   const blocking = (k: PropKind) => !decor.includes(k) && k !== 'torch';
+  if (biome.fields) plantFields(m, biome, rooms, propRng.fork(3), occupied, nearCenter, () => countReach(m, start.cx, start.cy) === total());
   for (const r of rooms) {
     if (r.kind === 'start') continue;
     const area = r.rx * r.ry;
@@ -395,12 +402,12 @@ export function generateFloor(opts: GenOptions): FloorMap {
       const x = r.cx + propRng.int(-r.rx, r.rx);
       const yy = r.cy + propRng.int(-r.ry, r.ry);
       const i = yy * W + x;
-      if (tileAt(m, x, yy) !== FLOOR || occupied.has(i) || nearCenter(x, yy)) continue;
+      if (tileAt(m, x, yy) !== FLOOR || occupied.has(i) || nearCenter(x, yy) || m.field?.[i]) continue;
       const useTree = biome.trees.length > 0 && propRng.chance(0.14);
       const kind: PropKind | 'tree' = useTree ? 'tree' : propRng.weighted(weights);
       const solid = kind === 'tree' || blocking(kind as PropKind);
-      // Solid props stay off the paths and never cut the floor in two.
-      if (solid && m.path[i]) continue;
+      // Solid props (and tall sunflowers) stay off the paths, and never cut the floor in two.
+      if ((solid || kind === 'sunflower') && m.path[i]) continue;
       if (solid) {
         m.tiles[i] = BLOCKED;
         if (countReach(m, start.cx, start.cy) !== total()) {
@@ -421,8 +428,8 @@ export function generateFloor(opts: GenOptions): FloorMap {
   }
   // Scatter little decor on open floor everywhere.
   for (const i of floorTiles) {
-    if (m.tiles[i] !== FLOOR || occupied.has(i) || !propRng.chance(0.05)) continue;
-    const pick = biome.props.filter(([k]) => decor.includes(k));
+    if (m.tiles[i] !== FLOOR || occupied.has(i) || m.field?.[i] || !propRng.chance(0.05)) continue;
+    const pick = biome.props.filter(([k]) => decor.includes(k) && !(k === 'sunflower' && m.path[i]));
     if (!pick.length) break;
     const x = i % W;
     const yy = (i / W) | 0;
@@ -455,5 +462,163 @@ export function generateFloor(opts: GenOptions): FloorMap {
 
   m.start = { x: start.cx * TILE + 8, y: start.cy * TILE + 8 };
   m.exit = { x: exit.cx * TILE + 8, y: (exit.cy - (boss ? 0 : 1)) * TILE + 8 };
+  return m;
+}
+
+/**
+ * The farm's fields: in each room off the tracks, a rectangle or two of plowed soil with a crop
+ * planted along its furrows (cabbages, wheat, a pumpkin patch, or only seedlings), and along the back
+ * a fence (never one that cuts the floor in two) or a row of sunflowers. Crops don't block walking.
+ */
+function plantFields(m: FloorMap, biome: Biome, rooms: Room[], rng: Rng, occupied: Set<number>, nearCenter: (x: number, y: number) => boolean, connected: () => boolean): void {
+  const W = m.w;
+  const field = new Uint8Array(m.w * m.h);
+  m.field = field;
+  const crops = biome.fields!.crops;
+  const add = (kind: PropKind, x: number, y: number) => m.props.push({ kind, x: Math.round(x), y: Math.round(y), solid: false, seed: rng.int(0, 1 << 30) });
+  for (const r of rooms) {
+    if (r.kind === 'start') continue;
+    const want = r.kind === 'side' ? 1 : r.rx * r.ry >= 30 ? 2 : 1;
+    for (let f = 0; f < want; f++) {
+      for (let attempt = 0; attempt < 16; attempt++) {
+        const fw = rng.int(3, 6);
+        const fh = rng.int(2, 3);
+        const x0 = r.cx + rng.int(-r.rx, r.rx - fw + 1);
+        const y0 = r.cy + rng.int(-r.ry, r.ry - fh + 1);
+        let ok = true;
+        // The whole rectangle on open, unpaved floor, with a strip of grass round it.
+        for (let yy = y0 - 1; yy <= y0 + fh && ok; yy++) {
+          for (let x = x0 - 1; x <= x0 + fw && ok; x++) {
+            const inside = yy >= y0 && yy < y0 + fh && x >= x0 && x < x0 + fw;
+            if (x < 0 || yy < 0 || x >= W || yy >= m.h) ok = false;
+            else if (field[yy * W + x]) ok = false;
+            else if (inside && (tileAt(m, x, yy) !== FLOOR || m.path[yy * W + x] || occupied.has(yy * W + x) || nearCenter(x, yy))) ok = false;
+          }
+        }
+        if (!ok) continue;
+        const crop = rng.weighted(crops);
+        const ns = rng.chance(0.3);
+        const val = (ns ? 2 : 1) | (crop === 'sprouts' || crop === 'pumpkin' ? 4 : 0);
+        for (let yy = y0; yy < y0 + fh; yy++) {
+          for (let x = x0; x < x0 + fw; x++) {
+            field[yy * W + x] = val;
+            occupied.add(yy * W + x);
+          }
+        }
+        // Crops stand on the ridges (a ridge every 8 px; a plant's base sits on its lower half).
+        if (crop !== 'sprouts') {
+          const step = crop === 'cabbage' ? 13 : crop === 'wheat' ? 6 : 13;
+          const px0 = x0 * TILE;
+          const py0 = y0 * TILE;
+          const pw = fw * TILE;
+          const ph = fh * TILE;
+          const lines = ns ? pw / 8 : ph / 8;
+          for (let l = 0; l < lines; l++) {
+            // Cabbages are wide: one on every other ridge, so the soil shows between the rows.
+            if (crop === 'cabbage' && l % 2) continue;
+            const across = l * 8 + (ns ? 3 : 4);
+            const len = ns ? ph : pw;
+            // Wheat stands thick; cabbages and pumpkins in staggered rows with soil showing between.
+            const off = crop === 'wheat' ? 3 : 6 + ((crop === 'cabbage' ? l >> 1 : l) % 2) * Math.floor(step / 2);
+            for (let a = off; a <= len - 4; a += step) {
+              if (crop === 'pumpkin' && !rng.chance(0.55)) continue;
+              const j = rng.int(-1, 1);
+              if (ns) add(crop, px0 + across, py0 + a + j);
+              else add(crop, px0 + a + j, py0 + across);
+            }
+          }
+        }
+        // Along the back: a fence, or sunflowers, or nothing.
+        const back = rng.weighted([['fence', 5], ['sunflower', 3], ['none', 3]] as const);
+        if (back !== 'none') {
+          const yy = y0 - 1;
+          for (let x = x0; x < x0 + fw; x++) {
+            const i = yy * W + x;
+            if (tileAt(m, x, yy) !== FLOOR || m.path[i] || occupied.has(i) || nearCenter(x, yy)) continue;
+            if (back === 'fence') {
+              m.tiles[i] = BLOCKED;
+              if (!connected()) {
+                m.tiles[i] = FLOOR;
+                continue;
+              }
+              m.props.push({ kind: 'fence', x: x * TILE + 8, y: yy * TILE + 13, solid: true, seed: rng.int(0, 1 << 30) });
+            } else {
+              add('sunflower', x * TILE + 4 + rng.int(0, 1), yy * TILE + 13);
+              add('sunflower', x * TILE + 12 + rng.int(-1, 0), yy * TILE + 12);
+            }
+            occupied.add(i);
+          }
+        }
+        break;
+      }
+    }
+  }
+}
+
+/**
+ * The camp: a clearing in the woods with a campfire in the middle, the squad's tents, a well, a cart,
+ * lanterns, and the glowing gate to the dungeon at the top of the path. No mobs.
+ */
+export function campMap(): FloorMap {
+  const W = 30;
+  const H = 24;
+  const m: FloorMap = { w: W, h: H, tiles: new Uint8Array(W * H), path: new Uint8Array(W * H), rooms: [], start: { x: 0, y: 0 }, exit: { x: 0, y: 0 }, props: [], spawns: [], seed: 4242 };
+  const rng = new Rng(4242);
+  const cx = 15;
+  const cy = 13;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const a = Math.atan2(y - cy, x - cx);
+      const wob = 1 + 0.1 * Math.sin(a * 3 + 1) + 0.06 * Math.sin(a * 5);
+      const inClearing = ((x - cx) / 10) ** 2 + ((y - cy) / 7.5) ** 2 <= wob * wob;
+      // The path north to the gate.
+      const inPath = Math.abs(x - cx) <= 1 && y >= 2 && y < cy;
+      if (inClearing || inPath) m.tiles[y * W + x] = FLOOR;
+      // The cobbled plaza round the fire and the path.
+      if (((x - cx) / 3.6) ** 2 + ((y - cy) / 2.8) ** 2 <= 1.1 || (inPath && Math.abs(x - cx) <= 1)) m.path[y * W + x] = 1;
+    }
+  }
+  m.rooms = [{ cx, cy, rx: 10, ry: 7, kind: 'start' }];
+  const at = (tx: number, ty: number) => ({ x: tx * TILE + 8, y: ty * TILE + 13 });
+  const add = (kind: Prop['kind'], tx: number, ty: number, solid = true, extra: Partial<Prop> = {}) => {
+    const p = at(tx, ty);
+    if (solid) m.tiles[ty * W + tx] = BLOCKED;
+    m.props.push({ kind, x: p.x, y: p.y, solid, seed: rng.int(0, 1 << 30), ...extra });
+  };
+  add('campfire', cx, cy);
+  add('tent', cx - 6, cy - 3);
+  add('tent', cx + 6, cy - 3);
+  add('well', cx - 7, cy + 3);
+  add('cart', cx + 7, cy + 3);
+  add('barrel', cx + 9, cy + 2);
+  add('crate', cx + 9, cy + 4);
+  add('barrel', cx - 9, cy - 1);
+  add('lantern', cx - 2, cy - 5, false);
+  add('lantern', cx + 3, cy - 5, false);
+  add('lantern', cx - 4, cy + 5, false);
+  add('lantern', cx + 5, cy + 5, false);
+  add('banner', cx - 2, 4, false);
+  add('banner', cx + 2, 4, false);
+  add('stump', cx - 4, cy + 2);
+  add('stump', cx + 4, cy + 2);
+  for (let i = 0; i < 18; i++) {
+    const x = rng.int(cx - 9, cx + 9);
+    const y = rng.int(cy - 6, cy + 6);
+    if (m.tiles[y * W + x] !== FLOOR || m.path[y * W + x]) continue;
+    m.props.push({ kind: rng.chance(0.6) ? 'flowers' : 'mushroomSmall', ...at(x, y), y: y * TILE + 8, solid: false, seed: rng.int(0, 1 << 30) });
+  }
+  // The woods all round.
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (m.tiles[y * W + x] !== SOLID) continue;
+      let near = false;
+      for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) if (tileAt(m, x + ox, y + oy) === FLOOR) near = true;
+      if (!near && ((x + y) % 2 === 1 || !rng.chance(0.6))) continue;
+      m.props.push({ kind: 'tree', tree: rng.pick(['oak', 'oak', 'maple', 'pine'] as const), x: x * TILE + 8 + rng.int(-4, 4), y: y * TILE + 12 + rng.int(-2, 2), solid: true, seed: rng.int(0, 1 << 30), edge: true });
+    }
+  }
+  m.props.sort((a, b) => a.y - b.y);
+  m.start = { x: cx * TILE + 8, y: (cy + 2) * TILE + 8 };
+  m.exit = { x: cx * TILE + 8, y: 3 * TILE + 8 };
   return m;
 }

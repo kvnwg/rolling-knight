@@ -85,12 +85,22 @@ export const BAL = {
       celestial: 2200, astral: 3500, divine: 6000, eternal: 10000, primordial: 20000,
     },
   },
+  /**
+   * The balancing system (power.ts): par is the Squad Power expected on a floor; foes are built so that
+   * at their difficulty a plain foe takes `ttk.mob` seconds of the squad's damage and each hit takes
+   * `hit.mob` of a knight's HP. Above par foes grow by (power / par)^aboveExp, below by ^belowExp.
+   */
+  balance: {
+    parBase: 750,
+    parGrowth: 1.1,
+    ttk: { mob: 1.4, elite: 5.5, boss: 28 },
+    hit: { mob: 0.05, elite: 0.075, boss: 0.1 },
+    aboveExp: 0.6,
+    belowExp: 0.2,
+    minBand: 0.5,
+    maxBand: 50,
+  },
   dungeon: {
-    /** Mob HP and damage at floor 1 (times each mob type's own numbers), growing every floor. */
-    hpBase: 2,
-    atkBase: 1.3,
-    hpGrowth: 1.15,
-    dmgGrowth: 1.1,
     goldGrowth: 1.14,
     goldPerKill: 3,
     floorsPerBiome: 5,

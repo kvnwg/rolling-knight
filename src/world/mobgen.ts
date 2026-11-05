@@ -1,11 +1,11 @@
 /**
  * Procedural mobs. Each floor designs three or four mob types from its biome: a body plan (slime,
- * beast, humanoid, flyer, plant, golem, bug, pumpkin, ghost, or the farm's pig and ram), a behavior
- * (chaser, archer, charger, bomber, caster, tank, swarm), colors from the biome with a twist, a size,
- * features (horns, spikes, eyes, crests) and a name. Every fifth floor adds a boss built the same way,
- * bigger, with attack patterns of its own.
+ * beast, humanoid, flyer, plant, golem, bug, pumpkin, ghost, or the farm's pig, ram and chicken), a
+ * behavior (chaser, archer, charger, bomber, caster, tank, swarm), colors from the biome with a twist,
+ * a size, features (horns, spikes, eyes, crests) and a name ("Adjective Noun", or one from the biome's
+ * own name tables: the farm's are jokes). Every fifth floor adds a boss built the same way, bigger,
+ * with attack patterns of its own (a biome can name its own boss plan, names and titles).
  */
-import { BAL } from '../core/balance';
 import { Rng } from '../core/rng';
 import type { Biome, BodyPlan, Ramp } from './biomes';
 
@@ -46,6 +46,7 @@ const BEHAVIORS: Record<BodyPlan, Behavior[]> = {
   ghost: ['caster', 'swarm'],
   pig: ['charger'],
   ram: ['charger'],
+  chicken: ['swarm'],
 };
 
 const NOUNS: Record<BodyPlan, Partial<Record<Behavior, string[]>>> = {
@@ -60,6 +61,17 @@ const NOUNS: Record<BodyPlan, Partial<Record<Behavior, string[]>>> = {
   ghost: { caster: ['Wraith', 'Banshee'], swarm: ['Spirit', 'Wisp'] },
   pig: { charger: ['Hog'] },
   ram: { charger: ['Ram'] },
+  chicken: { swarm: ['Hen', 'Chicken'] },
+};
+
+/**
+ * Plans drawn in their own colors (the farm's pack sprites and chickens): their ramp is only for their
+ * glow, their shots and the splat they leave, so it matches the animal, not the biome's cloth.
+ */
+const OWN_RAMPS: Partial<Record<BodyPlan, Ramp>> = {
+  pig: ['#5a2a24', '#a85d52', '#d18075', '#f4b8b0'],
+  ram: ['#1e1e24', '#404046', '#8a8288', '#f6e7da'],
+  chicken: ['#8a7e76', '#d0c8c0', '#f0ece6', '#ffffff'],
 };
 
 const BOSS_NAMES = ['Grumblor', 'Vexmaw', 'Old Gnarl', 'Skarr', 'Mother Brood', 'Kragg', 'Morrow', 'Ysgarth', 'Thul', 'Belloc', 'Nyssa', 'Ozrak'];
@@ -117,13 +129,17 @@ function design(biome: Biome, plan: BodyPlan, behavior: Behavior, rng: Rng, id: 
   const base = BASE[behavior];
   const noun = rng.pick(NOUNS[plan][behavior] ?? NOUNS[plan][BEHAVIORS[plan][0]] ?? ['Creature']);
   const adj = rng.pick(biome.mobs.adjectives);
+  // A biome's own name table replaces "Adjective Noun" (only biomes that have one draw from the rng here).
+  const table = biome.mobs.names?.[plan];
+  const name = table?.length ? rng.pick(table) : `${adj} ${noun}`;
   const flying = plan === 'flyer' || plan === 'ghost';
   const size = plan === 'golem' ? 1.25 : behavior === 'swarm' ? 0.8 : plan === 'beast' ? 1.1 : 1;
-  const ramp = twist(rng.pick(biome.mobs.palettes), rng);
+  const picked = twist(rng.pick(biome.mobs.palettes), rng);
+  const ramp = OWN_RAMPS[plan] ?? picked;
   const shotColor = ramp[ramp.length - 1];
   return {
     id,
-    name: `${adj} ${noun}`,
+    name,
     plan,
     behavior,
     ramp,
@@ -152,7 +168,10 @@ function design(biome: Biome, plan: BodyPlan, behavior: Behavior, rng: Rng, id: 
 export function floorMobs(biome: Biome, floor: number, seed: number): MobType[] {
   const rng = new Rng(Rng.hashSeed(seed ^ (floor * 7919) ^ 0x51ed));
   const n = floor >= 12 ? 4 : 3;
-  const plans = rng.shuffle([...biome.mobs.plans]);
+  let plans = rng.shuffle([...biome.mobs.plans]);
+  // A biome's signature mobs come first, so every one of its floors has them.
+  const core = biome.mobs.core;
+  if (core?.length) plans = [...core, ...plans.filter((p) => !core.includes(p))];
   const out: MobType[] = [];
   for (let i = 0; i < n; i++) {
     const plan = plans[i % plans.length];
@@ -166,14 +185,22 @@ export function floorMobs(biome: Biome, floor: number, seed: number): MobType[] 
 
 export function floorBoss(biome: Biome, floor: number, seed: number): MobType {
   const rng = new Rng(Rng.hashSeed(seed ^ (floor * 104729) ^ 0xb055));
+  const own = biome.mobs.boss;
   const candidates = biome.mobs.plans.filter((p) => ['golem', 'beast', 'humanoid', 'slime', 'ghost', 'pumpkin', 'pig', 'ram'].includes(p));
-  const plan = rng.pick(candidates.length ? candidates : biome.mobs.plans);
+  const plan = own ? own.plan : rng.pick(candidates.length ? candidates : biome.mobs.plans);
   const behavior = plan === 'golem' ? 'tank' : plan === 'ghost' ? 'caster' : BEHAVIORS[plan][0];
   const t = design(biome, plan, behavior, rng, `${biome.id}-${floor}-boss`);
   const moves: BossMove[] = rng.shuffle(['ring', 'fan', 'charge', 'slam', 'summon', 'rain'] as BossMove[]).slice(0, 3);
   if (!moves.includes('ring')) moves[0] = 'ring';
-  const name = rng.pick(BOSS_NAMES);
-  const title = `${rng.pick(biome.mobs.adjectives)} ${rng.pick(BOSS_TITLES)}`;
+  // Big farm animals always charge.
+  if ((plan === 'pig' || plan === 'ram') && !moves.includes('charge')) moves[moves[1] === 'ring' ? 2 : 1] = 'charge';
+  let name: string;
+  let title: string;
+  if (own) [name, title] = rng.pick(own.names);
+  else {
+    name = rng.pick(BOSS_NAMES);
+    title = `${rng.pick(biome.mobs.adjectives)} ${rng.pick(BOSS_TITLES)}`;
+  }
   return {
     ...t,
     name,
@@ -190,7 +217,3 @@ export function floorBoss(biome: Biome, floor: number, seed: number): MobType {
   };
 }
 
-/** Enemy stat scaling with depth. */
-export function floorScale(floor: number): { hp: number; atk: number } {
-  return { hp: BAL.dungeon.hpBase * Math.pow(BAL.dungeon.hpGrowth, floor - 1), atk: BAL.dungeon.atkBase * Math.pow(BAL.dungeon.dmgGrowth, floor - 1) };
-}

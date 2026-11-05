@@ -29,6 +29,7 @@ export function mend(raw: unknown): GameState {
   out.settings = { ...fresh.settings, ...(s.settings ?? {}) };
   out.seen = { ...fresh.seen, ...(s.seen ?? {}) };
   out.dupeRules = { ...fresh.dupeRules, ...(s.dupeRules ?? {}) };
+  if (!Array.isArray(out.quests)) out.quests = [];
   if (!Array.isArray(out.squad) || out.squad.length !== 3) out.squad = [null, null, null];
   out.squad = out.squad.map((id) => (id && out.roster[id] ? id : null));
   if (!(out.controlled >= 0 && out.controlled < 3)) out.controlled = 0;

@@ -3,6 +3,7 @@
  * projectiles) is rebuilt from `run` when the game loads.
  */
 import type { ClassId } from './knights';
+import type { Quest } from './quests';
 import type { Rarity } from './rarity';
 
 export type MutationId = 'gilded' | 'shadow' | 'radiant' | 'void';
@@ -135,6 +136,8 @@ export interface GameState {
     tiltShift: boolean;
   };
   seen: { tutorialHints: string[]; perksIntro: boolean };
+  /** NPC jobs taken (three active at most; see core/quests.ts). */
+  quests: Quest[];
 }
 
 export const SAVE_VERSION = 1;

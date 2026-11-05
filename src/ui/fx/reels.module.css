@@ -1,0 +1,954 @@
+/*
+ * The altar's reels (AltarReels.tsx, 'big'), ported from Dumpster Legend's reel.module.css: a slot
+ * machine of pixel-art reels rolling downward behind a payline, framed by marquee bulbs. Sizes are art
+ * pixels (var(--u) CSS px each); AltarReels.tsx sets the layout's sizes in px on the bank: --cell a
+ * cell's height, --win the window's, --frame the bulb frame's, --artw / --arth the knight's size, --ax
+ * its left edge in a cell, --acx its center in a reel. Nothing with pixel art in it is scaled or rotated:
+ * shakes and drops are whole-pixel steps, glows are hard-edged rings, only the light rays turn.
+ */
+.host {
+  --ink: #1a1326;
+  --cream: #fff7e6;
+  --edge: 0 calc(-1 * var(--u)) 0 0 var(--ink), 0 var(--u) 0 0 var(--ink), calc(-1 * var(--u)) 0 0 0 var(--ink), var(--u) 0 0 0 var(--ink);
+  position: relative;
+  width: 100%;
+  font-family: 'Pixelify Sans', 'Courier New', monospace;
+  /* (Pixelify Sans joins "fl" into one glyph: names like Starfletch read wrong.) */
+  font-variant-ligatures: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.host img,
+.host canvas {
+  image-rendering: pixelated;
+}
+
+/* ------------------------------------------------------------ the machine: shake, frame, glow */
+.rig {
+  position: relative;
+  margin: 0 auto;
+}
+/* A rare result on its way: the machine shakes by whole pixels, harder near the end. */
+.rig[data-shake='1'] {
+  animation: shake1 0.2s steps(1) infinite;
+}
+.rig[data-shake='2'] {
+  animation: shake2 0.14s steps(1) infinite;
+}
+@keyframes shake1 {
+  0% { transform: translateX(calc(-1 * var(--u))); }
+  50% { transform: translateX(var(--u)); }
+}
+@keyframes shake2 {
+  0% { transform: translate(calc(-1 * var(--u)), 0); }
+  25% { transform: translate(var(--u), calc(-1 * var(--u))); }
+  50% { transform: translate(calc(-1 * var(--u)), var(--u)); }
+  75% { transform: translate(var(--u), 0); }
+}
+
+.bank {
+  --glow: #ffc21a;
+  --prize: #ffc21a;
+  --pay: #ffc233;
+  --frame-c: #23263a;
+  --hi: #3a3f63;
+  --lo: #15172a;
+  --on: #fff3b0;
+  --off: #3a3f63;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: var(--frame-c);
+  box-shadow: var(--edge), inset 0 var(--u) 0 0 var(--hi), inset 0 calc(-1 * var(--u)) 0 0 var(--lo);
+}
+/* The build-up's glow: hard rings in the glow's color (AltarReels.tsx sets --glow as it climbs the tiers). */
+.bank[data-glow='1'] {
+  box-shadow: var(--edge), inset 0 var(--u) 0 0 var(--hi), inset 0 calc(-1 * var(--u)) 0 0 var(--lo), 0 0 0 calc(2 * var(--u)) var(--glow);
+}
+.bank[data-glow='2'] {
+  box-shadow:
+    var(--edge), inset 0 var(--u) 0 0 var(--hi), inset 0 calc(-1 * var(--u)) 0 0 var(--lo),
+    0 0 0 calc(2 * var(--u)) var(--glow), 0 0 0 calc(3 * var(--u)) color-mix(in srgb, var(--glow) 50%, transparent);
+}
+.bank[data-glow='3'] {
+  box-shadow:
+    var(--edge), inset 0 var(--u) 0 0 var(--hi), inset 0 calc(-1 * var(--u)) 0 0 var(--lo),
+    0 0 0 calc(2 * var(--u)) var(--glow), 0 0 0 calc(3 * var(--u)) color-mix(in srgb, var(--glow) 60%, transparent),
+    0 0 0 calc(4 * var(--u)) color-mix(in srgb, var(--glow) 30%, transparent);
+  animation: glowBeat 0.24s steps(1) infinite;
+}
+@keyframes glowBeat {
+  50% {
+    box-shadow:
+      var(--edge), inset 0 var(--u) 0 0 var(--hi), inset 0 calc(-1 * var(--u)) 0 0 var(--lo),
+      0 0 0 calc(2 * var(--u)) var(--glow), 0 0 0 calc(3 * var(--u)) var(--glow),
+      0 0 0 calc(4 * var(--u)) color-mix(in srgb, var(--glow) 45%, transparent);
+  }
+}
+.bank[data-glow] {
+  --pay: var(--glow);
+}
+.bank[data-golden] {
+  --frame-c: #6b4a12;
+  --hi: #ffc21a;
+  --lo: #b8501c;
+  --off: #9a6a1c;
+}
+.bank[data-golden]:not([data-glow]) {
+  box-shadow: var(--edge), inset 0 var(--u) 0 0 var(--hi), inset 0 calc(-1 * var(--u)) 0 0 var(--lo), 0 0 0 calc(2 * var(--u)) rgba(255, 194, 26, 0.6);
+}
+.bank[data-lucky]:not([data-golden]) {
+  --frame-c: #1f3a2a;
+  --hi: #46d36b;
+  --off: #2f6a3e;
+}
+
+/* ------------------------------------------------------------ marquee bulbs round the frame */
+/*
+ * Bulbs are 2 x 2 art pixels every 4, drawn as a repeating pattern along each edge (one lit, two dark)
+ * and chased by stepping the pattern one bulb at a time: clockwise, fast while the reels spin.
+ */
+.bulbs {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.bulbs i {
+  position: absolute;
+  display: block;
+  animation-duration: 1.2s;
+  animation-timing-function: steps(3);
+  animation-iteration-count: infinite;
+}
+.bulbs i:nth-child(1),
+.bulbs i:nth-child(2) {
+  left: 0;
+  right: 0;
+  height: calc(2 * var(--u));
+  background: linear-gradient(
+      90deg,
+      var(--on) 0 calc(2 * var(--u)),
+      transparent calc(2 * var(--u)) calc(4 * var(--u)),
+      var(--off) calc(4 * var(--u)) calc(6 * var(--u)),
+      transparent calc(6 * var(--u)) calc(8 * var(--u)),
+      var(--off) calc(8 * var(--u)) calc(10 * var(--u)),
+      transparent calc(10 * var(--u)) calc(12 * var(--u))
+    )
+    var(--u) 0 / calc(12 * var(--u)) 100% repeat-x;
+}
+.bulbs i:nth-child(1) {
+  top: var(--u);
+  animation-name: chaseR;
+}
+.bulbs i:nth-child(2) {
+  bottom: var(--u);
+  animation-name: chaseL;
+}
+.bulbs i:nth-child(3),
+.bulbs i:nth-child(4) {
+  top: var(--frame);
+  bottom: var(--frame);
+  width: calc(2 * var(--u));
+  background: linear-gradient(
+      180deg,
+      var(--on) 0 calc(2 * var(--u)),
+      transparent calc(2 * var(--u)) calc(4 * var(--u)),
+      var(--off) calc(4 * var(--u)) calc(6 * var(--u)),
+      transparent calc(6 * var(--u)) calc(8 * var(--u)),
+      var(--off) calc(8 * var(--u)) calc(10 * var(--u)),
+      transparent calc(10 * var(--u)) calc(12 * var(--u))
+    )
+    0 var(--u) / 100% calc(12 * var(--u)) repeat-y;
+}
+.bulbs i:nth-child(3) {
+  left: var(--u);
+  animation-name: chaseU;
+}
+.bulbs i:nth-child(4) {
+  right: var(--u);
+  animation-name: chaseD;
+}
+@keyframes chaseR {
+  from { background-position-x: var(--u); }
+  to { background-position-x: calc(13 * var(--u)); }
+}
+@keyframes chaseL {
+  from { background-position-x: var(--u); }
+  to { background-position-x: calc(-11 * var(--u)); }
+}
+@keyframes chaseD {
+  from { background-position-y: var(--u); }
+  to { background-position-y: calc(13 * var(--u)); }
+}
+@keyframes chaseU {
+  from { background-position-y: var(--u); }
+  to { background-position-y: calc(-11 * var(--u)); }
+}
+/* Spinning: a fast chase. */
+.bank[data-bulbs='spin'] .bulbs i {
+  animation-duration: 0.24s;
+}
+/* Building up: the bulbs take the glow's color and race. */
+.bank[data-bulbs='glow'] {
+  --on: var(--glow);
+  --off: color-mix(in srgb, var(--glow) 35%, #23263a);
+}
+.bank[data-bulbs='glow'] .bulbs i {
+  animation-duration: 0.15s;
+}
+/* A landing: every bulb flashes white. */
+.bank[data-bulbs='flash'] {
+  --on: #ffffff;
+  --off: #ffffff;
+}
+.bank[data-bulbs='flash'] .bulbs i {
+  animation: none;
+}
+/* After an Epic-or-better result: every bulb blinks in its color until the next spin. */
+.bank[data-bulbs='win'] {
+  --on: var(--prize);
+  --off: var(--prize);
+}
+.bank[data-bulbs='win'] .bulbs i {
+  animation: bulbBlink 0.36s steps(1) infinite;
+}
+@keyframes bulbBlink {
+  50% { opacity: 0.3; }
+}
+.bank[data-calm] .bulbs i {
+  animation: none !important;
+}
+
+/* ------------------------------------------------------------ the reels */
+.reels {
+  position: absolute;
+  left: var(--frame);
+  right: var(--frame);
+  top: var(--frame);
+  bottom: var(--frame);
+  display: flex;
+}
+.reel {
+  position: relative;
+  flex: none;
+  height: 100%;
+  overflow: hidden;
+  /* A paper reel drum: light in the middle, darker toward the edges, in hard bands. */
+  background: linear-gradient(
+    180deg,
+    #b9b2a3 0 calc(2 * var(--u)),
+    #d8d1bf calc(2 * var(--u)) calc(5 * var(--u)),
+    #efe9da calc(5 * var(--u)) calc(100% - 5 * var(--u)),
+    #d8d1bf calc(100% - 5 * var(--u)) calc(100% - 2 * var(--u)),
+    #b9b2a3 calc(100% - 2 * var(--u)) 100%
+  );
+}
+/* Behind the strip: the build-up's light and an Epic-or-better result's rays, centered on the knight. */
+.under {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.light {
+  position: absolute;
+  left: calc(var(--acx) - 40 * var(--u));
+  top: calc(50% - 40 * var(--u));
+  width: calc(80 * var(--u));
+  height: calc(80 * var(--u));
+  background: radial-gradient(
+    circle closest-side,
+    color-mix(in srgb, var(--glow) 60%, #fff) 0 22%,
+    color-mix(in srgb, var(--glow) 55%, transparent) 22% 46%,
+    color-mix(in srgb, var(--glow) 25%, transparent) 46% 72%,
+    transparent 72%
+  );
+  opacity: 0;
+}
+.bank[data-glow='1'] .reel[data-tease] .light {
+  opacity: 0.45;
+}
+.bank[data-glow='2'] .reel[data-tease] .light {
+  opacity: 0.75;
+}
+.bank[data-glow='3'] .reel[data-tease] .light {
+  opacity: 1;
+}
+.rays {
+  position: absolute;
+  left: calc(var(--acx) - 55 * var(--u));
+  top: calc(50% - 55 * var(--u));
+  width: calc(110 * var(--u));
+  height: calc(110 * var(--u));
+  animation: raysIn 0.3s steps(3) backwards, raySpin 12s linear infinite;
+}
+@keyframes raysIn {
+  from { opacity: 0; }
+}
+@keyframes raySpin {
+  to { transform: rotate(360deg); }
+}
+.bank[data-calm] .rays {
+  animation: raysIn 0.3s steps(3) backwards;
+}
+.strip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 0;
+  will-change: transform;
+}
+/* One knight rolling past: its "1 in X" on top (or beside it on a wide reel), then the knight. */
+.cell {
+  position: absolute;
+  left: var(--u);
+  right: var(--u);
+  height: var(--cell);
+  padding-top: var(--u);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+/* A dotted groove between cells, so each "1 in X" clearly belongs to the knight under it. */
+.cell::before {
+  content: '';
+  position: absolute;
+  left: calc(2 * var(--u));
+  right: calc(2 * var(--u));
+  top: 0;
+  height: var(--u);
+  background: repeating-linear-gradient(90deg, rgba(43, 33, 64, 0.32) 0 var(--u), transparent var(--u) calc(2 * var(--u)));
+}
+.art {
+  position: relative;
+  flex: none;
+  width: var(--artw);
+  height: var(--arth);
+  /* Blacked out while it rolls: only the shape and the odds show. */
+  filter: brightness(0);
+  opacity: 0.86;
+}
+.art > img {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--artw);
+  height: var(--arth);
+}
+.art > img.tok {
+  left: var(--tokx);
+  top: var(--toky);
+  width: var(--tokw);
+  height: var(--tokw);
+}
+/* Afterimages while a reel flies: hard copies of the silhouette trailing above it, whole pixels apart. */
+.reel[data-speed='fast'] .cell:not([data-revealed]) .art {
+  filter: brightness(0) drop-shadow(0 calc(-1 * var(--trail)) 0 rgba(26, 19, 38, 0.42)) drop-shadow(0 calc(-2 * var(--trail)) 0 rgba(26, 19, 38, 0.2));
+}
+.reel[data-speed='mid'] .cell:not([data-revealed]) .art {
+  filter: brightness(0) drop-shadow(0 calc(-1 * var(--trail)) 0 rgba(26, 19, 38, 0.3));
+}
+.reel[data-speed='fast'] .cell:not([data-revealed]) .odds {
+  opacity: 0.75;
+}
+.cell[data-revealed] .art {
+  filter: none;
+  opacity: 1;
+}
+.cell[data-revealed] {
+  background: color-mix(in srgb, var(--rc, #9e9e9e) 35%, transparent);
+  animation: cellReveal 0.42s steps(3) backwards;
+}
+/* Shown before this spin began (the last result rolling away, a reel seen again): no flash. */
+.cell[data-settled] {
+  animation: none;
+}
+/* Behind rays the result's row is only tinted, so the light shows through. */
+.reel[data-rays] .cell[data-revealed] {
+  background: color-mix(in srgb, var(--rc, #9e9e9e) 16%, transparent);
+}
+@keyframes cellReveal {
+  0% { background: #ffffff; }
+}
+.bank[data-calm] .cell[data-revealed] {
+  animation: none;
+}
+.odds {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: calc(0.5 * var(--u));
+  height: var(--lab);
+  font-size: var(--label);
+  line-height: var(--lab);
+  color: var(--rc, #9e9e9e);
+  white-space: nowrap;
+  text-shadow:
+    calc(0.5 * var(--u)) 0 0 var(--ink), calc(-0.5 * var(--u)) 0 0 var(--ink), 0 calc(0.5 * var(--u)) 0 var(--ink), 0 calc(-0.5 * var(--u)) 0 var(--ink),
+    calc(0.5 * var(--u)) calc(0.5 * var(--u)) 0 var(--ink), calc(-0.5 * var(--u)) calc(0.5 * var(--u)) 0 var(--ink),
+    calc(0.5 * var(--u)) calc(-0.5 * var(--u)) 0 var(--ink), calc(-0.5 * var(--u)) calc(-0.5 * var(--u)) 0 var(--ink);
+}
+.odds i {
+  font-style: normal;
+  font-size: 0.72em;
+  color: #ffffff;
+}
+.odds b {
+  font-weight: inherit;
+}
+.tier {
+  display: none;
+}
+
+/* One or two wide reels: the knight left of center, its odds big beside it, a landed result's tier too. */
+.bank[data-side] .cell {
+  display: block;
+  padding: 0;
+}
+.bank[data-side] .art {
+  position: absolute;
+  left: var(--ax);
+  top: calc(2 * var(--u));
+}
+.bank[data-side] .odds {
+  position: absolute;
+  left: var(--lx);
+  top: calc(2 * var(--u));
+  height: var(--arth);
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 0;
+  font-size: var(--big);
+  line-height: 1;
+  text-shadow: none;
+  -webkit-text-stroke: calc(1.4 * var(--u)) var(--ink);
+  paint-order: stroke fill;
+}
+.bank[data-side] .odds i {
+  font-size: var(--small);
+  -webkit-text-stroke: var(--u) var(--ink);
+}
+.bank[data-side] .tier {
+  position: absolute;
+  font-size: var(--tierf);
+  white-space: nowrap;
+  color: var(--rc, #9e9e9e);
+  -webkit-text-stroke: calc(1.2 * var(--u)) var(--ink);
+  paint-order: stroke fill;
+}
+/* One reel: the tier sits on the knight's other side; two: under the odds. */
+.bank[data-n='1'] .tier {
+  right: var(--tx);
+  top: calc(2 * var(--u));
+  height: var(--arth);
+  align-items: center;
+}
+.bank[data-n='2'] .tier {
+  left: var(--lx);
+  bottom: calc(2 * var(--u));
+}
+.bank[data-side] .cell[data-revealed] .tier {
+  display: flex;
+  animation: tierIn 0.3s steps(3) backwards;
+}
+.bank[data-side] .cell[data-settled] .tier {
+  animation: none;
+}
+@keyframes tierIn {
+  from { transform: translateY(calc(-2 * var(--u))); opacity: 0; }
+}
+.cell[data-token][data-revealed] {
+  background: color-mix(in srgb, #46d36b 35%, transparent);
+}
+/* Legendary and up: their odds blink while they roll past; Mythic and Primordial run through every color. */
+.cell[data-hot] .odds {
+  animation: oddsBlink 0.5s steps(2) infinite;
+}
+.cell[data-rainbow] .odds {
+  animation: oddsRainbow 0.6s steps(5) infinite;
+}
+@keyframes oddsBlink {
+  50% { color: #ffffff; }
+}
+@keyframes oddsRainbow {
+  0% { color: #ff5252; }
+  20% { color: #ffb300; }
+  40% { color: #69f0ae; }
+  60% { color: #40c4ff; }
+  80% { color: #e040fb; }
+}
+/* The drum's ink frame and its shading toward the top and bottom, over the rolling strip. */
+.curve {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: var(--u) solid var(--ink);
+  background: linear-gradient(
+    180deg,
+    rgba(26, 19, 38, 0.55) 0 var(--u),
+    rgba(26, 19, 38, 0.25) var(--u) calc(4 * var(--u)),
+    transparent calc(4 * var(--u)) calc(100% - 4 * var(--u)),
+    rgba(26, 19, 38, 0.25) calc(100% - 4 * var(--u)) calc(100% - var(--u)),
+    rgba(26, 19, 38, 0.55) calc(100% - var(--u)) 100%
+  );
+}
+
+/* ------------------------------------------------------------ the payline */
+/* The win line across every reel: ink just inside the result row, gold (or the glow) just outside, an arrow at each end. */
+.payline {
+  position: absolute;
+  left: var(--frame);
+  right: var(--frame);
+  top: calc(var(--frame) + var(--win) / 2 - var(--cell) / 2);
+  height: var(--cell);
+  pointer-events: none;
+  box-shadow:
+    0 calc(-1 * var(--u)) 0 0 var(--pay), 0 var(--u) 0 0 var(--pay),
+    inset 0 var(--u) 0 0 var(--ink), inset 0 calc(-1 * var(--u)) 0 0 var(--ink);
+}
+/* A landing flashes it white (AltarReels.tsx animates the opacity). */
+.payFlash {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: rgba(255, 255, 255, 0.22);
+  box-shadow:
+    0 calc(-1 * var(--u)) 0 0 #ffffff, 0 var(--u) 0 0 #ffffff,
+    inset 0 calc(2 * var(--u)) 0 0 #ffffff, inset 0 calc(-2 * var(--u)) 0 0 #ffffff;
+}
+.arrowL,
+.arrowR {
+  position: absolute;
+  top: calc(50% - 3 * var(--u));
+  width: calc(4 * var(--u));
+  height: calc(6 * var(--u));
+}
+.arrowL {
+  left: calc(-4 * var(--u));
+}
+.arrowR {
+  right: calc(-4 * var(--u));
+}
+
+/* ------------------------------------------------------------ landing effects */
+.fx {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+/* A point to burst from (the result's knight). */
+.at {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+/* Sparks in the result's color: a plus of art pixels each, flying out in whole-pixel steps. */
+.sparks i {
+  position: absolute;
+  left: calc(-1 * var(--u));
+  top: calc(-1 * var(--u));
+  width: var(--u);
+  height: var(--u);
+  background: #ffffff;
+  box-shadow: 0 calc(-1 * var(--u)) 0 0 var(--c), var(--u) 0 0 0 var(--c), 0 var(--u) 0 0 var(--c), calc(-1 * var(--u)) 0 0 0 var(--c);
+  opacity: 0;
+  animation: sparkFly 0.54s steps(6) both;
+}
+@keyframes sparkFly {
+  0% { transform: translate(0, 0); opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)); opacity: 0; }
+}
+/* White swooshes rush in from both sides along the payline as a result lands. */
+.swoosh {
+  position: absolute;
+  height: 0;
+}
+.swoosh i {
+  position: absolute;
+  top: calc(-3 * var(--u));
+  height: var(--u);
+  width: calc(12 * var(--u));
+  background: #ffffff;
+  animation: swooshL 0.48s steps(6) both;
+}
+.swoosh i[data-row='2'] {
+  top: calc(2 * var(--u));
+  width: calc(8 * var(--u));
+  animation-delay: 0.06s;
+}
+.swoosh i[data-side='l'] {
+  left: 0;
+}
+.swoosh i[data-side='r'] {
+  right: 0;
+  animation-name: swooshR;
+}
+.swoosh[data-big] i {
+  background: #fff3b0;
+  height: calc(2 * var(--u));
+}
+@keyframes swooshL {
+  0% { transform: translateX(0); opacity: 1; }
+  60% { opacity: 1; }
+  100% { transform: translateX(var(--travelL)); opacity: 0; }
+}
+@keyframes swooshR {
+  0% { transform: translateX(0); opacity: 1; }
+  60% { opacity: 1; }
+  100% { transform: translateX(calc(-1 * var(--travelR))); opacity: 0; }
+}
+/* The four-point sparkle twinkling round a Legendary-or-better result. */
+.twinkle {
+  position: absolute;
+  width: calc(7 * var(--u));
+  height: calc(7 * var(--u));
+  opacity: 0;
+  animation: twinkle 0.6s steps(1) 3 both;
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0; }
+  25%, 75% { opacity: 1; }
+}
+/* Legendary and up: the tier stamped over the reel's top edge (text only), then it fades. */
+.stamp {
+  position: absolute;
+  z-index: 2;
+  translate: -50% 0;
+  white-space: nowrap;
+  animation: stampIn 0.32s steps(4) backwards, stampOut 0.3s steps(3) 1.5s forwards;
+}
+@keyframes stampIn {
+  0% { transform: translateY(calc(-5 * var(--u))); opacity: 0; filter: brightness(2.2); }
+  50% { transform: translateY(var(--u)); opacity: 1; filter: brightness(1.6); }
+  100% { transform: none; filter: none; }
+}
+@keyframes stampOut {
+  to { opacity: 0; }
+}
+.stamp[data-calm] {
+  animation: stampOut 0.3s steps(3) 1.5s forwards;
+}
+/* Mythic and up: confetti over the machine, 2 x 1 art pixels falling in whole-pixel steps. */
+.confetti {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 0;
+}
+.confetti span {
+  position: absolute;
+  top: calc(-2 * var(--u));
+  width: calc(2 * var(--u));
+  height: var(--u);
+  animation-name: confettiFall, confettiFlip;
+  animation-timing-function: steps(40), steps(1);
+  animation-iteration-count: 1, infinite;
+  animation-fill-mode: both, none;
+}
+.confetti span[data-tall] {
+  width: var(--u);
+  height: calc(2 * var(--u));
+}
+@keyframes confettiFall {
+  0% { transform: translateY(0); opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translateY(var(--fall, calc(80 * var(--u)))); opacity: 0; }
+}
+@keyframes confettiFlip {
+  50% { width: var(--u); height: calc(2 * var(--u)); }
+}
+/* A luck token bursts into little pixel clovers. */
+.burst i {
+  position: absolute;
+  left: calc(-1 * var(--u));
+  top: calc(-1 * var(--u));
+  width: var(--u);
+  height: var(--u);
+  background: #2f8a45;
+  box-shadow: 0 calc(-1 * var(--u)) 0 0 #7cff6b, var(--u) 0 0 0 #7cff6b, 0 var(--u) 0 0 #7cff6b, calc(-1 * var(--u)) 0 0 0 #7cff6b;
+  opacity: 0;
+  animation: cloverFly 0.72s steps(6) both;
+}
+.burst i:nth-child(1) { --dx: 0px; --dy: calc(-24 * var(--u)); }
+.burst i:nth-child(2) { --dx: calc(18 * var(--u)); --dy: calc(-18 * var(--u)); }
+.burst i:nth-child(3) { --dx: calc(24 * var(--u)); --dy: 0px; }
+.burst i:nth-child(4) { --dx: calc(18 * var(--u)); --dy: calc(18 * var(--u)); }
+.burst i:nth-child(5) { --dx: 0px; --dy: calc(24 * var(--u)); }
+.burst i:nth-child(6) { --dx: calc(-18 * var(--u)); --dy: calc(18 * var(--u)); }
+.burst i:nth-child(7) { --dx: calc(-24 * var(--u)); --dy: 0px; }
+.burst i:nth-child(8) { --dx: calc(-18 * var(--u)); --dy: calc(-18 * var(--u)); }
+@keyframes cloverFly {
+  0% { transform: translate(0, 0); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)); opacity: 0; }
+}
+/* A luck token popping out of its reel and diving into the reel's stack (moved from JS in whole pixels). */
+.fly {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 4;
+  will-change: transform;
+  filter: drop-shadow(0 calc(2 * var(--u)) 0 rgba(10, 6, 20, 0.45));
+}
+
+/* ------------------------------------------------------------ badges and chains */
+.badges {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(-3 * var(--u));
+  z-index: 4;
+  display: flex;
+  justify-content: center;
+  gap: calc(2 * var(--u));
+  pointer-events: none;
+}
+.badge {
+  height: calc(5 * var(--u));
+  padding: 0 var(--u);
+  font-size: calc(4 * var(--u));
+  line-height: calc(5 * var(--u));
+  color: #ffffff;
+  background: #5a5668;
+  box-shadow: var(--edge);
+  text-shadow: calc(0.5 * var(--u)) calc(0.5 * var(--u)) 0 var(--ink);
+  animation: badgeIn 0.3s steps(3) backwards;
+}
+.badge[data-kind='golden'] {
+  background: #f5a524;
+}
+.badge[data-kind='lucky'] {
+  background: #2f8a45;
+}
+.badge[data-kind='turbo'] {
+  background: #2f56a6;
+}
+@keyframes badgeIn {
+  from { transform: translateY(calc(2 * var(--u))); opacity: 0; }
+}
+
+/*
+ * A reel's stacked-up luck ("×6"): rides on its top edge while it spins on to its knight. It grows as it
+ * climbs: bigger and a new color at ×10, ×25 (Epic or better guaranteed), ×50 (Legendary or better) and
+ * ×250 (Mythic or better), with a bigger drop, and the guaranteed tier under it.
+ */
+.chain {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  right: 0;
+  top: var(--u);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  white-space: nowrap;
+  font-size: calc(7 * var(--u));
+  line-height: 1;
+  color: #7ef08f;
+  -webkit-text-stroke: calc(1.2 * var(--u)) var(--ink);
+  paint-order: stroke fill;
+  pointer-events: none;
+  animation: chainDrop 0.27s steps(3) backwards;
+}
+@keyframes chainDrop {
+  from { transform: translateY(calc(-2 * var(--u))); color: #ffffff; }
+}
+.chain[data-tier='1'] {
+  font-size: calc(8 * var(--u));
+  color: #6fd8ff;
+}
+.chain[data-tier='2'] {
+  font-size: calc(10 * var(--u));
+  color: #d29bff;
+  animation: chainBig 0.33s steps(4) backwards;
+}
+.chain[data-tier='3'] {
+  font-size: calc(11 * var(--u));
+  color: #ffd23f;
+  animation: chainBig 0.36s steps(4) backwards;
+}
+.chain[data-tier='4'] {
+  font-size: calc(12 * var(--u));
+  color: #ff5252;
+  animation: chainBig 0.4s steps(5) backwards, chainRainbow 0.8s steps(1) 0.4s infinite;
+}
+@keyframes chainRainbow {
+  0% { color: #ff5252; }
+  20% { color: #ffb300; }
+  40% { color: #69f0ae; }
+  60% { color: #40c4ff; }
+  80% { color: #e040fb; }
+}
+@keyframes chainBig {
+  0% { transform: translateY(calc(-5 * var(--u))) scale(1.6); color: #ffffff; }
+  50% { transform: translateY(var(--u)) scale(0.92); }
+}
+/* The tier a big stack guarantees, under it. */
+.chainFloor {
+  margin-top: calc(0.5 * var(--u));
+  font-style: normal;
+  font-size: calc(4 * var(--u));
+  color: inherit;
+  -webkit-text-stroke: var(--u) var(--ink);
+}
+/* A combo merged onto it (ComboFx): the stack counts the whole combo, in gold, with a bigger drop. */
+.chain[data-gold] {
+  color: #ffd84a;
+  animation: chainGold 0.36s steps(4) backwards;
+}
+@keyframes chainGold {
+  from { transform: translateY(calc(-4 * var(--u))); color: #ffffff; }
+  50% { transform: translateY(calc(-2 * var(--u))); color: #fff6b0; }
+}
+.bank[data-calm] .chain {
+  animation: none;
+}
+
+/* ------------------------------------------------------------ combos (ComboFx) */
+/*
+ * Two or more reels landed a luck token in the same round: each one's number pops out of its reel and
+ * flies to the middle (--fly), they merge with a burst into their product under "COMBO!" and the sum that
+ * made it, which holds (--hold), then copies of the product drop onto each reel's chip (--back). All of
+ * it is timed here from the moment it mounts.
+ */
+.combo {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.comboPart,
+.comboBack {
+  position: absolute;
+  left: calc(-34 * var(--u));
+  width: calc(68 * var(--u));
+  top: calc(-12 * var(--u));
+  height: calc(24 * var(--u));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.comboPart,
+.comboBack,
+.comboX,
+.comboSum {
+  line-height: 1;
+  white-space: nowrap;
+  color: #ffd84a;
+  -webkit-text-stroke: calc(1.5 * var(--u)) var(--ink);
+  paint-order: stroke fill;
+}
+.comboPart {
+  opacity: 0;
+  animation: comboFly var(--fly) both;
+}
+@keyframes comboFly {
+  0% { transform: translate(0, 0) scale(0.4); opacity: 0; animation-timing-function: steps(3, jump-end); }
+  23% { transform: translate(0, calc(-2 * var(--u))) scale(1.25); opacity: 1; animation-timing-function: steps(5, jump-none); }
+  99% { transform: translate(var(--dx), 0) scale(1); opacity: 1; animation-timing-function: steps(1, jump-end); }
+  100% { transform: translate(var(--dx), 0) scale(1); opacity: 0; }
+}
+/* What happens as they meet stays hidden until then. */
+.comboLate {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  animation: comboShow 1ms steps(1, jump-end) var(--fly) both;
+}
+@keyframes comboShow {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+/* The merge: two hard diamond rings burst out of the middle. */
+.comboRing {
+  position: absolute;
+  left: calc(-15 * var(--u));
+  top: calc(-15 * var(--u));
+  width: calc(30 * var(--u));
+  height: calc(30 * var(--u));
+  box-sizing: border-box;
+  border: calc(2 * var(--u)) solid #fff3b0;
+  opacity: 0;
+  animation: comboRing 0.42s steps(5) var(--fly) both;
+}
+.comboRing[data-late] {
+  border-color: #ffc233;
+  animation-delay: calc(var(--fly) + 0.1s);
+}
+@keyframes comboRing {
+  0% { transform: rotate(45deg) scale(0.2); opacity: 1; }
+  80% { opacity: 1; }
+  100% { transform: rotate(45deg) scale(2.2); opacity: 0; }
+}
+/* It blinks out as the copies leave. */
+.comboHit {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  translate: -50% 0;
+  animation: comboBlinkOut 0.18s calc(var(--fly) + var(--hold)) forwards;
+}
+@keyframes comboBlinkOut {
+  0% { visibility: visible; animation-timing-function: steps(1, jump-end); }
+  33% { visibility: hidden; animation-timing-function: steps(1, jump-end); }
+  66% { visibility: visible; animation-timing-function: steps(1, jump-end); }
+  100% { visibility: hidden; }
+}
+.comboTitle {
+  animation: comboTitleIn 0.24s steps(3) var(--fly) both;
+}
+@keyframes comboTitleIn {
+  from { transform: translateY(calc(-3 * var(--u))); opacity: 0; }
+}
+/* The product slams in big and bright, then beats a few times while it holds. */
+.comboX {
+  -webkit-text-stroke-width: calc(1.8 * var(--u));
+  animation: comboXIn 0.3s steps(4) var(--fly) both, comboBeat 0.2s steps(2) calc(var(--fly) + 0.3s) 4 alternate;
+}
+@keyframes comboXIn {
+  0% { transform: scale(1.8); filter: brightness(2.2); }
+  45% { transform: scale(0.9); filter: brightness(1.4); }
+  100% { transform: none; filter: none; }
+}
+@keyframes comboBeat {
+  to { transform: scale(1.08); }
+}
+.combo[data-rainbow] .comboX {
+  animation: comboXIn 0.3s steps(4) var(--fly) both, comboBeat 0.2s steps(2) calc(var(--fly) + 0.3s) 4 alternate, chainRainbow 0.8s steps(1) infinite;
+}
+/* The sum that made it ("×2 × ×5"), under the product. */
+.comboSum {
+  margin-top: var(--u);
+  color: #fff3b0;
+  -webkit-text-stroke-width: var(--u);
+  animation: comboSumIn 0.2s steps(2) calc(var(--fly) + 0.12s) both;
+}
+@keyframes comboSumIn {
+  from { transform: translateY(calc(2 * var(--u))); opacity: 0; }
+}
+/* Copies of the product drop onto each reel's chip, shrinking to its size. */
+.comboBack {
+  opacity: 0;
+  -webkit-text-stroke-width: calc(1.8 * var(--u));
+  animation: comboBack var(--back) steps(5) calc(var(--fly) + var(--hold)) forwards;
+}
+@keyframes comboBack {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(0.42); opacity: 1; }
+}
+/* Reduce motion: nothing flies, drops or beats; the sum shows, then goes. */
+.combo[data-calm] .comboTitle,
+.combo[data-calm] .comboX,
+.combo[data-calm] .comboSum {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rays {
+    animation: raysIn 0.3s steps(3) backwards;
+  }
+}

@@ -93,7 +93,22 @@ export function heroAi(w: World, h: Unit, lead: Unit | undefined, dt: number): [
     if (go) heroSpecial(w, h, false);
   }
   // --- movement
-  if (target && target.uid !== ai.target) ai.target = target.uid;
+  if (target && target.uid !== ai.target) {
+    ai.target = target.uid;
+    ai.lastHp = target.hp;
+    ai.noHitT = 0;
+  }
+  // A watchdog: if the target's HP hasn't dropped in a while (shots that can't land, a foe that won't
+  // come), walk up to it instead of standing there.
+  if (target) {
+    if (target.hp < (ai.lastHp ?? Infinity)) ai.noHitT = 0;
+    else ai.noHitT = (ai.noHitT ?? 0) + dt;
+    ai.lastHp = target.hp;
+    if ((ai.noHitT ?? 0) > 2.5 && (!lead || isLead || dist(h.x, h.y, lead.x, lead.y) < 150)) {
+      if (ai.noHitT! > 6) ai.noHitT = 0;
+      return steer(w, h, target.x, target.y, w.goalFlow && isLead ? w.goalFlow : null);
+    }
+  }
   const follow = (): [number, number] => {
     if (!lead || isLead) return [0, 0];
     const d = dist(h.x, h.y, lead.x, lead.y);
@@ -413,7 +428,7 @@ function bossMove(w: World, m: Unit, target: Unit, enraged: boolean): void {
       break;
     case 'summon': {
       for (let k = 0; k < (enraged ? 3 : 2); k++) {
-        const a = w.makeMob(w.rng.pick(w.mobTypes), m.x + w.rng.float(-30, 30), m.y + w.rng.float(10, 30), false, false, w.scale);
+        const a = w.makeMob(w.rng.pick(w.mobTypes), m.x + w.rng.float(-30, 30), m.y + w.rng.float(10, 30), false, false);
         a.awake = true;
         a.room = m.room;
         if (!moveUnit(w.map, a, 0, 0)) {

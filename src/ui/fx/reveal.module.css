@@ -1,0 +1,612 @@
+/*
+ * The big reveal (Reveal.tsx), ported from Dumpster Legend's overlays.module.css. Sizes are art pixels
+ * (var(--u) CSS px each). Nothing that shows pixel art is rotated or scaled by a fraction: it moves by
+ * whole-pixel steps, flashes and fades. --ix / --iy are where the knight stands (px, set by Reveal.tsx),
+ * --c the light's color as it climbs the tiers.
+ */
+.rare {
+  --ink: #1a1326;
+  --cream: #fff7e6;
+  --gold: #ffc233;
+  --c: #ffb300;
+  --ix: 50%;
+  --iy: 45%;
+  --edge: 0 calc(-1 * var(--u)) 0 0 var(--ink), 0 var(--u) 0 0 var(--ink), calc(-1 * var(--u)) 0 0 0 var(--ink), var(--u) 0 0 0 var(--ink);
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  cursor: pointer;
+  font-family: 'Pixelify Sans', 'Courier New', monospace;
+  /* (Pixelify Sans joins "fl" into one glyph: names like Starfletch read wrong.) */
+  font-variant-ligatures: none;
+  color: #fff;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.rare img,
+.rare canvas {
+  image-rendering: pixelated;
+}
+.rareBlack {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  animation: fadeIn 250ms ease-out backwards;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+}
+
+/* Light gathering in the dark: motes (one art pixel each) drift toward the knight, a point of light throbs. */
+.motes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.mote {
+  position: absolute;
+  left: var(--ix);
+  top: var(--iy);
+  width: var(--u);
+  height: var(--u);
+  background: #fff;
+  box-shadow: 0 0 calc(2 * var(--u)) calc(0.5 * var(--u)) var(--c);
+  opacity: 0;
+  animation-name: moteIn;
+  animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.6);
+  animation-fill-mode: both;
+}
+@keyframes moteIn {
+  0% { transform: translate(var(--x), var(--y)); opacity: 0; }
+  25% { opacity: 1; }
+  100% { transform: translate(0, 0); opacity: 0.1; }
+}
+.rareSpark {
+  position: absolute;
+  left: calc(var(--ix) - var(--u));
+  top: calc(var(--iy) - var(--u));
+  width: calc(2 * var(--u));
+  height: calc(2 * var(--u));
+  background: #fff;
+  box-shadow: 0 0 calc(8 * var(--u)) calc(3 * var(--u)) color-mix(in srgb, var(--c) 80%, #fff);
+  animation: sparkPulse 0.5s steps(2) infinite alternate;
+}
+@keyframes sparkPulse {
+  from { opacity: 0.5; }
+  to { opacity: 1; }
+}
+.rareGlow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at var(--ix) var(--iy), color-mix(in srgb, var(--c) 50%, transparent) 0%, transparent 58%);
+}
+/* Rays drawn once into a small image (rays.ts), fade baked in, turning round the knight. */
+.rays {
+  position: absolute;
+  left: calc(var(--ix) - var(--rays) / 2);
+  top: calc(var(--iy) - var(--rays) / 2);
+  width: var(--rays);
+  height: var(--rays);
+  pointer-events: none;
+  animation: raySpin 14s linear infinite;
+}
+@keyframes raySpin {
+  to { transform: rotate(360deg); }
+}
+.raysBack {
+  opacity: 0.6;
+  animation-direction: reverse;
+  animation-duration: 9s;
+}
+
+/* ------------------------------------------------------------ the column: title, knight, odds, card */
+.center {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(3 * var(--u));
+  padding: 0 calc(6 * var(--u));
+  text-align: center;
+}
+/* Every block holds its place from the start (hidden until its moment), so nothing moves as they show. */
+.rareTitle:not([data-show]),
+.odds:not([data-show]),
+.card:not([data-show]),
+.rareItem:not([data-show]) {
+  visibility: hidden;
+}
+.rareTitle {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+/* Big outlined words slam in (text only). */
+.rareTitle[data-show] .title {
+  animation: titleIn 520ms cubic-bezier(0.34, 1.7, 0.5, 1) backwards;
+}
+@keyframes titleIn {
+  0% { transform: scale(2.4); opacity: 0; }
+  60% { transform: scale(0.92); opacity: 1; }
+  100% { transform: scale(1); }
+}
+/* A tutorial roll's banner ("BEGINNER'S LUCK!", "YOUR FIRST LEGEND!") over the title; it takes no room. */
+.scriptedBanner,
+.hyperBanner {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 2 * var(--u));
+  display: flex;
+  justify-content: center;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.scriptedBanner {
+  animation: bannerIn 360ms steps(4) backwards;
+}
+@keyframes bannerIn {
+  0% { translate: 0 calc(-4 * var(--u)); opacity: 0; }
+  50% { translate: 0 var(--u); opacity: 1; }
+  75% { translate: 0 0; }
+}
+.hyperBanner {
+  animation: hyperIn 480ms steps(6) backwards;
+}
+.hyperBanner + .scriptedBanner {
+  bottom: calc(100% + 20 * var(--u));
+}
+@keyframes hyperIn {
+  0% { translate: 0 calc(-10 * var(--u)); opacity: 0; }
+  40% { translate: 0 var(--u); opacity: 1; }
+  70% { translate: 0 0; }
+}
+.rare[data-calm] .scriptedBanner,
+.rare[data-calm] .hyperBanner {
+  animation: none;
+}
+
+/*
+ * The knight rises out of the dark as a silhouette in front of its rarity's light, one art pixel at a
+ * time; the light is a plain gradient disc behind it (not a blur filter, which is heavy on phones).
+ */
+.rareItem {
+  position: relative;
+  width: var(--kw);
+  height: var(--kh);
+}
+.rareItem[data-show] {
+  animation: rise var(--appear, 650ms) steps(8) backwards;
+}
+.rareItem::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--glowd);
+  height: var(--glowd);
+  margin: calc(var(--glowd) / -2) 0 0 calc(var(--glowd) / -2);
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--c) 70%, #fff) 0%, color-mix(in srgb, var(--c) 45%, transparent) 30%, transparent 68%);
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: -1;
+}
+.knight {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--kw);
+  height: var(--kh);
+  image-rendering: pixelated;
+}
+.rareItem:not([data-lit]) .knight {
+  filter: brightness(0);
+}
+@keyframes rise {
+  from { transform: translateY(calc(8 * var(--u))); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+/* ...then bursts into color with a flash, and bobs. */
+.rareItem[data-lit] {
+  animation: float 1.6s steps(1) 700ms infinite;
+}
+@keyframes float {
+  0%, 100% { transform: none; }
+  50% { transform: translateY(calc(-1 * var(--u))); }
+}
+.rareItem[data-lit]::before {
+  opacity: 1;
+  animation: litFlash 360ms steps(3) backwards;
+}
+@keyframes litFlash {
+  0% { opacity: 1; transform: scale(1.25); }
+  100% { opacity: 1; transform: none; }
+}
+/* A glint sweeping across the knight (masked to its own pixels). */
+.glint {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+.glint::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: calc(6 * var(--u));
+  background: rgba(255, 255, 255, 0.5);
+  transform: translateX(calc(-7 * var(--u)));
+  animation: glint 1.7s linear 250ms infinite;
+}
+@keyframes glint {
+  0% { transform: translateX(calc(-7 * var(--u))); }
+  55%, 100% { transform: translateX(calc(var(--kw) + var(--u))); }
+}
+.sparkle {
+  position: absolute;
+  opacity: 0;
+  image-rendering: pixelated;
+  animation: twinkle 1.1s steps(1) infinite both;
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0; }
+  30%, 70% { opacity: 1; }
+}
+.rare[data-calm] .rareItem,
+.rare[data-calm] .rareItem[data-lit],
+.rare[data-calm] .glint::after,
+.rare[data-calm] .rareSpark {
+  animation: none;
+}
+
+/* ------------------------------------------------------------ the odds plate */
+/* Square on the grid, it glows instead of growing; it takes each tier's colors as the number climbs. */
+.odds {
+  display: flex;
+  align-items: baseline;
+  gap: calc(2 * var(--u));
+  padding: 0 calc(6 * var(--u)) var(--u);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 50%, #fff) 0 50%, var(--c) 50% 100%);
+  box-shadow: var(--edge), 0 calc(2 * var(--u)) 0 0 var(--ink), 0 0 calc(6 * var(--u)) var(--c);
+  color: #fff;
+  -webkit-text-stroke: calc(1.6 * var(--u)) var(--ink);
+  paint-order: stroke fill;
+  transition: box-shadow 200ms;
+}
+.odds i {
+  font-style: normal;
+  font-size: calc(8 * var(--u));
+}
+.odds b {
+  display: inline-block;
+  min-width: 2.2ch;
+  font-weight: 400;
+  font-size: calc(17 * var(--u));
+  line-height: 1;
+}
+.odds[data-show] {
+  animation: oddsIn 300ms steps(3) backwards;
+}
+.odds[data-show] b {
+  animation: tierBump 260ms ease-out;
+}
+@keyframes oddsIn {
+  0% { transform: translateY(calc(-4 * var(--u))); opacity: 0; }
+  100% { transform: none; opacity: 1; }
+}
+@keyframes tierBump {
+  0% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+/* The real odds land: the plate drops into place with a flash, then beats. */
+.odds[data-landed] {
+  animation: slamIn 360ms steps(4) backwards, oddsBeat 0.8s steps(2) 1s infinite;
+}
+@keyframes slamIn {
+  0% { transform: translateY(calc(-4 * var(--u))); filter: brightness(2.2); }
+  100% { transform: none; filter: none; }
+}
+@keyframes oddsBeat {
+  50% {
+    box-shadow: var(--edge), 0 calc(2 * var(--u)) 0 0 var(--ink), 0 0 calc(10 * var(--u)) var(--c);
+    filter: brightness(1.15);
+  }
+}
+.odds[data-rarity='legendary'],
+.odds[data-rarity='divine'] {
+  background: linear-gradient(90deg, #fff3a0, #ffc233, #ff8a00, #ffc233, #fff3a0);
+}
+.odds[data-rarity='mythic'] {
+  background: linear-gradient(90deg, #ff5252, #ffb300, #69f0ae, #40c4ff, #e040fb);
+}
+.odds[data-rarity='ancient'] {
+  background: linear-gradient(90deg, #ffe3b8, #d2884a, #8a4b23, #d2884a, #ffe3b8);
+}
+.odds[data-rarity='exalted'] {
+  background: linear-gradient(90deg, #ff3b4e, #ffb300, #ff3b4e, #ffb300, #ff3b4e);
+}
+.odds[data-rarity='celestial'] {
+  background: linear-gradient(90deg, #e8fdff, #38e8ff, #2a6bff, #38e8ff, #e8fdff);
+}
+.odds[data-rarity='astral'] {
+  background: linear-gradient(90deg, #ffffff, #4dffb4, #38e8ff, #4dffb4, #ffffff);
+}
+.odds[data-rarity='eternal'] {
+  background: linear-gradient(90deg, #ffffff, #e9ddff, #ffd54f, #b48cff, #ffffff);
+}
+.odds[data-rarity='primordial'] {
+  background: linear-gradient(90deg, #fff07a, #ff5252, #ffb300, #69f0ae, #40c4ff, #e040fb, #fff07a);
+}
+
+/* ------------------------------------------------------------ the card: name, tier and class, tags */
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(2 * var(--u));
+  max-width: 92vw;
+}
+.name {
+  font-size: calc(10 * var(--u));
+  line-height: 1.1;
+  color: #fff;
+  -webkit-text-stroke: calc(1.6 * var(--u)) var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 var(--u) 0 var(--ink);
+}
+.sub {
+  font-size: calc(6 * var(--u));
+  line-height: 1.2;
+  color: var(--cream);
+  -webkit-text-stroke: var(--u) var(--ink);
+  paint-order: stroke fill;
+}
+.sub b {
+  font-weight: 700;
+}
+.card[data-show] .name {
+  animation: fadeUp 400ms ease-out 260ms backwards;
+}
+.card[data-show] .sub {
+  animation: fadeUp 400ms steps(3) 380ms backwards;
+}
+.card[data-show] .tags {
+  animation: fadeUp 400ms steps(3) 460ms backwards;
+}
+.card[data-show] .hyperSub,
+.card[data-show] .note {
+  animation: fadeUp 400ms ease-out 520ms backwards;
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(calc(3 * var(--u))); }
+}
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: calc(3 * var(--u));
+}
+.tag {
+  height: calc(9 * var(--u));
+  padding: 0 calc(3 * var(--u));
+  box-shadow: var(--edge);
+  font-size: calc(6 * var(--u));
+  line-height: calc(9 * var(--u));
+  color: #fff;
+  white-space: nowrap;
+  -webkit-text-stroke: var(--u) var(--ink);
+  paint-order: stroke fill;
+}
+.tagNew {
+  background: #ffc233;
+  animation: newBlink 600ms steps(2) infinite;
+}
+@keyframes newBlink {
+  50% { background: #fff3a0; }
+}
+.tagLuck {
+  background: #46d36b;
+}
+.tagMut {
+  background: var(--m, #7546b8);
+}
+.hyperSub {
+  font-size: calc(7 * var(--u));
+  color: #fff3b0;
+  -webkit-text-stroke: var(--u) var(--ink);
+  paint-order: stroke fill;
+}
+.note {
+  font-size: calc(5 * var(--u));
+  color: #d8dcf5;
+}
+.rare[data-calm] .card * {
+  animation: none !important;
+}
+
+/* ------------------------------------------------------------ flashes, the hint, confetti, shock */
+.flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  pointer-events: none;
+  animation: flash 420ms ease-out forwards;
+}
+@keyframes flash {
+  from { opacity: 0.85; }
+  to { opacity: 0; }
+}
+/* White builds up as the knight finishes rising, then the bloom fades. */
+.flashLate {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  pointer-events: none;
+  opacity: 0;
+  animation: flashLate var(--appear, 650ms) linear forwards;
+}
+@keyframes flashLate {
+  0%, 75% { opacity: 0; }
+  100% { opacity: 0.85; }
+}
+.tap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(8 * var(--u) + env(safe-area-inset-bottom, 0px));
+  font-size: calc(5 * var(--u));
+  color: rgba(255, 255, 255, 0.65);
+  text-align: center;
+  pointer-events: none;
+  animation: fadeUp 400ms ease-out 1200ms backwards;
+}
+.tapNow {
+  animation-delay: 0ms;
+}
+/* Confetti: pieces of 2 x 1 art pixels falling straight down, flipping to 1 x 2 and back. */
+.confetti {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.confetti span {
+  position: absolute;
+  top: calc(-4 * var(--u));
+  width: calc(2 * var(--u));
+  height: var(--u);
+  animation-name: fall, flipConfetti;
+  animation-timing-function: linear, steps(1);
+  animation-iteration-count: infinite, infinite;
+}
+.confetti span[data-tall] {
+  width: var(--u);
+  height: calc(2 * var(--u));
+}
+@keyframes fall {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(calc(100vh + 8 * var(--u))); }
+}
+@keyframes flipConfetti {
+  50% { width: var(--u); height: calc(2 * var(--u)); }
+}
+/* The landing's shock wave: a one-art-pixel square ring on a canvas of one pixel per art pixel. */
+.shock {
+  position: absolute;
+  pointer-events: none;
+  image-rendering: pixelated;
+}
+/* The landing quakes the column (whole pixels). */
+.rare[data-phase='landed']:not([data-calm]) .center {
+  animation: quake 460ms steps(7) 1;
+}
+@keyframes quake {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(calc(-3 * var(--u)), calc(2 * var(--u))); }
+  40% { transform: translate(calc(3 * var(--u)), calc(-2 * var(--u))); }
+  60% { transform: translate(calc(-2 * var(--u)), var(--u)); }
+  80% { transform: translate(var(--u), calc(-1 * var(--u))); }
+  100% { transform: none; }
+}
+
+/* ------------------------------------------------------------ HYPER RARE (HyperFx.tsx) */
+.hyperFx {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  image-rendering: pixelated;
+}
+/* Warning bands while it summons: hazard stripes along both edges and its name racing past. */
+.hyperBand {
+  --from: -100%;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 12%;
+  height: calc(20 * var(--u));
+  background: #0c0a14;
+  overflow: hidden;
+  pointer-events: none;
+  animation: bandIn 300ms steps(5) backwards;
+}
+.hyperBand[data-at='bottom'] {
+  --from: 100%;
+  top: auto;
+  bottom: 12%;
+}
+.hyperBand::before,
+.hyperBand::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: calc(3 * var(--u));
+  /* 8 x 3 art pixels: a stair-stepped yellow stripe on the band's black. */
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='3' shape-rendering='crispEdges'%3E%3Cpath fill='%23ffd23f' d='M0 0h4v1H0zM1 1h4v1H1zM2 2h4v1H2z'/%3E%3C/svg%3E") 0 0 / calc(8 * var(--u)) calc(3 * var(--u)) repeat-x;
+  animation: stripes 400ms steps(8) infinite;
+}
+.hyperBand::before {
+  top: 0;
+}
+.hyperBand::after {
+  bottom: 0;
+  animation-direction: reverse;
+}
+.hyperBand[data-at='bottom']::before {
+  animation-direction: reverse;
+}
+.hyperBand[data-at='bottom']::after {
+  animation-direction: normal;
+}
+@keyframes bandIn {
+  from { transform: translateX(var(--from)); }
+}
+@keyframes stripes {
+  to { background-position-x: calc(8 * var(--u)); }
+}
+.hyperTrack {
+  position: absolute;
+  left: 0;
+  top: calc(4 * var(--u));
+  display: flex;
+  white-space: pre;
+  font-weight: 700;
+  font-size: calc(9 * var(--u));
+  line-height: calc(12 * var(--u));
+  color: #ff3b3b;
+  -webkit-text-stroke: calc(1.4 * var(--u)) var(--ink);
+  paint-order: stroke fill;
+  animation: track 4s linear infinite, bandBlink 300ms steps(1) infinite;
+}
+.hyperBand[data-at='bottom'] .hyperTrack {
+  animation-direction: reverse, normal;
+}
+@keyframes track {
+  to { transform: translateX(-50%); }
+}
+@keyframes bandBlink {
+  50% { color: #ffffff; }
+}
+.rare[data-calm] .hyperBand,
+.rare[data-calm] .hyperBand::before,
+.rare[data-calm] .hyperBand::after,
+.rare[data-calm] .hyperTrack {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rays,
+  .confetti span {
+    animation: none;
+  }
+}

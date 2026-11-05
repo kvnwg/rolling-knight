@@ -10,10 +10,11 @@ import type { KnightStats } from '../core/roster';
 import type { MutationId } from '../core/state';
 import { heroAi, mobAi } from './ai';
 import type { Biome } from './biomes';
-import { dist, lineOfSight, moveUnit, norm, type Area, type FloatText, type Fx, type Pickup, type Shot, type Unit } from './entities';
+import { dist, lineOfSight, moveUnit, norm, type Area, type FloatText, type Fx, type Pickup, type Shot, type Unit, type View } from './entities';
 import { flowFrom, type Flow } from './flow';
 import { TILE, tileAt, type FloorMap } from './mapgen';
-import { floorScale, type MobType } from './mobgen';
+import { type MobType } from './mobgen';
+import { floorPar, foeStats } from '../core/power';
 import { heroDodge, heroSpecial, heroTick } from './skills';
 
 export interface HeroSpec {
@@ -61,6 +62,10 @@ export interface WorldOptions {
   controlled: number;
   seed: number;
   goldPerKill: number;
+  /** What the foes are built for, in Squad Power (power.ts); par for the floor when not given. */
+  difficulty?: number;
+  /** The camp (home screen): no mobs, the squad stands round the fire. */
+  camp?: boolean;
 }
 
 let nextUid = 1;
@@ -108,14 +113,18 @@ export class World {
   banner = 0;
   bannerT = 0;
   tagTeamT = 0;
-  scale: { hp: number; atk: number };
+  /** What this floor's foes are built for, in Squad Power (see power.ts). */
+  difficulty: number;
   /** The last 5 seconds, a snapshot every 0.1 s (for Rewind). */
   private history: Snapshot[] = [];
   private historyT = 0;
   /** A rewind playing: the snapshots from now back to the target, and how far through it is. */
   rewind: { frames: Snapshot[]; t: number; dur: number } | null = null;
 
+  camp: boolean;
+
   constructor(o: WorldOptions) {
+    this.camp = !!o.camp;
     this.map = o.map;
     this.biome = o.biome;
     this.floor = o.floor;
@@ -135,18 +144,33 @@ export class World {
       const alive = this.heroes.find((h) => !h.downed);
       if (alive) this.controlled = alive.slot!;
     }
-    const scale = floorScale(o.floor);
-    this.scale = scale;
+    if (this.camp) {
+      // Round the fire, facing it.
+      const fire = o.map.props.find((p) => p.kind === 'campfire') ?? { x: o.map.start.x, y: o.map.start.y - 20 };
+      const spots: Array<[number, number, View, 1 | -1]> = [[-22, 4, 'side', 1], [22, 4, 'side', -1], [0, 20, 'up', 1]];
+      this.heroes.forEach((h, i) => {
+        const [dx, dy, view, dir] = spots[i % 3];
+        h.x = fire.x + dx;
+        h.y = fire.y + dy;
+        h.view = view;
+        h.dir = dir;
+      });
+      this.portalOpen = true;
+      this.cleared = true;
+      this.difficulty = 0;
+      return;
+    }
+    this.difficulty = o.difficulty ?? floorPar(o.floor);
     for (const s of o.map.spawns) {
       const t = s.boss ? o.bossType! : this.rng.pick(o.mobTypes);
-      const m = this.makeMob(t, s.x, s.y, s.elite, s.boss, scale);
+      const m = this.makeMob(t, s.x, s.y, s.elite, s.boss);
       m.room = s.room;
       this.mobs.push(m);
       if (s.boss) {
         this.bossUnit = m;
         // The boss arrives with a few of the floor's mobs.
         for (let k = 0; k < 3; k++) {
-          const a = this.makeMob(this.rng.pick(o.mobTypes), s.x + (k - 1) * 30, s.y + 30, false, false, scale);
+          const a = this.makeMob(this.rng.pick(o.mobTypes), s.x + (k - 1) * 30, s.y + 30, false, false);
           a.room = s.room;
           this.mobs.push(a);
         }
@@ -211,10 +235,10 @@ export class World {
     return this.heroes.length > 0 && this.heroes.every((h) => h.rarity === 'common' || h.rarity === 'uncommon' || h.rarity === 'rare');
   }
 
-  makeMob(t: MobType, x: number, y: number, elite: boolean, boss: boolean, scale: { hp: number; atk: number }): Unit {
-    const hpMult = boss ? 1 : elite ? 3 : 1;
-    const atkMult = elite ? 1.5 : 1;
-    const maxHp = t.hp * scale.hp * hpMult;
+  /** A foe of type `t`, built for this floor's difficulty (its HP and hit come from power.ts's targets). */
+  makeMob(t: MobType, x: number, y: number, elite: boolean, boss: boolean): Unit {
+    const st = foeStats(t, this.difficulty, boss ? 'boss' : elite ? 'elite' : 'mob');
+    const maxHp = st.hp;
     return {
       uid: uid(),
       team: 'mob',
@@ -225,7 +249,7 @@ export class World {
       r: Math.round(t.radius * (elite ? 1.3 : 1)),
       hp: maxHp,
       maxHp,
-      atk: t.atk * scale.atk * atkMult,
+      atk: st.atk,
       armor: 0,
       speed: t.speed,
       dir: this.rng.chance(0.5) ? 1 : -1,
@@ -285,7 +309,8 @@ export class World {
       if (e.team === 'mob' && !e.awake && u.team === 'hero' && dist(u.x, u.y, e.x, e.y) > range) continue;
       const d = dist(u.x, u.y, e.x, e.y) - e.r;
       if (d > bd) continue;
-      if (sight && !lineOfSight(this.map, u.x, u.y - 4, e.x, e.y - 4)) continue;
+      // The line a shot's foot travels (it leaves from beside the shooter): both sides must be clear.
+      if (sight && !(lineOfSight(this.map, u.x - 4, u.y - 4, e.x, e.y) && lineOfSight(this.map, u.x + 4, u.y - 4, e.x, e.y))) continue;
       bd = d;
       best = e;
     }
@@ -530,6 +555,15 @@ export class World {
   }
 
   update(dt: number): void {
+    if (this.camp) {
+      this.time += dt;
+      for (const h of this.heroes) {
+        h.animT += dt;
+        h.moving = false;
+      }
+      for (const t of this.texts) t.t += dt;
+      return;
+    }
     if (this.rewind) {
       this.time += dt;
       this.updateRewind(dt);

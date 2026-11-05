@@ -63,7 +63,17 @@ export interface Unit {
   channel?: { kind: 'whirlwind' | 'lunge' | 'taunt'; t: number; dur: number; tick: number; dx: number; dy: number; hit: Set<number> };
   downed?: boolean;
   /** AI memory. */
-  ai?: { target: number | null; think: number; dodgeThink: number; wanderX: number; wanderY: number; stuck: number };
+  ai?: {
+    target: number | null;
+    think: number;
+    dodgeThink: number;
+    wanderX: number;
+    wanderY: number;
+    stuck: number;
+    /** Heroes: the target's HP when last seen, and how long it hasn't dropped (a shot that can't land). */
+    lastHp?: number;
+    noHitT?: number;
+  };
   // --- mobs
   type?: MobType;
   elite?: boolean;
@@ -194,15 +204,35 @@ export function moveUnit(m: FloorMap, u: Pick<Unit, 'x' | 'y' | 'r' | 'flying'>,
   return moved;
 }
 
-/** Walls between two points? (Water and props don't block sight.) */
+/**
+ * Walls between two points? (Water and props don't block sight.) Walks every tile the line crosses
+ * (not samples along it), so a line that clips a wall's corner is blocked, just as a shot would be.
+ * The tiles the line starts and ends in don't count.
+ */
 export function lineOfSight(m: FloorMap, ax: number, ay: number, bx: number, by: number): boolean {
-  const d = Math.hypot(bx - ax, by - ay);
-  const steps = Math.ceil(d / 6);
-  for (let i = 1; i < steps; i++) {
-    const t = i / steps;
-    const x = ax + (bx - ax) * t;
-    const y = ay + (by - ay) * t;
-    if (tileAt(m, Math.floor(x / TILE), Math.floor(y / TILE)) === 0) return false;
+  let tx = Math.floor(ax / TILE);
+  let ty = Math.floor(ay / TILE);
+  const ex = Math.floor(bx / TILE);
+  const ey = Math.floor(by / TILE);
+  const dx = bx - ax;
+  const dy = by - ay;
+  const stepX = dx > 0 ? 1 : -1;
+  const stepY = dy > 0 ? 1 : -1;
+  const dX = dx !== 0 ? TILE / Math.abs(dx) : Infinity;
+  const dY = dy !== 0 ? TILE / Math.abs(dy) : Infinity;
+  let maxX = dx !== 0 ? (stepX > 0 ? (tx + 1) * TILE - ax : ax - tx * TILE) / Math.abs(dx) : Infinity;
+  let maxY = dy !== 0 ? (stepY > 0 ? (ty + 1) * TILE - ay : ay - ty * TILE) / Math.abs(dy) : Infinity;
+  for (let i = 0; i < 512 && (tx !== ex || ty !== ey); i++) {
+    if (maxX < maxY) {
+      if (maxX > 1) break;
+      maxX += dX;
+      tx += stepX;
+    } else {
+      if (maxY > 1) break;
+      maxY += dY;
+      ty += stepY;
+    }
+    if ((tx !== ex || ty !== ey) && tileAt(m, tx, ty) === 0) return false;
   }
   return true;
 }

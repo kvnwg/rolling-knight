@@ -9,22 +9,36 @@ import { currentLuck } from './core/luck';
 import { newGame, rebirth as doRebirth } from './core/newGame';
 import { runOffline, type OfflineReport } from './core/offline';
 import { perksOpen } from './core/perks';
+import { floorDifficulty, squadPower, type Difficulty } from './core/power';
 import { Rng } from './core/rng';
 import { rollTick } from './core/roller';
 import { bestSquad, fillSquad, goldMult, killGold, knightStats } from './core/roster';
 import { clearSave, loadGame, saveGame } from './core/save';
 import type { GameState } from './core/state';
-import { biomeForFloor, isBossFloor, type Biome } from './world/biomes';
-import { generateFloor } from './world/mapgen';
+import { CAMP_BIOME, biomeForFloor, isBossFloor, type Biome } from './world/biomes';
+import { campMap, generateFloor, type FloorMap } from './world/mapgen';
 import { floorBoss, floorMobs } from './world/mobgen';
 import { World, type HeroSpec } from './world/world';
 
 export type Listener = (e: CoreEvent) => void;
 
+export interface Summoned {
+  knightId: string;
+  mutation: import('./core/state').MutationId | null;
+  oneIn: number;
+  isNew: boolean;
+  mult: number;
+  at: number;
+}
+
+let campMapCache: FloorMap | null = null;
+
 export class Game {
   state: GameState;
   rng: Rng;
   world: World | null = null;
+  /** The current floor's balance: par, the squad's power when it started, and what its foes are built for. */
+  difficulty: Difficulty | null = null;
   biome: Biome;
   offline: OfflineReport | null = null;
   /** Seconds of the floor's fade in or out (the renderer draws it). */
@@ -39,6 +53,13 @@ export class Game {
   /** Bumped whenever something the menus show changes. */
   version = 0;
   paused = false;
+  /** In the dungeon (true) or at camp, the home screen (false). The altar rolls either way. */
+  inDungeon = false;
+  /** The camp scene: the squad round the fire. */
+  camp: World | null = null;
+  private campKey = '';
+  /** The latest summons, newest first (the Summon tab's log). */
+  recent: Summoned[] = [];
 
   constructor(fresh = false) {
     const loaded = fresh ? null : loadGame();
@@ -59,6 +80,8 @@ export class Game {
   emit = (e: CoreEvent): void => {
     if (e.type === 'land') {
       this.version++;
+      this.recent.unshift({ knightId: e.knightId, mutation: e.mutation, oneIn: e.oneIn, isNew: e.result.kind === 'new', mult: e.mult, at: Date.now() });
+      if (this.recent.length > 30) this.recent.length = 30;
       // The tutorial's two big finds go straight into the squad.
       if (e.scripted === 'first' || e.scripted === 'beginner') {
         bestSquad(this.state);
@@ -102,6 +125,7 @@ export class Game {
     const seed = (s.run.biomeSeed ^ Math.imul(floor, 2654435761) ^ Math.imul(s.run.deaths + 1, 40503)) >>> 0;
     const map = generateFloor({ floor, biome, seed, boss });
     const mobTypes = floorMobs(biome, floor, seed);
+    this.difficulty = floorDifficulty(floor, squadPower(s));
     this.world = new World({
       map,
       biome,
@@ -114,6 +138,7 @@ export class Game {
       controlled: s.controlled,
       seed,
       goldPerKill: killGold(floor) * goldMult(s),
+      difficulty: this.difficulty.value,
     });
     this.world.auto = s.settings.autoPlay;
     s.controlled = this.world.controlled;
@@ -166,6 +191,51 @@ export class Game {
     this.version++;
   }
 
+  /** Rebuilds the camp scene when the squad changes. */
+  syncCamp(): void {
+    const key = this.state.squad.join('|') + Object.values(this.state.roster).map((r) => r.mutation ?? '').join('');
+    if (this.camp && key === this.campKey) return;
+    this.campKey = key;
+    campMapCache ??= campMap();
+    this.camp = new World({
+      map: campMapCache,
+      biome: CAMP_BIOME,
+      floor: 0,
+      boss: false,
+      mobTypes: [],
+      bossType: null,
+      squad: this.squadSpecs(),
+      perks: [],
+      controlled: this.state.controlled,
+      seed: 1,
+      goldPerKill: 0,
+      camp: true,
+    });
+  }
+
+  /** Into the dungeon: the floor you left off on (a new one if there's none). */
+  enterDungeon(): void {
+    if (!this.state.squad.some(Boolean)) return;
+    this.inDungeon = true;
+    if (!this.world) this.startFloor(this.state.run.floor);
+    else {
+      this.syncSquad();
+      this.emit({ type: 'floorStart', floor: this.world.floor, biome: this.world.biome.name, boss: this.world.boss });
+    }
+    this.fade = 1;
+    this.fadeDir = -1;
+    this.version++;
+  }
+
+  /** Back to camp: the floor waits as it is. */
+  leaveDungeon(): void {
+    this.inDungeon = false;
+    this.fade = 1;
+    this.fadeDir = -1;
+    this.save();
+    this.version++;
+  }
+
   switchTo(slot: number): void {
     if (this.world?.switchControl(slot)) {
       this.state.controlled = slot;
@@ -186,8 +256,13 @@ export class Game {
     s.playTimeMs += dt * 1000;
     rollTick(s, this.rng, Date.now(), dt, this.emit);
     s.rngState = this.rng.state;
-    // No floor until the squad has someone in it.
-    if (!this.world) {
+    if (!this.inDungeon) {
+      // At camp: the squad round the fire; the dungeon waits.
+      fillSquad(s);
+      this.syncCamp();
+      this.camp?.update(dt);
+    } else if (!this.world) {
+      // No floor until the squad has someone in it.
       fillSquad(s);
       if (s.squad.some(Boolean)) this.startFloor(s.run.floor);
     } else {
@@ -305,6 +380,7 @@ export class Game {
     if (!doRebirth(this.state)) return false;
     this.hpShare.clear();
     this.world = null;
+    this.inDungeon = false;
     this.emit({ type: 'rebirth', count: this.state.rebirths });
     saveGame(this.state);
     this.version++;
@@ -320,6 +396,8 @@ export class Game {
     this.state = newGame();
     this.rng = new Rng(this.state.rngState);
     this.world = null;
+    this.inDungeon = false;
+    this.recent = [];
     this.hpShare.clear();
     this.version++;
   }

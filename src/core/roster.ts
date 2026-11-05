@@ -240,10 +240,6 @@ export function setSquadSlot(state: GameState, slot: number, id: string | null):
   state.squad[slot] = id;
 }
 
-export function squadPower(state: GameState): number {
-  return state.squad.reduce((s, id) => s + (id && state.roster[id] ? knightPower(state, state.roster[id]) : 0), 0);
-}
-
 export function classOf(id: string): ClassId {
   return knightDef(id).cls;
 }
