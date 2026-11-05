@@ -1,14 +1,16 @@
 /**
- * Gold upgrades, laid out as the upgrade map (Dumpster Legend's honeycomb; the screen is
- * src/ui/upgrades/UpgradeMap.tsx, the hex layout src/core/upgradeTree.ts). Every line is a chain of
- * tiers bought in order (Luck I, Luck II, ...), one hex each, and the whole map grows out of Luck I:
- * a line's first tier opens once the tier it hangs off is owned. Gold "special" hexes are one-offs
- * (and the very expensive Extra Reel line). Each tier costs `growth` times the last. Bought with gold
- * within a run; a rebirth resets them.
+ * Gold upgrades, sold by the tinker on two tabs: Luck (the altar's and fortune's lines) and Combat
+ * (the squad's and chance lines). The tinker's counter shows each line as a card
+ * (src/ui/keeper/TinkerShop.tsx); each tab can also be seen as its upgrade map (Dumpster Legend's
+ * honeycomb: src/ui/upgrades/UpgradeMap.tsx, the hex layout src/core/upgradeTree.ts). Every line is a
+ * chain of tiers bought in order (Luck I, Luck II, ...), one hex each, and each tab grows out of its
+ * root: Luck I, and Whetstone I for Combat. A line's first tier opens once the tier it hangs off (in
+ * its own tab) is owned. Gold "special" hexes are one-offs (and the very expensive Extra Reel line).
+ * Each tier costs `growth` times the last. Bought with gold within a run; a rebirth resets them.
  *
  * Four kinds of line:
  *  - the altar's: luck, spins, reels, mutations, bad-luck protection;
- *  - the squad's: damage, HP, speed;
+ *  - the squad's: damage, HP, speed, and Quick Roll (skill rolls spin faster and recharge sooner);
  *  - fortune: gold, Luck Potions, nights away, kills that pay out;
  *  - chance: combat tricks that roll their dice in every fight (a LUCKY hit for x5, a coin flip for
  *    double or nothing, bouncing arrows, foes tripping and fumbling, a second wind). Their numbers are
@@ -25,12 +27,21 @@ export type UpgradeId =
   // fortune
   | 'greed' | 'treasury' | 'coinShower' | 'jackpot' | 'potionTime' | 'offline'
   // the squad
-  | 'might' | 'excalibur' | 'vitality' | 'dragonscale' | 'swiftness' | 'giantSlayer' | 'lifesteal'
+  | 'might' | 'excalibur' | 'vitality' | 'dragonscale' | 'swiftness' | 'quickRoll' | 'giantSlayer' | 'lifesteal'
   // chance
   | 'luckyStrike' | 'doubleOrNothing' | 'twoHeaded' | 'wildMagic' | 'ladyLuck' | 'ricochet' | 'secondWind' | 'butterfingers' | 'pratfall';
 
 /** What a line changes: the altar's rolls, the squad's numbers, gold and fortune, or combat by chance. */
 export type UpgradeKind = 'altar' | 'squad' | 'fortune' | 'chance';
+
+/** The tinker's two tabs: rolling luck (the altar and fortune) and combat (the squad and chance). */
+export type UpgradeTab = 'luck' | 'combat';
+export const UPGRADE_TABS: readonly UpgradeTab[] = ['luck', 'combat'];
+
+/** The tab a line is sold on. */
+export function upgradeTab(def: Pick<UpgradeDef, 'kind'>): UpgradeTab {
+  return def.kind === 'altar' || def.kind === 'fortune' ? 'luck' : 'combat';
+}
 
 export interface UpgradeDef {
   id: UpgradeId;
@@ -47,11 +58,11 @@ export interface UpgradeDef {
   /** What one more tier adds (tier n, 1-based; the old list's line and the tier ladder). */
   text: (tier: number) => string;
   icon: string;
-  /** Hangs off this tier of another line (every line but Luck). */
+  /** Hangs off this tier of another line on its tab (every line but the tabs' roots, Luck and Whetstone). */
   requires?: { id: UpgradeId; tier: number };
   /**
-   * Its hexes on the map, as steps from the hex it hangs off (Luck's from Luck I itself): n, ne, se,
-   * s, sw, nw, with `*k` repeating a step (src/core/upgradeTree.ts).
+   * Its hexes on its tab's map, as steps from the hex it hangs off (a root's from its first tier):
+   * n, ne, se, s, sw, nw, with `*k` repeating a step (src/core/upgradeTree.ts).
    */
   path: string;
   /** A gold hex: a one-off (or the Extra Reel line). */
@@ -116,7 +127,7 @@ export const UPGRADES: UpgradeDef[] = [
     text: () => 'Hourglass spins +50% faster',
   },
   {
-    id: 'extraReel', name: 'Extra Reel', kind: 'altar', group: 'altar', max: 4, cost: 6000, growth: 15, icon: 'reelGold', path: 'nw*4', special: true,
+    id: 'extraReel', name: 'Extra Reel', kind: 'altar', group: 'altar', max: 4, cost: 6000, growth: 15, icon: 'reelPlus', path: 'nw*4', special: true,
     requires: { id: 'luck', tier: 1 },
     desc: 'One more reel on every spin: one more knight each time. Very expensive.',
     text: () => '+1 reel: one more knight every spin',
@@ -182,10 +193,33 @@ export const UPGRADES: UpgradeDef[] = [
     desc: 'The altar and the squad earn more while you are away.',
     text: () => '+40% rolls and gold while away',
   },
-  // ---------------------------------------------------------------- the squad (south and south-west)
+  // ---------------------------------------------------------------- the squad: the Combat tab's root (north and south)
+  {
+    id: 'might', name: 'Whetstone', kind: 'squad', group: 'squad', max: 8, cost: 80, growth: 4.2, icon: 'sword', path: 'n*7',
+    desc: 'The whole squad hits harder. The root of the Combat tab.',
+    text: () => '+18% squad damage',
+  },
+  {
+    id: 'excalibur', name: 'Excalibur', kind: 'squad', group: 'squad', max: 1, cost: 1_500_000, growth: 1, icon: 'excalibur', path: 'n', special: true,
+    requires: { id: 'might', tier: 8 },
+    desc: 'A big damage bonus on top of Whetstone.',
+    text: () => '+30% squad damage',
+  },
+  {
+    id: 'giantSlayer', name: 'Giant Slayer', kind: 'squad', group: 'squad', max: 6, cost: 1500, growth: 3, icon: 'skull', path: 'ne se ne se ne se',
+    requires: { id: 'might', tier: 5 },
+    desc: 'More damage to elites and bosses.',
+    text: () => '+15% damage to elites and bosses',
+  },
+  {
+    id: 'lifesteal', name: 'Leechblade', kind: 'squad', group: 'squad', max: 5, cost: 2000, growth: 3.5, icon: 'drop', path: 'ne se ne se ne',
+    requires: { id: 'might', tier: 7 },
+    desc: 'Every hit heals the knight that landed it a little.',
+    text: () => '+2% of damage dealt heals',
+  },
   {
     id: 'vitality', name: 'Plate Mail', kind: 'squad', group: 'squad', max: 8, cost: 80, growth: 4.2, icon: 'heart', path: 's*8',
-    requires: { id: 'luck', tier: 1 },
+    requires: { id: 'might', tier: 1 },
     desc: 'More HP for the whole squad.',
     text: () => '+18% squad HP',
   },
@@ -202,30 +236,12 @@ export const UPGRADES: UpgradeDef[] = [
     text: () => '+6% move and attack speed',
   },
   {
-    id: 'might', name: 'Whetstone', kind: 'squad', group: 'squad', max: 8, cost: 80, growth: 4.2, icon: 'sword', path: 'sw*8',
-    requires: { id: 'luck', tier: 1 },
-    desc: 'The whole squad hits harder.',
-    text: () => '+18% squad damage',
+    id: 'quickRoll', name: 'Quick Roll', kind: 'squad', group: 'squad', max: 5, cost: 900, growth: 3.4, icon: 'quickRoll', path: 'ne se ne se ne',
+    requires: { id: 'swiftness', tier: 1 },
+    desc: "Your knights' skill rolls spin faster and come round again sooner.",
+    text: () => 'Skill rolls spin 12% faster, cooldown 6% shorter',
   },
-  {
-    id: 'excalibur', name: 'Excalibur', kind: 'squad', group: 'squad', max: 1, cost: 1_500_000, growth: 1, icon: 'excalibur', path: 'sw', special: true,
-    requires: { id: 'might', tier: 8 },
-    desc: 'A big damage bonus on top of Whetstone.',
-    text: () => '+30% squad damage',
-  },
-  {
-    id: 'giantSlayer', name: 'Giant Slayer', kind: 'squad', group: 'squad', max: 6, cost: 1500, growth: 3, icon: 'skull', path: 'nw sw nw sw nw sw',
-    requires: { id: 'might', tier: 5 },
-    desc: 'More damage to elites and bosses.',
-    text: () => '+15% damage to elites and bosses',
-  },
-  {
-    id: 'lifesteal', name: 'Leechblade', kind: 'squad', group: 'squad', max: 5, cost: 2000, growth: 3.5, icon: 'drop', path: 'nw sw nw sw nw',
-    requires: { id: 'might', tier: 7 },
-    desc: 'Every hit heals the knight that landed it a little.',
-    text: () => '+2% of damage dealt heals',
-  },
-  // ---------------------------------------------------------------- chance (west and south)
+  // ---------------------------------------------------------------- chance (west and south-west of Whetstone I)
   {
     id: 'luckyStrike', name: 'Lucky Strike', kind: 'chance', group: 'squad', max: 6, cost: 250, growth: 3.4, icon: 'luckyStrike', path: 'nw sw nw sw nw sw', rolls: true,
     requires: { id: 'might', tier: 1 },
@@ -306,7 +322,7 @@ export function upgradeCost(state: Pick<GameState, 'upgrades'>, id: UpgradeId): 
   return upgradeCostAt(UPGRADES_BY_ID.get(id)!, tier(state, id));
 }
 
-/** True once the tier this line hangs off is owned (Luck is always open). */
+/** True once the tier this line hangs off is owned (the tabs' roots, Luck and Whetstone, are always open). */
 export function upgradeUnlocked(state: Pick<GameState, 'upgrades'>, id: UpgradeId): boolean {
   const def = UPGRADES_BY_ID.get(id);
   if (!def) return false;
@@ -353,6 +369,9 @@ const ORDER: UpgradeDef[] = (() => {
  * clears lines whose parent tier isn't owned (a save from the old flat list). Call it on load.
  */
 export function sanitizeUpgrades(state: Pick<GameState, 'upgrades'>): void {
+  // Before the two tabs, Plate Mail hung off Luck I; now it hangs off Whetstone I (the Combat tab's
+  // root). A save with Plate Mail and no Whetstone keeps it, with Whetstone I on the house.
+  if ((Number(state.upgrades.vitality) || 0) >= 1 && !((Number(state.upgrades.might) || 0) >= 1)) state.upgrades.might = 1;
   const out: Record<string, number> = {};
   for (const def of ORDER) {
     const level = Math.min(def.max, Math.max(0, Math.floor(Number(state.upgrades[def.id]) || 0)));
@@ -360,6 +379,9 @@ export function sanitizeUpgrades(state: Pick<GameState, 'upgrades'>): void {
   }
   state.upgrades = out;
 }
+
+/** Quick Roll, per tier: a skill roll spins this much shorter, and its cooldown this much shorter (percent). */
+export const QUICK_ROLL = { spinPct: 12, cdPct: 6 } as const;
 
 /** Everything the altar, fortune and squad lines do, as numbers (the chance lines: chance.ts). */
 export function upgradeFx(state: Pick<GameState, 'upgrades'>) {
@@ -379,6 +401,9 @@ export function upgradeFx(state: Pick<GameState, 'upgrades'>) {
     hpPct: 18 * t('vitality') + 30 * t('dragonscale'),
     goldPct: 15 * t('greed') + 100 * t('treasury'),
     speedPct: 6 * t('swiftness'),
+    /** Quick Roll: how much shorter a skill roll spins, and how much shorter its cooldown, in percent. */
+    rollSpinPct: QUICK_ROLL.spinPct * t('quickRoll'),
+    skillCdPct: QUICK_ROLL.cdPct * t('quickRoll'),
     offlineEff: 0.4 * t('offline'),
   };
 }

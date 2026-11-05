@@ -7,9 +7,12 @@ graveyards, lava caves, crystal grottoes, moonlit shrines), control one knight a
 fight by their class; when its cooldown is up in a fight, each knight rolls a random skill from its
 class's list and fires it. Between dives
 you walk round the hub, a lamplit square before the Gilded Reel, where each keeper runs one counter:
-the Oracle's altar, the smith, the junk dealer, the quartermaster, the tinker's hex map of upgrades
-(with chance upgrades like Ricochet and Double or Nothing), the sage, the rebirth shrine, the notice
-board, and the warden by the steps down: walk down them to dive. Above all of them, at 1 in 2.5 billion, sits the Absolute tier and its one knight: Kevin, a
+the Oracle's altar, the smith, the junk dealer, the quartermaster, the tinker's upgrades on two tabs,
+Luck and Combat (with chance upgrades like Ricochet and Double or Nothing, and Quick Roll for faster
+skill rolls), the sage, the rebirth shrine, the notice board, and the warden by the steps down: walk
+down them to dive. Talk to a keeper and their screen opens with them big at their counter, lamplit
+among the things of their trade, and their wares below as cards on beige paper: a picture, a level,
+a number or two and a price, the details a tap away. Above all of them, at 1 in 2.5 billion, sits the Absolute tier and its one knight: Kevin, a
 black-haired normal guy and the strongest in the game by far. Duplicates become shards or gold;
 shards level your knights. Rebirth
 for permanent luck and power; perks from the first rebirth change how a run plays. Folk on the floors
@@ -67,7 +70,12 @@ recording: [`docs/SOUNDS.md`](docs/SOUNDS.md).
 - The UI wears the medieval pack's materials, painted in code at startup (`src/ui/skin.ts`): bevelled
   wooden, brass, crimson, steel and arcane buttons with a lip; dark plates with iron bolts; the pack's
   copper-rimmed bars; parchment cards; octagonal iron ability slots that turn brass when ready; wax
-  seals for difficulty.
+  seals for difficulty. The keepers' screens (`src/ui/keeper/`) are lighter: beige paper in a dark
+  brown border with torn corners, green tabs and buttons, slots pressed into the paper, dark brown
+  pixel text, and icons and numbers instead of sentences. Each keeper's scene across the top is
+  painted and lit in code (`src/render/art/keepers/`: the keeper's bust from their hub look, their
+  trade round them, lamps, candles, coals and glowing glass in stepped pools of warm light), at a
+  whole number of screen pixels per art pixel; `keepers-preview.html` shows them all.
 
 ## The sound
 
@@ -120,13 +128,13 @@ as usual). `?fresh` starts a new game. The game is on
 npm test
 ```
 
-144 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
+237 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
 timing, extra reels, the tutorial's scripted rolls, bad-luck protection, Lucky Spins, duplicates,
 shards, selling, levels and reforging, Humble Beginnings' 3x, rebirth; every biome's floors fully
 connected with spawns reachable and deterministic by seed, mob and boss design, a squad clearing a
 floor on Auto, auto attacks, dodge invulnerability, skill rolls and their odds, Rewind, the balance
-curve, the camera, the weather, the hub's map and keepers, folk and quests, the upgrade map and every
-chance upgrade in a fight, a full game starting up; and the PixelForge art: every sheet holding what
+curve, the camera, the weather, the hub's map and keepers, folk and quests, the two upgrade maps, Quick Roll and every
+chance upgrade in a fight, the keepers' scenes and cards, a full game starting up; and the PixelForge art: every sheet holding what
 the game plays in four directions, the body plan to monster mapping, the material recolors, every
 rarity's and mutation's ramps, and the animations the sim's state picks (attacks on the hit's tick,
 windups over the mobs' telegraphs, dodges, walks stepped by distance, deaths and revives); and the

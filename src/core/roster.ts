@@ -56,7 +56,10 @@ export interface KnightStats {
   atkCd: number;
   range: number;
   dodgeCd: number;
+  /** Seconds between skill rolls (Quick Roll shortens it). */
   specialCd: number;
+  /** A skill roll's spin, as a share of the usual (world/skills.ts ROLL_TIME): Quick Roll shortens it. */
+  rollTimeMult: number;
 }
 
 /** A knight's stats in the dungeon (before effects that depend on the moment, like Berserker). */
@@ -77,7 +80,8 @@ export function knightStats(state: GameState, id: string): KnightStats {
   if (hasPerk(state, 'rollDancer')) atkCd *= 1.2;
   let dodgeCd = cls.dodgeCd;
   if (hasPerk(state, 'rollDancer')) dodgeCd *= 0.5;
-  return { hp, atk, armor: cls.armor, speed: cls.speed * speedMult, atkCd, range: cls.range, dodgeCd, specialCd: skillRollCd(id) };
+  const specialCd = skillRollCd(id) * (1 - up.skillCdPct / 100);
+  return { hp, atk, armor: cls.armor, speed: cls.speed * speedMult, atkCd, range: cls.range, dodgeCd, specialCd, rollTimeMult: 1 - up.rollSpinPct / 100 };
 }
 
 // ------------------------------------------------------------------ duplicates

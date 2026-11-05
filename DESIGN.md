@@ -89,7 +89,9 @@ and Mythic or better.
 
 - **Skill rolls** (`src/core/skillbook.ts`, `src/world/skills.ts`). There is no fixed special: the
   skill button spins a 0.7 s reel over the class's list and fires whatever it lands on (the result is
-  fixed when the spin starts, as at the altar); then the cooldown starts. Allies roll on their own
+  fixed when the spin starts, as at the altar); then the cooldown starts. Quick Roll (the tinker's
+  Combat tab, 5 tiers off Swift Boots I) makes each tier's spin 12% shorter and the cooldown 6%
+  shorter (at 5 tiers: a 0.28 s spin, cooldowns 30% shorter). Allies roll on their own
   when the moment suits their role. Each class has six skills; at luck 1 they weigh 30, 26, 20, 13, 8
   and 3 in 100 (two commons, an uncommon, a rare, an epic, a legendary), and luck tilts them rarer
   (weight × luck^(0.1 × tier step), luck capped at 1000; Loaded Dice adds to it). Epic and up chain
@@ -117,6 +119,16 @@ Auto hands your knight to the AI too (and it is on while a menu is open). Empty 
 strongest free knight; anything else is your call (or Best squad), at the quartermaster in the hub.
 The squad is locked in the dungeon: knights rolled during a dive wait at the hub, and to change who
 fights (or spend anything) you head back up, or fall.
+
+## 6b. The tinker's upgrades
+
+`src/core/upgrades.ts`. Gold buys tiers of upgrade lines at Tinker Pell's counter, on two tabs:
+**Luck** (the altar's lines: luck, spins, reels, mutations, bad-luck protection, Loaded Dice; and
+fortune's: gold, Luck Potions, nights away, kills that pay out) and **Combat** (the squad's: damage,
+HP, speed, Quick Roll; and the chance lines that roll their dice in every fight). Each tab grows from
+its own root, Luck I and Whetstone I: a line opens once the tier it hangs off (always on its own
+tab) is owned, and each tier costs its line's growth times the last. Each tab is also an upgrade map
+(Dumpster Legend's honeycomb, `src/core/upgradeTree.ts`), one hex a tier. A rebirth resets them.
 
 ## 7. The dungeon
 

@@ -58,6 +58,8 @@ export interface Unit {
   dodgeT?: number;
   specialCd?: number;
   specialT?: number;
+  /** A skill roll's spin, as a share of ROLL_TIME (Quick Roll shortens it; 1 when left out). */
+  rollTimeMult?: number;
   /** An active dodge: direction, time left, speed. */
   rolling?: { dx: number; dy: number; t: number; dur: number; speed: number; kind: 'roll' | 'blink' | 'vault' | 'flip'; hit: Set<number> };
   /**
