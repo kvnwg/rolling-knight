@@ -101,18 +101,18 @@ export const BAL = {
     parBase: 750,
     parGrowth: 1.1,
     /**
-     * (Both a little under what they were, 1.4 s and 5% for a plain foe: foes now come at you faster,
-     * lunge, shoot readable volleys and keep their distance, so they land more blows and take longer to
-     * pin down; each blow and each foe is a little lighter to keep a floor's fight about as long.)
+     * Quick, dangerous fights: a plain foe goes down fast (0.6 s of the squad's damage, so a couple
+     * of your knight's hits) and every one of its blows hurts (8.5% of a knight). Elites and bosses
+     * last longer and hit harder. (Neither sponges nor pushovers.)
      */
-    ttk: { mob: 1.3, elite: 5.2, boss: 28 },
-    hit: { mob: 0.04, elite: 0.064, boss: 0.1 },
+    ttk: { mob: 0.6, elite: 2.6, boss: 18 },
+    hit: { mob: 0.085, elite: 0.12, boss: 0.15 },
     /**
-     * The first floors bite harder than par alone would say (a fresh squad, usually ahead of par, would
-     * otherwise stroll through them): on floor 1 foes hit `hit` more and take `ttk` longer to kill,
-     * fading evenly to the plain targets by floor `until`.
+     * The first floors bite a little harder than par alone would say (a fresh squad is usually ahead of
+     * par there): on floor 1 foes hit `hit` more and take `ttk` longer to kill, fading evenly to the
+     * plain targets by floor `until`.
      */
-    early: { until: 10, hit: 0.5, ttk: 0.3 },
+    early: { until: 10, hit: 0.2, ttk: 0.1 },
     aboveExp: 0.6,
     belowExp: 0.2,
     minBand: 0.5,

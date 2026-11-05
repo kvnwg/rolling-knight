@@ -222,11 +222,11 @@ there: 750 on floor 1, then x1.1 a floor). When a floor starts, its foes are bui
 par at par; above par they grow by (power / par)^0.6, so a squad four times par clears about 1.7x
 faster, not four times, and nothing folds in one hit; below par they shrink only by (power / par)^0.2,
 so the wall is real. Foes come from targets, not raw numbers: at their difficulty a plain foe takes
-1.3 s of the squad's damage and each hit takes 4% of a knight's HP (elites 5.2 s and 6.4%, bosses
-28 s and 10%), and each foe type keeps its shape against the plain chaser (a tank has three times
+0.6 s of the squad's damage and each hit takes 8.5% of a knight's HP (elites 2.6 s and 12%, bosses
+18 s and 15%): quick, dangerous fights, neither sponges nor pushovers, and each foe type keeps its shape against the plain chaser (a tank has three times
 its HP). (Each blow is lighter than it used to be because monsters now land many more: lunges,
 volleys, quicker feet.) The first floors bite harder than par alone would say (a new squad is usually
-well ahead of it there): on floor 1 foes hit 50% harder and take 30% longer to kill, fading to the
+well ahead of it there): on floor 1 foes hit 20% harder and take 10% longer to kill, fading to the
 plain targets by floor 10 (`BAL.balance.early`). The camp and the gate show Power against par with a
 wax seal: Deadly, Hard, Fair, Easy, Trivial. `npm run sim` plays the real game on Auto and logs power
 against par floor by floor.

@@ -53,7 +53,7 @@ describe('difficulty', () => {
   });
 
   // The first floors were a stroll (a fresh squad is usually well ahead of par there), so they bite
-  // harder now: on floor 1 foes hit 50% harder and last 30% longer (BAL.balance.early), fading evenly
+  // harder: on floor 1 foes hit 20% harder and last 10% longer (BAL.balance.early), fading evenly
   // to the plain targets above by floor 10.
   it('the first floors bite harder and last longer, fading to the plain targets by early.until', () => {
     expect(earlyBoost(1)).toEqual({ hit: 1 + B.early.hit, ttk: 1 + B.early.ttk });
@@ -73,19 +73,20 @@ describe('difficulty', () => {
       expect(r.mob.hit).toBeCloseTo(B.hit.mob * e.hit, 5);
       expect(r.boss.ttk).toBeCloseTo(B.ttk.boss * e.ttk, 5);
     }
-    // Still fair: floor 1's plain foe at par takes under 2 s to fell and under a tenth of a knight a hit.
-    expect(fightReport(1, floorPar(1)).mob.ttk).toBeLessThan(2);
-    expect(fightReport(1, floorPar(1)).mob.hit).toBeLessThan(0.1);
+    // Quick and dangerous, not unfair: floor 1's plain foe at par falls in under a second of the squad's
+    // damage and takes about a tenth of a knight a hit.
+    expect(fightReport(1, floorPar(1)).mob.ttk).toBeLessThan(1);
+    expect(fightReport(1, floorPar(1)).mob.hit).toBeLessThan(0.13);
   });
 
-  it('a squad far above par still meets foes worth fighting (nothing folds in one hit)', () => {
-    // Ten times par (the tutorial's Exalted on floor 1 is about 2.4x).
+  it('a squad far above par mows plain foes down, but a boss is still a fight', () => {
+    // Ten times par.
     const r = fightReport(3, floorPar(3) * 10);
     expect(r.challenge).toBe('trivial');
-    // A one-hit kill would be well under a tenth of a second of the whole squad's damage.
-    expect(r.mob.ttk).toBeGreaterThan(0.5);
-    expect(r.mob.hit).toBeGreaterThan(0.015);
-    expect(r.boss.ttk).toBeGreaterThan(10);
+    // Not quite nothing: a hit or so of your knight's, and a scratch when they land.
+    expect(r.mob.ttk).toBeGreaterThan(0.15);
+    expect(r.mob.hit).toBeGreaterThan(0.02);
+    expect(r.boss.ttk).toBeGreaterThan(5);
     // ...but being stronger always pays: faster than par, and smaller hits.
     expect(r.mob.ttk).toBeLessThan(B.ttk.mob);
     expect(r.mob.hit).toBeLessThan(B.hit.mob);
