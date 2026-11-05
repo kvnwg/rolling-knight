@@ -111,7 +111,7 @@ export const BAL = {
      * otherwise stroll through them): on floor 1 foes hit `hit` more and take `ttk` longer to kill,
      * fading evenly to the plain targets by floor `until`.
      */
-    early: { until: 10, hit: 0.25, ttk: 0.15 },
+    early: { until: 10, hit: 0.5, ttk: 0.3 },
     aboveExp: 0.6,
     belowExp: 0.2,
     minBand: 0.5,

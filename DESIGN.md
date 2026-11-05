@@ -214,7 +214,7 @@ so the wall is real. Foes come from targets, not raw numbers: at their difficult
 28 s and 10%), and each foe type keeps its shape against the plain chaser (a tank has three times
 its HP). (Each blow is lighter than it used to be because monsters now land many more: lunges,
 volleys, quicker feet.) The first floors bite harder than par alone would say (a new squad is usually
-well ahead of it there): on floor 1 foes hit 25% harder and take 15% longer to kill, fading to the
+well ahead of it there): on floor 1 foes hit 50% harder and take 30% longer to kill, fading to the
 plain targets by floor 10 (`BAL.balance.early`). The camp and the gate show Power against par with a
 wax seal: Deadly, Hard, Fair, Easy, Trivial. `npm run sim` plays the real game on Auto and logs power
 against par floor by floor.

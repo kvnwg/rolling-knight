@@ -54,7 +54,7 @@ describe('difficulty', () => {
   });
 
   // The first floors were a stroll (a fresh squad is usually well ahead of par there), so they bite
-  // harder now: on floor 1 foes hit 25% harder and last 15% longer (BAL.balance.early), fading evenly
+  // harder now: on floor 1 foes hit 50% harder and last 30% longer (BAL.balance.early), fading evenly
   // to the plain targets above by floor 10.
   it('the first floors bite harder and last longer, fading to the plain targets by early.until', () => {
     expect(earlyBoost(1)).toEqual({ hit: 1 + B.early.hit, ttk: 1 + B.early.ttk });
