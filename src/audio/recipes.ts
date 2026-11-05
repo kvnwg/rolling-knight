@@ -161,6 +161,18 @@ export const RECIPES: Record<FightCue, Recipe> = {
     hiss(v, 0.1, { type: 'highpass', f: 2200, to: 8000, gain: 0.12, attack: 0.02 });
     bell(v, midi(100), 0.22, 0.03, { dt: 0.06 });
   },
+  perfect_roll: (v) => {
+    // Level 1: the knight you steer (the zip and three bells); less: a squadmate's (one soft bell).
+    if (v.level < 0.5) {
+      bell(v, midi(88), 0.35, 0.03);
+      return;
+    }
+    tone(v, midi(76), 0.07, { type: 'triangle', to: midi(91), gain: 0.05 });
+    bell(v, midi(88), 0.55, 0.075, { dt: 0.03 });
+    bell(v, midi(91), 0.55, 0.065, { dt: 0.07 });
+    bell(v, midi(96), 0.8, 0.05, { dt: 0.11 });
+    hiss(v, 0.3, { type: 'highpass', f: 7000, gain: 0.05, attack: 0.005, dt: 0.02 });
+  },
   revive: (v) => {
     [72, 76, 79, 84].forEach((n, k) => ping(v, midi(n), 0.45, 0.05, { dt: k * 0.055 }));
     tone(v, midi(60), 0.35, { type: 'triangle', to: midi(72), gain: 0.03, attack: 0.05 });

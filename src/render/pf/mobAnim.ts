@@ -2,10 +2,14 @@
  * Which PixelForge frame a mob shows, read from the sim every frame (nothing here changes the sim).
  * The mob's attack plays over the game's own timing: its windup frames are stretched over the
  * wind-up (windT counting down from windDur: the telegraph the game already gives), the strike frame
- * shows on the tick the sim deals the hit (swingT jumps), then the recovery plays. A charge loops
- * its rush (the Stone Warden's charge frames, a wolf's run) while chargeT lasts. Bosses play the
- * move they wind up (ring, fan, charge, slam, summon, rain) and roar when they enrage. Deaths play
- * out after the sim has let go of the mob (see the renderer's corpses).
+ * shows on the tick the sim deals the hit (swingT jumps), then the recovery plays. Lunges (ai.ts) use
+ * frames the sheets already have: the crouch is the lunge's windup frames, a dash holds its strike
+ * frame (a goblin's stab, a skeleton's thrust, a bat's dive) or runs (a charge: a wolf's run, an orc's
+ * stride, the Stone Warden's rush frames), a leap holds a frame in the air (an ogre's club overhead, a
+ * slime stretched tall, a wolf crouched then biting) and lands on the strike frame. The renderer moves
+ * the whole body on top (mobMotion.ts: the crouch, the arc, the squash). Bosses play the move they
+ * wind up (ring, fan, charge, slam, summon, rain, leap) and roar when they enrage. Deaths play out
+ * after the sim has let go of the mob (see the renderer's corpses).
  */
 import type { Unit } from '../../world/entities';
 import type { World } from '../../world/world';
@@ -26,19 +30,27 @@ interface Kit {
   bomb?: string;
   death: string;
   stun?: string;
+  /** A lunge's anim (its crouch, its flight and its landing); the melee's when left out. */
+  lunge?: string;
+  /** What a dash shows: the lunge's strike frame held (the default), or its gait run fast ('run'). */
+  dash?: 'hold' | 'run';
+  /** The lunge anim's frame a leap holds in the air; by default its last windup frame going up and its strike frame coming down. */
+  air?: number;
+  /** A throw's anim (its raise over the wind-up, its release). */
+  throw?: string;
 }
 
 const KITS: Record<MonsterId, Kit> = {
-  slime: { walk: 'move', cycle: 14, melee: 'attack_slam', ranged: 'attack_spit', bomb: 'attack_spit', death: 'death' },
-  bat: { walk: 'idle', cycle: 0, melee: 'attack_swoop', death: 'death' },
-  wolf: { walk: 'walk', cycle: 11, run: 'run', runCycle: 22, melee: 'attack_bite', death: 'death' },
-  frost_wolf: { walk: 'walk', cycle: 11, run: 'run', runCycle: 22, melee: 'attack_bite', death: 'death' },
-  goblin: { walk: 'walk', cycle: 7, melee: 'attack_slash', death: 'death' },
-  goblin_chief: { walk: 'walk', cycle: 7, melee: 'attack_slash', death: 'death' },
+  slime: { walk: 'move', cycle: 14, melee: 'attack_slam', ranged: 'attack_spit', bomb: 'attack_spit', death: 'death', lunge: 'attack_slam', air: 2 },
+  bat: { walk: 'idle', cycle: 0, melee: 'attack_swoop', death: 'death', lunge: 'attack_swoop' },
+  wolf: { walk: 'walk', cycle: 11, run: 'run', runCycle: 22, melee: 'attack_bite', death: 'death', lunge: 'attack_bite' },
+  frost_wolf: { walk: 'walk', cycle: 11, run: 'run', runCycle: 22, melee: 'attack_bite', death: 'death', lunge: 'attack_bite' },
+  goblin: { walk: 'walk', cycle: 7, melee: 'attack_slash', death: 'death', lunge: 'attack_slash' },
+  goblin_chief: { walk: 'walk', cycle: 7, melee: 'attack_slash', death: 'death', lunge: 'attack_slash' },
   goblin_archer: { walk: 'walk', cycle: 7, melee: 'shoot_bow', ranged: 'shoot_bow', death: 'death' },
-  orc: { walk: 'walk', cycle: 10, melee: 'attack_slash', death: 'death', stun: 'stun' },
-  skeleton: { walk: 'walk', cycle: 10, melee: 'attack_slash', death: 'death_crumble', stun: 'stun' },
-  ogre: { walk: 'walk', cycle: 15, melee: 'attack_heavy', death: 'death' },
+  orc: { walk: 'walk', cycle: 10, melee: 'attack_slash', death: 'death', stun: 'stun', lunge: 'attack_heavy', dash: 'run' },
+  skeleton: { walk: 'walk', cycle: 10, melee: 'attack_slash', death: 'death_crumble', stun: 'stun', lunge: 'attack_slash' },
+  ogre: { walk: 'walk', cycle: 15, melee: 'attack_heavy', death: 'death', lunge: 'attack_heavy', throw: 'attack_heavy' },
   stone_warden: { walk: 'walk', cycle: 16, melee: 'attack_slam', death: 'death' },
 };
 
@@ -55,7 +67,11 @@ export const BOSS_ANIM: Record<string, string> = {
   slam: 'attack_slam',
   summon: 'summon',
   rain: 'stomp',
+  leap: 'attack_slam',
 };
+
+/** Moves whose aim follows the target through the first half of the wind-up (the sprite turns with it). */
+const AIMED: ReadonlySet<string> = new Set(['dash', 'charge', 'leap']);
 
 /** The animation a mob plays for one of the game's moves. */
 export function moveAnim(monster: MonsterId, move: string | undefined, boss: boolean): string {
@@ -63,6 +79,8 @@ export function moveAnim(monster: MonsterId, move: string | undefined, boss: boo
   if (boss && move && BOSS_ANIM[move]) return BOSS_ANIM[move];
   if (move === 'shoot' || move === 'cast') return kit.ranged ?? kit.melee;
   if (move === 'bomb') return kit.bomb ?? kit.melee;
+  if (move === 'dash' || move === 'charge' || move === 'leap') return kit.lunge ?? kit.melee;
+  if (move === 'throw') return kit.throw ?? kit.melee;
   return kit.melee;
 }
 
@@ -138,9 +156,10 @@ function towardHero(w: World, m: Unit, cur: Dir): Dir {
   return best ? facing(best.x - m.x, best.y - m.y) : cur;
 }
 
-/** Where the move aims: a charge's heading, a shot's target, else the nearest knight. */
+/** Where the move aims: a dash's or a charge's heading, a leap's landing spot, a shot's target, else the nearest knight. */
 function moveDir(w: World, m: Unit, cur: Dir): Dir {
-  if (m.move === 'charge' && (m.moveX || m.moveY)) return facing(m.moveX!, m.moveY!);
+  if ((m.move === 'charge' || m.move === 'dash') && (m.moveX || m.moveY)) return facing(m.moveX!, m.moveY!);
+  if (m.move === 'leap' && m.spotX !== undefined && m.spotY !== undefined && (m.spotX !== m.x || m.spotY !== m.y)) return facing(m.spotX - m.x, m.spotY - m.y);
   if ((m.move === 'shoot' || m.move === 'cast') && m.moveX !== undefined && m.moveY !== undefined) return facing(m.moveX - m.x, m.moveY - m.y);
   return towardHero(w, m, cur);
 }
@@ -207,12 +226,13 @@ export function mobPose(w: World, m: Unit, monster: MonsterId, sheetName: SheetN
     s.wind = null;
   }
   s.swingT = m.swingT;
-  const charging = !!(m.chargeT && m.chargeT > 0);
+  const charging = !!m.rush;
   if (s.charging && !charging) s.chargeEnd = now;
   s.charging = charging;
   if ((m.bossPhase ?? 0) > s.phase) s.enrageAt = now;
   s.phase = m.bossPhase ?? 0;
   const busy = windT > 0 || charging;
+  const spent = (m.recoverT ?? 0) > 0;
   const hit = now - s.hurtAt;
   // A flash per hit, but a boss (or an elite) taking a squad's blows doesn't strobe: at most one
   // short flash every so often.
@@ -238,8 +258,9 @@ export function mobPose(w: World, m: Unit, monster: MonsterId, sheetName: SheetN
     const f = clip('hurt', s.dir);
     return out('hurt', s.dir, f[Math.min(1, f.length - 1)][0], { stunned: true });
   }
-  // --- a wind-up: the windup frames over the game's telegraph
+  // --- a wind-up: the windup frames over the game's telegraph (a lunge turns with its aim while it tracks)
   if (windT > 0 && s.wind) {
+    if (s.wind.move && AIMED.has(s.wind.move)) s.wind.dir = moveDir(w, m, s.wind.dir);
     const { anim, dir } = s.wind;
     const f = clip(anim, dir);
     const st = strikeOf(sheet, anim);
@@ -248,18 +269,32 @@ export function mobPose(w: World, m: Unit, monster: MonsterId, sheetName: SheetN
     // A charge's windup ends on its last tell frame (the rush comes with the move).
     return out(anim, dir, f[at(f.slice(0, Math.max(1, st)), p * total)][0]);
   }
-  // --- a charge: the rush loops while it lasts
-  if (charging) {
-    const dir = m.moveX || m.moveY ? facing(m.moveX ?? 0, m.moveY ?? 0) : s.dir;
-    const a = sheet.meta.anims.charge;
-    if (a?.loopFrames && m.boss) {
+  // --- a dash or a leap in flight
+  const r = m.rush;
+  if (r) {
+    const dir = r.x1 !== r.x0 || r.y1 !== r.y0 ? facing(r.x1 - r.x0, r.y1 - r.y0) : s.dir;
+    const p = Math.min(1, r.t / Math.max(0.01, r.dur));
+    // A boss's charge: the Stone Warden's own rush frames, looped.
+    const ca = sheet.meta.anims.charge;
+    if (m.boss && r.move === 'charge' && ca?.loopFrames) {
       const f = clip('charge', dir);
-      const lf = a.loopFrames;
-      const i = lf[Math.floor((now * 1000) / f[lf[0]][1]) % lf.length];
-      return out('charge', dir, f[i][0]);
+      const lf = ca.loopFrames;
+      return out('charge', dir, f[lf[Math.floor((now * 1000) / f[lf[0]][1]) % lf.length]][0]);
     }
-    const run = kit.run && sheet.has(kit.run) ? kit.run : kit.walk;
-    return out(run, dir, loop(run, dir, now * 1000 * 1.6));
+    const anim = moveAnim(monster, r.move, !!m.boss);
+    const f = clip(anim, dir);
+    const st = Math.min(f.length - 1, strikeOf(sheet, anim));
+    if (r.kind === 'dash') {
+      // A charge runs (its run, or its walk at a sprint); a dash holds its strike (a stab, a thrust, a dive).
+      if (r.move === 'charge' || kit.dash === 'run') {
+        const run = kit.run && sheet.has(kit.run) ? kit.run : kit.walk;
+        return out(run, dir, loop(run, dir, now * 1000 * 1.8));
+      }
+      return out(anim, dir, f[st][0]);
+    }
+    // A leap: the kit's frame held in the air, or its last windup frame and, about to land, the strike.
+    const i = kit.air !== undefined && !m.boss ? kit.air : p < 0.7 ? Math.max(0, st - 1) : st;
+    return out(anim, dir, f[Math.min(f.length - 1, i)][0]);
   }
   // --- the strike and its recovery (after a charge, from where the rush ended)
   if (s.strike) {
@@ -269,7 +304,8 @@ export function mobPose(w: World, m: Unit, monster: MonsterId, sheetName: SheetN
     const u = (now - (charged ? s.chargeEnd : s.strike.at)) * 1000;
     const lf = sheet.meta.anims[anim]?.loopFrames;
     const rest = anim === 'charge' && lf ? f.slice(Math.max(...lf) + 1) : f.slice(strikeOf(sheet, anim));
-    if (u < clipMs(rest) && !(s.speed > 8 && u > 120)) return out(anim, dir, rest[at(rest, u)][0]);
+    // (Cut short if it sets off walking again; not while it stands spent after a lunge, still sliding to a stop.)
+    if (u < clipMs(rest) && !(s.speed > 8 && u > 120 && !spent)) return out(anim, dir, rest[at(rest, u)][0]);
     s.strike = null;
   }
   // --- a boss's roar at half HP
@@ -283,7 +319,7 @@ export function mobPose(w: World, m: Unit, monster: MonsterId, sheetName: SheetN
     return out('hurt', s.dir, f[at(f, hit * 1000)][0]);
   }
   // --- moving: steps by distance, so the feet stay planted
-  const moving = (m.moving || s.speed > 6) && s.speed > 3;
+  const moving = !spent && (m.moving || s.speed > 6) && s.speed > 3;
   if (moving) {
     const dir = travelDir(s.vx, s.vy, s.dir);
     const { anim, cyc } = gait(sheet, kit, s.speed);

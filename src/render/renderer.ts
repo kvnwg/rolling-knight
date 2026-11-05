@@ -6,7 +6,7 @@
 import type { Game } from '../game';
 import { RARITY_COLOR } from '../core/rarity';
 import { BIOMES, type Biome } from '../world/biomes';
-import type { Area, Fx, Shot, Unit } from '../world/entities';
+import { norm, type Area, type FloatText, type Fx, type Shot, type Unit } from '../world/entities';
 import { TILE, type FloorMap, type Prop } from '../world/mapgen';
 import type { World } from '../world/world';
 import { flash, makeCanvas, mixHex, shade, toCanvas } from './art/draw';
@@ -33,13 +33,228 @@ import type { Sky } from '../world/sky';
 import { npcFrame, questMarker } from './art/npcs';
 import { npcMarker } from '../world/npcs';
 import { pfReady, SHEETS, type SheetName } from './pf/assets';
-import { frameCanvas, frameMask, haloCanvas, haloSpot, haloWidth, headTop } from './pf/frames';
+import { frameBuf as pfFrameBuf, frameCanvas, frameMask, haloCanvas, haloSpot, haloWidth, headTop, type Paint } from './pf/frames';
 import { heroPose, pruneHeroes, type HeroPose } from './pf/heroAnim';
 import { knightPaint, paintStep } from './pf/knightLook';
 import { deathPoofMs, deathPose, lastMoveOf, mobDirOf, mobPose, pruneMobs } from './pf/mobAnim';
 import { mobPaint, type MobPaint } from './pf/mobLook';
 import { facing, type Dir } from './pf/sheet';
 import { Vfx } from './vfx/vfx';
+import { boulderAt, isStill, mobMotion, type MobMotion } from './mobMotion';
+import { BOMB_R, BOSS_SLAM_R, SLAM_R, lobRadius, lungeOf } from '../world/ai';
+import { blank, rot90, type PixelBuf } from './pixel/buf';
+
+/** A sprite's opaque body box, in its own pixels (inclusive). */
+interface Box {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/** The opaque pixels' box of a buffer (its soft shadow, alpha under 255, left out); the whole buffer if it's empty. */
+function opaqueBox(b: PixelBuf): Box {
+  let x0 = b.w;
+  let y0 = b.h;
+  let x1 = -1;
+  let y1 = -1;
+  for (let y = 0; y < b.h; y++) {
+    for (let x = 0; x < b.w; x++) {
+      if (b.px[(y * b.w + x) * 4 + 3] !== 255) continue;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+    }
+  }
+  return x1 < 0 ? { x0: 0, y0: 0, x1: b.w - 1, y1: b.h - 1 } : { x0, y0, x1, y1 };
+}
+
+/** PERFECT!'s fill, one color per glyph row: white at the top, through gold to amber, per face. */
+const PERFECT_FILL = {
+  small: ['#ffffff', '#fff2b0', '#ffe27a', '#ffd04a', '#f0a830'],
+  big: ['#ffffff', '#fff6c8', '#ffe27a', '#ffd04a', '#ffb83a', '#f59a2a', '#e07a1e'],
+  huge: ['#ffffff', '#ffffff', '#fff6c8', '#ffe27a', '#ffd04a', '#ffc040', '#ffb03a', '#f59a2a', '#e07a1e'],
+} as const;
+
+/**
+ * A chunk of the floor an ogre tears up to throw, `size` px across: a rough lump of rock in the
+ * biome's stone (its path's colors, pulled toward plain rock greys so it reads on any floor), lit from
+ * the top left, with the biome's ground (grass, snow, sand, moss) still on top and a crack across it.
+ */
+function boulderBuf(b: Biome, size: number): PixelBuf {
+  const w = size;
+  const h = size - 1;
+  const out = blank(w, h);
+  const path = b.path.ramp;
+  const pick = (i: number) => path[Math.min(path.length - 1, i)];
+  const stone = [mixHex(pick(0), '#3e3834', 0.45), mixHex(pick(1), '#625c54', 0.45), mixHex(pick(2), '#8a8478', 0.45), mixHex(pick(3), '#b4aea2', 0.45)];
+  const turf = [b.ground.ramp[Math.min(2, b.ground.ramp.length - 1)], b.ground.ramp[b.ground.ramp.length - 1]];
+  const cx = (w - 1) / 2;
+  const cy = (h - 1) / 2 + 0.4;
+  const inside = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h && ((x - cx) / (w / 2)) ** 2 + ((y - cy) / (h / 2)) ** 2 <= 0.9 + ((x * 7 + y * 13) % 5) * 0.035;
+  const edge = (x: number, y: number) => !inside(x - 1, y) || !inside(x + 1, y) || !inside(x, y - 1) || !inside(x, y + 1);
+  const set = (x: number, y: number, hex: string) => {
+    const [r, g, bl] = rgb(hex);
+    out.px.set([r, g, bl, 255], (y * w + x) * 4);
+  };
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!inside(x, y)) continue;
+      if (edge(x, y)) {
+        set(x, y, '#1a1326');
+        continue;
+      }
+      const l = -((x - cx) / (w / 2)) * 0.45 - ((y - cy) / (h / 2)) * 0.75;
+      set(x, y, stone[l > 0.45 ? 3 : l > 0.05 ? 2 : l > -0.4 ? 1 : 0]);
+    }
+  }
+  // The ground it was torn from, still on top: the first row of rock in each column (two rows in the middle).
+  for (let x = 1; x < w - 1; x++) {
+    let y = 0;
+    while (y < h && !(inside(x, y) && !edge(x, y))) y++;
+    if (y >= h - 2) continue;
+    set(x, y, turf[1]);
+    if (Math.abs(x - cx) < w * 0.3 && inside(x, y + 1) && !edge(x, y + 1)) set(x, y + 1, turf[0]);
+  }
+  // A crack.
+  const c0 = Math.round(cx) - 1;
+  const c1 = Math.round(cy) + 1;
+  if (inside(c0, c1) && !edge(c0, c1) && inside(c0 + 1, c1 + 1) && !edge(c0 + 1, c1 + 1)) {
+    set(c0, c1, stone[0]);
+    set(c0 + 1, c1 + 1, stone[0]);
+  }
+  return out;
+}
+
+/** The warning red at a lightness `l` (0 to 1): dark blood red in the shadows, hot red in the middle, salmon in the lights. */
+function warnRed(l: number): [number, number, number] {
+  const k = Math.max(0, Math.min(1, l));
+  return k < 0.5
+    ? [Math.round(96 + (238 - 96) * (k / 0.5)), Math.round(10 + (34 - 10) * (k / 0.5)), Math.round(14 + (28 - 14) * (k / 0.5))]
+    : [255, Math.round(34 + (150 - 34) * ((k - 0.5) / 0.5)), Math.round(28 + (128 - 28) * ((k - 0.5) / 0.5))];
+}
+
+/** A color pulled most of the way to the warning red of its own lightness (so the shading still reads). */
+function warnShift(r: number, g: number, b: number): [number, number, number] {
+  const [wr, wg, wb] = warnRed((r * 0.3 + g * 0.59 + b * 0.11) / 255 + 0.12);
+  const k = 0.72;
+  return [Math.round(r + (wr - r) * k), Math.round(g + (wg - g) * k), Math.round(b + (wb - b) * k)];
+}
+
+const warnPaints = new Map<string, Paint>();
+
+/** A PixelForge paint's red warning version: every material shifted to red (its outline and soft shadow kept). */
+function warnPaint(p: MobPaint): Paint {
+  const key = `${p.key}|warn`;
+  let out = warnPaints.get(key);
+  if (out) return out;
+  const recolor: Record<string, string[]> = {};
+  for (const [hex, a, mat, shade] of SHEETS[p.sheet].meta.colors) {
+    if (mat === 'outline' || mat === 'shadow' || a < 255) continue;
+    const own = p.recolor[mat];
+    const src = own && own.length ? own[Math.min(shade, own.length - 1)] : hex;
+    const [r, g, b] = rgb(src);
+    const [nr, ng, nb] = warnShift(r, g, b);
+    (recolor[mat] ??= [])[shade] = `#${[nr, ng, nb].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+  }
+  // (A material's shades with no color of their own take the nearest one's.)
+  for (const ramp of Object.values(recolor)) for (let i = 0; i < ramp.length; i++) ramp[i] ??= ramp[i - 1] ?? ramp.find(Boolean)!;
+  out = { recolor, key };
+  warnPaints.set(key, out);
+  if (warnPaints.size > 400) warnPaints.delete(warnPaints.keys().next().value!);
+  return out;
+}
+
+/** A sprite buffer shifted to the warning red (its dark outline pixels kept dark). */
+function warnTint(b: PixelBuf): PixelBuf {
+  const out = blank(b.w, b.h);
+  for (let i = 0; i < b.px.length; i += 4) {
+    const a = b.px[i + 3];
+    if (!a) continue;
+    const r = b.px[i];
+    const g = b.px[i + 1];
+    const bl = b.px[i + 2];
+    const dark = (r * 0.3 + g * 0.59 + bl * 0.11) / 255 < 0.16;
+    const [nr, ng, nb] = dark ? [r, g, bl] : warnShift(r, g, bl);
+    out.px[i] = nr;
+    out.px[i + 1] = ng;
+    out.px[i + 2] = nb;
+    out.px[i + 3] = a;
+  }
+  return out;
+}
+
+/**
+ * The warning outline round a sprite's body (its opaque pixels; a soft shadow doesn't count), two
+ * pixels outside it: hot red next to the body, a dark red edge outside that (it reads on red floors
+ * too). The buffer is 2 px larger each way than the sprite's. `white`: the same shape all white (the
+ * light-range mask).
+ */
+function outlineBuf(b: PixelBuf, white = false): PixelBuf {
+  const W = b.w + 4;
+  const H = b.h + 4;
+  const out = blank(W, H);
+  const body = (x: number, y: number) => x >= 0 && y >= 0 && x < b.w && y < b.h && b.px[(y * b.w + x) * 4 + 3] === 255;
+  const ring1 = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const sx = x - 2;
+      const sy = y - 2;
+      if (body(sx, sy)) continue;
+      if (body(sx - 1, sy) || body(sx + 1, sy) || body(sx, sy - 1) || body(sx, sy + 1)) ring1[y * W + x] = 1;
+    }
+  }
+  const on1 = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && ring1[y * W + x] === 1;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      if (ring1[y * W + x]) out.px.set(white ? [255, 255, 255, 255] : [255, 46, 30, 255], i);
+      else if (!body(x - 2, y - 2) && (on1(x - 1, y) || on1(x + 1, y) || on1(x, y - 1) || on1(x, y + 1))) out.px.set(white ? [255, 255, 255, 255] : [72, 6, 10, 255], i);
+    }
+  }
+  return out;
+}
+
+/**
+ * A dash's lane on the ground, as a canvas centered on where it starts: along (ux, uy) for `len` px,
+ * `half` px each side; a soft red wash inside, solid red edges and a bar across the end, every pixel
+ * whole (no smoothing).
+ */
+function laneBand(ux: number, uy: number, len: number, half: number): HTMLCanvasElement {
+  const size = (len + half + 2) * 2 + 1;
+  const o = Math.floor(size / 2);
+  const b = blank(size, size);
+  const inside = (px: number, py: number) => {
+    const rx = px - o;
+    const ry = py - o;
+    const along = rx * ux + ry * uy;
+    return along >= 0 && along <= len && Math.abs(-rx * uy + ry * ux) <= half;
+  };
+  for (let py = 0; py < size; py++) {
+    for (let px = 0; px < size; px++) {
+      if (!inside(px, py)) continue;
+      const edge = !inside(px - 1, py) || !inside(px + 1, py) || !inside(px, py - 1) || !inside(px, py + 1);
+      b.px.set(edge ? [255, 74, 58, 235] : [255, 90, 70, 64], (py * size + px) * 4);
+    }
+  }
+  return toCanvas(b);
+}
+
+/** A copy of a buffer keeping only its body (alpha 255), or only its soft shadow (the rest), or the body in one color. */
+function splitBuf(b: PixelBuf, keep: 'body' | 'shadow', color?: string): PixelBuf {
+  const out = blank(b.w, b.h);
+  const c = color ? [parseInt(color.slice(1, 3), 16), parseInt(color.slice(3, 5), 16), parseInt(color.slice(5, 7), 16)] : null;
+  for (let i = 0; i < b.px.length; i += 4) {
+    const a = b.px[i + 3];
+    if (!a || (keep === 'body') !== (a === 255)) continue;
+    out.px[i] = c ? c[0] : b.px[i];
+    out.px[i + 1] = c ? c[1] : b.px[i + 1];
+    out.px[i + 2] = c ? c[2] : b.px[i + 2];
+    out.px[i + 3] = a;
+  }
+  return out;
+}
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -150,6 +365,17 @@ export class Renderer {
   private pfFx: Array<{ name: SheetName; x: number; y: number; at: number; world: World }> = [];
   /** The attack effects: swings, shots in flight, their impacts (src/render/vfx). */
   private vfx = new Vfx();
+  /** Body boxes of PixelForge frames (for squash and stretch), by sheet and frame. */
+  private boxes = new Map<string, Box>();
+  /**
+   * Afterimages of mobs mid-dash or mid-leap: silhouettes where each was drawn a few frames back (in
+   * world pixels, on the world's clock), and when it last kicked up dust.
+   */
+  private trails = new Map<number, { world: World; dustAt: number; snaps: Array<{ x: number; y: number; ox: number; oy: number; w: number; h: number; c: HTMLCanvasElement; at: number }> }>();
+  /** Perfect rolls: where the knight was when the hit went through it, for its flash and afterimage. */
+  private perfects: Array<{ uid: number; x: number; y: number; at: number; world: World; big: boolean }> = [];
+  /** This frame's tells over mobs' heads (drawn with the HUD, after the numbers). */
+  private tells: Array<{ x: number; y: number; a: number }> = [];
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -350,6 +576,8 @@ export class Renderer {
     // (The hub paints its own way down: its steps, and the glow at their foot.)
     if (!hub) this.drawPortal(g, em, w, sx, sy);
     for (const a of w.areas) this.drawArea(g, em, a, sx, sy);
+    // Lunges' tells on the ground: a dash's lane, a leap's landing ring.
+    for (const m of w.mobs) if (!m.dead && visible(m.x, m.y, 160)) this.drawTell(g, m, sx, sy);
 
     // --- PixelForge: knight poses for this frame, and mobs that just died start their deaths
     const pf = pfReady();
@@ -383,8 +611,16 @@ export class Renderer {
     for (const u of [...w.heroes, ...w.mobs]) {
       if (u.dead && u.hurtT < -0.3) continue;
       if (!visible(u.x, u.y)) continue;
+      // A PixelForge mob in the air: its own soft shadow goes with it (drawMob), and a firm one here marks the ground under it.
+      const air = pf && u.team === 'mob' && !u.dead && (u.rush?.kind === 'leap' || (u.rush && u.flying)) ? mobMotion(u, w.time) : null;
+      if (air && air.lift > 0) {
+        const k = air.shadow * (u.boss ? 2.2 : u.elite ? 1.3 : 1);
+        this.ellipse(g, sx(u.x), sy(u.y), Math.max(2, Math.round((u.r + 2) * k)), Math.max(1, Math.round(2.2 * k)));
+        continue;
+      }
       if (pf && (u.team === 'hero' || (!u.dead && mobPaint(u.type!, !!u.elite, !!u.boss)) || this.corpses.some((c) => c.uid === u.uid))) continue;
-      const big = u.boss ? 3 : u.elite ? 1.4 : 1;
+      // (A mob in the air leaves its shadow on the ground, smaller the higher it goes.)
+      const big = (u.boss ? 3 : u.elite ? 1.4 : 1) * (u.team === 'mob' && !u.dead ? mobMotion(u, w.time).shadow : 1);
       this.ellipse(g, sx(u.x), sy(u.y), Math.round((u.r + 1) * big), Math.max(1, Math.round(2 * big)), u.flying ? 0.6 : 1);
     }
 
@@ -502,6 +738,9 @@ export class Renderer {
     // (read before the Fx below are turned into effects: a stroke's own marks replace their sparks)
     this.vfx.update(w);
     this.vfx.drawSwings(w, ui, cx, cy);
+    // Boulders in the air (over everything standing), and knights flashing from a perfect roll.
+    for (const a of w.areas) if (a.kind === 'boulder' && a.delay > 0) this.drawFlyingBoulder(st, w, a, sx, sy);
+    this.drawPerfects(st, ui, w, sx, sy);
     if (hub) {
       hub.drawFore(st, em, cx, cy, this.LW, this.LH);
       hub.updateMotes(dt);
@@ -510,6 +749,7 @@ export class Renderer {
 
     // --- shots, sparks, leaves and weather. Attack effects (shots, spell and hit bursts) go on the
     // unlit top layer: crisp, never bloomed or glowing (only the setting glows).
+    // (Foes' bullets are the effects' danger balls: big, outlined, white-hot hearts; vfx/art.ts bulletSprite.)
     const warden = (s: Shot) => pf && this.wardenShot(w, s);
     for (const s of w.shots) if (warden(s)) this.drawRockShard(st, s, sx, sy);
     this.vfx.drawShots(w, ui, cx, cy, this.W, this.H, warden);
@@ -934,6 +1174,11 @@ export class Renderer {
     const [px, py] = meta.pivot;
     const x = sx(m.x);
     const y = sy(m.y);
+    // How the whole body moves on top of the frame: a crouch, a leap's arc, a dash's stretch, a landing's squash.
+    const mo = mobMotion(m, w.time);
+    const flash = pose.flash;
+    // The red warning through a wind-up: the body pulses red (a hit's flash wins that frame).
+    const look: Paint = mo.warn && !flash ? warnPaint(paint) : paint;
     // Elites shine in their eyes' color.
     if (m.elite) {
       ctx.fillStyle = mixHex(paint.recolor.eyes?.[0] ?? m.type!.ramp[3], '#ffffff', 0.3);
@@ -944,21 +1189,281 @@ export class Renderer {
       }
       ctx.globalAlpha = 1;
     }
-    ctx.drawImage(frameCanvas(paint.sheet, pose.k, paint, pose.flash), x - px, y - py);
-    this.layers.cap.x.drawImage(frameMask(paint.sheet, pose.k, paint, pose.flash), x - px, y - py);
-    const top = y - py + meta.tops[pose.k][0];
+    const cap = this.layers.cap.x;
+    const box = this.frameBox(paint.sheet, pose.k, paint);
+    const geo = this.squashGeom(meta.cell, meta.cell, px, py, box, mo.wide, mo.tall);
+    // Afterimages in a pale wash of the body's own main material (a ghost of itself).
+    const main = ['slime', 'fur', 'hide', 'skin', 'bone', 'membrane', 'stone'].map((k) => paint.recolor[k]).find((r) => r && r.length);
+    const tint = mixHex(main ? main[main.length - 1] : m.type!.ramp[3], '#d4e6ff', 0.55);
+    this.drawTrail(ctx, w, m, mo, geo, sx, sy, () => this.cached(`pfsil|${paint.sheet}|${pose.k}|${paint.key}|${tint}`, () => toCanvas(splitBuf(pfFrameBuf(paint.sheet, pose.k, paint), 'body', tint))));
+    if (isStill(mo)) {
+      ctx.drawImage(frameCanvas(paint.sheet, pose.k, look, flash), x - px, y - py);
+      cap.drawImage(frameMask(paint.sheet, pose.k, paint, flash), x - px, y - py);
+    } else {
+      let body = frameCanvas(paint.sheet, pose.k, look, flash);
+      if (mo.lift !== 0) {
+        // Off the ground (or dipping toward it): the body moves without its soft shadow. Up in a leap,
+        // a firm shadow marks the ground under it (the shadow pass); a swooping flyer keeps its own.
+        if (mo.lift < 0) {
+          const shadow = this.cached(`pfsh|${paint.sheet}|${pose.k}|${paint.key}`, () => toCanvas(splitBuf(pfFrameBuf(paint.sheet, pose.k, paint), 'shadow')));
+          ctx.drawImage(shadow, x - px, y - py);
+        }
+        body = this.cached(`pfbody|${paint.sheet}|${pose.k}|${look.key}|${flash ? 1 : 0}`, () => toCanvas(splitBuf(pfFrameBuf(paint.sheet, pose.k, look, flash), 'body')));
+      }
+      ctx.globalAlpha = mo.fade;
+      cap.globalAlpha = mo.fade;
+      ctx.drawImage(body, x + mo.jitter - geo.ox, y - mo.lift - geo.oy, geo.w, geo.h);
+      cap.drawImage(frameMask(paint.sheet, pose.k, paint, flash), x + mo.jitter - geo.ox, y - mo.lift - geo.oy, geo.w, geo.h);
+      ctx.globalAlpha = 1;
+      cap.globalAlpha = 1;
+    }
+    if (mo.outline) {
+      // ...and a crisp red outline (dark-edged, so it reads on any floor) holds round it all the while.
+      const og = this.squashGeom(meta.cell + 4, meta.cell + 4, px + 2, py + 2, { x0: box.x0 + 2, y0: box.y0 + 2, x1: box.x1 + 2, y1: box.y1 + 2 }, mo.wide, mo.tall);
+      const ol = this.cached(`pfol|${paint.sheet}|${pose.k}`, () => toCanvas(outlineBuf(pfFrameBuf(paint.sheet, pose.k, paint))));
+      const olMask = this.cached(`pfolm|${paint.sheet}|${pose.k}`, () => toCanvas(outlineBuf(pfFrameBuf(paint.sheet, pose.k, paint), true)));
+      ctx.drawImage(ol, x + mo.jitter - og.ox, y - mo.lift - og.oy, og.w, og.h);
+      cap.drawImage(olMask, x + mo.jitter - og.ox, y - mo.lift - og.oy, og.w, og.h);
+    }
+    const top = y - mo.lift - geo.oy + Math.round(meta.tops[pose.k][0] * (geo.h / meta.cell));
     if (pose.stunned) this.stunStars(this.layers.emit.x, x, top - 3);
     // Asleep: a little "z".
     if (!m.awake && Math.floor(this.time * 1.5 + m.uid) % 3 === 0) {
       const z = this.textCanvas('Z', { face: 'small', fill: '#d8e0ff', ink: '#1a1326' });
       ctx.drawImage(z, x + 3, top - 6);
     }
-    // A charge's telegraph: a line of dots where it will run.
-    if (m.windT && m.windT > 0 && m.move === 'charge') {
-      ctx.fillStyle = 'rgba(255,90,90,0.8)';
-      for (let k = 1; k < 12; k++) {
-        if ((k + Math.floor(this.time * 20)) % 2) continue;
-        ctx.fillRect(sx(m.x + (m.moveX ?? 0) * k * 8), sy(m.y + (m.moveY ?? 0) * k * 8), 1, 1);
+    // An ogre's throw: the rock it tore up, raised over its head.
+    if (m.move === 'throw' && (m.windT ?? 0) > 0) this.drawHeldBoulder(ctx, w, m, x, y, top);
+    if (mo.tell > 0) this.drawTellMark(x, top, mo.tell);
+  }
+
+  /** A PixelForge frame's body box (its soft shadow left out), for squash and stretch. */
+  private frameBox(sheet: SheetName, k: number, paint: MobPaint): Box {
+    const key = `${sheet}|${k}`;
+    let b = this.boxes.get(key);
+    if (!b) {
+      b = opaqueBox(pfFrameBuf(sheet, k, paint));
+      // (Not before the sheet's pixels are in: an empty frame would give the whole cell.)
+      if (SHEETS[sheet].ready) this.boxes.set(key, b);
+    }
+    return b;
+  }
+
+  /**
+   * Where and how big to draw a `cw` x `ch` sprite pivoting at (px, py) so its body (box) is `wide`
+   * pixels wider and `tall` taller, its feet staying put: whole pixels, nearest neighbour.
+   */
+  private squashGeom(cw: number, ch: number, px: number, py: number, box: Box, wide: number, tall: number): { ox: number; oy: number; w: number; h: number } {
+    const kx = Math.max(0.3, (box.x1 - box.x0 + 1 + wide) / (box.x1 - box.x0 + 1));
+    const ky = Math.max(0.3, (box.y1 - box.y0 + 1 + tall) / (box.y1 - box.y0 + 1));
+    return { ox: Math.round(px * kx), oy: Math.round(py * ky), w: Math.max(1, Math.round(cw * kx)), h: Math.max(1, Math.round(ch * ky)) };
+  }
+
+  /**
+   * Afterimages: while a mob dashes or leaps, a silhouette of it (in a light tint of its colors) every
+   * few hundredths of a second, fading out behind it; on a dash, dust kicked up from its feet.
+   */
+  private drawTrail(ctx: Ctx, w: World, m: Unit, mo: MobMotion, geo: { ox: number; oy: number; w: number; h: number }, sx: (x: number) => number, sy: (y: number) => number, silhouette: () => HTMLCanvasElement): void {
+    let tr = this.trails.get(m.uid);
+    if (tr && tr.world !== w) {
+      this.trails.delete(m.uid);
+      tr = undefined;
+    }
+    if (mo.trail) {
+      if (!tr) this.trails.set(m.uid, (tr = { world: w, dustAt: -9, snaps: [] }));
+      const last = tr.snaps[tr.snaps.length - 1];
+      if (!last || w.time - last.at >= 0.045) {
+        tr.snaps.push({ x: m.x + mo.jitter, y: m.y - mo.lift, ...geo, c: silhouette(), at: w.time });
+        if (tr.snaps.length > 4) tr.snaps.shift();
+      }
+      const r = m.rush;
+      if (r && r.kind === 'dash' && !m.flying && w.time - tr.dustAt > 0.045) {
+        tr.dustAt = w.time;
+        const [dx, dy] = norm(r.x1 - r.x0, r.y1 - r.y0);
+        const rnd = (a: number) => (Math.random() * 2 - 1) * a;
+        this.particles.push({ ...this.p('dust', m.x - dx * 4 + rnd(2), m.y + rnd(1), Math.random() < 0.5 ? '#c4b8a0' : '#9a8e7a', 0.35), vx: -dx * 24 + rnd(10), vy: -dy * 14 + rnd(5), vz: 10 + Math.random() * 12, size: Math.random() < 0.35 ? 2 : 1 });
+      }
+    }
+    if (!tr) return;
+    tr.snaps = tr.snaps.filter((s) => w.time - s.at < 0.2);
+    for (const s of tr.snaps) {
+      const age = w.time - s.at;
+      if (age < 0.03) continue;
+      ctx.globalAlpha = Math.round(0.75 * (1 - age / 0.2) * 10) / 10;
+      ctx.drawImage(s.c, sx(s.x) - s.ox, sy(s.y) - s.oy, s.w, s.h);
+    }
+    ctx.globalAlpha = 1;
+    if (!tr.snaps.length && !mo.trail) this.trails.delete(m.uid);
+  }
+
+  /** The tell over a mob's head as it winds up a lunge or a throw (drawn with the HUD, over the numbers: drawTells). */
+  private drawTellMark(x: number, top: number, alpha: number): void {
+    this.tells.push({ x, y: top, a: alpha });
+  }
+
+  /** The tells queued this frame: a thick red "!" (the huge face) on the HUD layer, so neither the dark nor the numbers hide it. */
+  private drawTells(ui: Ctx): void {
+    const c = this.textCanvas('!', { face: 'huge', fill: ['#ffffff', '#ffe8e0', '#ffb4a0', '#ff7a60', '#ff5a44', '#ff4a3a', '#e8342a', '#d82a20', '#c8241c'], ink: '#140c14' });
+    for (const t of this.tells) {
+      ui.globalAlpha = t.a;
+      ui.drawImage(c, t.x - Math.floor(c.width / 2), t.y - c.height - 1);
+    }
+    ui.globalAlpha = 1;
+    this.tells.length = 0;
+  }
+
+  /** An ogre's throw winding up: the chunk of ground it tears up in front of it, then holds high over its head, shaking. */
+  private drawHeldBoulder(ctx: Ctx, w: World, m: Unit, x: number, feet: number, top: number): void {
+    const p = 1 - (m.windT ?? 0) / Math.max(0.01, m.windDur ?? 1);
+    const c = this.boulderCanvas(w.biome, m.elite ? 15 : 13, 0);
+    const up = Math.min(1, p / 0.35);
+    const ease = up * up * (3 - 2 * up);
+    const low = feet - c.height + 1;
+    const high = top - c.height + 3;
+    const bx = x + Math.round(m.dir * 7 * (1 - ease));
+    const by = Math.round(low + (high - low) * ease) + (p > 0.7 ? (Math.floor(this.time * 30) % 2 ? 1 : 0) : 0);
+    ctx.drawImage(c, bx - Math.floor(c.width / 2), by);
+  }
+
+  /** A chunk of floor torn up by an ogre, as a canvas, turned by quarter turns as it tumbles. */
+  private boulderCanvas(b: Biome, size: number, turn: number): HTMLCanvasElement {
+    return this.cached(`boulder|${b.id}|${size}|${turn}`, () => toCanvas(rot90(boulderBuf(b, size), turn)));
+  }
+
+  /** A thrown boulder in the air: along its lob from the thrower's hands to the ring, tumbling. */
+  private drawFlyingBoulder(ctx: Ctx, w: World, a: Area, sx: (x: number) => number, sy: (y: number) => number): void {
+    const flight = Math.max(0.01, a.flight ?? 1);
+    const at = boulderAt(a.x0 ?? a.x, a.y0 ?? a.y, a.z0 ?? 30, a.x, a.y, 1 - a.delay / flight);
+    const c = this.boulderCanvas(w.biome, a.r >= 20 ? 15 : 13, Math.floor(a.t * 12) % 4);
+    ctx.drawImage(c, sx(at.x) - Math.floor(c.width / 2), sy(at.y - at.z) - Math.floor(c.height / 2));
+  }
+
+  /**
+   * A big move's red indicator on the ground, from the start of its wind-up: a dash or a charge, the
+   * lane it will run down (chevrons lighting up along it as the wind-up runs out, white once its aim has
+   * locked); a leap or a thrown boulder, the ring where it will come down; a ground slam or a bomber's
+   * blast, the ring it will fill; each filling up and pulsing, and staying while the move is under way.
+   */
+  private drawTell(ctx: Ctx, m: Unit, sx: (x: number) => number, sy: (y: number) => number): void {
+    const r = m.rush;
+    if (r) {
+      const p = Math.min(1, r.t / Math.max(0.01, r.dur));
+      if (r.kind === 'leap') this.landingRing(ctx, sx(r.x1), sy(r.y1), r.r, 0.5 + 0.5 * p, true);
+      else {
+        // The lane it's running down, fading as it goes.
+        const [dx, dy] = norm(r.x1 - r.x0, r.y1 - r.y0);
+        this.dashLane(ctx, r.x0, r.y0, dx, dy, Math.hypot(r.x1 - r.x0, r.y1 - r.y0), m.r + r.r + 2, 1, true, 1 - p * 0.7, sx, sy);
+      }
+      return;
+    }
+    if (!m.windT || m.windT <= 0 || !m.move) return;
+    const p = 1 - m.windT / Math.max(0.01, m.windDur ?? m.windT);
+    const locked = p >= 0.5;
+    switch (m.move) {
+      case 'dash':
+      case 'charge': {
+        const L = lungeOf(m, m.move);
+        if (L && m.moveX !== undefined && m.moveY !== undefined) this.dashLane(ctx, m.x, m.y, m.moveX, m.moveY, L.reach, m.r + L.r + 2, p, locked, 1, sx, sy);
+        break;
+      }
+      case 'leap': {
+        const L = lungeOf(m, 'leap');
+        if (L && m.spotX !== undefined && m.spotY !== undefined) this.landingRing(ctx, sx(m.spotX), sy(m.spotY), L.r, p * 0.5, locked);
+        break;
+      }
+      case 'throw':
+        if (m.spotX !== undefined && m.spotY !== undefined) this.landingRing(ctx, sx(m.spotX), sy(m.spotY), lobRadius(m), p * 0.35, locked);
+        break;
+      case 'slam':
+        this.landingRing(ctx, sx(m.x), sy(m.y), m.boss ? BOSS_SLAM_R : SLAM_R, p, p > 0.7);
+        break;
+      case 'bomb':
+        this.landingRing(ctx, sx(m.x), sy(m.y), BOMB_R, p, p > 0.7);
+        break;
+    }
+  }
+
+  /**
+   * A dash's lane from (x, y) along (dx, dy): `len` long, `half` wide each side, lit `fill` of the way.
+   * The band (a red wash, a hot red edge with a dark rim outside it so it reads on any floor, a bar
+   * across its end) is drawn once per heading (64 of them) and length (in 4 px steps), pixel by pixel,
+   * and cached; it pulses, stronger as the wind-up fills. Thick chevrons march along it on top, lit as far
+   * as the wind-up has come (white once the aim has locked).
+   */
+  private dashLane(ctx: Ctx, x: number, y: number, dx: number, dy: number, len: number, half: number, fill: number, locked: boolean, alpha: number, sx: (x: number) => number, sy: (y: number) => number): void {
+    const dir = ((Math.round((Math.atan2(dy, dx) / (Math.PI * 2)) * 64) % 64) + 64) % 64;
+    const ang = (dir / 64) * Math.PI * 2;
+    const ux = Math.cos(ang);
+    const uy = Math.sin(ang);
+    const L = Math.max(8, Math.round(len / 4) * 4);
+    const H = Math.max(3, Math.round(half));
+    const band = this.cached(`lane|${dir}|${L}|${H}`, () => laneBand(ux, uy, L, H));
+    const o = Math.floor(band.width / 2);
+    const pulse = Math.floor(this.time * (locked ? 12 : 8)) % 2 ? 1 : 0.78;
+    ctx.globalAlpha = Math.min(1, (0.6 + 0.4 * fill) * pulse) * alpha;
+    ctx.drawImage(band, sx(x) - o, sy(y) - o);
+    const nx = -uy;
+    const ny = ux;
+    const step = 8;
+    const shift = (this.time * 36) % step;
+    const arm = Math.min(5, Math.max(2, Math.round(H * 0.55)));
+    for (let s = 6 + shift; s < L - 2; s += step) {
+      const lit = s / L <= fill;
+      ctx.fillStyle = lit ? (locked ? '#ffffff' : '#ffd0c4') : '#ff4a36';
+      ctx.globalAlpha = (lit ? 1 : 0.5) * alpha;
+      for (let k = 0; k <= arm; k++) {
+        for (const back of [0, 1]) {
+          const tx = x + ux * (s - back);
+          const ty = y + uy * (s - back);
+          ctx.fillRect(sx(tx - ux * k + nx * k), sy(ty - uy * k + ny * k), 1, 1);
+          ctx.fillRect(sx(tx - ux * k - nx * k), sy(ty - uy * k - ny * k), 1, 1);
+        }
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /**
+   * Where something comes down (a leap, a boulder, a blast): a ring of strong red two pixels thick with a
+   * dark rim outside it (it reads on snow, sand, lava and moss alike), filling `fill` of the way from the
+   * middle, pulsing (faster and white inside once `locked`), a cross on the spot.
+   */
+  private landingRing(ctx: Ctx, x: number, y: number, r: number, fill: number, locked: boolean): void {
+    const pulse = Math.floor(this.time * (locked ? 12 : 8)) % 2 ? 1 : 0.75;
+    ctx.fillStyle = '#ff3a2a';
+    this.ellipse(ctx, x, y, Math.round(r * fill), Math.round(r * fill * 0.6), 0.38 * pulse);
+    this.ring(ctx, x, y, r + 1, '#3a0408', 0.9);
+    this.ring(ctx, x, y, r, '#ff2e1e', pulse);
+    this.ring(ctx, x, y, r - 1, locked ? '#ffffff' : '#ff5a44', (locked ? 0.85 : 0.6) * pulse);
+    ctx.fillStyle = locked ? '#ffffff' : '#ffb4a4';
+    ctx.globalAlpha = 0.95;
+    ctx.fillRect(x - 3, y, 7, 1);
+    ctx.fillRect(x, y - 2, 1, 5);
+    ctx.globalAlpha = 1;
+  }
+
+  /**
+   * A perfect roll: the knight flashes bright for a beat, and an afterimage of it stays where the hit
+   * went through it, fading (drawn over the knight from its pose; the knight's own drawing is left
+   * alone). The flash is drawn crisp on the unlit top layer (no glow).
+   */
+  private drawPerfects(st: Ctx, top: Ctx, w: World, sx: (x: number) => number, sy: (y: number) => number): void {
+    this.perfects = this.perfects.filter((p) => p.world === w && this.time - p.at < 0.4);
+    for (const p of this.perfects) {
+      const h = w.heroes.find((u) => u.uid === p.uid);
+      const pose = h ? this.heroPoses.get(h.uid) : undefined;
+      if (!h || !pose) continue;
+      const paint = knightPaint(h.knightId!, h.mutation ?? null, paintStep(h.rarity!, this.time));
+      const [px, py] = SHEETS[paint.sheet].meta.pivot;
+      const c = frameCanvas(paint.sheet, pose.k, paint, true, pose.anim, pose.dir);
+      const age = this.time - p.at;
+      st.globalAlpha = Math.round(Math.max(0, 0.6 * (1 - age / 0.4)) * 10) / 10;
+      st.drawImage(c, sx(p.x) - px, sy(p.y) - py);
+      st.globalAlpha = 1;
+      if (age < (p.big ? 0.12 : 0.07)) {
+        top.globalAlpha = 0.8;
+        top.drawImage(c, sx(h.x) - px, sy(h.y) - py);
+        top.globalAlpha = 1;
       }
     }
   }
@@ -994,17 +1499,22 @@ export class Renderer {
       // A quick puff of fading.
       return;
     }
-    let pose: MobPose = m.windT && m.windT > 0 ? 'wind' : m.swingT > 0 ? 'strike' : m.moving || m.chargeT ? 'walk' : 'idle';
+    // A dash runs its walk fast; a leap holds its strike pose in the air.
+    const r = m.rush;
+    let pose: MobPose = m.windT && m.windT > 0 ? 'wind' : r?.kind === 'leap' ? 'strike' : m.swingT > 0 ? 'strike' : m.moving || r ? 'walk' : 'idle';
     const n = poseFrames(t, pose);
-    const frame = pose === 'walk' ? Math.floor(m.animT * (m.chargeT ? 16 : 8)) % n : pose === 'idle' ? Math.floor(m.animT * 3) % n : 0;
+    const frame = pose === 'walk' ? Math.floor(m.animT * (r ? 16 : 8)) % n : pose === 'idle' ? Math.floor(m.animT * 3) % n : 0;
     if (!m.awake) pose = 'idle';
     const flip = m.dir < 0;
-    const white = m.hurtT > 0.1 || (pose === 'wind' && Math.floor(this.time * 20) % 2 === 0);
-    const key = `m|${t.id}|${pose}|${frame}|${m.elite ? 1 : 0}|${m.boss ? 1 : 0}|${white ? 1 : 0}|${flip ? 1 : 0}`;
+    const mo = mobMotion(m, w.time);
+    // A hit flashes it white; through a wind-up it pulses red (and a red outline holds round it, below).
+    const white = m.hurtT > 0.1;
+    const red = !white && mo.warn;
+    const key = `m|${t.id}|${pose}|${frame}|${m.elite ? 1 : 0}|${m.boss ? 1 : 0}|${white ? 1 : red ? 2 : 0}|${flip ? 1 : 0}`;
     const c = this.cached(key, () => {
       const fr = mobFrame(t, pose, frame, 'down', !!m.elite, !!m.boss);
       this.mobMeta.set(key, { ax: fr.ax, ay: fr.ay });
-      let b = white ? flash(fr.buf, pose === 'wind' ? '#ffe0e0' : '#ffffff') : fr.buf;
+      let b = white ? flash(fr.buf, '#ffffff') : red ? warnTint(fr.buf) : fr.buf;
       if (flip) b = flipX(b);
       return toCanvas(b);
     });
@@ -1027,23 +1537,38 @@ export class Renderer {
       }
       ctx.globalAlpha = 1;
     }
-    ctx.globalAlpha = m.awake ? 1 : 0.92;
-    ctx.drawImage(c, sx(m.x) - ax, sy(m.y) - ay + hover);
+    // The same generic motion as PixelForge's monsters: squash and stretch about the feet, lifted off
+    // its shadow (drawn on the ground), afterimages behind.
+    const geo = this.squashGeom(c.width, c.height, ax, ay, { x0: 0, y0: 0, x1: c.width - 1, y1: c.height - 1 }, mo.wide, mo.tall);
+    const tint = mixHex(t.ramp[3], '#d4e6ff', 0.5);
+    const hy = sy(m.y) + hover;
+    this.drawTrail(ctx, w, m, mo, geo, sx, (y) => sy(y) + hover, () =>
+      this.cached(`${key}|sil|${tint}`, () => {
+        const fr = mobFrame(t, pose, frame, 'down', !!m.elite, !!m.boss);
+        const b = flash(fr.buf, tint);
+        return toCanvas(flip ? flipX(b) : b);
+      }),
+    );
+    ctx.globalAlpha = (m.awake ? 1 : 0.92) * mo.fade;
+    if (isStill(mo)) ctx.drawImage(c, sx(m.x) - ax, hy - ay);
+    else ctx.drawImage(c, sx(m.x) + mo.jitter - geo.ox, hy - mo.lift - geo.oy, geo.w, geo.h);
     ctx.globalAlpha = 1;
+    if (mo.outline) {
+      const okey = `m|${t.id}|${pose}|${frame}|${m.elite ? 1 : 0}|${m.boss ? 1 : 0}|${flip ? 1 : 0}`;
+      const ol = this.cached(`${okey}|ol`, () => {
+        const fr = mobFrame(t, pose, frame, 'down', !!m.elite, !!m.boss);
+        return toCanvas(outlineBuf(flip ? flipX(fr.buf) : fr.buf));
+      });
+      const og = this.squashGeom(ol.width, ol.height, ax + 2, ay + 2, { x0: 2, y0: 2, x1: c.width + 1, y1: c.height + 1 }, mo.wide, mo.tall);
+      ctx.drawImage(ol, sx(m.x) + mo.jitter - og.ox, hy - mo.lift - og.oy, og.w, og.h);
+    }
+    const top = hy - mo.lift - geo.oy;
     // Asleep: a little "z".
     if (!m.awake && Math.floor(this.time * 1.5 + m.uid) % 3 === 0) {
       const z = this.textCanvas('Z', { face: 'small', fill: '#d8e0ff', ink: '#1a1326' });
-      ctx.drawImage(z, sx(m.x) + 3, sy(m.y) - c.height - 2);
+      ctx.drawImage(z, sx(m.x) + 3, top - 2);
     }
-    // A charge's telegraph: a line of dots where it will run.
-    if (m.windT && m.windT > 0 && m.move === 'charge') {
-      ctx.fillStyle = 'rgba(255,90,90,0.8)';
-      for (let k = 1; k < 12; k++) {
-        if ((k + Math.floor(this.time * 20)) % 2) continue;
-        ctx.fillRect(sx(m.x + (m.moveX ?? 0) * k * 8), sy(m.y + (m.moveY ?? 0) * k * 8), 1, 1);
-      }
-    }
-    void w;
+    if (mo.tell > 0) this.drawTellMark(sx(m.x), top, mo.tell);
   }
 
   private drawPickup(ctx: Ctx, kind: 'gold' | 'potion' | 'hourglass', x: number, y: number): void {
@@ -1107,6 +1632,34 @@ export class Renderer {
     const y = sy(a.y);
     const danger = a.team === 'mob';
     const col = danger ? '#ff4a3a' : a.color;
+    if (a.kind === 'boulder' && a.delay > 0) {
+      // A boulder on its way down: its shadow growing on the spot as it falls, inside the ring where it lands.
+      const p = Math.max(0, Math.min(1, 1 - a.delay / Math.max(0.01, a.flight ?? 1)));
+      const sr = Math.max(1, Math.round(a.r * (0.15 + 0.5 * p * p)));
+      ctx.fillStyle = '#0c0812';
+      this.ellipse(ctx, x, y, sr, Math.max(1, Math.round(sr * 0.6)), 0.3 + 0.35 * p);
+      this.landingRing(ctx, x, y, a.r, 0.35 + 0.65 * p, p > 0.55);
+      return;
+    }
+    if (a.kind === 'rubble') {
+      // What's left of a boulder: chips of stone round the spot, fading.
+      ctx.globalAlpha = Math.min(1, a.dur / 0.5);
+      for (let i = 0; i < 9; i++) {
+        const ang = i * 2.39 + (a.uid % 7);
+        const d = ((i % 3) + 1) * a.r * 0.32;
+        ctx.fillStyle = i % 3 === 0 ? '#2a2420' : i % 3 === 1 ? '#6a645c' : '#9a948a';
+        ctx.fillRect(x + Math.round(Math.cos(ang) * d), y + Math.round(Math.sin(ang) * d * 0.6), i % 4 === 0 ? 2 : 1, 1);
+      }
+      ctx.globalAlpha = 1;
+      return;
+    }
+    if (a.delay > 0 && danger) {
+      // A foe's blast coming (a caster's circle, a boss's rain): the same strong red ring as every
+      // other warning, filling as it counts down.
+      const t = Math.max(0, Math.min(1, 1 - a.delay / Math.max(0.3, a.delay + a.t)));
+      this.landingRing(ctx, x, y, a.r, t, t > 0.6);
+      return;
+    }
     if (a.delay > 0) {
       // A telegraph: a ring that fills in as it counts down.
       const total = a.kind === 'meteor' ? 0.9 : a.kind === 'rain' ? 0.25 : 1;
@@ -1290,6 +1843,12 @@ export class Renderer {
       if (m.elite || m.boss) out.push({ x: sx(m.x), y: sy(m.y) - (m.boss && pfEye ? 24 : 8), r: m.boss ? 46 : 22, color: pfEye ?? m.type!.ramp[3], intensity: pfEye ? 0.45 : 0.55, bloom: m.boss });
       else if (m.type!.plan === 'flyer' && /Wisp|Spirit/.test(m.type!.name)) out.push({ x: sx(m.x), y: sy(m.y) - 8, r: 18, color: m.type!.ramp[3], intensity: 0.8, bloom: true });
       else if (m.type!.plan === 'golem') out.push({ x: sx(m.x), y: sy(m.y) - 10, r: 14, color: m.type!.eye, intensity: 0.6, bloom: true });
+      // A lunge's tell lights the ground it will cross a little (it reads in the dark).
+      const L = (m.windT ?? 0) > 0 ? lungeOf(m, m.move) : undefined;
+      if (L && m.move === 'leap' && m.spotX !== undefined && m.spotY !== undefined) out.push({ x: sx(m.spotX), y: sy(m.spotY), r: L.r * 1.6, color: '#ff4a3a', intensity: 0.4 });
+      else if (L && (m.move === 'dash' || m.move === 'charge') && m.moveX !== undefined && m.moveY !== undefined) {
+        out.push({ x: sx(m.x + (m.moveX * L.reach) / 2), y: sy(m.y + (m.moveY * L.reach) / 2), r: L.reach * 0.55, color: '#ff4a3a', intensity: 0.3 });
+      }
     }
     if (w.portalOpen) out.push({ x: sx(w.map.exit.x), y: sy(w.map.exit.y) - 4, r: 60, color: '#b08aff', intensity: 1, bloom: true });
     for (const p of this.particles) if (p.glow) out.push({ x: sx(p.x), y: sy(p.y - p.z), r: p.kind === 'firefly' ? 8 : 6, color: p.color, intensity: Math.min(1, p.life / p.max + 0.2) * 0.7 });
@@ -1303,7 +1862,7 @@ export class Renderer {
   }
 
   private spawnFx(w: World): void {
-    for (const f of w.fx) this.burst(f);
+    for (const f of w.fx) this.burst(f, w);
     w.fx.length = 0;
   }
 
@@ -1336,7 +1895,7 @@ export class Renderer {
     }
   }
 
-  private burst(f: Fx): void {
+  private burst(f: Fx, w: World): void {
     // The pack effects (Will Tice / unTied Games), on top of the particles.
     switch (f.kind) {
       case 'hit':
@@ -1355,6 +1914,7 @@ export class Renderer {
         break;
       case 'blast':
         if (f.src === 'slam') this.fx('shock', f.x, f.y);
+        else if (f.src === 'boulder') this.fx('smoke', f.x, f.y - 2);
         else if (f.src === 'bomb') this.fx('explosion', f.x, f.y - 6);
         else if (f.src === 'meteor') {
           this.fx('boom', f.x, f.y - 8);
@@ -1397,6 +1957,11 @@ export class Renderer {
         add(3, () => ({ ...this.p('dust', f.x + rnd(3), f.y, f.color ?? '#a89c88', 0.35), vx: rnd(20), vy: rnd(8), vz: 8 }));
         break;
       case 'blast':
+        if (f.src === 'boulder') {
+          // The rock bursts: chips of stone flung up and out (they don't glow).
+          add(16, (i) => ({ ...this.p('dust', f.x + rnd(3), f.y + rnd(2), i % 3 === 0 ? '#2a2420' : i % 3 === 1 ? '#6a645c' : '#a49e94', 0.55), vx: rnd(70), vy: rnd(40), vz: 40 + Math.random() * 60, size: i % 4 === 0 ? 2 : 1 }));
+          break;
+        }
         add(14 * Math.min(3, f.size ?? 1), () => ({ ...this.p('ember', f.x, f.y, Math.random() < 0.4 ? '#ffffff' : col, 0.5), vx: rnd(90), vy: rnd(60), vz: 20 + Math.random() * 50 }));
         this.particles.push({ ...this.p('ring', f.x, f.y, col, 0.3), size: Math.round((f.size ?? 1) * 6) });
         break;
@@ -1415,6 +1980,33 @@ export class Renderer {
         this.flashT = 0.35;
         add(24, (i) => ({ ...this.p('mote', f.x + Math.cos(i) * 10, f.y + Math.sin(i) * 5, '#c8a8ff', 1.4), vz: 26 + Math.random() * 20 }));
         break;
+      case 'land': {
+        // A lunge comes down: a ring of dust thrown out along the ground, and a shock ring for a big one.
+        const k = Math.min(4, f.size ?? 1);
+        const n = Math.round(10 + 4 * k);
+        add(n, (i) => {
+          const a = (i / n) * Math.PI * 2 + Math.random() * 0.3;
+          const sp = 30 + 14 * k + Math.random() * 18;
+          return { ...this.p('dust', f.x + Math.cos(a) * 3, f.y + Math.sin(a) * 2, f.color ?? (i % 3 ? '#c4b8a0' : '#8a7e6c'), 0.42 + Math.random() * 0.15), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.55, vz: 8 + Math.random() * 14, size: i % 3 === 0 ? 2 : 1 };
+        });
+        this.particles.push({ ...this.p('ring', f.x, f.y, '#e8dcc4', 0.3), size: Math.round(4 + 3 * k) });
+        if (k >= 2) this.fx('shock', f.x, f.y);
+        break;
+      }
+      case 'perfect': {
+        // A perfect roll: a gold ring and a burst of sparkles round the knight, and its flash (drawPerfects).
+        const big = (f.size ?? 1) >= 1;
+        this.particles.push({ ...this.p('ring', f.x, f.y, '#fff0a8', big ? 0.32 : 0.22), size: big ? 7 : 5 });
+        this.particles.push({ ...this.p('ring', f.x, f.y, '#ffffff', 0.16), size: big ? 3 : 2 });
+        const n = big ? 12 : 6;
+        add(n, (i) => {
+          const a = (i / n) * Math.PI * 2;
+          return { ...this.p('mote', f.x, f.y, i % 2 ? '#ffe27a' : '#ffffff', 0.45), vx: Math.cos(a) * (big ? 50 : 34), vy: Math.sin(a) * (big ? 30 : 20), vz: 6 };
+        });
+        if (big) this.fx('sparkle', f.x, f.y);
+        if (f.uid !== undefined) this.perfects.push({ uid: f.uid, x: f.x, y: f.y + 8, at: this.time, world: w, big });
+        break;
+      }
       case 'coin':
         break;
     }
@@ -1509,6 +2101,22 @@ export class Renderer {
 
   // ------------------------------------------------------------------ overlay
 
+  /**
+   * PERFECT! over a knight that rolled through a hit: the big pixel font in a stepped gold (white at
+   * the top), with a drop shadow; it pops in a size up (the huge face) for its first beat and bounces,
+   * then floats up and fades. A squadmate's is the small face.
+   */
+  private drawPerfectText(ctx: Ctx, t: FloatText, sx: (x: number) => number, sy: (y: number) => number): void {
+    const face = t.big ? (t.t < 0.07 ? 'huge' : 'big') : 'small';
+    const fill = face === 'huge' ? PERFECT_FILL.huge : face === 'big' ? PERFECT_FILL.big : PERFECT_FILL.small;
+    const c = this.textCanvas(t.text, { face, fill, ink: '#140c14', shadow: face !== 'small' });
+    const a = t.t > 0.6 ? Math.max(0, 1 - (t.t - 0.6) * 2.2) : 1;
+    ctx.globalAlpha = Math.round(a * 4) / 4;
+    const bounce = t.t < 0.05 ? 2 : t.t < 0.12 ? 1 : t.t < 0.18 ? -1 : 0;
+    ctx.drawImage(c, sx(t.x) - Math.floor(c.width / 2), sy(t.y) - Math.floor(c.height / 2) - bounce);
+    ctx.globalAlpha = 1;
+  }
+
   private drawOverlay(ctx: Ctx, w: World, sx: (x: number) => number, sy: (y: number) => number): void {
     // At the hub, a little gold arrow bobbing over the steps down: the way into the dungeon.
     if (w.hub) {
@@ -1541,6 +2149,10 @@ export class Renderer {
     }
     // Damage and heal numbers.
     for (const t of w.texts) {
+      if (t.style === 'perfect') {
+        this.drawPerfectText(ctx, t, sx, sy);
+        continue;
+      }
       const c = this.textCanvas(t.text, { face: t.big ? 'big' : 'small', fill: t.color, ink: '#140c14' });
       const a = t.t > 0.5 ? Math.max(0, 1 - (t.t - 0.5) * 2.5) : 1;
       ctx.globalAlpha = Math.round(a * 4) / 4;
@@ -1548,6 +2160,8 @@ export class Renderer {
       ctx.drawImage(c, sx(t.x) - Math.floor(c.width / 2), sy(t.y) - pop);
     }
     ctx.globalAlpha = 1;
+    // Lunges' and throws' tells over the mobs' heads, over the numbers.
+    this.drawTells(ctx);
     // When only a few mobs are left, arrows point to them; when the portal opens, one points there.
     const lead = w.leader();
     if (!lead) return;

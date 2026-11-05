@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BAL } from '../src/core/balance';
 import { KNIGHTS } from '../src/core/knights';
 import { newGame } from '../src/core/newGame';
-import { REF_DPS, REF_FOE, REF_HP, REF_POWER, fightReport, floorDifficulty, floorPar, foeStats, knightRating, squadPower } from '../src/core/power';
+import { REF_DPS, REF_FOE, REF_HP, REF_POWER, earlyBoost, fightReport, floorDifficulty, floorPar, foeStats, knightRating, squadPower } from '../src/core/power';
 import { addKnight, levelUp } from '../src/core/roster';
 import type { GameState } from '../src/core/state';
 
@@ -42,8 +42,8 @@ describe('difficulty', () => {
     expect(floorPar(1)).toBe(B.parBase);
   });
 
-  it('at par, a plain foe takes ttk.mob seconds of the squad and hits for hit.mob of a knight', () => {
-    for (const f of [1, 7, 20, 45]) {
+  it('at par, a plain foe takes ttk.mob seconds of the squad and hits for hit.mob of a knight (past the first floors)', () => {
+    for (const f of [B.early.until, 20, 45]) {
       const r = fightReport(f, floorPar(f));
       expect(r.challenge).toBe('fair');
       expect(r.mob.ttk).toBeCloseTo(B.ttk.mob, 5);
@@ -51,6 +51,32 @@ describe('difficulty', () => {
       expect(r.elite.ttk).toBeCloseTo(B.ttk.elite, 5);
       expect(r.boss.ttk).toBeCloseTo(B.ttk.boss, 5);
     }
+  });
+
+  // The first floors were a stroll (a fresh squad is usually well ahead of par there), so they bite
+  // harder now: on floor 1 foes hit 25% harder and last 15% longer (BAL.balance.early), fading evenly
+  // to the plain targets above by floor 10.
+  it('the first floors bite harder and last longer, fading to the plain targets by early.until', () => {
+    expect(earlyBoost(1)).toEqual({ hit: 1 + B.early.hit, ttk: 1 + B.early.ttk });
+    expect(earlyBoost(B.early.until)).toEqual({ hit: 1, ttk: 1 });
+    expect(earlyBoost(60)).toEqual({ hit: 1, ttk: 1 });
+    let last = earlyBoost(1);
+    for (let f = 2; f <= B.early.until; f++) {
+      const e = earlyBoost(f);
+      expect(e.hit).toBeLessThan(last.hit);
+      expect(e.ttk).toBeLessThan(last.ttk);
+      last = e;
+    }
+    for (const f of [1, 3, 7]) {
+      const r = fightReport(f, floorPar(f));
+      const e = earlyBoost(f);
+      expect(r.mob.ttk).toBeCloseTo(B.ttk.mob * e.ttk, 5);
+      expect(r.mob.hit).toBeCloseTo(B.hit.mob * e.hit, 5);
+      expect(r.boss.ttk).toBeCloseTo(B.ttk.boss * e.ttk, 5);
+    }
+    // Still fair: floor 1's plain foe at par takes under 2 s to fell and under a tenth of a knight a hit.
+    expect(fightReport(1, floorPar(1)).mob.ttk).toBeLessThan(2);
+    expect(fightReport(1, floorPar(1)).mob.hit).toBeLessThan(0.1);
   });
 
   it('a squad far above par still meets foes worth fighting (nothing folds in one hit)', () => {

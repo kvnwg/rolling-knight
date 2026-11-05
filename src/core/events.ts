@@ -29,6 +29,8 @@ export type CoreEvent =
   | { type: 'bossDown'; floor: number; first: boolean }
   | { type: 'wipe'; floor: number; back: number }
   | { type: 'rebirth'; count: number }
+  /** A knight's dodge roll made something miss it (once per roll); `mine`: the knight you control. */
+  | { type: 'perfectRoll'; mine: boolean }
   | { type: 'toast'; text: string; tone?: 'good' | 'bad' | 'info' | 'gold' };
 
 export type EventSink = (e: CoreEvent) => void;

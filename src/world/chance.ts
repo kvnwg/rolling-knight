@@ -157,7 +157,7 @@ export function onHeroHurt(w: World, hero: Unit, amount: number, from: Unit | nu
     if (w.rng.chance(p)) {
       from.stunT = Math.max(from.stunT, from.boss ? CHANCE.butterfingers.daze * 0.5 : CHANCE.butterfingers.daze);
       from.windT = 0;
-      from.chargeT = 0;
+      from.rush = undefined;
       from.move = undefined;
       say(w, c, from, 'FUMBLE!', COLORS.fumble);
       w.fx.push({ kind: 'spark', x: from.x, y: from.y - 10, color: '#e8e0c8' });
@@ -284,7 +284,7 @@ export function onTick(w: World, dt: number): void {
 function trip(w: World, c: Ctx, m: Unit): void {
   m.stunT = m.elite ? CHANCE.pratfall.eliteStun : CHANCE.pratfall.stun;
   m.windT = 0;
-  m.chargeT = 0;
+  m.rush = undefined;
   m.move = undefined;
   m.moving = false;
   m.hurtT = 0.18;

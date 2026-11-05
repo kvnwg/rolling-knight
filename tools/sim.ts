@@ -35,8 +35,11 @@ let wipes = 0;
 let downs = 0;
 const floorTimes: number[] = [];
 let floorT0 = 0;
+let perfect = 0;
+let perfectMine = 0;
 g.on((e) => {
   if (e.type === 'land') counts[e.rarity] = (counts[e.rarity] ?? 0) + 1;
+  if (e.type === 'perfectRoll') (perfect++, e.mine && perfectMine++);
   if (e.type === 'wipe') (wipes++, timeline.push(`${(g.state.playTimeMs / 60000).toFixed(1)}m wipe on ${e.floor}, back to ${e.back}`));
   if (e.type === 'rebirth') timeline.push(`${(g.state.playTimeMs / 60000).toFixed(1)}m REBIRTH ${e.count}`);
 });
@@ -85,4 +88,5 @@ console.log('rolled:', RARITIES.filter((r) => counts[r]).map((r) => `${r} ${coun
 console.log('squad:', s.squad.map((id) => (id ? `${id} L${s.roster[id]?.level}` : '-')).join(' | '), `power ${Math.round(squadPower(s))}`);
 const avg = floorTimes.length ? floorTimes.reduce((a, b) => a + b, 0) / floorTimes.length : 0;
 console.log(`floors cleared ${floorTimes.length}, avg ${avg.toFixed(0)} s per floor, knights downed ${downs}, wipes ${wipes}`);
+console.log(`perfect rolls ${perfect} (${perfectMine} by the knight you control)`);
 console.log(`(${((realNow() - start) / 1000).toFixed(1)} s real)`);

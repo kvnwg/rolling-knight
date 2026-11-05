@@ -261,6 +261,8 @@ export function heroDodge(w: World, h: Unit, mx: number, my: number, fromHive = 
   const k = kinds[h.cls!];
   h.rolling = { dx, dy, t: k.dur, dur: k.dur, speed: k.dist / k.dur, kind: k.kind, hit: new Set() };
   h.invuln = Math.max(h.invuln, k.dur + 0.05);
+  // Anything that misses the knight because of this roll makes it a perfect roll (world.ts evades).
+  h.dodge = { until: w.time + k.dur + 0.05, perfect: false };
   w.fx.push({ kind: 'dust', x: h.x, y: h.y });
   if (k.kind === 'blink') {
     // Blink: jump straight there (as far as the floor allows).

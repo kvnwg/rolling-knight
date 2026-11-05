@@ -99,8 +99,19 @@ export const BAL = {
   balance: {
     parBase: 750,
     parGrowth: 1.1,
-    ttk: { mob: 1.4, elite: 5.5, boss: 28 },
-    hit: { mob: 0.05, elite: 0.075, boss: 0.1 },
+    /**
+     * (Both a little under what they were, 1.4 s and 5% for a plain foe: foes now come at you faster,
+     * lunge, shoot readable volleys and keep their distance, so they land more blows and take longer to
+     * pin down; each blow and each foe is a little lighter to keep a floor's fight about as long.)
+     */
+    ttk: { mob: 1.3, elite: 5.2, boss: 28 },
+    hit: { mob: 0.04, elite: 0.064, boss: 0.1 },
+    /**
+     * The first floors bite harder than par alone would say (a fresh squad, usually ahead of par, would
+     * otherwise stroll through them): on floor 1 foes hit `hit` more and take `ttk` longer to kill,
+     * fading evenly to the plain targets by floor `until`.
+     */
+    early: { until: 10, hit: 0.25, ttk: 0.15 },
     aboveExp: 0.6,
     belowExp: 0.2,
     minBand: 0.5,
