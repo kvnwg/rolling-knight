@@ -168,11 +168,15 @@ export function paintBroadleaf(s: BroadSpec): Built {
   });
   // The dark core fills between the lobes (seen only in the gaps).
   const CORE = 1000;
-  sc.sphere(CX, CY + RY * 0.06, -RZ * 0.5, RX * 0.84, RY * 0.8, RZ * 0.55, LEAF, CORE, { n: 22, amp: 0.1, ph: R() * 6 });
-  clumps.forEach((c, i) => {
-    const n = Math.max(5, Math.round((Math.PI * 2 * c.r) / 4.6));
-    sc.sphere(c.x, c.y, c.z, c.r, c.r * 0.92, c.r * 0.9, LEAF, i, { n, amp: 0.13 + R() * 0.06, ph: R() * 6 });
-  });
+  const coreScallop = { n: 22, amp: 0.1, ph: R() * 6 };
+  // Front-most first, so the clumps behind skip the pixels already covered.
+  const scallops = clumps.map((c) => ({ n: Math.max(5, Math.round((Math.PI * 2 * c.r) / 4.6)), amp: 0.13 + R() * 0.06, ph: R() * 6 }));
+  const order = clumps.map((_, i) => i).sort((a, b) => clumps[b].z + clumps[b].r * 0.9 - (clumps[a].z + clumps[a].r * 0.9));
+  for (const i of order) {
+    const c = clumps[i];
+    sc.sphere(c.x, c.y, c.z, c.r, c.r * 0.92, c.r * 0.9, LEAF, i, scallops[i]);
+  }
+  sc.sphere(CX, CY + RY * 0.06, -RZ * 0.5, RX * 0.84, RY * 0.8, RZ * 0.55, LEAF, CORE, coreScallop);
 
   // Willow curtains: strands from the crown's rim toward the ground, in front and behind.
   const STRANDS = 3000;

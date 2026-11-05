@@ -192,7 +192,8 @@ export class Scene {
         const dx = (x + 0.5 - cx) / rx;
         const dy = (y + 0.5 - cy) / ry;
         const d2 = dx * dx + dy * dy;
-        if (d2 >= 1.0001 && !sc) continue;
+        // Outside the ball (a scallop only ever cuts in), or behind something nearer than it can reach.
+        if (d2 >= 1 || this.z[y * this.w + x] >= cz + rz) continue;
         const d = Math.sqrt(d2);
         let f = 1;
         if (sc && d > 0.3) {

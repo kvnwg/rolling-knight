@@ -23,7 +23,7 @@ import { SOLID, TILE, type FloorMap, type Prop } from './mapgen';
 export type TreeSize = 'bush' | 'small' | 'medium' | 'huge';
 
 /** How many painted variants of each kind and size a floor uses (the renderer caches one sprite each). */
-export const TREE_VARIANTS = 6;
+export const TREE_VARIANTS = 4;
 
 export interface TreeProp extends Prop {
   kind: 'tree';
