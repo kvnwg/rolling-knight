@@ -224,6 +224,21 @@ describe('the squad in a fight', () => {
     expect(w.portalOpen).toBe(true);
   });
 
+  it('turns coins lying on a floor into gold the squad picks up (nothing there only looks like a pickup)', () => {
+    const biome = BIOMES.dungeon;
+    let found = 0;
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const map = generateFloor({ floor: 22, biome, seed, boss: false });
+      const coins = map.props.filter((p) => p.kind === 'coins').length;
+      expect(map.props.some((p) => p.kind === 'flask'), `seed ${seed}`).toBe(false);
+      const w = new World({ map, biome, floor: 22, boss: false, mobTypes: floorMobs(biome, 22, seed), bossType: null, squad: squad([knightId('rare', 'ranger')]), perks: [], controlled: 0, seed, goldPerKill: 3 });
+      expect(w.map.props.some((p) => p.kind === 'coins')).toBe(false);
+      expect(w.pickups.filter((p) => p.kind === 'gold').length).toBe(coins);
+      found += coins;
+    }
+    expect(found).toBeGreaterThan(0);
+  });
+
   it('your knight attacks only while you hold the attack, toward your aim', () => {
     const w = world([knightId('rare', 'ranger')]);
     const h = w.heroes[0];

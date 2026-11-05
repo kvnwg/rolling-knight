@@ -136,7 +136,8 @@ function dressRoom(c: DecorCtx, r: Room, blue: boolean, wallTaken: ReadonlySet<n
     }
   }
   // --- lights on the floor, and the small things
-  const loose: Array<[PropKind, number]> = [['candles', 3], ['candlestick', 2], ['flask', 3], ['coins', 1], ['bones', 2], ['rubble', 2], ['sword', 1]];
+  // (No flasks on the floor: they read as potions to pick up. Coins on the floor are real gold: world.ts.)
+  const loose: Array<[PropKind, number]> = [['candles', 3], ['candlestick', 2], ['coins', 1], ['bones', 2], ['rubble', 2], ['sword', 1]];
   let lights = 0;
   let things = start ? 2 : rng.int(3, 6);
   const once = new Set<PropKind>();

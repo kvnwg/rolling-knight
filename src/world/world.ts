@@ -218,6 +218,12 @@ export class World {
     }
     this.difficulty = o.difficulty ?? floorPar(o.floor);
     this.traps = makeTraps(o.map);
+    // Coins lying on the floor are real gold: they sit where they lie until the squad picks them up.
+    for (const p of o.map.props) {
+      if (p.kind !== 'coins') continue;
+      this.pickups.push({ uid: uid(), x: p.x, y: p.y, vx: 0, vy: 0, z: 0, vz: 0, kind: 'gold', amount: Math.max(1, Math.round(this.goldPerKill * 3)), t: 0, taken: false });
+    }
+    o.map.props = o.map.props.filter((p) => p.kind !== 'coins');
     for (const s of o.map.spawns) {
       const t = s.boss ? o.bossType! : this.rng.pick(o.mobTypes);
       const m = this.makeMob(t, s.x, s.y, s.elite, s.boss);
