@@ -4,7 +4,7 @@
  * attack on touch screens, the skill roll, the dodge roll, Auto and Camp).
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { knightDef } from '../core/knights';
+import { CLASSES, knightDef } from '../core/knights';
 import { CHALLENGE } from '../core/power';
 import { activeQuests } from '../core/quests';
 import type { Npc } from '../world/npcs';
@@ -16,6 +16,7 @@ import { Bar, Chunky } from './common';
 import { Px } from './px';
 import { SkillRoll, skillSlotLabel, skillSlotState } from './SkillRoll';
 import { SpellSlam } from './SpellSlam';
+import { CLASS_TINT } from './ClassTag';
 import { RUN_ITEMS, RUN_ITEM_IDS, canStack } from '../core/runItems';
 import { fmt } from './format';
 import { AltarReels } from './fx/AltarReels';
@@ -257,7 +258,9 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
               </span>
               <span className="nm">
                 <span>{def.name}</span>
-                <Px icon={CLASS_ICON[def.cls]} size="xs" />
+                <span className="cls-chip" style={{ ['--cc' as string]: CLASS_TINT[def.cls] }} title={CLASSES[def.cls].name}>
+                  <Px icon={CLASS_ICON[def.cls]} size="xs" />
+                </span>
               </span>
               <Bar value={hp} kind="hp" />
             </button>

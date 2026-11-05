@@ -31,7 +31,7 @@ import { Delta, Glyph, KeeperScreen, Purse, ShopBody, ShopFoot, ShopGrid, ShopHe
 import { OfferCard } from './OfferCard';
 import { RollBody, RollButton, RollHead, RollLabel, RollList, RollReel, RollRow, RollStage, pctShort, rarityInk, type ReelSpin } from './RollMachine';
 import { Icon } from './TinkerShop';
-import { CLASS_ICON } from '../classIcons';
+import { ClassTag } from '../ClassTag';
 import { Codex } from '../panels';
 import { coinFly } from '../fx/coinFly';
 import { DragKnight } from './DragKnight';
@@ -779,6 +779,7 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
                     )}
                   </div>
                   <b>{knightDef(id).name}</b>
+                  <ClassTag cls={knightDef(id).cls} short />
                   <small>
                     Lv {st.roster[id]?.level ?? 1} · <Px icon="sword" size="xs" /> {fmt(knightRating(st, id))}
                   </small>
@@ -828,7 +829,7 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
                     key={id}
                     cardId={id}
                     level={`Lv ${rec.level}`}
-                    levelRight={<Px icon={CLASS_ICON[def.cls]} size="xs" />}
+                    levelRight={<ClassTag cls={def.cls} short />}
                     art={<HeroArt id={id} mutation={rec.mutation} s={1} />}
                     tall
                     tag={rarityTag(id)}
@@ -860,7 +861,7 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
                   <OfferCard
                     key={id}
                     level={`Lv ${rec.level}`}
-                    levelRight={<Px icon={CLASS_ICON[def.cls]} size="xs" />}
+                    levelRight={<ClassTag cls={def.cls} short />}
                     art={
                       <DragKnight onDrop={(to) => putAt(id, to)} title="Drag onto a squad slot">
                         <HeroArt id={id} mutation={rec.mutation} s={1} />
@@ -900,7 +901,7 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
                 <OfferCard
                   key={id}
                   level={rec.mutation ? rec.mutation.toUpperCase() : 'No mutation'}
-                  levelRight={<Px icon={CLASS_ICON[def.cls]} size="xs" />}
+                  levelRight={<ClassTag cls={def.cls} short />}
                   art={<HeroArt id={id} mutation={rec.mutation} s={1} />}
                   tall
                   tag={rarityTag(id)}
