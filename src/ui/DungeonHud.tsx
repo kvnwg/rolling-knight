@@ -311,10 +311,10 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
           size="sm"
           rim={s.settings.autoPlay ? 'brass' : 'iron'}
           className={`k-auto ${s.settings.autoPlay ? 'on' : ''}`}
-          label="AUTO ATTACK"
+          label={s.settings.autoPlay ? 'AUTO ON' : 'AUTO'}
           hint="T"
           flash={flash.auto}
-          title="Auto attack: your knight aims and fires by itself (T)"
+          title="Auto battle: your knight fights and goes down by itself; steer or attack to take over (T)"
           onClick={() => (uiSound('tap'), game.setAuto(!s.settings.autoPlay))}
         >
           <Px icon="reel" size="sm" s={1} />

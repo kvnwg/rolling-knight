@@ -184,7 +184,7 @@ export class Game {
     this.applyRunItems();
     this.questEvent({ type: 'floor', floor });
     this.world.auto = s.settings.autoPlay;
-    this.world.bot = this.bot;
+    this.world.bot = this.bot || s.settings.autoPlay;
     // The upgrade map's chance lines play on this floor.
     onFloorStart(this.world, s);
     s.controlled = this.world.controlled;
@@ -307,7 +307,7 @@ export class Game {
     this.fade = 1;
     this.fadeDir = -1;
     this.syncHub(true);
-    if (this.bot) this.autoReturnT = 5;
+    if (this.bot || s.settings.autoPlay) this.autoReturnT = 5;
     this.save();
     this.version++;
   }
@@ -425,10 +425,17 @@ export class Game {
     }
   }
 
-  /** Auto attack (the setting autoPlay): your knight aims and attacks by itself; you still move and dodge. */
+  /**
+   * Auto battle (the setting autoPlay): your knight plays itself in a fight, moving, dodging and
+   * fighting by its class's AI, and goes down once the floor is done (App hands it back to you
+   * while you steer or attack); after a wipe the squad heads back down on its own.
+   */
   setAuto(on: boolean): void {
     this.state.settings.autoPlay = on;
-    if (this.world) this.world.auto = on;
+    if (this.world) {
+      this.world.auto = on;
+      this.world.bot = this.bot || on;
+    }
     this.version++;
   }
 

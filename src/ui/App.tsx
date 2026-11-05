@@ -232,13 +232,15 @@ export function App() {
         wasIn = game.inDungeon;
         if (!wasIn) music.setScene('camp');
       }
-      // A reveal pauses the fight (the altar keeps its own pace). Auto attack (the setting, and while a
-      // sheet is open) only aims and attacks for you: moving and dodging stay yours. The dev bot
-      // (?auto, the sim) plays the knight outright.
+      // A reveal pauses the fight (the altar keeps its own pace). Auto battle (the setting) plays your
+      // knight outright in a fight: it moves, dodges, fights and goes down when the floor is done;
+      // steering or attacking yourself takes over for as long as you do. A sheet open only aims and
+      // attacks for you. The dev bot (?auto, the sim) never lets go.
       game.paused = revealRef.current.length > 0 || talkRef.current !== null;
       if (w) {
+        const autoBattle = game.inDungeon && game.state.settings.autoPlay && !(c.mx || c.my || c.attack);
         w.auto = game.state.settings.autoPlay || sheetRef.current;
-        w.bot = game.bot;
+        w.bot = game.bot || autoBattle;
         // A counter or a sheet open at the hub holds your knight still.
         const hold = !game.inDungeon && sheetRef.current;
         w.input.mx = hold ? 0 : c.mx;
