@@ -84,14 +84,24 @@ function cast(skill: SkillId, cls: ClassId, seconds = 4): { plays: Map<string, n
   const claims = new Map<string, number>();
   const counted = new WeakSet<object>();
   let landed = false;
+  const x0 = h.x;
+  const y0 = h.y;
   for (let t = 0; t < ROLL_TIME + seconds; t += DT) {
     // (The knight's own attacks would only add bursts no skill makes.)
     h.atkT = 999;
+    // (Held where it stood until the skill fires: a Legendary's slam takes a beat, and a knight
+    // jostled up to a wall meanwhile would cut Excalibur's line short.)
+    if (!landed) {
+      h.x = x0;
+      h.y = y0;
+    }
     w.update(DT);
-    // (Once it lands, no other roll: the knight's AI would roll again at once.)
+    // (Once it lands, no other roll: the knight's AI chains the next one on in the same frame.)
     if (h.lastSkill) {
       landed = true;
       h.specialT = 999;
+      h.skillRoll = undefined;
+      h.skillSlam = undefined;
     }
     sp.update(w);
     for (const a of w.areas) {
