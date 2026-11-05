@@ -75,8 +75,9 @@ export function goodMomentToRoll(w: World, h: Unit, target: Unit | null, foes: r
     case 'caster':
       return !!target && ((w.densest(h, 150, 34)?.n ?? 0) >= 2 || boss || patient);
     case 'healer': {
-      const hurt = w.heroes.filter((o) => !o.downed && o.hp / o.maxHp < 0.75).length;
-      return down || hurt >= 2 || w.heroes.some((o) => !o.downed && o.hp / o.maxHp < 0.5) || (!!target && waited > 5);
+      // (Not at the first scratch: a roll spent early leaves nothing for a knight who falls.)
+      const hurt = w.heroes.filter((o) => !o.downed && o.hp / o.maxHp < 0.55).length;
+      return down || hurt >= 2 || w.heroes.some((o) => !o.downed && o.hp / o.maxHp < 0.35) || (!!target && waited > 6);
     }
   }
   return false;

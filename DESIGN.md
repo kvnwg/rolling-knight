@@ -78,18 +78,35 @@ and Mythic or better.
   Uncommons with Humble Beginnings).
 - **Classes** (the kit is the same for every knight of a class):
 
-| Class | Role | Auto attack | Dodge | Special |
-| --- | --- | --- | --- | --- |
-| Guardian | Tank | Shield Bash (knockback) | Bulwark Roll (short, then half damage) | Rallying Taunt |
-| Blade | Fighter | Cleave (wide arc) | Combat Roll | Whirlwind |
-| Ranger | Archer | Longshot | Backflip (long) | Arrow Rain |
-| Cleric | Healer | Holy Orb (heals the most hurt ally) | Blessed Step (healing glow) | Sanctuary (heal 35%, raise a fallen knight) |
-| Arcanist | Mage (rebirth 1) | Arcane Bolt (seeking, splash) | Blink | Meteor |
-| Lancer | Lancer (rebirth 2) | Pierce (a line) | Vault | Dragon Lunge |
+| Class | Role | Auto attack | Dodge |
+| --- | --- | --- | --- |
+| Guardian | Tank | Shield Bash (knockback) | Bulwark Roll (short, then half damage) |
+| Blade | Fighter | Cleave (wide arc) | Combat Roll |
+| Ranger | Archer | Longshot | Backflip (long) |
+| Cleric | Healer | Holy Orb (heals the most hurt ally) | Blessed Step (healing glow) |
+| Arcanist | Mage (rebirth 1) | Arcane Bolt (seeking, splash) | Blink |
+| Lancer | Lancer (rebirth 2) | Pierce (a line) | Vault |
 
-- **Signature specials.** A few rare knights replace their class's special. **Chronomancer Aeon**
-  (Mythic Arcanist) has **Rewind**: the squad goes back 4 seconds (positions, HP, fallen knights),
-  enemy shots and spells in the air vanish, and damage dealt stays.
+- **Skill rolls** (`src/core/skillbook.ts`, `src/world/skills.ts`). There is no fixed special: the
+  skill button spins a 0.7 s reel over the class's list and fires whatever it lands on (the result is
+  fixed when the spin starts, as at the altar); then the cooldown starts. Allies roll on their own
+  when the moment suits their role. Each class has six skills; at luck 1 they weigh 30, 26, 20, 13, 8
+  and 3 in 100 (two commons, an uncommon, a rare, an epic, a legendary), and luck tilts them rarer
+  (weight × luck^(0.1 × tier step), luck capped at 1000; Loaded Dice adds to it). Epic and up chain
+  several beats and announce their tier; legendary and up flash the screen and stop time for a beat.
+
+| Class | Common | Common | Uncommon | Rare | Epic | Legendary |
+| --- | --- | --- | --- | --- | --- | --- |
+| Guardian | Shield Slam | Iron Skin | Ground Pound | Rallying Taunt | Aegis | Titan's Wrath |
+| Blade | Twin Slash | Battle Cry | Shadowstep | Whirlwind | Thousand Cuts | Excalibur |
+| Ranger | Power Shot | Fan of Arrows | Snare Shot | Arrow Rain | Arrow Nova | Thousand Arrows |
+| Cleric | Mend | Smite | Blessing | Sanctuary | Guardian Angel | Miracle |
+| Arcanist | Magic Missiles | Frost Nova | Chain Lightning | Meteor | Singularity | Meteor Storm |
+| Lancer | Javelin | Sweep | Impale | Dragon Lunge | Wyrm Rush | Skyfall |
+
+- **Signature skills.** A few rare knights add a jackpot to their own list (weight 2). **Chronomancer
+  Aeon** (Mythic Arcanist) can roll **Rewind**: the squad goes back 4 seconds (positions, HP, fallen
+  knights), enemy shots and spells in the air vanish, and damage dealt stays.
 
 ## 6. The squad
 
@@ -147,8 +164,8 @@ beaten for the first time in a run) buy perks from four trees; a rebirth clears 
   luck 1; 2 shards per low dupe), Rags to Riches (+25% stats per tier below Legendary), Peasant Revolt
   (a low-rarity squad deals double damage and dodges twice as often), Hand-Me-Downs (shards spread to
   the whole class).
-- **Command**: Tag Team (switching fires the special), Lone Wolf (solo: ×3 HP, ×2.5 damage), Hive Mind
-  (the squad dodges with you; allies' specials 2× faster), War Banner (your hits speed up the squad),
+- **Command**: Tag Team (switching rolls a free skill), Lone Wolf (solo: ×3 HP, ×2.5 damage), Hive Mind
+  (the squad dodges with you; allies' skill rolls 2× faster), War Banner (your hits speed up the squad),
   Heirloom (keep your knight through the next rebirth).
 - **Rigged Reels**: Four-Leaf Litter, Bootleg Reel, Greased Gears, Pawn Shop, Rigged Jackpot.
 - **Bad Ideas**: Glass Cannon, Roll Dancer, Blood Pact, Berserker, Kamikaze.

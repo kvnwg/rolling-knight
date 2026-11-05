@@ -353,15 +353,21 @@ function effect(w: World, h: Unit, sk: SkillDef): void {
   switch (sk.id) {
     // ------------------------------------------------------------ Guardian
     case 'shieldSlam': {
+      // The shield into everything in front (facing the nearest foe first).
       const n = SKILLS.shieldSlam.n;
-      const t = foeFor(w, h, n.reach);
-      if (t) {
-        face(h, t.x, t.y);
-        hit(w, h, t, n.dmg, { knock: n.knock, crit: true });
-        stun(w, t, n.stun);
-      }
+      const t = foeFor(w, h, n.r + 24);
       const [dx, dy] = heading(w, h, t);
-      w.fx.push({ kind: 'blast', x: t?.x ?? h.x + dx * 12, y: t?.y ?? h.y + dy * 12, color: c, size: 1, src: 'slam' });
+      face(h, h.x + dx * 10, h.y + dy * 10);
+      const cx = h.x + dx * 12;
+      const cy = h.y + dy * 12;
+      for (const e of w.enemiesIn('hero', cx, cy - 4, n.r)) {
+        const [ex, ey] = norm(e.x - h.x, e.y - h.y);
+        if (ex * dx + ey * dy < -0.2 && dist(e.x, e.y, h.x, h.y) > 10) continue;
+        const [kx, ky] = ex || ey ? [ex, ey] : [dx, dy];
+        hit(w, h, e, n.dmg, { knock: n.knock, kx, ky, crit: true });
+        stun(w, e, n.stun);
+      }
+      w.fx.push({ kind: 'blast', x: cx, y: cy, color: c, size: 1.2, src: 'slam' });
       w.shakeIt(2, 0.15);
       break;
     }
@@ -369,7 +375,9 @@ function effect(w: World, h: Unit, sk: SkillDef): void {
       const n = SKILLS.ironSkin.n;
       guard(h, n.dr, n.dur);
       w.heal(h, h.maxHp * n.heal);
+      for (const e of w.livingMobs()) if (dist(e.x, e.y, h.x, h.y) <= n.r) taunt(w, e, h, n.taunt);
       w.fx.push({ kind: 'levelup', x: h.x, y: h.y, color: c });
+      w.fx.push({ kind: 'shock', x: h.x, y: h.y, color: c, size: 2, src: 'taunt' });
       break;
     }
     case 'groundPound': {
@@ -589,9 +597,13 @@ function effect(w: World, h: Unit, sk: SkillDef): void {
     }
     // ------------------------------------------------------------ Cleric
     case 'mend': {
+      // A fallen knight first (the nearest), else the most hurt.
       const n = SKILLS.mend.n;
-      const o = mostHurt(w) ?? h;
-      w.clericHeal(o, o.maxHp * n.heal);
+      const fallen = w.perks.has('bloodPact') ? null : nearestFallen(w, h);
+      const o = fallen ?? mostHurt(w) ?? h;
+      for (const p of w.livingHeroes()) if (p !== o) w.clericHeal(p, p.maxHp * n.rest);
+      if (fallen) w.revive(fallen, n.revive);
+      else w.clericHeal(o, o.maxHp * n.heal);
       w.fx.push({ kind: 'levelup', x: o.x, y: o.y, color: c });
       w.areas.push({ uid: uid(), team: 'hero', x: o.x, y: o.y, r: 14, delay: 0, dur: 1, tick: 1, tickT: 1, dmg: 0, kind: 'glow', from: h.uid, color: c, t: 0 });
       break;
@@ -618,7 +630,7 @@ function effect(w: World, h: Unit, sk: SkillDef): void {
     case 'sanctuary': {
       const n = SKILLS.sanctuary.n;
       for (const o of w.livingHeroes()) w.clericHeal(o, o.maxHp * n.heal);
-      const fallen = w.heroes.filter((o) => o.downed).sort((p, q) => dist(p.x, p.y, h.x, h.y) - dist(q.x, q.y, h.x, h.y))[0];
+      const fallen = nearestFallen(w, h);
       if (fallen && !w.perks.has('bloodPact')) w.revive(fallen, n.revive);
       w.areas.push({ uid: uid(), team: 'hero', x: h.x, y: h.y, r: n.r, delay: 0, dur: n.dur, tick: n.every, tickT: n.every, dmg: 0, heal: n.regen, kind: 'sanctuary', from: h.uid, color: c, t: 0 });
       w.fx.push({ kind: 'levelup', x: h.x, y: h.y, color: c });
@@ -667,7 +679,7 @@ function effect(w: World, h: Unit, sk: SkillDef): void {
       const base = Math.atan2(dy, dx);
       for (let i = 0; i < n.missiles; i++) {
         const ang = base + (i - (n.missiles - 1) / 2) * n.spread;
-        fire(w, h, Math.cos(ang), Math.sin(ang), { kind: 'bolt', speed: n.speed, dmg: a * n.dmg, color: c, r: 3, life: 1.8, homing: n.homing });
+        fire(w, h, Math.cos(ang), Math.sin(ang), { kind: 'bolt', speed: n.speed, dmg: a * n.dmg, color: c, r: 3, life: 1.8, homing: n.homing, splash: n.splash });
       }
       break;
     }
@@ -755,8 +767,9 @@ function effect(w: World, h: Unit, sk: SkillDef): void {
       }
       later(h, n.dur, () => {
         for (const e of w.enemiesIn('hero', spot.x, spot.y, n.burstR)) {
-          const [kx, ky] = norm(e.x - spot.x, e.y - spot.y);
-          hit(w, h, e, n.burst, { knock: 20, kx: kx || 1, ky, crit: true });
+          const [ox, oy] = norm(e.x - spot.x, e.y - spot.y);
+          const [kx, ky] = ox || oy ? [ox, oy] : [1, 0];
+          hit(w, h, e, n.burst, { knock: 20, kx, ky, crit: true });
         }
         w.shakeIt(5, 0.35);
       });
@@ -988,7 +1001,7 @@ function lunge(w: World, h: Unit, dur: number, speed: number, dmg: number, knock
 }
 
 /** A shot of the knight's from its hands (or from x, y). */
-function fire(w: World, h: Unit, dx: number, dy: number, o: { kind: Shot['kind']; speed: number; dmg: number; color: string; r: number; life: number; pierce?: number; homing?: number; x?: number; y?: number }): void {
+function fire(w: World, h: Unit, dx: number, dy: number, o: { kind: Shot['kind']; speed: number; dmg: number; color: string; r: number; life: number; pierce?: number; homing?: number; splash?: number; x?: number; y?: number }): void {
   w.shots.push({
     uid: uid(),
     team: 'hero',
@@ -1004,6 +1017,7 @@ function fire(w: World, h: Unit, dx: number, dy: number, o: { kind: Shot['kind']
     from: h.uid,
     ...(o.pierce ? { pierce: o.pierce } : {}),
     ...(o.homing ? { homing: o.homing } : {}),
+    ...(o.splash ? { splash: o.splash } : {}),
   });
 }
 
@@ -1043,6 +1057,13 @@ function slash(w: World, h: Unit, mult: number, r: number, knock: number): void 
     hit(w, h, e, mult, { knock, crit: true });
   }
   w.fx.push({ kind: 'crit', x: cx, y: cy, color: '#e8f0ff' });
+}
+
+/** The fallen knight nearest to h, if any. */
+function nearestFallen(w: World, h: Unit): Unit | null {
+  let best: Unit | null = null;
+  for (const o of w.heroes) if (o.downed && (!best || dist(o.x, o.y, h.x, h.y) < dist(best.x, best.y, h.x, h.y))) best = o;
+  return best;
 }
 
 /** The living knight with the least of their HP left. */

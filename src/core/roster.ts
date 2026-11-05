@@ -5,12 +5,13 @@
  * strongest free knight; anything else is your choice (or Best squad).
  */
 import { BAL } from './balance';
-import { CLASSES, knightDef, specialOf, type ClassId } from './knights';
+import { CLASSES, knightDef, type ClassId } from './knights';
 import { hasPerk } from './perks';
 import { RARITY_STAT, rarityIndex, type Rarity } from './rarity';
 import type { GameState, KnightRec, MutationId } from './state';
 import { MUTATIONS } from './state';
 import { upgradeFx } from './upgrades';
+import { skillRollCd } from './skillbook';
 
 const LEGENDARY = rarityIndex('legendary');
 
@@ -76,7 +77,7 @@ export function knightStats(state: GameState, id: string): KnightStats {
   if (hasPerk(state, 'rollDancer')) atkCd *= 1.2;
   let dodgeCd = cls.dodgeCd;
   if (hasPerk(state, 'rollDancer')) dodgeCd *= 0.5;
-  return { hp, atk, armor: cls.armor, speed: cls.speed * speedMult, atkCd, range: cls.range, dodgeCd, specialCd: specialOf(id).cd };
+  return { hp, atk, armor: cls.armor, speed: cls.speed * speedMult, atkCd, range: cls.range, dodgeCd, specialCd: skillRollCd(id) };
 }
 
 // ------------------------------------------------------------------ duplicates

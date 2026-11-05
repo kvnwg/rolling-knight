@@ -2,7 +2,7 @@
  * The HUD in the dungeon: the floor, the currencies and luck, the altar's mini roller, the squad (tap
  * to take control), quests, and the pixel action buttons: the special, the dodge roll, Auto and Camp.
  */
-import { CLASSES, knightDef, specialOf } from '../core/knights';
+import { CLASSES, knightDef } from '../core/knights';
 import { CHALLENGE } from '../core/power';
 import { activeQuests, questGoal } from '../core/quests';
 import type { Npc } from '../world/npcs';
@@ -11,7 +11,8 @@ import { drySpell } from '../core/roller';
 import type { Controls } from '../input/input';
 import type { Game } from '../game';
 import { Bar, Chunky } from './common';
-import { Px, type IconName } from './px';
+import { Px } from './px';
+import { SkillRoll, skillSlotLabel, skillSlotState } from './SkillRoll';
 import { AltarReels } from './fx/AltarReels';
 import daggerUrl from '../assets/ui/dagger.png';
 import { uiSound } from './sound';
@@ -20,7 +21,6 @@ import { TopBar } from './TopBar';
 
 const touch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
-const SPECIAL_ICON: Record<string, IconName> = { guardian: 'shield', blade: 'sword', ranger: 'target', cleric: 'heart', arcanist: 'bolt', lancer: 'arrowRight' };
 
 export function DungeonHud({ game, controls, press, onCamp, onSettings, onLuck, onAltar, onTalk }: {
   game: Game;
@@ -39,7 +39,7 @@ export function DungeonHud({ game, controls, press, onCamp, onSettings, onLuck, 
   const mobsLeft = w ? w.livingMobs().length : 0;
   const dodge = me ? Math.max(0, me.dodgeT!) : 0;
   const special = me ? Math.max(0, me.specialT!) : 0;
-  const sp = me ? specialOf(me.knightId!) : null;
+  const roll = me ? skillSlotState(me) : 'off';
   const showHints = s.run.floor === 1 && s.rebirths === 0 && s.playTimeMs < 150_000;
   const boss = w?.bossUnit && !w.bossUnit.dead ? w.bossUnit : null;
   const ch = game.difficulty ? CHALLENGE[game.difficulty.challenge] : null;
@@ -133,12 +133,12 @@ export function DungeonHud({ game, controls, press, onCamp, onSettings, onLuck, 
           {!touch && <span className="key">T</span>}
         </button>
         <button
-          className={`slot-btn ${special <= 0 && me ? 'ready' : 'cooling'}`}
+          className={`slot-btn ${roll === 'ready' ? 'ready' : 'cooling'}`}
           onPointerDown={(e) => (e.stopPropagation(), press('special'))}
-          title="Special (E)"
+          title="Skill roll (E)"
         >
-          <span className="well" style={{ ['--ring' as string]: `var(--sk-slot-${special <= 0 && me ? 'brass' : 'iron'}-arcane)` }}>
-            <Px icon={sp?.signature === 'rewind' ? 'clock' : SPECIAL_ICON[me?.cls ?? 'blade']} size="md" s={1.5} />
+          <span className="well" style={{ ['--ring' as string]: `var(--sk-slot-${roll === 'ready' || roll === 'rolling' ? 'brass' : 'iron'}-arcane)` }}>
+            <SkillRoll game={game} />
             {special > 0 && me && (
               <>
                 <i className="cool" style={{ ['--cd' as string]: `${Math.ceil((special / me.specialCd!) * 8) * 12.5}%` }} />
@@ -146,7 +146,7 @@ export function DungeonHud({ game, controls, press, onCamp, onSettings, onLuck, 
               </>
             )}
           </span>
-          <span className="lbl">{sp ? sp.name.toUpperCase() : 'SPECIAL'}</span>
+          <span className="lbl">{me ? skillSlotLabel(me) : 'SKILL'}</span>
           {!touch && <span className="key">E</span>}
         </button>
         <button className="slot-btn small" onClick={() => (uiSound('close'), onCamp())} title="Camp (Esc)">
@@ -197,7 +197,7 @@ export function DungeonHud({ game, controls, press, onCamp, onSettings, onLuck, 
 
       {showHints && me && (
         <div className="hint glass outlined">
-          {touch ? 'Drag on the left to move. Your knights attack on their own.' : 'WASD to move · SPACE dodge roll · E special · 1 2 3 switch knight'}
+          {touch ? 'Drag on the left to move. Your knights attack on their own.' : 'WASD to move · SPACE dodge roll · E skill roll · 1 2 3 switch knight'}
           <span className="t-muted">{CLASSES[me.cls!].auto.name} fires by itself whenever a foe is in range.</span>
         </div>
       )}

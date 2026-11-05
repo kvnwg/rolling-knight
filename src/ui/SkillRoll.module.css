@@ -1,0 +1,255 @@
+/*
+ * The skill roll (SkillRoll.tsx) inside the HUD's special slot: a window on the slot's enamel where
+ * the knight's skill icons spin past, a flash and a burst when one lands, its name popping up above
+ * the slot; and the skill table for the hero sheet. Sizes are art pixels (var(--px)), motion moves in
+ * whole pixels, glows are hard-edged rings.
+ */
+.root {
+  --ink: #1a1326;
+  --tc: #ffffff;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  font-family: 'Pixelify Sans', 'Courier New', monospace;
+  font-variant-ligatures: none;
+}
+
+/* The window: the enamel inside the ring, cut to the slot's octagon. */
+.win {
+  position: absolute;
+  inset: var(--inset);
+  overflow: hidden;
+  clip-path: polygon(17% 0, 83% 0, 100% 17%, 100% 83%, 83% 100%, 17% 100%, 0 83%, 0 17%);
+}
+.bump {
+  position: absolute;
+  inset: 0;
+}
+.strip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.cell {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: var(--cell);
+}
+.cell img {
+  image-rendering: pixelated;
+}
+.root[data-state='off'] .strip {
+  visibility: hidden;
+}
+/* Cooling down: the skill it landed on, in the dark. */
+.root[data-state='cooling'] .strip {
+  filter: brightness(0.55) saturate(0.6);
+}
+/* A rare result on its way in: the window's edge beats in its tier's light. */
+.root[data-tease] .win::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 0 var(--px) var(--tc);
+  animation: tease 0.14s steps(1) infinite;
+}
+@keyframes tease {
+  50% {
+    box-shadow: inset 0 0 0 calc(2 * var(--px)) var(--tc);
+  }
+}
+.flash {
+  position: absolute;
+  inset: 0;
+  background: var(--tc);
+  opacity: 0;
+}
+
+/* Sparks flying off the slot (Epic and up). */
+.sparks {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+}
+.sparks img {
+  position: absolute;
+  image-rendering: pixelated;
+}
+
+/* Light rays behind the slot (Legendary and the jackpot), turning, then fading. */
+.rays {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--size) * 2.4 * var(--px));
+  height: calc(var(--size) * 2.4 * var(--px));
+  margin: calc(var(--size) * -1.2 * var(--px)) 0 0 calc(var(--size) * -1.2 * var(--px));
+  z-index: -1;
+  animation:
+    raysIn 0.24s steps(3) backwards,
+    raysSpin 8s linear infinite,
+    raysOut 0.5s steps(4) forwards;
+  animation-delay: 0s, 0s, calc(var(--dur) - 0.6s);
+}
+@keyframes raysIn {
+  from {
+    opacity: 0;
+    scale: 0.4;
+  }
+}
+@keyframes raysSpin {
+  to {
+    rotate: 360deg;
+  }
+}
+@keyframes raysOut {
+  to {
+    opacity: 0;
+  }
+}
+
+/* The name, popping up above the slot (kept on screen by --shift), its tier under it from Rare up. */
+.pop {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 3 * var(--px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(0.5 * var(--px));
+  translate: calc(-50% + var(--shift, 0px)) 0;
+  white-space: nowrap;
+  animation: pop var(--dur) steps(16) forwards;
+  transform-origin: 50% 100%;
+}
+.root[data-calm] .pop {
+  animation: popCalm var(--dur) steps(4) forwards;
+}
+@keyframes pop {
+  0% {
+    transform: translateY(calc(4 * var(--px))) scale(0.4);
+    opacity: 0;
+  }
+  8% {
+    transform: translateY(calc(-2 * var(--px))) scale(1.25);
+    opacity: 1;
+  }
+  16% {
+    transform: none;
+  }
+  78% {
+    transform: translateY(calc(-3 * var(--px)));
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(calc(-9 * var(--px)));
+    opacity: 0;
+  }
+}
+@keyframes popCalm {
+  0%,
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.tier {
+  font-size: calc(3.6 * var(--px));
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--tc);
+  text-shadow:
+    calc(0.6 * var(--px)) 0 0 var(--ink),
+    calc(-0.6 * var(--px)) 0 0 var(--ink),
+    0 calc(0.6 * var(--px)) 0 var(--ink),
+    0 calc(-0.6 * var(--px)) 0 var(--ink),
+    0 calc(1.2 * var(--px)) 0 var(--ink);
+}
+.pop[data-step='5'] .tier {
+  animation: jackpot 0.2s steps(1) infinite;
+}
+@keyframes jackpot {
+  50% {
+    color: #fff07a;
+  }
+}
+
+/* ------------------------------------------------------------ the hero sheet's table */
+
+.table {
+  display: flex;
+  flex-direction: column;
+  gap: var(--px);
+  font-family: 'Pixelify Sans', 'Courier New', monospace;
+  font-variant-ligatures: none;
+}
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: calc(3 * var(--px));
+  padding: 0 calc(1 * var(--px));
+  font-size: calc(4.3 * var(--px));
+  color: #b3b6d8;
+}
+.head b {
+  color: #ffcf4a;
+}
+.row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0 calc(2.5 * var(--px));
+  padding: calc(1.5 * var(--px)) calc(2.5 * var(--px)) calc(1.5 * var(--px)) calc(2 * var(--px));
+  background: rgba(10, 8, 22, 0.45);
+  box-shadow:
+    inset var(--px) 0 0 var(--tc),
+    0 calc(-1 * var(--px)) 0 0 #1a1326,
+    0 var(--px) 0 0 #1a1326,
+    calc(-1 * var(--px)) 0 0 0 #1a1326,
+    var(--px) 0 0 0 #1a1326;
+  font-size: calc(4.3 * var(--px));
+  line-height: 1.3;
+  color: #b3b6d8;
+}
+.row[data-on] {
+  background: rgba(255, 207, 74, 0.14);
+}
+.icon {
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: calc(14 * var(--px));
+  height: calc(14 * var(--px));
+  background: rgba(10, 8, 22, 0.5);
+  box-shadow: inset 0 0 0 var(--px) var(--tc);
+}
+.icon img {
+  image-rendering: pixelated;
+}
+.name {
+  font-weight: 700;
+  color: #fffaf0;
+}
+.name .tier {
+  margin-left: calc(1.5 * var(--px));
+  font-size: calc(3.4 * var(--px));
+  text-shadow: none;
+}
+.odds {
+  font-weight: 700;
+  color: var(--tc);
+  text-align: right;
+}
+.text {
+  grid-column: 2 / 4;
+}

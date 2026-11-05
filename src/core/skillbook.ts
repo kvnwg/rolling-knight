@@ -7,8 +7,9 @@
  *
  * Odds: each skill has a weight (a class's six add up to 100, so at luck 1 a weight is its chance
  * in percent). Luck tilts them gently toward the rarer tiers: a skill's weight is multiplied by
- * luck ^ (0.1 x its tier's step above common), so luck 10 makes a legendary 2.5x as likely and luck
- * 100 6.3x, while the commons stay as they are (luck past 1,000 counts as 1,000).
+ * luck ^ (0.1 x its tier's step above common), so at luck 10 a legendary weighs 2.5x as much (its
+ * chance goes from 3% to about 5.7%) and at luck 100 6.3x, while the commons keep their weight (luck
+ * past 1,000 counts as 1,000).
  *
  * Numbers (`n`): damage in multiples of the knight's attack, heals and shields as shares of max HP
  * (a damage-taken multiplier for `dr`), distances in art pixels (16 to a tile), times in seconds.
@@ -86,44 +87,44 @@ const less = (dr: number) => pct(1 - dr);
 // The numbers first, so each skill's line is written from the same numbers its effect uses.
 const N = {
   // --- Guardian
-  shieldSlam: { dmg: 2.5, knock: 26, stun: 1.2, reach: 44 },
-  ironSkin: { dr: 0.5, dur: 5, heal: 0.12 },
+  shieldSlam: { dmg: 2.5, knock: 26, stun: 1.2, r: 30 },
+  ironSkin: { dr: 0.5, dur: 5, heal: 0.12, taunt: 3, r: 64 },
   groundPound: { dmg: 2, r: 46, stun: 1.5, knock: 10 },
   rallyingTaunt: { r: 96, taunt: 4, dr: 0.4, dmg: 1.5, knock: 18 },
   aegis: { dr: 0.3, dur: 6, heal: 0.2, r: 48, dmg: 0.5, knock: 22 },
   titansWrath: { dmg: 5, r: 72, stun: 2.5, knock: 30, taunt: 6, tauntR: 150, dr: 0.2, dur: 6, after: 3, afterDmg: 1.5, afterR: 56, every: 0.45 },
   // --- Blade
-  twinSlash: { dmg: 1.8, r: 26, knock: 8, gap: 0.16 },
-  battleCry: { atkSpd: 1.6, moveSpd: 1.25, dur: 5 },
-  shadowstep: { dmg: 3.5, reach: 110, stun: 0.6 },
+  twinSlash: { dmg: 2.4, r: 28, knock: 8, gap: 0.16 },
+  battleCry: { atkSpd: 1.7, moveSpd: 1.25, dur: 6 },
+  shadowstep: { dmg: 4.5, reach: 110, stun: 1 },
   whirlwind: { dur: 2, every: 0.22, dmg: 0.8, r: 28, knock: 5 },
   thousandCuts: { strikes: 10, every: 0.15, dmg: 1.5, reach: 90 },
   excalibur: { dmg: 4, blasts: 7, step: 24, r: 16, every: 0.06, endDmg: 5, endR: 30 },
   // --- Ranger
-  powerShot: { dmg: 3, pierce: 4, speed: 300 },
-  fanShot: { arrows: 5, spread: 0.2, dmg: 1.3, speed: 220 },
-  snare: { dmg: 1.6, r: 28, stun: 2.2, speed: 220, reach: 200 },
+  powerShot: { dmg: 4, pierce: 6, speed: 300 },
+  fanShot: { arrows: 7, spread: 0.16, dmg: 1.4, speed: 220 },
+  snare: { dmg: 2, r: 32, stun: 2.5, speed: 220, reach: 200 },
   arrowRain: { r: 34, dur: 2, every: 0.18, dmg: 0.5, reach: 150 },
   arrowNova: { arrows: 16, rings: 2, gap: 0.22, dmg: 1.5, speed: 220, leap: 44 },
   thousandArrows: { spots: 8, r: 28, dur: 3, every: 0.15, dmg: 0.6, reach: 190 },
   // --- Cleric
-  mend: { heal: 0.3 },
-  smite: { dmg: 3.5, r: 20, delay: 0.35, heal: 0.06, reach: 140 },
-  blessing: { heal: 0.15, atkSpd: 1.4, dur: 6 },
+  mend: { heal: 0.35, rest: 0.1, revive: 0.3 },
+  smite: { dmg: 3.5, r: 20, delay: 0.35, heal: 0.12, reach: 140 },
+  blessing: { heal: 0.2, atkSpd: 1.4, dur: 6 },
   sanctuary: { heal: 0.35, revive: 0.35, r: 42, dur: 3, every: 0.5, regen: 0.03 },
   guardianAngel: { revive: 0.5, heal: 0.25, invuln: 3 },
   miracle: { dmg: 3, r: 130, stun: 1.5, invuln: 2, every: 0.05 },
   // --- Arcanist
-  magicMissiles: { missiles: 5, dmg: 1.2, speed: 140, homing: 8, spread: 0.35 },
-  frostNova: { dmg: 1.3, r: 44, slow: 3, knock: 10 },
-  chainLightning: { jumps: 6, dmg: 2, range: 70, stun: 0.4, every: 0.07, reach: 150 },
+  magicMissiles: { missiles: 6, dmg: 1.5, speed: 140, homing: 8, spread: 0.3, splash: 14 },
+  frostNova: { dmg: 2, r: 48, slow: 3, knock: 10 },
+  chainLightning: { jumps: 7, dmg: 2.2, range: 70, stun: 0.4, every: 0.07, reach: 150 },
   meteor: { r: 36, delay: 0.9, dmg: 4, reach: 160 },
   singularity: { r: 76, pull: 48, dur: 2.5, every: 0.25, dmg: 0.5, burst: 4, burstR: 44, reach: 160 },
   meteorStorm: { meteors: 7, every: 0.25, r: 30, dmg: 3.5, reach: 180 },
   // --- Lancer
-  javelin: { dmg: 2.6, speed: 260, pierce: 20 },
-  sweep: { dmg: 1.6, r: 34, knock: 18 },
-  impale: { dmg: 3.5, pierceDmg: 1.5, reach: 60, stun: 1.5 },
+  javelin: { dmg: 3, speed: 260, pierce: 20 },
+  sweep: { dmg: 2.2, r: 36, knock: 18 },
+  impale: { dmg: 4.5, pierceDmg: 2, reach: 60, stun: 1.5 },
   dragonLunge: { dur: 0.34, speed: 300, dmg: 3, knock: 14, reach: 160 },
   wyrmRush: { lunges: 3, dur: 0.26, speed: 320, dmg: 3, gap: 0.32, reach: 150 },
   skyfall: { leap: 0.55, dmg: 6, r: 50, knock: 30, stun: 1.5, shards: 8, shardDmg: 1.5, fire: 3, reach: 130 },
@@ -137,11 +138,11 @@ const ENTRIES = {
   // ------------------------------------------------------------------ Guardian (tank)
   shieldSlam: {
     cls: 'guardian', tier: 'common', weight: 30, icon: 'shield', color: '#d8e0f0', name: 'Shield Slam',
-    text: `Slams the nearest foe for ${pct(N.shieldSlam.dmg)} attack, knocking it flying and stunning it ${N.shieldSlam.stun} s.`,
+    text: `Slams the shield into every foe in front: ${pct(N.shieldSlam.dmg)} attack, knocked flying and stunned ${N.shieldSlam.stun} s.`,
   },
   ironSkin: {
     cls: 'guardian', tier: 'common', weight: 26, icon: 'helm', color: '#c8d4ec', name: 'Iron Skin',
-    text: `Braces behind the shield: ${less(N.ironSkin.dr)} less damage taken for ${N.ironSkin.dur} s, and ${pct(N.ironSkin.heal)} HP back.`,
+    text: `Braces and bellows: foes close by turn on the Guardian for ${N.ironSkin.taunt} s; ${less(N.ironSkin.dr)} less damage taken for ${N.ironSkin.dur} s and ${pct(N.ironSkin.heal)} HP back.`,
   },
   groundPound: {
     cls: 'guardian', tier: 'uncommon', weight: 20, icon: 'quake', color: '#e0b878', name: 'Ground Pound',
@@ -212,7 +213,7 @@ const ENTRIES = {
   // ------------------------------------------------------------------ Cleric (healer)
   mend: {
     cls: 'cleric', tier: 'common', weight: 30, icon: 'heart', color: '#7dff8a', name: 'Mend',
-    text: `Mends the most hurt knight for ${pct(N.mend.heal)} HP.`,
+    text: `Mends the most hurt knight for ${pct(N.mend.heal)} HP (or raises a fallen one with ${pct(N.mend.revive)}), and the rest of the squad for ${pct(N.mend.rest)}.`,
   },
   smite: {
     cls: 'cleric', tier: 'common', weight: 26, icon: 'pillar', color: '#fff0a0', name: 'Smite',
@@ -237,7 +238,7 @@ const ENTRIES = {
   // ------------------------------------------------------------------ Arcanist (mage)
   magicMissiles: {
     cls: 'arcanist', tier: 'common', weight: 30, icon: 'missiles', color: '#b08aff', name: 'Magic Missiles',
-    text: `${N.magicMissiles.missiles} seeking missiles, ${pct(N.magicMissiles.dmg)} attack each.`,
+    text: `${N.magicMissiles.missiles} seeking missiles that burst on impact, ${pct(N.magicMissiles.dmg)} attack each.`,
   },
   frostNova: {
     cls: 'arcanist', tier: 'common', weight: 26, icon: 'frost', color: '#9edcf7', name: 'Frost Nova',
@@ -286,7 +287,7 @@ const ENTRIES = {
   },
   // ------------------------------------------------------------------ signatures (one knight's jackpot)
   rewind: {
-    cls: null, tier: 'jackpot', weight: 2, icon: 'clock', color: '#9ad8ff', name: SIGNATURES['mythic-arcanist']?.name ?? 'Rewind',
+    cls: null, tier: 'jackpot', weight: 2, icon: 'clock', color: '#9ad8ff', name: Object.values(SIGNATURES).find((x) => x.id === 'rewind')?.name ?? 'Rewind',
     text: `Time turns back ${N.rewind.back} s for the squad: where everyone stood, their HP, fallen knights too. Damage dealt stays.`,
   },
 } as const satisfies Record<keyof typeof N, Entry>;

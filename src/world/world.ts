@@ -124,6 +124,8 @@ export class World {
   banner = 0;
   bannerT = 0;
   tagTeamT = 0;
+  /** The player's luck right now (Loaded Dice included); Game sets it every tick, and skill rolls lean rarer with it. */
+  luck = 1;
   /** What this floor's foes are built for, in Squad Power (see power.ts). */
   difficulty: number;
   /** The last 5 seconds, a snapshot every 0.1 s (for Rewind). */

@@ -5,7 +5,7 @@
  */
 import { useMemo, useState, type ReactNode } from 'react';
 import { BAL } from '../core/balance';
-import { CLASSES, CLASS_IDS, KNIGHTS, knightDef, specialOf, unlockedClasses, type ClassId } from '../core/knights';
+import { CLASSES, CLASS_IDS, KNIGHTS, knightDef, unlockedClasses, type ClassId } from '../core/knights';
 import { luckBreakdown, lowestDroppable, oneInFor, revealBar } from '../core/luck';
 import { canRebirth, rebirthFloor } from '../core/newGame';
 import { PERKS, PERK_TREES, buyPerk, canBuyPerk, hasPerk, perksOpen } from '../core/perks';
@@ -25,6 +25,8 @@ import { fmt, oneIn } from './format';
 import { Px, type IconName } from './px';
 import { AltarReels } from './fx/AltarReels';
 import { uiSound } from './sound';
+import { SkillTable } from './SkillRoll';
+import { skillRollLuck } from '../core/chance';
 
 export type HomeTab = 'camp' | 'summon' | 'heroes' | 'upgrades' | 'perks' | 'rebirth';
 
@@ -394,7 +396,6 @@ export function HeroDetail({ game, id, onClose }: { game: Game; id: string; onCl
   const cls = CLASSES[def.cls];
   const st = knightStats(s, id);
   const cost = levelCost(rec.level);
-  const sp = specialOf(id);
   const slot = s.squad.indexOf(id);
   const refresh = () => {
     game.syncSquad();
@@ -449,11 +450,7 @@ export function HeroDetail({ game, id, onClose }: { game: Game; id: string; onCl
           <br />
           {cls.dodge.text}
         </div>
-        <div className="skill">
-          <b>{sp.name}</b> <span className="kind">{sp.signature ? 'signature special' : 'special'} · {sp.cd}s</span>
-          <br />
-          {sp.text}
-        </div>
+        <SkillTable knightId={id} luck={game.luck * skillRollLuck(s)} cd={st.specialCd} highlight={game.world?.heroes.find((h) => h.knightId === id)?.lastSkill?.skill} />
         <div className="stack">
           <div className="spread outlined" style={{ fontSize: 'calc(4.4 * var(--px))' }}>
             <span>

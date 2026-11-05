@@ -23,6 +23,7 @@ import { hubLayout } from './world/hubWorld';
 import { applyDialogAction, dialogFor, placeNpcs, type DialogChoice, type DialogNode, type Npc } from './world/npcs';
 import { questEvent, type Quest, type QuestEvent, type QuestReward } from './core/quests';
 import { onFloorStart } from './world/chance';
+import { skillRollLuck } from './core/chance';
 
 export type Listener = (e: CoreEvent) => void;
 
@@ -342,6 +343,7 @@ export class Game {
       if (s.squad.some(Boolean)) this.startFloor(s.run.floor);
     } else {
       // The squad is locked in the dungeon: new knights wait at the hub.
+      this.world.luck = this.luck * skillRollLuck(s);
       this.world.update(dt);
       this.handleWorldEvents();
     }

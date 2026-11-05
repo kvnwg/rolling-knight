@@ -4,9 +4,11 @@ A top-down (3/4 view) pixel action roguelite with a rolling game on top, in the 
 Legend. A free Summoning Altar rolls knights forever; you field a squad of three in endless,
 procedurally generated dungeons (hamlets, a farm, dark forests, tundra, crypts, bogs, desert ruins,
 graveyards, lava caves, crystal grottoes, moonlit shrines), control one knight and let the other two
-fight by their class. Between dives you walk round the hub, where each keeper runs one counter: the
-altar, the smith, the scrapper, the quartermaster, the outfitter, the sage, the rebirth shrine, the
-notice board and the gate down. Duplicates become shards or gold; shards level your knights. Rebirth
+fight by their class; the skill button rolls a random skill from your class's list. Between dives
+you walk round the hub, a lamplit square before the Gilded Reel, where each keeper runs one counter:
+the Oracle's altar, the smith, the junk dealer, the quartermaster, the tinker's hex map of upgrades
+(with chance upgrades like Ricochet and Double or Nothing), the sage, the rebirth shrine, the notice
+board and the steps down. Duplicates become shards or gold; shards level your knights. Rebirth
 for permanent luck and power; perks from the first rebirth change how a run plays. Folk on the floors
 hand out jobs, and one of them may be a demon in disguise.
 
@@ -20,12 +22,18 @@ How every system works, with its numbers: [`DESIGN.md`](DESIGN.md). Art sources 
   Arcanist's hat, a Lancer's winged helm), rarity armor, capes from Epic, halos from Celestial,
   cycling colors at Primordial, and mutations (Gilded, Shadow, Radiant, Void). Humanoid mobs use the
   same skeleton; other mobs are painted from shapes at their own size.
-- The ground is painted once per floor: cobbles, grass tufts, flagstones, snow, ice, sand, mud,
-  basalt; walls and cliffs with their front faces; water with banks and foam, lava, chasms; ambient
-  occlusion where floor meets wall. Trees are rounded leaf clumps lit from the top left.
+- The look follows Firefly Garden turned into pixels: bright, readable places edge to edge. The
+  hamlet is a town of half-timbered houses, fenced lots, hedges, a market square with striped stalls,
+  a fountain and string lights, and a canal with a bridge; trees stand in clumps on the lawns
+  (blossom trees, maples, dark pines), each throwing its shadow down and to the right. The ground is
+  painted once per floor (cobbles with mortar, grass with flowers, flagstones, snow, sand, mud,
+  basalt, water with banks, lava), with about 30 kinds of decals and every standing thing's shadow
+  baked in. Fireflies, butterflies and mist drift over it.
 - Cinematic light: the scene is multiplied by each biome's ambient (cool and dim, or warm), torches,
   lanterns, braziers, lava, crystals, spells and the knights themselves light it in stepped bands
-  with bloom, then a grade and a vignette. Weather per biome: fireflies, snow, embers, petals, fog.
+  with bloom, then a grade and a vignette. Daylight is lifted near white; out in the open each floor
+  rolls its weather (clear, overcast, or rain with splashes, rings on water and a rain sound), and
+  cloud shadows drift over sunny floors. Weather per biome too: fireflies, snow, embers, petals, fog.
 - Tilt-shift: the ground goes soft the further past your knight it lies, and a little at the bottom
   edge, so the dungeon looks like a miniature; anything standing (trees, props, characters) stays
   crisp. Half strength indoors (crypts, lava caves). A switch in Settings turns it off.
@@ -50,14 +58,15 @@ npm run dev
 ```
 
 Open http://localhost:5173. Keyboard: WASD or arrows to move. At the hub, E or Enter talks to the
-keeper you're standing by. In the dungeon: Space or Shift to dodge roll, E or Q for the special, Enter
+keeper you're standing by. In the dungeon: Space or Shift to dodge roll, E or Q to roll a skill, Enter
 or F to talk to someone, 1 2 3 to take control of a knight, T for Auto, Esc to head back up to the
 hub. Touch: drag to move; the buttons do the rest. Your knights attack on their own whenever
 something is in range.
 
 Dev shortcuts by URL: `?floor=16` starts on that floor with a ready squad, `&squad=mythic` sets its
 rarity, `&classes=arcanist,guardian,cleric` its classes, `&auto` plays itself, `&gold=100000`;
-`&camp` stays at the hub and `&hub` skips choosing a knight. `?fresh` starts a new game. The game is on
+`&camp` stays at the hub and `&hub` skips choosing a knight, `&sky=rain` (or `clear`, `overcast`) sets
+every floor's weather. `?fresh` starts a new game. The game is on
 `window.__game`, the renderer on `window.__renderer`.
 
 ## Tests, balance and art previews
@@ -66,11 +75,13 @@ rarity, `&classes=arcanist,guardian,cleric` its classes, `&auto` plays itself, `
 npm test
 ```
 
-27 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
+121 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
 timing, extra reels, the tutorial's scripted rolls, bad-luck protection, Lucky Spins, duplicates,
-shards, selling and levels, Humble Beginnings' 3x, rebirth; every biome's floors fully connected with
-spawns reachable and deterministic by seed, mob and boss design, a squad clearing a floor on Auto,
-auto attacks, dodge invulnerability, Rewind, and a full game starting up.
+shards, selling, levels and reforging, Humble Beginnings' 3x, rebirth; every biome's floors fully
+connected with spawns reachable and deterministic by seed, mob and boss design, a squad clearing a
+floor on Auto, auto attacks, dodge invulnerability, skill rolls and their odds, Rewind, the balance
+curve, the camera, the weather, the hub's map and keepers, folk and quests, the upgrade map and every
+chance upgrade in a fight, and a full game starting up.
 
 ```bash
 npm run sim -- --minutes 40

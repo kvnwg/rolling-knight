@@ -402,8 +402,12 @@ describe('allies', () => {
     const w = world([knightId('rare', 'blade'), knightId('rare', 'guardian'), knightId('rare', 'ranger')]);
     const [me, tank, archer] = w.heroes;
     for (const h of w.heroes) h.specialT = 0;
-    // No fight: nobody rolls.
-    for (const m of w.mobs) m.awake = false;
+    // No fight (every foe asleep far off, at the exit): nobody rolls.
+    for (const m of w.mobs) {
+      m.awake = false;
+      m.x = w.map.exit.x;
+      m.y = w.map.exit.y;
+    }
     run(w, 2);
     expect(w.heroes.some((h) => h.lastSkill || h.skillRoll)).toBe(false);
     // A fight right on top of the squad.
