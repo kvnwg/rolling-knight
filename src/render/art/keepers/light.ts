@@ -4,6 +4,9 @@
  * lamp, candle and coal bed's warm pool, the pools stepped into bands with an ordered dither at their
  * edges (pixel art's light, not a smooth gradient); then whatever glows (flames, orbs, coals, lit
  * glass) shines at full strength with a soft bloom round it, and the corners fall off into shadow.
+ * A keeper is lit smoothly instead (their painter marks them: `figureMask`): the same pools without
+ * the steps or the dither, so their own hand-painted shading carries their form and no dither crawls
+ * across a face.
  * Pure: no DOM, so tests and tools can light a scene too.
  */
 import { rgb } from '../../pixel/buf';
@@ -25,6 +28,22 @@ export interface LightOpts {
 }
 
 const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
+
+/** The figures on a layer to be lit smoothly: a flag per pixel. */
+const FIGURES = new WeakMap<Layer, { mask: Uint8Array }>();
+
+/**
+ * The mask of a layer's pixels lit smoothly (made on first ask): set an entry to 1 for each pixel
+ * of a figure, at (y - L.y0) * L.w + (x - L.x0).
+ */
+export function figureMask(L: Layer): Uint8Array {
+  let e = FIGURES.get(L);
+  if (!e) {
+    e = { mask: new Uint8Array(L.w * L.h) };
+    FIGURES.set(L, e);
+  }
+  return e.mask;
+}
 
 /** A box blur of one channel set (RGB floats), `r` pixels each way, run twice (about a soft tent). */
 function blur(src: Float32Array, w: number, h: number, r: number): Float32Array {
@@ -77,37 +96,42 @@ export function lightLayer(L: Layer, o: LightOpts, lights: readonly LightSpec[] 
   const src = L.buf.px;
   const gsrc = L.glow.px;
   const vig = o.vignette ?? 0.35;
+  /** The light falling on a pixel: the pools stepped and dithered at their edges, or smooth (th null). */
+  const lightAt = (x: number, y: number, th: number | null): [number, number, number] => {
+    let r = amb[0];
+    let g = amb[1];
+    let b = amb[2];
+    for (const l of ls) {
+      const dx = x + 0.5 - l.x;
+      const dy = (y + 0.5 - l.y) * 1.15;
+      const d2 = dx * dx + dy * dy;
+      if (d2 >= l.r * l.r) continue;
+      let f = 1 - Math.sqrt(d2) / l.r;
+      f = f * f * (3 - 2 * f);
+      // Stepped pools, dithered at each step's edge.
+      if (th !== null) f = Math.floor(f * bands + th) / bands;
+      r += l.cr * f;
+      g += l.cg * f;
+      b += l.cb * f;
+    }
+    // The corners fall off.
+    const vx = (x + 0.5) / W - 0.5;
+    const vy = (y + 0.5) / H - 0.42;
+    const v = 1 - vig * Math.min(1, (vx * vx * 1.6 + vy * vy * 1.2) * 2.2);
+    return [r * v, g * v, b * v];
+  };
+  const figures = FIGURES.get(L);
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       const i = (y * W + x) * 4;
-      const th = BAYER4[(x & 3) + ((y & 3) << 2)];
-      let r = amb[0];
-      let g = amb[1];
-      let b = amb[2];
-      for (const l of ls) {
-        const dx = x + 0.5 - l.x;
-        const dy = (y + 0.5 - l.y) * 1.15;
-        const d2 = dx * dx + dy * dy;
-        if (d2 >= l.r * l.r) continue;
-        let f = 1 - Math.sqrt(d2) / l.r;
-        f = f * f * (3 - 2 * f);
-        // Stepped pools, dithered at each step's edge.
-        f = Math.floor(f * bands + th) / bands;
-        r += l.cr * f;
-        g += l.cg * f;
-        b += l.cb * f;
-      }
-      // The corners fall off.
-      const vx = (x + 0.5) / W - 0.5;
-      const vy = (y + 0.5) / H - 0.42;
-      const v = 1 - vig * Math.min(1, (vx * vx * 1.6 + vy * vy * 1.2) * 2.2);
-      r *= v;
-      g *= v;
-      b *= v;
+      const fig = figures?.mask[y * W + x];
+      const [r, g, b] = lightAt(x, y, fig ? null : BAYER4[(x & 3) + ((y & 3) << 2)]);
+      // A figure is never lit past its painted highlights, so they keep their detail.
+      const cap = fig ? 1.08 : 1.35;
       if (src[i + 3]) {
-        out[i] = Math.min(255, src[i] * Math.min(1.35, r));
-        out[i + 1] = Math.min(255, src[i + 1] * Math.min(1.35, g));
-        out[i + 2] = Math.min(255, src[i + 2] * Math.min(1.35, b));
+        out[i] = Math.min(255, src[i] * Math.min(cap, r));
+        out[i + 1] = Math.min(255, src[i + 1] * Math.min(cap, g));
+        out[i + 2] = Math.min(255, src[i + 2] * Math.min(cap, b));
         out[i + 3] = 255;
       }
       if (gsrc[i + 3]) {
@@ -136,9 +160,10 @@ export function lightLayer(L: Layer, o: LightOpts, lights: readonly LightSpec[] 
     for (let p = 0; p < W * H; p++) {
       const i = p * 4;
       if (!out[i + 3]) continue;
-      // Banded too, so the halo steps like the light does.
+      // Banded too, so the halo steps like the light does (smooth and softer on a figure).
       const th = BAYER4[((p % W) & 3) + ((Math.floor(p / W) & 3) << 2)];
-      const q = (v: number) => Math.floor(v * bloom * 10 + th) / 10;
+      const smooth = figures?.mask[p];
+      const q = (v: number) => (smooth ? v * bloom * 0.5 : Math.floor(v * bloom * 10 + th) / 10);
       out[i] = Math.min(255, out[i] + 255 * q(soft[p * 3]));
       out[i + 1] = Math.min(255, out[i + 1] + 255 * q(soft[p * 3 + 1]));
       out[i + 2] = Math.min(255, out[i + 2] + 255 * q(soft[p * 3 + 2]));

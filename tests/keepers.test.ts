@@ -3,8 +3,11 @@ import { newGame } from '../src/core/newGame';
 import { PERKS } from '../src/core/perks';
 import { effectAt, tabLines } from '../src/core/upgradeTree';
 import { UPGRADES, UPGRADE_TABS, upgradeTab } from '../src/core/upgrades';
+import { Layer } from '../src/render/art/hubKit';
+import { HUB_CAST } from '../src/render/art/hubNpcs';
+import { bustGeometry, paintBust, type BustTool } from '../src/render/art/keepers/bust';
 import { lightLayer } from '../src/render/art/keepers/light';
-import { paintKeeperScene } from '../src/render/art/keepers/scenes';
+import { COUNTER_H, paintKeeperScene } from '../src/render/art/keepers/scenes';
 import { UI_SPRITES } from '../src/render/pixel/ui';
 import { TINKER_CATS } from '../src/ui/keeper/tinkerCats';
 import { UPGRADE_ICON_ROWS } from '../src/ui/upgrades/iconRows';
@@ -94,5 +97,50 @@ describe("the keepers' scenes", () => {
     const a = paintKeeperScene('upgrades', 200, 100).L.buf.px;
     const b = paintKeeperScene('upgrades', 200, 100).L.buf.px;
     expect(Buffer.from(a).equals(Buffer.from(b))).toBe(true);
+  });
+});
+
+describe('the keepers at their counters', () => {
+  /** A keeper's bust painted on a layer reaching well above the scene's top; its topmost row. */
+  const topRow = (L: Layer) => {
+    for (let y = L.y0; y < L.y0 + L.h; y++) for (let x = L.x0; x < L.x0 + L.w; x++) if (L.a(x, y)) return y;
+    return Infinity;
+  };
+  const SHORTEST = 86;
+  const TOOLS: Array<BustTool | undefined> = [undefined, 'wrench', 'hammer', 'tongs', 'candle', 'quill', 'staff', 'spear', 'magnifier', 'orbStaff'];
+
+  it('fit whole in the shortest scene, hats, hair and whatever they hold', () => {
+    const base = SHORTEST - COUNTER_H;
+    for (const [id, def] of Object.entries(HUB_CAST)) {
+      for (const tool of TOOLS) {
+        const L = new Layer(0, -40, 120, SHORTEST + 40);
+        paintBust(L, 60, base, { look: def.look, tool }).front(L);
+        expect(topRow(L), `${id} ${tool ?? ''}`).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+
+  it('are chibis: a big head about three fifths of the figure, wider than the shoulders under it', () => {
+    const base = SHORTEST - COUNTER_H;
+    for (const [id, def] of Object.entries(HUB_CAST)) {
+      const L = new Layer(0, -40, 120, SHORTEST + 40);
+      paintBust(L, 60, base, { look: def.look });
+      const g = bustGeometry(60, base);
+      const top = topRow(L);
+      const share = (g.chin - top + 1) / (base - top);
+      expect(share, id).toBeGreaterThan(0.55);
+      expect(share, id).toBeLessThan(0.66);
+      const width = (y0: number, y1: number) => {
+        let w = 0;
+        for (let y = y0; y <= y1; y++) {
+          let a = Infinity;
+          let z = -Infinity;
+          for (let x = L.x0; x < L.x0 + L.w; x++) if (L.a(x, y)) [a, z] = [Math.min(a, x), Math.max(z, x)];
+          w = Math.max(w, z - a + 1);
+        }
+        return w;
+      };
+      expect(width(g.top, g.chin), id).toBeGreaterThan(width(g.chin + 6, base - 1));
+    }
   });
 });
