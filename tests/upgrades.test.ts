@@ -1,16 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { BAL } from '../src/core/balance';
 import { CHANCE, chanceFx, expectedHitMult, rollHit, rollKill, skillRollLuck, tripChance } from '../src/core/chance';
-import { knightId } from '../src/core/knights';
+import { CLASSES, knightId } from '../src/core/knights';
 import { currentLuck, luckyEvery, luckyMult } from '../src/core/luck';
 import { newGame } from '../src/core/newGame';
 import { Rng } from '../src/core/rng';
 import { drySpell, reelCount, spinCycle } from '../src/core/roller';
 import { addKnight, knightStats } from '../src/core/roster';
 import type { GameState } from '../src/core/state';
-import { HEX_BY_KEY, ROOT_KEY, UPGRADE_MAP, UPGRADE_MAP_ERRORS, effectAt, hexView, layoutUpgradeMap, nodeKey, nodeName, pctText, visibleHexes } from '../src/core/upgradeTree';
 import {
-  UPGRADES, UPGRADES_BY_ID, buyUpgrade, canBuy, sanitizeUpgrades, tier, upgradeCost, upgradeCostAt, upgradeFx, upgradeNodeState, upgradeUnlocked, type UpgradeId,
+  HEX_BY_KEY, ROOT_KEY, ROOT_KEYS, UPGRADE_MAP, UPGRADE_MAPS, UPGRADE_MAP_ERRORS, effectAt, hexTab, hexView, layoutUpgradeMap, nodeKey, nodeName, pctText, tabLines, visibleHexes,
+} from '../src/core/upgradeTree';
+import {
+  QUICK_ROLL, UPGRADES, UPGRADES_BY_ID, UPGRADE_TABS, buyUpgrade, canBuy, sanitizeUpgrades, tier, upgradeCost, upgradeCostAt, upgradeFx, upgradeNodeState, upgradeTab, upgradeUnlocked,
+  type UpgradeId,
 } from '../src/core/upgrades';
 import { BIOMES } from '../src/world/biomes';
 import { castWildMagic, chanceOf, onFloorStart, onHeroHit, onHeroHurt, onKill, onShotHit, onTick, WILD_SPELLS } from '../src/world/chance';
@@ -18,6 +21,8 @@ import type { Shot, Unit } from '../src/world/entities';
 import { generateFloor } from '../src/world/mapgen';
 import { floorMobs } from '../src/world/mobgen';
 import { World, type HeroSpec } from '../src/world/world';
+import { ROLL_TIME, onSkillRoll, rollTime, startSkillRoll } from '../src/world/skills';
+import { Game } from '../src/game';
 
 function game(ups: Partial<Record<UpgradeId, number>> = {}, gold = 0): GameState {
   const s = newGame(1);
@@ -54,8 +59,9 @@ function counted(r: Rng): { rng: Rng; draws: () => number } {
   return { rng: r, draws: () => n };
 }
 
-function squad(ids: string[]): HeroSpec[] {
+function squad(ids: string[], ups: Partial<Record<UpgradeId, number>> = {}): HeroSpec[] {
   const s = newGame(1);
+  Object.assign(s.upgrades, ups);
   ids.forEach((id) => addKnight(s, id, null));
   return ids.map((id, slot) => {
     const [rarity, cls] = id.split('-') as [HeroSpec['rarity'], HeroSpec['cls']];
@@ -63,10 +69,10 @@ function squad(ids: string[]): HeroSpec[] {
   });
 }
 
-function world(ids = [knightId('rare', 'ranger'), knightId('rare', 'guardian')], seed = 99): World {
+function world(ids = [knightId('rare', 'ranger'), knightId('rare', 'guardian')], seed = 99, ups: Partial<Record<UpgradeId, number>> = {}): World {
   const biome = BIOMES.hamlet;
   const map = generateFloor({ floor: 2, biome, seed, boss: false });
-  return new World({ map, biome, floor: 2, boss: false, mobTypes: floorMobs(biome, 2, seed), bossType: null, squad: squad(ids), perks: [], controlled: 0, seed, goldPerKill: 10 });
+  return new World({ map, biome, floor: 2, boss: false, mobTypes: floorMobs(biome, 2, seed), bossType: null, squad: squad(ids, ups), perks: [], controlled: 0, seed, goldPerKill: 10 });
 }
 
 const firstMob = (w: World): Unit => w.mobs.find((m) => !m.dead && !m.boss)!;
@@ -74,24 +80,50 @@ const firstMob = (w: World): Unit => w.mobs.find((m) => !m.dead && !m.boss)!;
 // ------------------------------------------------------------------ the map
 
 describe('the upgrade map', () => {
-  it('lays every tier of every line out as one hex, none overlapping, all growing from Luck I', () => {
+  it('splits the lines over two tabs: Luck (the altar and fortune) and Combat (the squad and chance)', () => {
+    expect(UPGRADE_TABS).toEqual(['luck', 'combat']);
+    for (const u of UPGRADES) expect(upgradeTab(u), u.id).toBe(u.kind === 'altar' || u.kind === 'fortune' ? 'luck' : 'combat');
+    expect(tabLines('luck').length + tabLines('combat').length).toBe(UPGRADES.length);
+    // A line only ever hangs off a line on its own tab, so each tab can be bought up on its own.
+    for (const u of UPGRADES) if (u.requires) expect(upgradeTab(UPGRADES_BY_ID.get(u.requires.id)!), u.id).toBe(upgradeTab(u));
+    // One root each: Luck, and Whetstone for Combat (open from the start, no Luck needed).
+    expect(tabLines('luck').filter((u) => !u.requires).map((u) => u.id)).toEqual(['luck']);
+    expect(tabLines('combat').filter((u) => !u.requires).map((u) => u.id)).toEqual(['might']);
+    expect(upgradeUnlocked(game(), 'might')).toBe(true);
+    expect(upgradeUnlocked(game(), 'vitality')).toBe(false);
+    expect(upgradeUnlocked(game({ might: 1 }), 'vitality')).toBe(true);
+  });
+
+  it('lays each tab out as its own map, every tier one hex, none overlapping, each growing from its root', () => {
     expect(UPGRADE_MAP_ERRORS).toEqual([]);
     expect(UPGRADE_MAP.length).toBe(UPGRADES.reduce((n, u) => n + u.max, 0));
-    expect(UPGRADES.filter((u) => !u.requires).map((u) => u.id)).toEqual(['luck']);
+    expect(ROOT_KEYS).toEqual({ luck: 'luck:1', combat: 'might:1' });
     expect(ROOT_KEY).toBe('luck:1');
-    const root = HEX_BY_KEY.get(ROOT_KEY)!;
-    expect([root.col, root.row, root.prev]).toEqual([0, 0, null]);
-    const cells = new Set(UPGRADE_MAP.map((n) => `${n.col},${n.row}`));
-    expect(cells.size).toBe(UPGRADE_MAP.length);
-    for (const n of UPGRADE_MAP) {
-      // Doubled coordinates: col + row is always even, and every hex sits next to the one it hangs off.
-      expect(Math.abs(n.col + n.row) % 2).toBe(0);
-      if (!n.prev) continue;
-      const p = HEX_BY_KEY.get(n.prev)!;
-      const dc = n.col - p.col;
-      const dr = n.row - p.row;
-      expect((dc === 0 && Math.abs(dr) === 2) || (Math.abs(dc) === 1 && Math.abs(dr) === 1), n.key).toBe(true);
+    for (const tab of UPGRADE_TABS) {
+      const map = UPGRADE_MAPS[tab];
+      expect(map.length, tab).toBe(tabLines(tab).reduce((n, u) => n + u.max, 0));
+      const root = HEX_BY_KEY.get(ROOT_KEYS[tab])!;
+      expect([root.col, root.row, root.prev], tab).toEqual([0, 0, null]);
+      const cells = new Set(map.map((n) => `${n.col},${n.row}`));
+      expect(cells.size, tab).toBe(map.length);
+      for (const n of map) {
+        expect(hexTab(n), n.key).toBe(tab);
+        // Doubled coordinates: col + row is always even, and every hex sits next to the one it hangs off.
+        expect(Math.abs(n.col + n.row) % 2).toBe(0);
+        if (!n.prev) {
+          expect(n.key).toBe(ROOT_KEYS[tab]);
+          continue;
+        }
+        const p = HEX_BY_KEY.get(n.prev)!;
+        expect(hexTab(p), n.key).toBe(tab);
+        const dc = n.col - p.col;
+        const dr = n.row - p.row;
+        expect((dc === 0 && Math.abs(dr) === 2) || (Math.abs(dc) === 1 && Math.abs(dr) === 1), n.key).toBe(true);
+      }
     }
+    // A line hanging off the other tab's map has nowhere to grow from.
+    const bad = layoutUpgradeMap([{ id: 'a', max: 2, path: 'n' }, { id: 'b', max: 1, path: 'n', requires: { id: 'luck', tier: 1 } }]);
+    expect(bad.errors.some((e) => e.includes('not on the map'))).toBe(true);
   });
 
   it('keeps every RK line and adds the new ones, each with a name, a description and an icon', () => {
@@ -200,18 +232,36 @@ describe('costs', () => {
     sanitizeUpgrades(orphan);
     expect(orphan.upgrades).toEqual({});
   });
+
+  it('keep a save from before the tabs whole: Plate Mail (now off Whetstone I) brings Whetstone I with it', () => {
+    const s = game({ luck: 1, vitality: 4, secondWind: 2, swiftness: 1 });
+    sanitizeUpgrades(s);
+    expect(s.upgrades).toEqual({ luck: 1, might: 1, vitality: 4, secondWind: 2, swiftness: 1 });
+    // Nothing given when there's no Plate Mail, and Whetstone owned stays as it was.
+    const t = game({ luck: 2, might: 3, vitality: 2 });
+    sanitizeUpgrades(t);
+    expect(t.upgrades).toEqual({ luck: 2, might: 3, vitality: 2 });
+    const u = game({ luck: 2 });
+    sanitizeUpgrades(u);
+    expect(u.upgrades).toEqual({ luck: 2 });
+  });
 });
 
 // ------------------------------------------------------------------ reveal rules
 
 describe('what the map shows', () => {
-  it('opens on Luck I, with "?" on its six neighbors and nothing else', () => {
+  it('opens each tab on its root, with "?" on its neighbors and nothing else', () => {
     const s = game();
-    const shown = visibleHexes(s);
-    expect(shown.find((h) => h.node.key === 'luck:1')?.view).toBe('open');
-    const mystery = shown.filter((h) => h.view === 'mystery').map((h) => h.node.key).sort();
-    expect(mystery).toEqual(['extraReel:1', 'greed:1', 'luck:2', 'might:1', 'spinSpeed:1', 'vitality:1']);
-    expect(shown.length).toBe(7);
+    const luck = visibleHexes(s, 'luck');
+    expect(luck.find((h) => h.node.key === 'luck:1')?.view).toBe('open');
+    expect(luck.filter((h) => h.view === 'mystery').map((h) => h.node.key).sort()).toEqual(['extraReel:1', 'greed:1', 'luck:2', 'spinSpeed:1']);
+    expect(luck.length).toBe(5);
+    const combat = visibleHexes(s, 'combat');
+    expect(combat.find((h) => h.node.key === 'might:1')?.view).toBe('open');
+    expect(combat.filter((h) => h.view === 'mystery').map((h) => h.node.key).sort()).toEqual(['luckyStrike:1', 'might:2', 'vitality:1']);
+    expect(combat.length).toBe(4);
+    // Both maps together.
+    expect(visibleHexes(s).length).toBe(9);
   });
 
   it('shows owned tiers bright, the next ones with a price, one step past them "?", and hides the rest', () => {
@@ -226,8 +276,8 @@ describe('what the map shows', () => {
     expect(at('alchemy:1')).toBe('open');
     expect(at('alchemy:2')).toBe('mystery');
     expect(at('alchemy:3')).toBeNull();
-    // The six spokes off Luck I are open; their second tiers "?".
-    for (const id of ['spinSpeed', 'greed', 'vitality', 'might', 'extraReel'] as const) {
+    // The spokes off Luck I are open; their second tiers "?".
+    for (const id of ['spinSpeed', 'greed', 'extraReel'] as const) {
       expect(at(nodeKey(id, 1))).toBe('open');
       expect(at(nodeKey(id, 2))).toBe('mystery');
       expect(at(nodeKey(id, 3))).toBeNull();
@@ -238,6 +288,18 @@ describe('what the map shows', () => {
     expect(at('luckySpin:1')).toBe('mystery');
     s.upgrades.spinSpeed = 3;
     expect(at('luckySpin:1')).toBe('open');
+    // Luck doesn't open the Combat tab: Whetstone I does.
+    expect(at('vitality:1')).toBe('mystery');
+    s.upgrades.might = 1;
+    for (const id of ['vitality', 'luckyStrike'] as const) {
+      expect(at(nodeKey(id, 1))).toBe('open');
+      expect(at(nodeKey(id, 2))).toBe('mystery');
+    }
+    expect(at('might:2')).toBe('open');
+    expect(at('quickRoll:1')).toBeNull();
+    s.upgrades.vitality = 1;
+    s.upgrades.swiftness = 1;
+    expect(at('quickRoll:1')).toBe('open');
   });
 
   it('shows a gold special as "?" next to an open hex, then open, then owned', () => {
@@ -302,6 +364,109 @@ describe('effects', () => {
     expect(pctText(0.0025)).toBe('0.25%');
     expect(pctText(0.045)).toBe('4.5%');
     expect(pctText(0.6)).toBe('60%');
+  });
+});
+
+// ------------------------------------------------------------------ Quick Roll
+
+describe('Quick Roll', () => {
+  it('is a Combat line off Swift Boots I: five tiers, each dearer than the last', () => {
+    const q = UPGRADES_BY_ID.get('quickRoll')!;
+    expect(upgradeTab(q)).toBe('combat');
+    expect(q.kind).toBe('squad');
+    expect(q.max).toBe(5);
+    expect(q.requires).toEqual({ id: 'swiftness', tier: 1 });
+    expect(HEX_BY_KEY.get('quickRoll:5')).toBeDefined();
+    const prices = [0, 1, 2, 3, 4].map((t) => upgradeCostAt(q, t));
+    expect(prices[0]).toBe(900);
+    for (let t = 1; t < 5; t++) expect(prices[t]).toBeGreaterThan(prices[t - 1] * 3);
+    const s = game(openLine('quickRoll'), 1e9);
+    for (let t = 0; t < 5; t++) expect(buyUpgrade(s, 'quickRoll')).toBe(true);
+    expect(buyUpgrade(s, 'quickRoll')).toBe(false);
+    expect(tier(s, 'quickRoll')).toBe(5);
+  });
+
+  it('per tier: the roll spins 12% shorter and the cooldown is 6% shorter', () => {
+    expect(QUICK_ROLL).toEqual({ spinPct: 12, cdPct: 6 });
+    for (let t = 0; t <= 5; t++) {
+      const fx = upgradeFx(game({ quickRoll: t }));
+      expect(fx.rollSpinPct).toBe(12 * t);
+      expect(fx.skillCdPct).toBe(6 * t);
+    }
+    expect(effectAt(game(), 'quickRoll', 0)).toBe('-0% spin, -0% cooldown');
+    expect(effectAt(game(), 'quickRoll', 3)).toBe('-36% spin, -18% cooldown');
+  });
+
+  it("shortens every knight's skill cooldown and roll spin in its stats, and nothing else", () => {
+    for (const cls of ['guardian', 'blade', 'ranger', 'cleric', 'arcanist', 'lancer'] as const) {
+      const id = knightId('epic', cls);
+      const plain = game();
+      addKnight(plain, id, null);
+      const quick = game({ quickRoll: 5 });
+      addKnight(quick, id, null);
+      const a = knightStats(plain, id);
+      const b = knightStats(quick, id);
+      expect(a.specialCd).toBeCloseTo(CLASSES[cls].specialCd, 9);
+      expect(a.rollTimeMult).toBe(1);
+      expect(b.specialCd).toBeCloseTo(CLASSES[cls].specialCd * 0.7, 9);
+      expect(b.rollTimeMult).toBeCloseTo(0.4, 9);
+      expect(b.atk).toBeCloseTo(a.atk, 9);
+      expect(b.hp).toBeCloseTo(a.hp, 9);
+      expect(b.atkCd).toBeCloseTo(a.atkCd, 9);
+    }
+  });
+
+  it('lands a skill roll sooner in the fight, and starts the shorter cooldown', () => {
+    const id = knightId('rare', 'blade');
+    const spin = (ups: Partial<Record<UpgradeId, number>>) => {
+      const w = world([id], 7, ups);
+      const h = w.heroes[0];
+      h.specialT = 0;
+      const landed: number[] = [];
+      const stop = onSkillRoll((e) => {
+        if (e.phase === 'land' && e.hero === h) landed.push(w.time);
+      });
+      const t0 = w.time;
+      expect(startSkillRoll(w, h)).toBe(true);
+      const dur = h.skillRoll!.dur;
+      for (let i = 0; i < 60 && !landed.length; i++) w.update(1 / 60);
+      stop();
+      return { dur, took: landed[0] - t0, cd: h.specialCd!, left: h.specialT!, mult: h.rollTimeMult };
+    };
+    const plain = spin({});
+    expect(plain.dur).toBeCloseTo(ROLL_TIME, 9);
+    expect(plain.took).toBeGreaterThanOrEqual(ROLL_TIME - 1e-6);
+    const quick = spin(openLine('quickRoll', { quickRoll: 5 }));
+    expect(quick.mult).toBeCloseTo(0.4, 9);
+    expect(quick.dur).toBeCloseTo(ROLL_TIME * 0.4, 9);
+    expect(quick.took).toBeLessThan(ROLL_TIME * 0.4 + 0.02);
+    expect(quick.took).toBeLessThan(plain.took - 0.3);
+    expect(quick.cd).toBeCloseTo(plain.cd * 0.7, 9);
+    // The cooldown that starts as it lands is the shorter one.
+    expect(quick.left).toBeLessThanOrEqual(quick.cd + 1e-9);
+    expect(quick.left).toBeGreaterThan(quick.cd - 0.05);
+    // A unit without the field spins for ROLL_TIME.
+    expect(rollTime({})).toBe(ROLL_TIME);
+    expect(rollTime({ rollTimeMult: 0.76 })).toBeCloseTo(ROLL_TIME * 0.76, 9);
+  });
+
+  it('reaches the knights already on a floor when it is bought', () => {
+    const g = new Game(true);
+    for (let t = 0; t < 30; t += 1 / 30) g.tick(1 / 30);
+    g.enterDungeon();
+    for (let t = 0; t < 3; t += 1 / 30) g.tick(1 / 30);
+    const w = g.world!;
+    expect(w.heroes.length).toBeGreaterThan(0);
+    const before = w.heroes.map((h) => h.specialCd!);
+    expect(w.heroes.every((h) => (h.rollTimeMult ?? 1) === 1)).toBe(true);
+    g.state.gold = 1e9;
+    for (const id of ['might', 'vitality', 'swiftness'] as const) buyUpgrade(g.state, id);
+    for (let t = 0; t < 2; t++) expect(buyUpgrade(g.state, 'quickRoll')).toBe(true);
+    g.syncSquad();
+    w.heroes.forEach((h, i) => {
+      expect(h.rollTimeMult).toBeCloseTo(0.76, 9);
+      expect(h.specialCd!).toBeCloseTo(before[i] * 0.88, 6);
+    });
   });
 });
 

@@ -201,6 +201,7 @@ export class Game {
       h.atkCd = fresh.atkCd;
       h.dodgeCd = fresh.dodgeCd;
       h.specialCd = fresh.specialCd;
+      h.rollTimeMult = fresh.rollTimeMult;
       h.mutation = sp.mutation;
     }
     if (!w.heroes.some((h) => h.slot === w.controlled && !h.downed)) {

@@ -27,7 +27,30 @@ export const MATS = {
   steel: { face: '#3b74bc', hi: '#8cc0f4', lo: '#2a548e', lip: '#18325c', ink: '#060c18' },
   emerald: { face: '#3c964a', hi: '#82dc7c', lo: '#296e38', lip: '#164824', ink: '#04120a' },
   iron: { face: '#4e4642', hi: '#857a70', lo: '#38312d', lip: '#221c19', ink: '#130505' },
+  // The keepers' screens (the "Pixel Art GUI" look): green buttons and tabs, beige paper, an amber
+  // highlight for the category you're in, grey for what's done.
+  leaf: { face: '#5fae44', hi: '#b4e47a', lo: '#3f8a32', lip: '#2a6022', ink: '#16300f' },
+  paper: { face: '#ecdab4', hi: '#fff6e0', lo: '#d6bd8e', lip: '#b08c5c', ink: '#3d2414' },
+  amber: { face: '#eb9a3c', hi: '#ffd28a', lo: '#c87428', lip: '#8e4a18', ink: '#3a1c0a' },
+  ash: { face: '#b9ae9c', hi: '#ddd3c0', lo: '#9a8f7e', lip: '#776c5e', ink: '#3b342c' },
 } satisfies Record<string, Mat>;
+
+/** The keepers' paper: its fill, its shade, the brown of its border and the ink of its outline. */
+export const PAPER = {
+  fill: '#f2e2bf',
+  fill2: '#efdcb6',
+  fill3: '#f6e9cc',
+  shade: '#dcc398',
+  inset: '#e2cca0',
+  insetEdge: '#8e6842',
+  border: '#6e4527',
+  borderLit: '#91603a',
+  borderDark: '#53331c',
+  ink: '#2b170c',
+  corner: '#6a4226',
+  cornerLit: '#85573a',
+  cornerDark: '#43281a',
+} as const;
 export type MatName = keyof typeof MATS;
 
 // ------------------------------------------------------------------ a tiny pixel canvas
@@ -295,6 +318,119 @@ function seal(color: Hex): string {
   return p.url();
 }
 
+// ------------------------------------------------------------------ the keepers' paper
+
+/** A tiny position hash in [0, 1) (the paper's speckle and the torn corners' ragged edges). */
+function hash2(x: number, y: number, s: number): number {
+  let h = Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(s | 0, 982451653);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+
+/**
+ * A big sheet of light beige paper in a dark brown border 3 pixels thick (outline, a lit edge, the
+ * border), a soft shade inside its top and left, a faint speckle, and darker torn corners: a ragged
+ * triangle of dark brown in each, its torn edge inked. 40 x 40 for an 8-pixel 9-slice, tiled.
+ */
+function paperPanel(): string {
+  // (40 square: the 8-pixel corners, and a 24-pixel middle that tiles without showing a grid.)
+  const n = 40;
+  const p = new Pix(n, n);
+  for (let y = 0; y < n; y++) {
+    for (let x = 0; x < n; x++) {
+      const d = Math.min(x, y, n - 1 - x, n - 1 - y);
+      if (d === 0) {
+        if ((x === 0 || x === n - 1) && (y === 0 || y === n - 1)) continue;
+        p.set(x, y, PAPER.ink);
+      } else if (d === 1) p.set(x, y, x === 1 || y === 1 ? PAPER.borderLit : PAPER.border);
+      else if (d === 2) p.set(x, y, PAPER.border);
+      else if (d === 3) p.set(x, y, PAPER.ink, 0.85);
+      else if (d === 4 && (x === 4 || y === 4)) p.set(x, y, PAPER.shade);
+      else {
+        const r = hash2(x, y, 3);
+        p.set(x, y, r < 0.08 ? PAPER.fill2 : r > 0.94 ? PAPER.fill3 : PAPER.fill);
+      }
+    }
+  }
+  // The torn corners: a ragged dark triangle in each, inside the outline.
+  for (const [cx, cy, sx, sy] of [
+    [0, 0, 1, 1],
+    [n - 1, 0, -1, 1],
+    [0, n - 1, 1, -1],
+    [n - 1, n - 1, -1, -1],
+  ]) {
+    // (Inside the 8-pixel corner slice, so nothing of it stretches along the edges.)
+    for (let v = 1; v < 8; v++) {
+      for (let u = 1; u < 8; u++) {
+        const x = cx + sx * u;
+        const y = cy + sy * v;
+        const reach = 6 + (hash2(u * sx, v * sy, 11) < 0.45 ? 1 : 0) - (hash2(u, v * sy, 5) < 0.2 ? 1 : 0);
+        const s = u + v;
+        if (s > reach + 1) continue;
+        if (s === reach + 1 || s === reach) p.set(x, y, PAPER.ink, s === reach ? 1 : 0.55);
+        else {
+          const r = hash2(x, y, 17);
+          p.set(x, y, r < 0.18 ? PAPER.cornerLit : r > 0.8 ? PAPER.cornerDark : PAPER.corner);
+        }
+      }
+    }
+  }
+  return p.url();
+}
+
+/** A slot pressed into the paper: a slightly darker beige with a dark inner edge top and left, a light one below. 10 x 10, 3-slice. */
+function paperInset(): string {
+  const p = new Pix(10, 10);
+  for (let y = 0; y < 10; y++) {
+    for (let x = 0; x < 10; x++) {
+      if ((x === 0 || x === 9) && (y === 0 || y === 9)) continue;
+      if (x === 0 || y === 0) p.set(x, y, PAPER.insetEdge);
+      else if (x === 9 || y === 9) p.set(x, y, '#fbf2dc');
+      else if (x === 1 || y === 1) p.set(x, y, '#c7aa7a');
+      else p.set(x, y, PAPER.inset);
+    }
+  }
+  return p.url();
+}
+
+/** An offer card: lighter paper in a one-pixel brown outline, lit on its top and left edges. 12 x 12, 4-slice. */
+function paperCard(face: Hex, hi: Hex, lo: Hex, ink: Hex): string {
+  const p = new Pix(12, 12);
+  for (let y = 0; y < 12; y++) {
+    for (let x = 0; x < 12; x++) {
+      if ((x === 0 || x === 11) && (y === 0 || y === 11)) continue;
+      const d = Math.min(x, y, 11 - x, 11 - y);
+      if (d === 0) p.set(x, y, ink);
+      else if (d === 1) p.set(x, y, x === 1 || y === 1 ? (x === 10 || y === 10 ? face : hi) : lo);
+      else p.set(x, y, face);
+    }
+  }
+  return p.url();
+}
+
+/**
+ * A tab on top of a panel: rounded top corners, outlined on the top and sides, a light top edge, and
+ * no line along the bottom (it sits on the panel). 16 x 14, sliced 5 5 2 5.
+ */
+function tab(m: Mat): string {
+  const p = new Pix(16, 14);
+  for (let y = 0; y < 14; y++) {
+    for (let x = 0; x < 16; x++) {
+      if (y === 0 && (x < 2 || x > 13)) continue;
+      if (y === 1 && (x === 0 || x === 15)) continue;
+      const edge = y === 0 || x === 0 || x === 15 || (y === 1 && (x === 1 || x === 14));
+      if (edge) p.set(x, y, m.ink);
+      else if (y === 1 || (y === 2 && (x === 1 || x === 14))) p.set(x, y, m.hi);
+      else if (x === 1) p.set(x, y, mixHex(m.face, m.hi, 0.5));
+      else if (x === 14) p.set(x, y, m.lo);
+      else if (y >= 12) p.set(x, y, m.lo);
+      else p.set(x, y, m.face);
+    }
+  }
+  return p.url();
+}
+
 /** A chain, tiling vertically: links seen edge-on and face-on in turn. 4 x 8. */
 function chain(): string {
   const p = new Pix(4, 8);
@@ -357,6 +493,14 @@ export function installSkin(): void {
     add(`slot-sm-${ring}-${enamel}`, slot(24, MATS[ring], MATS[enamel]));
   }
   for (const [name, color] of Object.entries({ deadly: '#d0262e', hard: '#e0702a', fair: '#d8a020', easy: '#4caa3c', trivial: '#3a8ad0' })) add(`seal-${name}`, seal(color));
+  // The keepers' screens.
+  add('pa-panel', paperPanel());
+  add('pa-inset', paperInset());
+  add('pa-card', paperCard('#f8ecd2', '#fffaf0', '#dcc49a', PAPER.ink));
+  add('pa-card-dim', paperCard('#e6d5b4', '#f0e2c6', '#cbb48c', '#5a4632'));
+  add('pa-card-gold', paperCard('#fbefc8', '#fffbe6', '#e2c47e', '#5a3a0c'));
+  add('pa-tab', tab(MATS.paper));
+  add('pa-tab-on', tab(MATS.leaf));
   const style = document.createElement('style');
   style.dataset.skin = '1';
   style.textContent = `:root{${css.join('')}}`;

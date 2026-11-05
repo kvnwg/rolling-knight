@@ -4,7 +4,8 @@
  *  - HubHud: the top bar, the little altar (the rolling never stops), and the prompt to talk to the
  *    keeper you're standing by;
  *  - StationSheet: a keeper's counter, opened by talking to them: the altar, the smith, the scrapper,
- *    the quartermaster, the outfitter, the sage, the shrine, the notice board, the gate;
+ *    the quartermaster, the tinker, the sage, the shrine, the notice board, the gate; each one the
+ *    shared keeper screen (src/ui/keeper/: the keeper at their counter, tabs, offers as cards);
  *  - CharacterSelect: who you play as, when the game opens.
  * In the dungeon none of this is reachable: to change your squad or spend anything you leave, or fall.
  */
@@ -12,7 +13,6 @@ import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { sfx } from '../audio/sfx';
 import { knightDef } from '../core/knights';
 import { CHALLENGE, floorDifficulty, knightRating, squadPower } from '../core/power';
-import { activeQuests, questGoal, rewardText } from '../core/quests';
 import { RARITY_COLOR, RARITY_NAME } from '../core/rarity';
 import { bestSquad, rankedKnights } from '../core/roster';
 import type { Game } from '../game';
@@ -23,7 +23,10 @@ import { HUB_STEPS_Y, type HubStation, type StationId } from '../world/hubWorld'
 import { Chunky, HeroArt, HeroLive } from './common';
 import { AltarReels } from './fx/AltarReels';
 import { fmt } from './format';
-import { DupeBar, HeroCard, HeroesPanel, PerksPanel, RebirthPanel, Section, SummonPanel, UpgradesPanel } from './panels';
+import { HeroCard, HeroesPanel } from './panels';
+import { SmithShop, ScrapShop } from './keeper/KnightShops';
+import { BoardShop, GateShop, OracleShop, QuartermasterShop, SageShop, ShrineShop } from './keeper/Shops';
+import { TinkerShop } from './keeper/TinkerShop';
 import { Px, type IconName } from './px';
 import { KNIGHT_PIC_H, KNIGHT_PIC_W } from './sprites';
 import { uiSound } from './sound';
@@ -132,156 +135,54 @@ export function HubHud({ game, onTalk, onSettings, onLuck }: { game: Game; onTal
 
 // ------------------------------------------------------------------ a keeper's counter
 
+/** A keeper's counter: their own screen in the shared layout (src/ui/keeper/). */
 export function StationSheet({ game, station, onOpen, onClose }: { game: Game; station: HubStation; onOpen: (id: string) => void; onClose: () => void }) {
-  const portrait = usePortrait(station);
   useEffect(() => {
     if (station.id !== 'altar') return;
     sfx.setAltarFocus(true);
     return () => sfx.setAltarFocus(false);
   }, [station]);
-  return (
-    <div className="modal" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="sheet station-sheet">
-        <button className="btn red square x" onClick={() => (uiSound('close'), onClose())} aria-label="Close">
-          <Px icon="x" size="sm" />
-        </button>
-        <header className="keeper">
-          <div className="portrait">{portrait ? <img className="px" src={portrait} alt="" /> : <Px icon={STATION_ICON[station.id]} size="md" s={2} />}</div>
-          <div className="who outlined">
-            <Chunky text={station.name.toUpperCase()} size={8} grad="gold" />
-            <span className="job">{station.job}</span>
-            <p className="say">"{station.greeting}"</p>
-          </div>
-        </header>
-        <div className="counter">
-          <StationBody game={game} station={station} onOpen={onOpen} onClose={onClose} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StationBody({ game, station, onOpen, onClose }: { game: Game; station: HubStation; onOpen: (id: string) => void; onClose: () => void }) {
+  const p = { game, station, onClose };
   switch (station.id) {
     case 'altar':
-      return <SummonPanel game={game} onOpen={onOpen} />;
-    case 'smith':
-      return <HeroesPanel game={game} onOpen={onOpen} />;
-    case 'scrap':
-      return <ScrapPanel game={game} onOpen={onOpen} />;
-    case 'squad':
-      return <SquadPanel game={game} onOpen={onOpen} />;
+      return <OracleShop {...p} onOpen={onOpen} />;
     case 'upgrades':
-      return <UpgradesPanel game={game} />;
+      return <TinkerShop {...p} />;
+    case 'smith':
+      return <SmithShop {...p} onOpen={onOpen} />;
+    case 'scrap':
+      return <ScrapShop {...p} onOpen={onOpen} />;
     case 'perks':
-      return <PerksPanel game={game} />;
+      return <SageShop {...p} />;
     case 'rebirth':
-      return <RebirthPanel game={game} />;
+      return <ShrineShop {...p} />;
     case 'quests':
-      return <QuestsPanel game={game} />;
+      return <BoardShop {...p} />;
     case 'gate':
-      return <GatePanel game={game} onClose={onClose} />;
+      return <GateShop {...p} />;
+    case 'squad':
+      return (
+        <QuartermasterShop {...p}>
+          <SquadPanel game={game} onOpen={onOpen} />
+        </QuartermasterShop>
+      );
   }
 }
 
-function ScrapPanel({ game, onOpen }: { game: Game; onOpen: (id: string) => void }) {
-  const s = game.state;
-  const ids = rankedKnights(s).filter((id) => s.roster[id].dupes > 0);
-  return (
-    <>
-      <DupeBar game={game} />
-      <Section title="Duplicates" sub={ids.length ? 'tap a knight to break down or sell its copies' : 'nothing to scrap yet'}>
-        <div className="heroes-grid">
-          {ids.map((id) => (
-            <HeroCard key={id} game={game} id={id} onOpen={onOpen} />
-          ))}
-        </div>
-      </Section>
-    </>
-  );
-}
-
+/** The quartermaster's roster: who's in the squad and who leads, then every knight (panels.tsx). */
 function SquadPanel({ game, onOpen }: { game: Game; onOpen: (id: string) => void }) {
   const s = game.state;
   return (
     <>
-      <Section
-        title="Your squad"
-        sub={`Power ${fmt(squadPower(s))}`}
-        right={
-          <button className="btn small" onClick={() => (bestSquad(s), game.syncHub(true), uiSound('equip', 3))}>
-            Best squad
-          </button>
-        }
-      >
+      <div className="spread">
         <div className="squad-row">
           {s.squad.map((id, slot) => (id ? <HeroCard key={slot} game={game} id={id} onOpen={onOpen} slot={slot === s.controlled ? 0 : undefined} /> : null))}
         </div>
-        <p className="lead">The knight in the gold frame is the one you play. Tap a knight to swap it, or pick who leads below.</p>
-      </Section>
-      <HeroesPanel game={game} onOpen={onOpen} />
-    </>
-  );
-}
-
-function QuestsPanel({ game }: { game: Game }) {
-  const s = game.state;
-  const list = activeQuests(s.quests ?? []);
-  return (
-    <Section title="Jobs" sub={list.length ? `${list.length} taken` : 'none taken'}>
-      {list.length === 0 && <p className="lead">Folk in the dungeon ask for help. Talk to them down there, and their jobs show up here.</p>}
-      {list.map((q) => (
-        <div key={q.id} className={`quest plate outlined ${q.done ? 'done' : ''}`}>
-          <b>{q.title}</b>
-          <span>{questGoal(q)}</span>
-          <span className="t-gold">{rewardText(q.reward)}</span>
-          {q.done && <span className="t-good">Done: back to {q.giverName ?? 'the giver'}</span>}
-        </div>
-      ))}
-    </Section>
-  );
-}
-
-function GatePanel({ game, onClose }: { game: Game; onClose: () => void }) {
-  const s = game.state;
-  const floor = s.run.floor;
-  const biome = biomeForFloor(floor, s.run.biomeSeed);
-  const power = squadPower(s);
-  const diff = floorDifficulty(floor, power);
-  const ch = CHALLENGE[diff.challenge];
-  return (
-    <>
-      <div className="hero-banner">
-        <Chunky text={`FLOOR ${floor}`} size={12} grad="gold" />
-        <span className="lead">
-          {biome.name}
-          {floor % 5 === 0 ? ' · a boss waits here' : ''}
-        </span>
-        <div className="power-check glass outlined" title={ch.text}>
-          <span>
-            Power <b>{fmt(power)}</b>
-          </span>
-          <span className="t-muted">
-            par <b>{fmt(diff.par)}</b>
-          </span>
-          <span className="dchip" style={{ ['--cc' as string]: ch.color, ['--seal' as string]: `var(--sk-seal-${diff.challenge})` }}>
-            {ch.name.toUpperCase()}
-          </span>
-        </div>
-        <p className="lead">{ch.text}</p>
-        <button className="btn gold big breathe" onClick={() => (uiSound('embark'), onClose(), game.enterDungeon())}>
-          <Px icon="swords" s={1.5} />
-          <span>
-            {game.world ? 'CONTINUE' : 'DESCEND'}
-            <span className="sub">Your squad is locked in until you come back</span>
-          </span>
+        <button className="btn small" onClick={() => (bestSquad(s), game.syncHub(true), uiSound('equip', 3))} title="Best squad">
+          <Px icon="star" size="sm" />
         </button>
       </div>
-      <Section title="Going down with you">
-        <div className="squad-row">
-          {s.squad.map((id, slot) => (id ? <HeroCard key={slot} game={game} id={id} onOpen={() => {}} slot={slot === s.controlled ? 0 : undefined} /> : null))}
-        </div>
-      </Section>
+      <HeroesPanel game={game} onOpen={onOpen} />
     </>
   );
 }

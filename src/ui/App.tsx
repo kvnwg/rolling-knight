@@ -20,7 +20,6 @@ import { Chunky, HeroArt, type Grad } from './common';
 import { DungeonHud } from './DungeonHud';
 import { fmt, secs } from './format';
 import { CharacterSelect, HubHud, StationSheet } from './Hub';
-import { UpgradeMap } from './upgrades/UpgradeMap';
 import { HeroDetail, LuckSheet, SettingsSheet } from './panels';
 import { hubLayout, type HubStation } from '../world/hubWorld';
 import type { Npc } from '../world/npcs';
@@ -185,6 +184,8 @@ export function App() {
     let last = performance.now();
     let raf = 0;
     let hudT = 0;
+    let frameN = 0;
+    let skipDt = 0;
     let wasIn = !game.inDungeon;
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
@@ -221,7 +222,13 @@ export function App() {
         c.toggleAuto = false;
       }
       game.tick(dt);
-      r.render(game, game.paused ? 0 : dt, game.inDungeon ? game.world : game.hub);
+      // A keeper's screen covers the hub (all of it on a phone; on a wide screen it shows blurred
+      // either side): draw the hub a quarter as often underneath, with the time that went by.
+      skipDt += dt;
+      if (!stationRef.current || game.inDungeon || ++frameN % 4 === 0) {
+        r.render(game, game.paused ? 0 : skipDt, game.inDungeon ? game.world : game.hub);
+        skipDt = 0;
+      }
       hudT += dt;
       if (hudT > 0.1) {
         hudT = 0;
@@ -256,8 +263,7 @@ export function App() {
     const onKey = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
       if (k === 'escape') {
-        // The upgrade map handles its own Esc (its popup first, then the map).
-        if (stationRef.current?.id === 'upgrades') return;
+        // (A keeper's own overlays, the upgrade map and the details popups, take Esc first.)
         if (sheetRef.current) {
           setDetail(null);
           setSettings(false);
@@ -311,8 +317,7 @@ export function App() {
         </div>
       )}
       {choosing && <CharacterSelect game={game} onSelect={(id) => (csPick.current = id)} onPick={() => setPicked(true)} />}
-      {station && !inDungeon && station.id === 'upgrades' && <UpgradeMap game={game} onClose={() => setStation(null)} />}
-      {station && !inDungeon && station.id !== 'upgrades' && <StationSheet game={game} station={station} onOpen={setDetail} onClose={() => setStation(null)} />}
+      {station && !inDungeon && <StationSheet game={game} station={station} onOpen={setDetail} onClose={() => setStation(null)} />}
       {talking && inDungeon && <DialogBox game={game} npc={talking} onClose={() => setTalking(null)} />}
       <div className="toasts">
         {toasts.map((t) => (

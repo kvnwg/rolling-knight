@@ -1,6 +1,7 @@
 /**
- * The Upgrades screen: Dumpster Legend's upgrade map, a full-screen honeycomb that grows out of Luck I.
- * Every tier of every upgrade line is one hex. Owned hexes are bright, the next buyable ones show their
+ * An upgrade tab as a map: Dumpster Legend's upgrade map, a full-screen honeycomb that grows out of
+ * the tab's root (Luck I for the Luck tab, Whetstone I for Combat); the tinker's counter opens it from
+ * either tab (src/ui/keeper/TinkerShop.tsx). Every tier of every upgrade line on the tab is one hex. Owned hexes are bright, the next buyable ones show their
  * price, the ones just past those show "?", and everything further out stays hidden until you get
  * close. Gold hexes are one-off specials (and the Extra Reel line). Drag to pan, pinch or scroll to
  * zoom, tap a hex for its details (tap it again for the whole line: UpgradePopup.tsx), and hold Buy to
@@ -12,7 +13,7 @@
  * zoomed far out). Positions are in Dumpster Legend's stage px (6 to an art pixel), so its geometry,
  * zoom range and gestures carry over unchanged.
  *
- *   <UpgradeMap game={game} onClose={() => ...} />
+ *   <UpgradeMap game={game} tab="combat" onClose={() => ...} />
  *
  * It covers the screen (position fixed, z-index var(--upgrade-map-z, 13): under sheets and reveals,
  * over the HUD) and follows the game on its own, whatever its parent's render cadence.
@@ -20,8 +21,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { currentLuck } from '../../core/luck';
 import { squadPower } from '../../core/power';
-import { HEX_BY_KEY, ROOT_KEY, UPGRADE_MAP, effectAt, hexView, lineOf, nodeKey, nodeName, roman, type HexNode, type HexView } from '../../core/upgradeTree';
-import { UPGRADES, buyUpgrade, tier, upgradeCost, upgradeNodeState, type UpgradeDef } from '../../core/upgrades';
+import { HEX_BY_KEY, ROOT_KEYS, UPGRADE_MAPS, effectAt, hexTab, hexView, lineOf, nodeKey, nodeName, roman, type HexNode, type HexView } from '../../core/upgradeTree';
+import { UPGRADES, buyUpgrade, tier, upgradeCost, upgradeNodeState, type UpgradeDef, type UpgradeTab } from '../../core/upgrades';
 import type { Game } from '../../game';
 import { Chunky } from '../common';
 import { fmt } from '../format';
@@ -42,7 +43,7 @@ const homeZoom = (wide: boolean) => (wide ? 0.85 : 1);
 /** The canvas's pixels at most (about 16 MB): a screen's worth on any phone, a little softer on a 4K monitor. */
 const MAX_CANVAS_PX = 4_200_000;
 /** Lines that change the squad's stats on the floor (the World needs them refreshed). */
-const SQUAD_STATS = new Set(['might', 'vitality', 'swiftness', 'excalibur', 'dragonscale']);
+export const SQUAD_STATS = new Set(['might', 'vitality', 'swiftness', 'quickRoll', 'excalibur', 'dragonscale']);
 
 function hexPoints(r: number): string {
   return [0, 60, 120, 180, 240, 300]
@@ -80,14 +81,20 @@ function nameLines(ctx: CanvasRenderingContext2D, def: UpgradeDef): { lines: str
 
 /* ---------------------------------------------------------------- what stays between visits */
 
-/** The selected hex and where the map was panned and zoomed to (kept while the app runs). */
-const memory: { sel: string; view: View | null; scale: number } = { sel: ROOT_KEY, view: null, scale: 2.5 / UI_PX };
+/** Each tab's selected hex and where its map was panned and zoomed to (kept while the app runs). */
+const memories: Record<UpgradeTab, { sel: string; view: View | null }> = {
+  luck: { sel: ROOT_KEYS.luck, view: null },
+  combat: { sel: ROOT_KEYS.combat, view: null },
+};
+const scaleMemory = { scale: 2.5 / UI_PX };
 
-/** Opens the map next time on this hex (`${line id}:${tier}`, e.g. "luckyStrike:1"), centered on it. */
+/** Opens its tab's map next time on this hex (`${line id}:${tier}`, e.g. "luckyStrike:1"), centered on it. */
 export function focusUpgradeHex(key: string): void {
-  if (!HEX_BY_KEY.has(key)) return;
-  memory.sel = key;
-  memory.view = null;
+  const n = HEX_BY_KEY.get(key);
+  if (!n) return;
+  const m = memories[hexTab(n)];
+  m.sel = key;
+  m.view = null;
 }
 
 /* ---------------------------------------------------------------- small hooks */
@@ -235,9 +242,12 @@ function MapGold({ gold }: { gold: number }) {
 
 /* ---------------------------------------------------------------- the screen */
 
-export function UpgradeMap({ game, onClose }: { game: Game; onClose?: () => void }) {
+export function UpgradeMap({ game, tab = 'luck', onClose, closeText = 'CLOSE' }: { game: Game; tab?: UpgradeTab; onClose?: () => void; closeText?: string }) {
   useFollow(game);
   const st = game.state;
+  const memory = memories[tab];
+  const ROOT_KEY = ROOT_KEYS[tab];
+  const MAP = UPGRADE_MAPS[tab];
   const calm = !!st.settings.reduceMotion;
   const [sel, setSelState] = useState(() => memory.sel);
   const selRef = useRef(sel);
@@ -254,7 +264,7 @@ export function UpgradeMap({ game, onClose }: { game: Game; onClose?: () => void
   const sig = UPGRADES.map((u) => tier(st, u.id)).join(',');
   const hexes = useMemo(() => {
     const out: Array<{ node: HexNode; view: HexView; price: number }> = [];
-    for (const n of UPGRADE_MAP) {
+    for (const n of MAP) {
       const view = hexView(st, n);
       if (view) out.push({ node: n, view, price: view === 'open' ? upgradeCost(st, n.id) : 0 });
     }
@@ -300,7 +310,7 @@ export function UpgradeMap({ game, onClose }: { game: Game; onClose?: () => void
   const wideRef = useRef(wide);
   wideRef.current = wide;
   /** CSS px per stage px (an art pixel is var(--px) CSS px and 6 stage px). */
-  const scaleRef = useRef(memory.scale);
+  const scaleRef = useRef(scaleMemory.scale);
   /** The map hasn't been touched yet (a pan, a pinch, the wheel, a glide): a resize may place it afresh. */
   const untouched = useRef(true);
   const measure = (): boolean => {
@@ -405,7 +415,7 @@ export function UpgradeMap({ game, onClose }: { game: Game; onClose?: () => void
   };
   const save = () => {
     memory.view = { ...viewRef.current };
-    memory.scale = scaleRef.current;
+    scaleMemory.scale = scaleRef.current;
   };
   const stopAnim = () => {
     if (!animRef.current) return;
@@ -745,9 +755,7 @@ export function UpgradeMap({ game, onClose }: { game: Game; onClose?: () => void
 
       <div className={s.head}>
         <div className={s.titles} ref={titlesRef}>
-          <Chunky text="UPGRADES" size={11} grad="gold" />
-          <span className={s.sub}>Cheap at first, then pricier every tier. A rebirth resets them.</span>
-          <span className={s.hint}>Drag to explore, pinch or scroll to zoom. Tap a hex twice for its line.</span>
+          <Chunky text={tab === 'luck' ? 'LUCK MAP' : 'COMBAT MAP'} size={11} grad={tab === 'luck' ? 'green' : 'red'} />
         </div>
         <button className={`btn blue square ${s.centerBtn}`} data-ui onClick={center} aria-label="Center the map" title="Center the map">
           <Px icon="target" size="md" />
@@ -767,7 +775,7 @@ export function UpgradeMap({ game, onClose }: { game: Game; onClose?: () => void
           </span>
           {onClose && (
             <button className={`btn red ${s.close}`} onClick={close}>
-              CLOSE
+              {closeText}
             </button>
           )}
           <span className={s.barRight}>

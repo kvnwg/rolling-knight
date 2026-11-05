@@ -16,8 +16,14 @@ import { SKILLS, TIER_NAME, TIER_RARITY, rollSkill, tierStep, type SkillDef, typ
 import { dist, lineOfSight, moveUnit, norm, type Shot, type Unit } from './entities';
 import { uid, type World } from './world';
 
-/** Seconds a skill roll spins before it lands. */
+/** Seconds a skill roll spins before it lands (Quick Roll shortens it: the knight's rollTimeMult). */
 export const ROLL_TIME = 0.7;
+
+/** Seconds this knight's skill roll spins: ROLL_TIME, shortened by Quick Roll. */
+export function rollTime(h: Pick<Unit, 'rollTimeMult'>): number {
+  const m = h.rollTimeMult;
+  return ROLL_TIME * (typeof m === 'number' && Number.isFinite(m) ? Math.max(0.1, Math.min(1, m)) : 1);
+}
 
 /** Movement, the auto attack, skill rolls and any running dodge or skill, every frame. */
 export function heroTick(w: World, h: Unit, dt: number, mx: number, my: number): void {
@@ -240,7 +246,7 @@ export function startSkillRoll(w: World, h: Unit, o: { free?: boolean; skill?: S
   const forced = o.skill ?? h.skillRig;
   h.skillRig = undefined;
   const skill = forced ? SKILLS[forced] : rollSkill(h.knightId, luck, w.rng);
-  h.skillRoll = { skill: skill.id, t: 0, dur: ROLL_TIME, free: !!o.free, luck, seed: w.rng.int(1, 0x3fffffff) };
+  h.skillRoll = { skill: skill.id, t: 0, dur: rollTime(h), free: !!o.free, luck, seed: w.rng.int(1, 0x3fffffff) };
   w.fx.push({ kind: 'spark', x: h.x, y: h.y - 16, color: '#ffe27a' });
   for (const fn of listeners) fn({ phase: 'start', world: w, hero: h, skill, free: !!o.free, luck });
   return true;

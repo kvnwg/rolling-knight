@@ -260,6 +260,7 @@ export class World {
       dodgeT: 0,
       specialCd: h.stats.specialCd * (this.perks.has('loneWolf') ? 0.7 : 1),
       specialT: cls.specialCd * 0.35,
+      rollTimeMult: h.stats.rollTimeMult,
       downed: h.hpShare <= 0,
       ai: { target: null, think: 0, dodgeThink: 0, wanderX: 0, wanderY: 0, stuck: 0 },
     };
