@@ -10,7 +10,7 @@ import type { Game } from '../../game';
 import { Chunky } from '../common';
 import { fmt } from '../format';
 import { Px } from '../px';
-import { CardTile, useHoldRepeat } from './UpgradeMap';
+import { CardTile, useHoldRepeat } from './parts';
 import s from './hexmap.module.css';
 
 export function UpgradePopup({ game, node, onBuy, onClose }: { game: Game; node: HexNode; onBuy: (repeat: number) => boolean; onClose: () => void }) {

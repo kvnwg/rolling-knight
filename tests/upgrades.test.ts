@@ -542,9 +542,14 @@ describe('the chance hooks in a fight', () => {
     const w = world();
     onFloorStart(w, game({ ricochet: 5 }));
     const h = w.heroes[0];
-    const [a, b] = w.mobs.filter((m) => !m.dead && !m.boss);
+    const [a, b, c, d] = w.mobs.filter((m) => !m.dead && !m.boss);
+    // A row of foes 30 px apart (the map's own layout shouldn't decide what's in range).
     b.x = a.x + 30;
     b.y = a.y;
+    c.x = b.x + 30;
+    c.y = a.y;
+    d.x = c.x + 30;
+    d.y = a.y;
     const shot: Shot = { uid: 1, team: 'hero', x: a.x - 10, y: a.y - 6, vx: 200, vy: 0, r: 2, dmg: 50, life: 1, kind: 'arrow', color: '#f0e0b0', from: h.uid };
     w.rng = fixedRng([0]);
     onShotHit(w, shot, a);

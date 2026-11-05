@@ -28,7 +28,8 @@ import { fmt } from '../format';
 import { Px } from '../px';
 import { uiSound } from '../sound';
 import { DRAW, HH, R, UI_PX, drawMap, fontReset, hexAt, nodeX, nodeY, wrapName, type DrawHex, type DrawState, type View } from './hexMapDraw';
-import { cardIcon, hexIcon } from './icons';
+import { hexIcon } from './icons';
+import { CardTile, useHoldRepeat } from './parts';
 import { UpgradePopup } from './UpgradePopup';
 import s from './hexmap.module.css';
 
@@ -80,7 +81,7 @@ function nameLines(ctx: CanvasRenderingContext2D, def: UpgradeDef): { lines: str
 /* ---------------------------------------------------------------- what stays between visits */
 
 /** The selected hex and where the map was panned and zoomed to (kept while the app runs). */
-const memory: { sel: string; view: View | null } = { sel: ROOT_KEY, view: null };
+const memory: { sel: string; view: View | null; scale: number } = { sel: ROOT_KEY, view: null, scale: 2.5 / UI_PX };
 
 /** Opens the map next time on this hex (`${line id}:${tier}`, e.g. "luckyStrike:1"), centered on it. */
 export function focusUpgradeHex(key: string): void {
@@ -129,36 +130,6 @@ function useCountUp(target: number): number {
   return shown;
 }
 
-/**
- * Hold to keep buying: the first buy on press, then again after 380 ms, each wait a fifth shorter than
- * the last (never under 70 ms), until a buy fails or the press ends.
- */
-export function useHoldRepeat(fn: (repeat: number) => boolean) {
-  const timer = useRef<number | null>(null);
-  const fnRef = useRef(fn);
-  fnRef.current = fn;
-  const stop = () => {
-    if (timer.current !== null) window.clearTimeout(timer.current);
-    timer.current = null;
-  };
-  useEffect(() => stop, []);
-  const start = (e: { preventDefault: () => void; button?: number }) => {
-    if (e.button !== undefined && e.button > 0) return;
-    e.preventDefault();
-    stop();
-    let n = 0;
-    if (!fnRef.current(n++)) return;
-    let delay = 380;
-    const loop = () => {
-      if (!fnRef.current(n++)) return stop();
-      delay = Math.max(70, delay * 0.8);
-      timer.current = window.setTimeout(loop, delay);
-    };
-    timer.current = window.setTimeout(loop, delay);
-  };
-  return { onPointerDown: start, onPointerUp: stop, onPointerLeave: stop, onPointerCancel: stop, onContextMenu: (e: { preventDefault: () => void }) => e.preventDefault() };
-}
-
 /* ---------------------------------------------------------------- buying */
 
 /**
@@ -180,27 +151,24 @@ export function buyHex(game: Game, key: string, repeat = 0): { ok: boolean; next
 
 /* ---------------------------------------------------------------- the buy card */
 
-function CardTile({ node, view, onClick }: { node: HexNode; view: HexView; onClick?: () => void }) {
-  const icon = cardIcon(lineOf(node).icon);
-  return (
-    <span className={s.cardTile} data-view={view} data-special={node.special || undefined} onClick={onClick}>
-      {view === 'mystery' ? (
-        <span className={s.cardQ}>?</span>
-      ) : (
-        <img className="px" src={icon.url} alt="" draggable={false} style={{ width: `calc(${icon.w} * var(--px))`, height: `calc(${icon.h} * var(--px))` }} />
-      )}
-    </span>
-  );
-}
-export { CardTile };
-
 function BuyCard({ game, node, view, onBuy, onDetails }: { game: Game; node: HexNode; view: HexView; onBuy: (repeat: number) => boolean; onDetails: () => void }) {
   const st = game.state;
   const def = lineOf(node);
   const level = tier(st, def.id);
   const cost = upgradeCost(st, def.id);
   const afford = st.gold >= cost;
-  const hold = useHoldRepeat(onBuy);
+  // A press that can't buy: the button shakes its head, a pixel each way.
+  const [nope, setNope] = useState(0);
+  const hold = useHoldRepeat((repeat) => {
+    const ok = onBuy(repeat);
+    if (!ok && repeat === 0) setNope((x) => x + 1);
+    return ok;
+  });
+  useEffect(() => {
+    if (!nope) return;
+    const t = window.setTimeout(() => setNope(0), 400);
+    return () => window.clearTimeout(t);
+  }, [nope]);
   const prev = node.prev ? HEX_BY_KEY.get(node.prev) : undefined;
   if (view === 'mystery') {
     return (
@@ -248,7 +216,7 @@ function BuyCard({ game, node, view, onBuy, onDetails }: { game: Game; node: Hex
         </button>
       ) : (
         <div className={s.buyCol}>
-          <button className={`btn green ${s.buy}`} data-afford={afford} {...hold}>
+          <button key={nope ? `n${nope}` : 'buy'} className={`btn green ${s.buy}`} data-afford={afford} data-nope={nope > 0 || undefined} {...hold}>
             <Px icon="coin" size="sm" />
             <span>{fmt(cost)}</span>
           </button>
@@ -327,13 +295,12 @@ export function UpgradeMap({ game, onClose }: { game: Game; onClose?: () => void
   /* ----- layout: the UI's pixel size, and where the open part of the map is (stage px) */
   const overlayRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
-  const headRef = useRef<HTMLDivElement>(null);
   const titlesRef = useRef<HTMLDivElement>(null);
   const footRef = useRef<HTMLDivElement>(null);
   const wideRef = useRef(wide);
   wideRef.current = wide;
   /** CSS px per stage px (an art pixel is var(--px) CSS px and 6 stage px). */
-  const scaleRef = useRef(2.5 / UI_PX);
+  const scaleRef = useRef(memory.scale);
   /** The map hasn't been touched yet (a pan, a pinch, the wheel, a glide): a resize may place it afresh. */
   const untouched = useRef(true);
   const measure = (): boolean => {
@@ -438,10 +405,14 @@ export function UpgradeMap({ game, onClose }: { game: Game; onClose?: () => void
   };
   const save = () => {
     memory.view = { ...viewRef.current };
+    memory.scale = scaleRef.current;
   };
   const stopAnim = () => {
+    if (!animRef.current) return;
     cancelAnimationFrame(animRef.current);
     animRef.current = 0;
+    // (A glide stopped short, by a tap or by closing, still leaves the map where it got to.)
+    save();
   };
   /** First visit: the selection (Luck I to start) at the focus, at the home zoom. */
   const place = () => {
@@ -772,7 +743,7 @@ export function UpgradeMap({ game, onClose }: { game: Game; onClose?: () => void
       </div>
       <canvas ref={canvasRef} className={s.canvas} aria-hidden />
 
-      <div className={s.head} ref={headRef}>
+      <div className={s.head}>
         <div className={s.titles} ref={titlesRef}>
           <Chunky text="UPGRADES" size={11} grad="gold" />
           <span className={s.sub}>Cheap at first, then pricier every tier. A rebirth resets them.</span>

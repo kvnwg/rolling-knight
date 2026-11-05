@@ -4,6 +4,7 @@
  */
 import { newGame } from './newGame';
 import { SAVE_VERSION, type GameState } from './state';
+import { sanitizeUpgrades } from './upgrades';
 
 export const SAVE_KEY = 'rolling-knight-save';
 const RESCUE_KEY = 'rolling-knight-rescue';
@@ -40,6 +41,8 @@ export function mend(raw: unknown): GameState {
   if (out.roll.current && !out.roll.current.landed) out.roll.current = null;
   out.roll.timer = 0;
   out.version = SAVE_VERSION;
+  // Upgrade tiers within each line's range (the map was rebuilt: some lines have fewer tiers now).
+  sanitizeUpgrades(out);
   return out;
 }
 

@@ -22,6 +22,7 @@ import { World, type HeroSpec } from './world/world';
 import { hubLayout } from './world/hubWorld';
 import { applyDialogAction, dialogFor, placeNpcs, type DialogChoice, type DialogNode, type Npc } from './world/npcs';
 import { questEvent, type Quest, type QuestEvent, type QuestReward } from './core/quests';
+import { onFloorStart } from './world/chance';
 
 export type Listener = (e: CoreEvent) => void;
 
@@ -156,6 +157,8 @@ export class Game {
     });
     this.questEvent({ type: 'floor', floor });
     this.world.auto = s.settings.autoPlay;
+    // The upgrade map's chance lines play on this floor.
+    onFloorStart(this.world, s);
     s.controlled = this.world.controlled;
     this.fade = 1;
     this.fadeDir = -1;

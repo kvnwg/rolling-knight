@@ -4,7 +4,7 @@
  * the floor's own Rng (`w.rng`, so a run plays the same for the same seed) and shows what happened
  * with the floor's float texts and effects ("LUCKY!", "DOUBLE!", "TRIP!", "JACKPOT!").
  *
- * Where each hook is called (src/world/world.ts):
+ * Where each hook is called (src/game.ts for the first, src/world/world.ts for the rest):
  *  - onFloorStart(w, state)  once a floor's World exists (Game.startFloor, after `new World(...)`).
  *  - onHeroHit / onHeroHurt  in World.damage, once the hit's final amount is known (after armor and
  *                            damage reduction), before it's taken off: a knight hitting a foe, and a
@@ -44,6 +44,8 @@ interface Ctx {
   bounces: WeakMap<Shot, number>;
   /** When each word last floated up (so a cleave through a crowd doesn't bury the screen). */
   saidAt: Map<string, number>;
+  /** The last words over each unit (uid): when, and how many, so a quick second one floats above the first. */
+  saidOn: Map<number, { t: number; n: number }>;
 }
 
 const CTX = new WeakMap<World, Ctx>();
@@ -68,7 +70,7 @@ export const COLORS = {
  * ready again). Call it for every floor's World, after `new World(...)`.
  */
 export function onFloorStart(w: World, save: ChanceSave): void {
-  CTX.set(w, { save, fx: chanceFx(save), fxAt: w.time, winded: new Set(), wildReady: new Map(), bounces: new WeakMap(), saidAt: new Map() });
+  CTX.set(w, { save, fx: chanceFx(save), fxAt: w.time, winded: new Set(), wildReady: new Map(), bounces: new WeakMap(), saidAt: new Map(), saidOn: new Map() });
 }
 
 /** The chance numbers a floor plays with right now (null when the floor was never bound). */
@@ -85,12 +87,19 @@ function fxOf(c: Ctx, w: World): ChanceFx {
   return c.fx;
 }
 
-/** A word over a unit, at most every `gap` seconds per word. */
+/**
+ * A word over a unit, at most every `gap` seconds per word. Words said over the same unit close
+ * together float up in a little stack instead of on top of each other (and above its damage numbers).
+ */
 function say(w: World, c: Ctx, u: Unit, text: string, color: string, big = true, gap = 0.12): void {
   const last = c.saidAt.get(text);
   if (last !== undefined && w.time - last < gap && w.time >= last) return;
   c.saidAt.set(text, w.time);
-  w.text(u.x, u.y - (u.boss ? 50 : 30), text, color, big);
+  const prev = c.saidOn.get(u.uid);
+  const n = prev && w.time - prev.t < 0.6 && w.time >= prev.t ? Math.min(3, prev.n + 1) : 0;
+  c.saidOn.set(u.uid, { t: w.time, n });
+  if (c.saidOn.size > 256) c.saidOn.clear();
+  w.text(u.x, u.y - (u.boss ? 54 : 32) - n * 11, text, color, big);
 }
 
 // ------------------------------------------------------------------ hits

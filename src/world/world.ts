@@ -19,6 +19,7 @@ import { demonDeathLines, demonEnrageLines, demonMobType, demonTauntsFor, type N
 import { floorPar, foeStats } from '../core/power';
 import { heroDodge, heroSpecial, heroTick } from './skills';
 import { CLEAR, skyOf, type Sky } from './sky';
+import { onHeroHit, onHeroHurt, onKill, onShotHit, onTick } from './chance';
 
 export interface HeroSpec {
   knightId: string;
@@ -416,6 +417,14 @@ export class World {
     amount *= 1 - target.armor;
     if (target.drT > 0) amount *= target.dr;
     amount = Math.max(1, amount);
+    // The upgrade map's chance lines (chance.ts): lucky and doubled hits, fumbles, Second Wind...
+    if (target.team === 'hero') {
+      amount = onHeroHurt(this, target, amount, from);
+      if (amount <= 0) return 0;
+    } else if (from && from.team === 'hero') {
+      amount = onHeroHit(this, from, target, amount, opts);
+      if (amount <= 0) return 0;
+    }
     target.hp -= amount;
     target.hurtT = 0.18;
     if (opts.knock && !target.boss) {
@@ -455,6 +464,7 @@ export class World {
     this.fx.push({ kind: 'death', x: m.x, y: m.y - 4, color: t.ramp[2], size: m.boss ? 3 : m.elite ? 2 : 1, src: m.boss ? 'boss' : t.plan === 'slime' ? 'slime' : undefined });
     const gold = Math.max(1, Math.round(this.goldPerKill * (m.boss ? 25 : m.elite ? 4 : 1)));
     this.events.push({ type: 'kill', gold, elite: !!m.elite, boss: !!m.boss, x: m.x, y: m.y, name: t.name });
+    onKill(this, m);
     if (this.demon && this.demon.unit === m) {
       this.text(m.x, m.y - 34, this.rng.pick(demonDeathLines), '#ff9a6a', true);
       this.demon = null;
@@ -746,6 +756,7 @@ export class World {
       if (m.dead) continue;
       mobAi(this, m, dt);
     }
+    onTick(this, dt);
     separate(this);
     updateShots(this, dt);
     updateAreas(this, dt);
@@ -859,6 +870,7 @@ function updateShots(w: World, dt: number): void {
       if (t.team === 'hero' && (t.invuln > 0 || t.rolling)) continue;
       const crit = s.team === 'hero' && w.rng.chance(0.1);
       w.damage(t, s.dmg * (crit ? 1.6 : 1), from, { crit, knock: s.kind === 'arrow' ? 3 : 2, kx: s.vx, ky: s.vy });
+      onShotHit(w, s, t);
       if (s.heal && from) {
         // Holy Orb: heals the most hurt ally.
         const hurt = w.heroes.filter((h) => !h.downed).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];

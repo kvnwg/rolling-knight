@@ -251,6 +251,18 @@
   --skd: var(--sk-btn-iron-down);
   color: var(--muted);
 }
+/* Can't afford it: the button shakes its head, a pixel each way. */
+.buy[data-nope] {
+  animation: buyNope 400ms steps(4) backwards;
+}
+@keyframes buyNope {
+  25% {
+    transform: translateX(calc(-1 * var(--px)));
+  }
+  75% {
+    transform: translateX(var(--px));
+  }
+}
 .short {
   font-size: calc(3.6 * var(--px));
   text-align: center;

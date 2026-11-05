@@ -20,6 +20,7 @@ import { Chunky, HeroArt, type Grad } from './common';
 import { DungeonHud } from './DungeonHud';
 import { fmt, secs } from './format';
 import { CharacterSelect, HubHud, StationSheet } from './Hub';
+import { UpgradeMap } from './upgrades/UpgradeMap';
 import { HeroDetail, LuckSheet, SettingsSheet } from './panels';
 import { hubLayout, type HubStation } from '../world/hubWorld';
 import type { Npc } from '../world/npcs';
@@ -60,6 +61,8 @@ export function App() {
   const ctl = useMemo(() => createControls(), []);
   const [, setTick] = useState(0);
   const [station, setStation] = useState<HubStation | null>(null);
+  const stationRef = useRef(station);
+  stationRef.current = station;
   const [talking, setTalking] = useState<Npc | null>(null);
   const talkRef = useRef(talking);
   talkRef.current = talking;
@@ -252,6 +255,8 @@ export function App() {
     const onKey = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
       if (k === 'escape') {
+        // The upgrade map handles its own Esc (its popup first, then the map).
+        if (stationRef.current?.id === 'upgrades') return;
         if (sheetRef.current) {
           setDetail(null);
           setSettings(false);
@@ -305,7 +310,8 @@ export function App() {
         </div>
       )}
       {choosing && <CharacterSelect game={game} onSelect={(id) => (csPick.current = id)} onPick={() => setPicked(true)} />}
-      {station && !inDungeon && <StationSheet game={game} station={station} onOpen={setDetail} onClose={() => setStation(null)} />}
+      {station && !inDungeon && station.id === 'upgrades' && <UpgradeMap game={game} onClose={() => setStation(null)} />}
+      {station && !inDungeon && station.id !== 'upgrades' && <StationSheet game={game} station={station} onOpen={setDetail} onClose={() => setStation(null)} />}
       {talking && inDungeon && <DialogBox game={game} npc={talking} onClose={() => setTalking(null)} />}
       <div className="toasts">
         {toasts.map((t) => (
