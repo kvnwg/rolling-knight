@@ -68,7 +68,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     hp: 150, atk: 7, armor: 0.1, speed: 56, range: 88, atkCd: 0.9, dodgeCd: 1.3, specialCd: 14,
     auto: { name: 'Holy Orb', text: 'A slow orb of light; each hit heals the most hurt ally a little.' },
     dodge: { name: 'Blessed Step', text: 'A roll that leaves a small healing glow behind.' },
-    special: { name: 'Sanctuary', text: 'Heals the whole squad for 35% and raises a fallen knight.' },
+    special: { name: 'Sanctuary', text: 'Heals the whole squad for 35% and keeps healing them on holy ground.' },
     unlockRebirths: 0,
   },
   arcanist: {

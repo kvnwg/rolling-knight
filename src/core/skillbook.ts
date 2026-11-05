@@ -108,10 +108,10 @@ const N = {
   arrowNova: { arrows: 16, rings: 2, gap: 0.22, dmg: 1.5, speed: 220, leap: 44 },
   thousandArrows: { spots: 8, r: 28, dur: 3, every: 0.15, dmg: 0.6, reach: 190 },
   // --- Cleric
-  mend: { heal: 0.35, rest: 0.1, revive: 0.3 },
+  mend: { heal: 0.35, rest: 0.1 },
   smite: { dmg: 3.5, r: 20, delay: 0.35, heal: 0.12, reach: 140 },
   blessing: { heal: 0.2, atkSpd: 1.4, dur: 6 },
-  sanctuary: { heal: 0.35, revive: 0.35, r: 42, dur: 3, every: 0.5, regen: 0.03 },
+  sanctuary: { heal: 0.35, r: 42, dur: 3, every: 0.5, regen: 0.03 },
   guardianAngel: { revive: 0.5, heal: 0.25, invuln: 3 },
   miracle: { dmg: 3, r: 130, stun: 1.5, invuln: 2, every: 0.05 },
   // --- Arcanist
@@ -213,7 +213,7 @@ const ENTRIES = {
   // ------------------------------------------------------------------ Cleric (healer)
   mend: {
     cls: 'cleric', tier: 'common', weight: 30, icon: 'heart', color: '#7dff8a', name: 'Mend',
-    text: `Mends the most hurt knight for ${pct(N.mend.heal)} HP (or raises a fallen one with ${pct(N.mend.revive)}), and the rest of the squad for ${pct(N.mend.rest)}.`,
+    text: `Mends the most hurt knight for ${pct(N.mend.heal)} HP, and the rest of the squad for ${pct(N.mend.rest)}.`,
   },
   smite: {
     cls: 'cleric', tier: 'common', weight: 26, icon: 'pillar', color: '#fff0a0', name: 'Smite',

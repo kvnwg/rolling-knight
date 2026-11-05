@@ -779,7 +779,6 @@ export class World {
       this.portalOpen = true;
       this.events.push({ type: 'cleared' });
       this.fx.push({ kind: 'portal', x: this.map.exit.x, y: this.map.exit.y });
-      for (const h of this.heroes) if (h.downed) this.revive(h, BAL.dungeon.reviveHpPct);
       this.refreshFlows();
     }
     if (this.portalOpen && !this.exited && lead && dist(lead.x, lead.y, this.map.exit.x, this.map.exit.y) < 14) {

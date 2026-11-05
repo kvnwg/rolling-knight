@@ -597,13 +597,11 @@ function effect(w: World, h: Unit, sk: SkillDef): void {
     }
     // ------------------------------------------------------------ Cleric
     case 'mend': {
-      // A fallen knight first (the nearest), else the most hurt.
+      // The most hurt knight standing (only Epic and Legendary skills raise the fallen).
       const n = SKILLS.mend.n;
-      const fallen = w.perks.has('bloodPact') ? null : nearestFallen(w, h);
-      const o = fallen ?? mostHurt(w) ?? h;
+      const o = mostHurt(w) ?? h;
       for (const p of w.livingHeroes()) if (p !== o) w.clericHeal(p, p.maxHp * n.rest);
-      if (fallen) w.revive(fallen, n.revive);
-      else w.clericHeal(o, o.maxHp * n.heal);
+      w.clericHeal(o, o.maxHp * n.heal);
       w.fx.push({ kind: 'levelup', x: o.x, y: o.y, color: c });
       w.areas.push({ uid: uid(), team: 'hero', x: o.x, y: o.y, r: 14, delay: 0, dur: 1, tick: 1, tickT: 1, dmg: 0, kind: 'glow', from: h.uid, color: c, t: 0 });
       break;
@@ -630,8 +628,6 @@ function effect(w: World, h: Unit, sk: SkillDef): void {
     case 'sanctuary': {
       const n = SKILLS.sanctuary.n;
       for (const o of w.livingHeroes()) w.clericHeal(o, o.maxHp * n.heal);
-      const fallen = nearestFallen(w, h);
-      if (fallen && !w.perks.has('bloodPact')) w.revive(fallen, n.revive);
       w.areas.push({ uid: uid(), team: 'hero', x: h.x, y: h.y, r: n.r, delay: 0, dur: n.dur, tick: n.every, tickT: n.every, dmg: 0, heal: n.regen, kind: 'sanctuary', from: h.uid, color: c, t: 0 });
       w.fx.push({ kind: 'levelup', x: h.x, y: h.y, color: c });
       break;
@@ -1057,13 +1053,6 @@ function slash(w: World, h: Unit, mult: number, r: number, knock: number): void 
     hit(w, h, e, mult, { knock, crit: true });
   }
   w.fx.push({ kind: 'crit', x: cx, y: cy, color: '#e8f0ff' });
-}
-
-/** The fallen knight nearest to h, if any. */
-function nearestFallen(w: World, h: Unit): Unit | null {
-  let best: Unit | null = null;
-  for (const o of w.heroes) if (o.downed && (!best || dist(o.x, o.y, h.x, h.y) < dist(best.x, best.y, h.x, h.y))) best = o;
-  return best;
 }
 
 /** The living knight with the least of their HP left. */

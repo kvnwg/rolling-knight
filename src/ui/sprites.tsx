@@ -11,35 +11,31 @@ import type { Dir } from '../render/pf/sheet';
 
 /**
  * A knight picture is KNIGHT_PIC_W x KNIGHT_PIC_H image pixels, the knight's feet on row
- * KNIGHT_PIC_FEET. The size is measured from the knight sheets themselves (measureKnightPics, once
- * they load): the box every knight's standing frames fit in, halo and weapons included, so a sheet of
- * any cell size or shape is framed whole. Every picture is cut at the same place relative to the feet,
- * so knights of every class stand on the same line at the same scale. (The values below are the old
- * 32 px sheets', used until then.)
+ * KNIGHT_PIC_FEET: the size every screen (cards, reels, reveals, the character select) is laid out
+ * for. Every class's knights stand on the same line at the same scale. A knight taller than the
+ * picture (Kevin) is framed from just above his head instead, so his face always shows.
  */
-export let KNIGHT_PIC_W = 30;
-export let KNIGHT_PIC_H = 28;
-export let KNIGHT_PIC_FEET = 24;
+export const KNIGHT_PIC_W = 30;
+export const KNIGHT_PIC_H = 28;
+export const KNIGHT_PIC_FEET = 24;
 /** The picture's top-left relative to a sheet's pivot. */
-let picLeft = -14;
-let picTop = -24;
+const picLeft = -14;
+const picTop = -24;
+/** Sheets taller than the picture: where their pictures start instead (relative to the pivot). */
+const tallTop = new Map<SheetName, number>();
 
 /** Every sheet a knight can be drawn from. */
 export function knightSheetNames(): SheetName[] {
   return [...new Set<SheetName>([...Object.values(KNIGHT_SHEET), ...Object.values(KNIGHT_SHEET_BY_ID)])];
 }
 
-/** Measures the knight pictures from the loaded sheets (call once they're ready; main.tsx does). */
+/** Finds the sheets too tall for the picture (call once they're ready; main.tsx does). */
 export function measureKnightPics(): void {
-  const box = knightBounds(knightSheetNames());
-  if (!box) return;
-  const [l, t, r, b] = box;
-  // A pixel of air all round, so outlines never touch the picture's edge.
-  picLeft = l - 1;
-  picTop = t - 1;
-  KNIGHT_PIC_W = r - l + 3;
-  KNIGHT_PIC_H = b - t + 3;
-  KNIGHT_PIC_FEET = -picTop;
+  tallTop.clear();
+  for (const name of knightSheetNames()) {
+    const b = knightBounds([name]);
+    if (b && b[1] - 1 < picTop) tallTop.set(name, b[1] - 1);
+  }
   cache.clear();
 }
 
@@ -98,7 +94,8 @@ export function knightUrl(id: string, mutation: MutationId | null, opts: { view?
   let buf: PixelBuf;
   if (pfReady()) {
     const still = knightStill(id, mutation, DIR_OF[view], opts.frame ?? 0);
-    buf = cut(still.buf, still.pivot[0] + picLeft, still.pivot[1] + picTop, KNIGHT_PIC_W, KNIGHT_PIC_H);
+    const top = tallTop.get(still.paint.sheet) ?? picTop;
+    buf = cut(still.buf, still.pivot[0] + picLeft, still.pivot[1] + top, KNIGHT_PIC_W, KNIGHT_PIC_H);
   } else buf = legacyBuf(id, mutation, view, opts.frame ?? 0);
   url = bufToUrl(buf, opts.silhouette);
   cache.set(key, url);

@@ -409,8 +409,10 @@ export class Game {
     const w = this.world;
     if (w) {
       for (const h of w.heroes) {
-        const share = h.downed ? BAL.dungeon.reviveHpPct : h.hp / h.maxHp;
-        this.hpShare.set(h.knightId!, healAll ? 1 : Math.min(1, share + (1 - share) * BAL.dungeon.healBetweenFloors));
+        // A fallen knight stays down into the next floor: only a support knight's Epic or Legendary
+        // skill raises one (or the hub, where everyone recovers).
+        const share = h.hp / h.maxHp;
+        this.hpShare.set(h.knightId!, healAll ? 1 : h.downed ? 0 : Math.min(1, share + (1 - share) * BAL.dungeon.healBetweenFloors));
       }
       // Coins still in the air are banked.
       for (const p of w.pickups) this.collect(p.kind, p.amount);

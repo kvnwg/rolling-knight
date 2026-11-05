@@ -234,7 +234,8 @@ export function hubScene(): HubScene {
   if (cached) return cached;
   const art = buildHub();
   // Just above the steps, facing up the court at the shop.
-  const spawn = { x: HUB_CX, y: HUB_STEPS_Y - 12, view: 'up' as View, dir: 1 as const };
+  // Up in the court (out of every keeper's talking range), so the view opens with you near its middle.
+  const spawn = { x: HUB_CX, y: HUB_STEPS_Y - 32, view: 'up' as View, dir: 1 as const };
   const people = [...art.stations.filter((s) => s.def), ...art.extras];
   cached = {
     w: HUB_W,

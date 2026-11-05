@@ -64,12 +64,8 @@ interface FxSprite {
   flip: boolean;
 }
 
-/** Effects that glow (drawn over the light, and lighting what's around them). */
+/** Bright effects: drawn crisp on the unlit top layer (they don't glow or light the scene). */
 const EMISSIVE: ReadonlySet<FxName> = new Set(['hit', 'crit', 'slash', 'boom', 'sparkle', 'levelUp', 'lightning', 'heal', 'electric', 'explosion']);
-const FX_LIGHT: Partial<Record<FxName, [string, number]>> = {
-  crit: ['#ffd84a', 26], boom: ['#ff8a3a', 40], explosion: ['#ff8a3a', 34], sparkle: ['#a8d8ff', 24], levelUp: ['#ffd84a', 50],
-  lightning: ['#d88aff', 36], heal: ['#fff0a0', 44], electric: ['#b08aff', 60], slash: ['#ffffff', 18],
-};
 
 /** Target art pixels on the screen's short side; a phone comes in closer (about 236 across a 3x iPhone, was 295). */
 const SHORT_SIDE = 270;
@@ -79,8 +75,8 @@ const PHONE_SHORT_SIDE = 230;
  * a desktop the same from its short side): the hub is one cozy shop front, painted to fill the screen.
  */
 const HUB_SHORT_SIDE = 150;
-/** Where your knight sits on the hub's screen, top to bottom: low, looking up the court at the shop. */
-const HUB_FOCUS_Y = 0.72;
+/** Where your knight sits on the hub's screen, top to bottom: a little below the middle. */
+const HUB_FOCUS_Y = 0.55;
 
 /** PixelForge FX are drawn in their own colors. */
 const NO_PAINT = { recolor: {}, key: 'fx' } as const;
@@ -497,10 +493,11 @@ export class Renderer {
       hub.drawMotes(em, cx, cy, this.LW, this.LH, this.time);
     } else this.ambient?.drawAir(em, cx, cy, this.LW, this.LH, this.time);
 
-    // --- shots, sparks, leaves and weather
+    // --- shots, sparks, leaves and weather. Attack effects (shots, spell and hit bursts) go on the
+    // unlit top layer: crisp, never bloomed or glowing (only the setting glows).
     for (const s of w.shots) {
       if (pf && this.wardenShot(w, s)) this.drawRockShard(st, s, sx, sy);
-      else this.drawShot(s.kind === 'arrow' ? st : em, s, sx, sy);
+      else this.drawShot(s.kind === 'arrow' ? st : ui, s, sx, sy);
     }
     this.spawnFx(w);
     if (!hub) this.weather(biome, dt, cx, cy);
@@ -509,14 +506,10 @@ export class Renderer {
     if (w.sky.rain > 0) this.rain.drawAir(st, cx, cy);
     this.advanceFx(dt);
     this.drawFx(st, sx, sy, false);
-    this.drawFx(em, sx, sy, true);
+    this.drawFx(ui, sx, sy, true);
 
-    // --- light
+    // --- light (the setting's: effects light nothing)
     const lights = this.collectLights(w, biome, cx, cy, sx, sy);
-    for (const f of this.fxs) {
-      const l = FX_LIGHT[f.name];
-      if (l) out_push(lights, { x: sx(f.x), y: sy(f.y), r: l[1], color: l[0], intensity: 0.9, bloom: true });
-    }
     if (outdoors && w.sky.kind === 'clear') this.sunFlecks(lights, w, cx, cy);
     this.flashT = Math.max(0, this.flashT - dt);
 
@@ -1300,12 +1293,6 @@ export class Renderer {
       if (h.cls === 'arcanist') out.push({ x: sx(h.x) + h.dir * 4, y: sy(h.y) - 16, r: 10, color: orb, intensity: 0.35, bloom: true });
     }
     if (this.ambient) for (const l of this.ambient.lights(cx, cy, this.W, this.H, this.time)) out.push(l);
-    for (const s of w.shots) {
-      if (s.kind === 'arrow') continue;
-      // A Stone Warden's thrown stones only catch a little light (they don't glow like spells).
-      if (pfReady() && this.wardenShot(w, s)) out.push({ x: sx(s.x), y: sy(s.y), r: 12, color: '#fff2d8', intensity: 0.35 });
-      else out.push({ x: sx(s.x), y: sy(s.y), r: s.team === 'hero' ? 20 : 16, color: s.color, intensity: 0.9, bloom: true });
-    }
     for (const a of w.areas) {
       if (a.kind === 'fire' || (a.kind === 'meteor' && a.delay < 0.4)) out.push({ x: sx(a.x), y: sy(a.y), r: a.r * 1.6, color: '#ff7a2a', intensity: 0.9, bloom: true });
       else if (a.kind === 'sanctuary') out.push({ x: sx(a.x), y: sy(a.y), r: a.r * 1.4, color: '#fff0a0', intensity: 0.7, bloom: true });
@@ -1650,10 +1637,6 @@ function gradeOf(b: Biome, sky: Sky | null): Grade {
     vignette: day || grey ? Math.min(0.32, b.light.vignette * 0.7) : Math.min(0.75, b.light.vignette + 0.1),
     bloom: indoor ? 0.9 : wet ? 0.65 : 0.5,
   };
-}
-
-function out_push(list: Light[], l: Light): void {
-  list.push(l);
 }
 
 export { BIOMES, RARITY_COLOR };
