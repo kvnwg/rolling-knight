@@ -1,5 +1,6 @@
 /** A fresh save, and the state a rebirth starts from. */
 import { BAL } from './balance';
+import { shuffleDeck } from './deck';
 import { RARITIES, type Rarity } from './rarity';
 import { Rng } from './rng';
 import { SAVE_VERSION, type DupeRule, type GameState } from './state';
@@ -44,7 +45,8 @@ export function newGame(seed = Date.now()): GameState {
       beginnerAt: null,
       nextSpinId: 1,
     },
-    run: { floor: 1, bestFloor: 1, bosses: 0, checkpoint: 1, biomeSeed: Rng.hashSeed(s ^ 0xbeef), deaths: 0 },
+    // The first floor ever is the plain chain of rooms; after that the deck takes over.
+    run: { floor: 1, bestFloor: 1, bosses: 0, checkpoint: 1, biomeSeed: Rng.hashSeed(s ^ 0xbeef), deaths: 0, designDeck: shuffleDeck(s, null, 'chain'), lastDesign: null, visits: 0 },
     codex: {},
     records: { bestOneIn: 0, bestName: null, bestFloorEver: 1, kills: 0, spins: 0 },
     stats: { killsThisRun: 0, goldPerMinute: 0, goldWindow: [] },
@@ -87,7 +89,9 @@ export function rebirth(state: GameState): boolean {
   }
   state.heirloom = kept?.id ?? null;
   state.potionEndsAt = null;
-  state.run = { floor: 1, bestFloor: 1, bosses: 0, checkpoint: 1, biomeSeed: Rng.hashSeed(state.seed ^ (state.rebirths * 7919)), deaths: 0 };
+  // The deck of floor designs carries on through the rebirth (no design comes round early).
+  const { designDeck, lastDesign } = state.run;
+  state.run = { floor: 1, bestFloor: 1, bosses: 0, checkpoint: 1, biomeSeed: Rng.hashSeed(state.seed ^ (state.rebirths * 7919)), deaths: 0, designDeck, lastDesign, visits: 0 };
   state.stats.killsThisRun = 0;
   state.roll.current = null;
   state.roll.timer = 0;

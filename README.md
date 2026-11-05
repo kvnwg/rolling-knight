@@ -76,7 +76,8 @@ something is in range.
 Dev shortcuts by URL: `?floor=16` starts on that floor with a ready squad, `&squad=mythic` sets its
 rarity, `&classes=arcanist,guardian,cleric` its classes, `&auto` plays itself, `&gold=100000`;
 `&camp` stays at the hub and `&hub` skips choosing a knight, `&sky=rain` (or `clear`, `overcast`) sets
-every floor's weather. `?fresh` starts a new game. The game is on
+every floor's weather, `&design=maze` the next floor's design (`src/world/designs.ts`; then the deck
+as usual). `?fresh` starts a new game. The game is on
 `window.__game`, the renderer on `window.__renderer`.
 
 ## Tests, balance and art previews
@@ -110,6 +111,14 @@ npx tsx tools/preview.ts knights shots/knights.png
 ```bash
 npx tsx tools/preview.ts mobs shots/mobs.png
 ```
+
+```bash
+DESIGN=loop npx tsx tools/preview.ts floor shots/floor.png forest 12 1234
+npx tsx tools/preview.ts designs shots/floors_designs.png hamlet,forest,crypt,desert,ember 8 1234 4 tundra
+```
+
+A floor (any design; `RAW=1` without the biome's light, `SOFT=1` with it softened), and a contact
+sheet of every floor design in a few biomes with a row of boss floors.
 
 ## Build
 

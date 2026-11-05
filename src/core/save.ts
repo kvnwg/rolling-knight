@@ -2,7 +2,9 @@
  * Saves live in localStorage as JSON. A save that fails to load is kept under a rescue key instead
  * of being thrown away, and anything missing from an older save is filled in from a new game.
  */
+import { cleanDeck, isDesign, shuffleDeck } from './deck';
 import { newGame } from './newGame';
+import { Rng } from './rng';
 import { SAVE_VERSION, type GameState } from './state';
 import { sanitizeUpgrades } from './upgrades';
 
@@ -40,10 +42,27 @@ export function mend(raw: unknown): GameState {
   // A spin in progress is replayed from scratch rather than resumed mid-animation.
   if (out.roll.current && !out.roll.current.landed) out.roll.current = null;
   out.roll.timer = 0;
+  mendDeck(out, s.run);
   out.version = SAVE_VERSION;
   // Upgrade tiers within each line's range (the map was rebuilt: some lines have fewer tiers now).
   sanitizeUpgrades(out);
   return out;
+}
+
+/**
+ * The deck of floor designs. A save from before there were designs (version 1) played the chain of
+ * rooms on every floor: it gets a fresh deck that opens with something else. A damaged deck loses
+ * what isn't a design.
+ */
+function mendDeck(out: GameState, saved: Partial<GameState['run']> | undefined): void {
+  const run = out.run;
+  if (!Array.isArray(saved?.designDeck)) {
+    run.lastDesign = 'chain';
+    run.designDeck = shuffleDeck(Rng.hashSeed(run.biomeSeed ^ out.seed ^ 0x5eed), 'chain');
+  }
+  run.designDeck = cleanDeck(run.designDeck);
+  if (!isDesign(run.lastDesign)) run.lastDesign = null;
+  if (!Number.isInteger(run.visits) || run.visits < 0) run.visits = 0;
 }
 
 export function loadGame(): GameState | null {

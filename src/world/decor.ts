@@ -15,7 +15,7 @@
  */
 import { Rng } from '../core/rng';
 import type { Biome, PropKind } from './biomes';
-import { BLOCKED, FLOOR, SOLID, TILE, tileAt, type FloorMap, type Room } from './mapgen';
+import { BLOCKED, FLOOR, SOLID, TILE, squeezes, tileAt, type FloorMap, type Room } from './mapgen';
 
 export interface DecorCtx {
   m: FloorMap;
@@ -25,8 +25,9 @@ export interface DecorCtx {
   occupied: Set<number>;
   /** Near a start, exit or arena middle (kept clear). */
   nearCenter(x: number, y: number): boolean;
-  /** Is all the floor still reachable from the start? */
-  connected(): boolean;
+  /** Is all the floor still reachable from the start? Pass the tile just closed when it was the only
+   * change (a much quicker check). */
+  connected(closed?: number): boolean;
 }
 
 export interface HouseLayout {
@@ -80,9 +81,9 @@ function free(c: DecorCtx, x: number, y: number): boolean {
 function solidProp(c: DecorCtx, kind: PropKind, x: number, y: number, dx = 0, dy = 0, seed = c.rng.int(0, 1 << 30), paved = false): boolean {
   const { m } = c;
   const i = y * m.w + x;
-  if (!free(c, x, y) || (m.path[i] && !paved) || (paved && onRoute(m, x, y))) return false;
+  if (!free(c, x, y) || (m.path[i] && !paved) || (paved && onRoute(m, x, y)) || squeezes(m, x, y)) return false;
   m.tiles[i] = BLOCKED;
-  if (!c.connected()) {
+  if (!c.connected(i)) {
     m.tiles[i] = FLOOR;
     return false;
   }
@@ -100,9 +101,9 @@ function onRoute(m: FloorMap, x: number, y: number): boolean {
 function cluster(c: DecorCtx, x: number, y: number, kinds: PropKind[], paved = false): boolean {
   const { m } = c;
   const i = y * m.w + x;
-  if (!free(c, x, y) || (m.path[i] && !paved) || (paved && onRoute(m, x, y))) return false;
+  if (!free(c, x, y) || (m.path[i] && !paved) || (paved && onRoute(m, x, y)) || squeezes(m, x, y)) return false;
   m.tiles[i] = BLOCKED;
-  if (!c.connected()) {
+  if (!c.connected(i)) {
     m.tiles[i] = FLOOR;
     return false;
   }
@@ -207,7 +208,7 @@ function village(c: DecorCtx): void {
   const { m, rng } = c;
   const W = m.w;
   // --- a canal across the town where the street narrows, a bridge carrying the street over it
-  canalAndBridge(c);
+  canalAndBridge(c, m.design === 'gauntlet' ? 6 : 1);
   // --- houses along the north edges of the lots, near the street
   const houses: Array<{ tx: number; ty: number; tiles: number; door: number }> = [];
   for (const lot of placeLots(c, [5, 4], 12, 1)) {
@@ -400,8 +401,9 @@ function market(c: DecorCtx): void {
 }
 
 /** A canal across the town: two rows of water through the lots where the street is narrow enough
- * for a bridge, the street carried over it on a plank deck between two rails. */
-function canalAndBridge(c: DecorCtx): void {
+ * for a bridge, the street carried over it on a plank deck between two rails. Up to `max` of them,
+ * one to a narrow street (the gauntlet's squares, each on its own island between canals). */
+function canalAndBridge(c: DecorCtx, max = 1): void {
   const { m, rng } = c;
   const W = m.w;
   const rows: number[] = [];
@@ -431,25 +433,38 @@ function canalAndBridge(c: DecorCtx): void {
     if (clear) rows.push(y);
   }
   if (!rows.length) return;
-  const y = rows[Math.floor(rng.next() * rows.length)];
+  let picks: number[];
+  if (max <= 1) picks = [rows[Math.floor(rng.next() * rows.length)]];
+  else {
+    // A narrow street gives a few rows in a row: the middle one of each.
+    const runs: number[][] = [];
+    for (const y of rows) {
+      const last = runs[runs.length - 1];
+      if (last && y - last[last.length - 1] <= 1) last.push(y);
+      else runs.push([y]);
+    }
+    picks = runs.map((r) => r[r.length >> 1]).slice(0, max);
+  }
   m.canal ??= new Uint8Array(W * m.h);
-  let bx0 = W;
-  let bx1 = 0;
-  for (let x = 1; x < W - 1; x++) {
-    for (const yy of [y, y + 1]) {
-      m.canal[yy * W + x] = 1;
-      if (at(m, x, yy) === FLOOR) {
-        c.occupied.add(yy * W + x);
-        bx0 = Math.min(bx0, x);
-        bx1 = Math.max(bx1, x);
+  for (const y of picks) {
+    let bx0 = W;
+    let bx1 = 0;
+    for (let x = 1; x < W - 1; x++) {
+      for (const yy of [y, y + 1]) {
+        m.canal[yy * W + x] = 1;
+        if (at(m, x, yy) === FLOOR) {
+          c.occupied.add(yy * W + x);
+          bx0 = Math.min(bx0, x);
+          bx1 = Math.max(bx1, x);
+        }
       }
     }
+    clearTrees(m, 0, y - 1, W - 1, y + 1);
+    reserve(m, 0, y, W - 1, y + 1);
+    // The bridge's two rails, at the deck's sides.
+    m.props.push({ kind: 'bridgeRail', x: bx0 * TILE + 2, y: (y + 2) * TILE + 6, solid: false, seed: 1 });
+    m.props.push({ kind: 'bridgeRail', x: (bx1 + 1) * TILE - 2, y: (y + 2) * TILE + 6, solid: false, seed: 2 });
   }
-  clearTrees(m, 0, y - 1, W - 1, y + 1);
-  reserve(m, 0, y, W - 1, y + 1);
-  // The bridge's two rails, at the deck's sides.
-  m.props.push({ kind: 'bridgeRail', x: bx0 * TILE + 2, y: (y + 2) * TILE + 6, solid: false, seed: 1 });
-  m.props.push({ kind: 'bridgeRail', x: (bx1 + 1) * TILE - 2, y: (y + 2) * TILE + 6, solid: false, seed: 2 });
 }
 
 // ------------------------------------------------------------------ the wilds

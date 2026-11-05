@@ -122,8 +122,14 @@ fights (or spend anything) you head back up, or fall.
 
 Endless floors, a new biome every 5 floors (a boss on every 5th): Mossy Hamlet, Gloomwood, Frostfang
 Tundra, Sunken Crypt, Mirewater Bog, Sunscorch Ruins, Hollow Graves, Ember Depths, Prism Grotto,
-Moonlit Shrine; after the first lap the order is reshuffled. Each floor is a chain of rooms from the
-start to the exit with side rooms, pools and props, checked to be fully connected. Mobs are designed
+Moonlit Shrine; after the first lap the order is reshuffled. Each floor is built to one of ten
+designs (`src/world/designs.ts`): a chain of rooms, a loop round a lake or a block of houses, a plaza
+with spokes, switchbacks, arenas joined by bridges, a crossroads with two wings, open ground with
+islands of cover, a valley with ledges, a maze, a keep with a ring road. Their order is a shuffled
+deck kept in the save (`src/core/deck.ts`): no design repeats until all have been played, a reshuffle
+never repeats the last one, and a floor you come back to is a new map to the next design. Boss
+floors keep the same arena with a different approach. Every floor has side rooms, pools and props,
+and is checked to be fully connected. Mobs are designed
 per floor: body plan, behavior (chaser, archer, charger, bomber, caster, tank, swarm), colors, size,
 features and name; bosses have three of ring, fan, charge, slam, summon and rain, and enrage at
 half HP. Clearing a floor opens the portal. A wiped squad is carried back to the hub, and the run

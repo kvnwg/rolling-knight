@@ -1,13 +1,18 @@
 /**
- * Procedural floors. A floor is a chain of rooms from the start (bottom) to the exit (top), with a
- * side room or two, joined by corridors. Cave biomes get blobby rooms and winding passages smoothed
- * by a cellular pass; crypts and lava caves get rectangular rooms and straight halls. Then pools,
- * paths, the farm's crop fields, props and lights, and the mob packs. Every floor is checked to be
- * fully connected.
+ * Procedural floors. Each floor is built to a design (designs.ts: a chain of rooms, a loop round a
+ * lake, a plaza with spokes, switchbacks, arenas and bridges, a crossroads, open ground with islands
+ * of cover, a valley with ledges, a maze, a keep with a ring road), dealt from a deck so they don't
+ * repeat (core/deck.ts). The design lays out the rooms and carves the floor in the biome's style:
+ * cave biomes get blobby rooms and winding passages smoothed by a cellular pass; crypts and lava
+ * caves get rectangular rooms and straight halls. Then, for every design alike: pools, paths, the
+ * farm's crop fields, the town's houses and the wilds (decor.ts), props and lights, and the mob
+ * packs. Every floor is checked to be fully connected.
  */
 import { Rng } from '../core/rng';
+import type { DesignId } from '../core/deck';
 import { BIOMES, type Biome, type PropKind, type TreeKind } from './biomes';
 import { dressFloor } from './decor';
+import { DESIGNS, Shaper } from './designs';
 import { placeTrees, roomTree, type TreeSize } from './forest';
 
 export const TILE = 16;
@@ -23,6 +28,8 @@ export interface Room {
   rx: number;
   ry: number;
   kind: 'start' | 'normal' | 'exit' | 'arena' | 'side';
+  /** No foes here (the rooms on a boss floor's way to its arena). */
+  quiet?: boolean;
 }
 
 export interface Prop {
@@ -75,6 +82,8 @@ export interface FloorMap {
   props: Prop[];
   spawns: Spawn[];
   seed: number;
+  /** The design the floor was built to (generated floors; designs.ts). */
+  design?: DesignId;
 }
 
 export function idx(m: Pick<FloorMap, 'w'>, x: number, y: number): number {
@@ -95,11 +104,45 @@ export function blocksShots(m: FloorMap, tx: number, ty: number): boolean {
   return tileAt(m, tx, ty) === SOLID;
 }
 
+/** How many open floor tiles in a row from (x, y) going (dx, dy), not counting (x, y), up to `cap`. */
+function openRun(m: FloorMap, x: number, y: number, dx: number, dy: number, cap = 3): number {
+  let n = 0;
+  while (n < cap && tileAt(m, x + dx * (n + 1), y + dy * (n + 1)) === FLOOR) n++;
+  return n;
+}
+
+/**
+ * Would a prop on the floor tile (x, y) squeeze the way past it to less than three tiles, across or
+ * up and down? (Against a wall in a room it leaves plenty; at the side of a corridor three wide, or in
+ * the middle of one four or five wide, it wouldn't. A squad turning back through a squeeze can jam.)
+ */
+export function squeezes(m: FloorMap, x: number, y: number): boolean {
+  return Math.max(openRun(m, x, y, -1, 0), openRun(m, x, y, 1, 0)) < 3 || Math.max(openRun(m, x, y, 0, -1), openRun(m, x, y, 0, 1)) < 3;
+}
+
+const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
+
+/** Does any of these (just closed) tiles leave a gap of one or two floor tiles to the next obstacle? */
+function narrowGap(m: FloorMap, tiles: readonly number[]): boolean {
+  return tiles.some((i) => {
+    const x = i % m.w;
+    const y = (i / m.w) | 0;
+    for (const [dx, dy] of DIRS) {
+      const n = openRun(m, x, y, dx, dy);
+      if (n === 1 || n === 2) return true;
+    }
+    return false;
+  });
+}
+
 /** Breadth-first distances (in tiles) from (sx, sy) over walkable tiles; -1 unreachable. */
 export function bfs(m: FloorMap, sx: number, sy: number, passable: (t: number) => boolean = (t) => t === FLOOR): Int32Array {
-  const dist = new Int32Array(m.w * m.h).fill(-1);
+  const W = m.w;
+  const N = W * m.h;
+  const dist = new Int32Array(N).fill(-1);
   if (!passable(tileAt(m, sx, sy))) return dist;
-  const q = new Int32Array(m.w * m.h);
+  const tiles = m.tiles;
+  const q = new Int32Array(N);
   let head = 0;
   let tail = 0;
   const s = idx(m, sx, sy);
@@ -107,15 +150,25 @@ export function bfs(m: FloorMap, sx: number, sy: number, passable: (t: number) =
   q[tail++] = s;
   while (head < tail) {
     const c = q[head++];
-    const cx = c % m.w;
-    const cy = (c / m.w) | 0;
+    const cx = c % W;
     const d = dist[c] + 1;
-    if (cx > 0) visit(c - 1);
-    if (cx < m.w - 1) visit(c + 1);
-    if (cy > 0) visit(c - m.w);
-    if (cy < m.h - 1) visit(c + m.w);
-    function visit(n: number) {
-      if (dist[n] >= 0 || !passable(m.tiles[n])) return;
+    let n = c - 1;
+    if (cx > 0 && dist[n] < 0 && passable(tiles[n])) {
+      dist[n] = d;
+      q[tail++] = n;
+    }
+    n = c + 1;
+    if (cx < W - 1 && dist[n] < 0 && passable(tiles[n])) {
+      dist[n] = d;
+      q[tail++] = n;
+    }
+    n = c - W;
+    if (n >= 0 && dist[n] < 0 && passable(tiles[n])) {
+      dist[n] = d;
+      q[tail++] = n;
+    }
+    n = c + W;
+    if (n < N && dist[n] < 0 && passable(tiles[n])) {
       dist[n] = d;
       q[tail++] = n;
     }
@@ -123,17 +176,104 @@ export function bfs(m: FloorMap, sx: number, sy: number, passable: (t: number) =
   return dist;
 }
 
-function countReach(m: FloorMap, sx: number, sy: number): number {
-  let n = 0;
-  const d = bfs(m, sx, sy);
-  for (let i = 0; i < d.length; i++) if (d[i] >= 0) n++;
-  return n;
-}
+/**
+ * Keeps a floor in one piece: is every floor tile still reachable from the start? It reuses its
+ * buffers, and when only one tile has just been closed (a prop stood on it) it first looks round
+ * that tile: if the open tiles beside it still join up among themselves, nothing can have been cut
+ * off and no search is needed.
+ */
+export class Reach {
+  private mark: Int32Array;
+  private q: Int32Array;
+  private stamp = 0;
+  private ring: number[];
 
-function countFloor(m: FloorMap): number {
-  let n = 0;
-  for (let i = 0; i < m.tiles.length; i++) if (m.tiles[i] === FLOOR) n++;
-  return n;
+  constructor(
+    private m: FloorMap,
+    private sx: number,
+    private sy: number,
+  ) {
+    this.mark = new Int32Array(m.w * m.h);
+    this.q = new Int32Array(m.w * m.h);
+    const W = m.w;
+    // The eight round a tile in order (N, NE, E, SE, S, SW, W, NW): the edge-on ones at even places.
+    this.ring = [-W, -W + 1, 1, W + 1, W, W - 1, -1, -W - 1];
+  }
+
+  /** Every floor tile reachable from the start? */
+  all(): boolean {
+    const W = this.m.w;
+    const N = W * this.m.h;
+    const t = this.m.tiles;
+    let total = 0;
+    for (let i = 0; i < N; i++) if (t[i] === FLOOR) total++;
+    const s = this.sy * W + this.sx;
+    if (t[s] !== FLOOR) return total === 0;
+    const mark = this.mark;
+    const q = this.q;
+    const st = ++this.stamp;
+    let head = 0;
+    let tail = 0;
+    mark[s] = st;
+    q[tail++] = s;
+    while (head < tail) {
+      const c = q[head++];
+      const cx = c % W;
+      let n = c - 1;
+      if (cx > 0 && mark[n] !== st && t[n] === FLOOR) {
+        mark[n] = st;
+        q[tail++] = n;
+      }
+      n = c + 1;
+      if (cx < W - 1 && mark[n] !== st && t[n] === FLOOR) {
+        mark[n] = st;
+        q[tail++] = n;
+      }
+      n = c - W;
+      if (n >= 0 && mark[n] !== st && t[n] === FLOOR) {
+        mark[n] = st;
+        q[tail++] = n;
+      }
+      n = c + W;
+      if (n < N && mark[n] !== st && t[n] === FLOOR) {
+        mark[n] = st;
+        q[tail++] = n;
+      }
+    }
+    return tail === total;
+  }
+
+  /** Still all one piece, now that floor tile `i` is closed (and it was before)? */
+  closed(i: number): boolean {
+    const W = this.m.w;
+    const t = this.m.tiles;
+    const x = i % W;
+    const y = (i / W) | 0;
+    if (x < 1 || y < 1 || x >= W - 1 || y >= this.m.h - 1 || i === this.sy * W + this.sx) return this.all();
+    let open = 0;
+    for (let k = 0; k < 8; k++) if (t[i + this.ring[k]] === FLOOR) open |= 1 << k;
+    if (open === 255) return true;
+    // Runs of open tiles round it that hold an edge-on neighbor: one (or none) and nothing was cut.
+    let k0 = 0;
+    while (open & (1 << k0)) k0++;
+    let runs = 0;
+    let inRun = false;
+    let edgeOn = false;
+    for (let j = 1; j <= 8; j++) {
+      const k = (k0 + j) & 7;
+      if (open & (1 << k)) {
+        if (!inRun) {
+          inRun = true;
+          edgeOn = false;
+        }
+        if ((k & 1) === 0) edgeOn = true;
+      } else if (inRun) {
+        if (edgeOn) runs++;
+        inRun = false;
+      }
+    }
+    return runs <= 1 || this.all();
+  }
 }
 
 export interface GenOptions {
@@ -141,154 +281,26 @@ export interface GenOptions {
   biome: Biome;
   seed: number;
   boss: boolean;
+  /** The floor's design (designs.ts): the chain of rooms when left out. */
+  design?: DesignId;
 }
 
 export function generateFloor(opts: GenOptions): FloorMap {
   const { biome, boss, floor } = opts;
   const rng = new Rng(Rng.hashSeed(opts.seed ^ (floor * 2654435761)));
   const cave = biome.layout === 'cave';
-  const W = 46;
-  const margin = 4;
-  // --- rooms, top (exit) to bottom (start)
-  const main: Room[] = [];
-  const nMain = boss ? 2 : 5 + Math.min(3, Math.floor(floor / 10)) + rng.int(0, 1);
-  let y = margin + 2;
-  let px = W / 2;
-  for (let i = 0; i < nMain; i++) {
-    const kind: Room['kind'] = i === 0 ? (boss ? 'arena' : 'exit') : i === nMain - 1 ? 'start' : 'normal';
-    let rx: number;
-    let ry: number;
-    if (kind === 'arena') {
-      rx = 11;
-      ry = 9;
-    } else if (kind === 'start') {
-      rx = cave ? 4 : 5;
-      ry = cave ? 3 : 4;
-    } else {
-      rx = cave ? rng.int(6, 9) : rng.int(4, 7);
-      ry = cave ? rng.int(5, 7) : rng.int(4, 5);
-    }
-    const lo = margin + rx + 1;
-    const hi = W - margin - rx - 2;
-    const cx = Math.round(Math.max(lo, Math.min(hi, px + rng.int(-12, 12))));
-    const cy = y + ry;
-    main.push({ cx, cy, rx, ry, kind });
-    px = cx;
-    y = cy + ry + rng.int(5, 8);
-  }
-  const H = y + margin;
-  const m: FloorMap = {
-    w: W,
-    h: H,
-    tiles: new Uint8Array(W * H),
-    path: new Uint8Array(W * H),
-    rooms: [],
-    start: { x: 0, y: 0 },
-    exit: { x: 0, y: 0 },
-    props: [],
-    spawns: [],
-    seed: opts.seed,
-  };
-  const rooms: Room[] = [...main];
-  // Side rooms hang off the main chain (not on boss floors).
-  const sides: Array<[Room, Room]> = [];
-  if (!boss) {
-    const nSide = rng.int(1, 2);
-    for (let k = 0; k < nSide; k++) {
-      const parent = main[rng.int(1, main.length - 2)];
-      const dir = parent.cx < W / 2 ? 1 : -1;
-      const rx = cave ? rng.int(3, 5) : rng.int(3, 4);
-      const ry = cave ? rng.int(3, 4) : 3;
-      const cx = Math.max(margin + rx + 1, Math.min(W - margin - rx - 2, parent.cx + dir * rng.int(13, 17)));
-      const side: Room = { cx, cy: parent.cy + rng.int(-2, 2), rx, ry, kind: 'side' };
-      rooms.push(side);
-      sides.push([parent, side]);
-    }
-  }
+  const design = opts.design ?? 'chain';
+  // --- the design lays out the rooms and carves the floor
+  const g = new Shaper(rng, biome, floor, boss, opts.seed);
+  const plan = DESIGNS[design].layout(g);
+  const m = g.m;
+  const W = m.w;
+  const H = m.h;
+  m.design = design;
+  const rooms = plan.rooms;
   m.rooms = rooms;
-
-  const set = (x: number, yy: number, v: number) => {
-    if (x < 2 || yy < 2 || x >= W - 2 || yy >= H - 2) return;
-    m.tiles[yy * W + x] = v;
-  };
-  const markPath = (x: number, yy: number) => {
-    if (x < 0 || yy < 0 || x >= W || yy >= H) return;
-    m.path[yy * W + x] = 1;
-  };
-
-  // --- carve rooms
-  for (const r of rooms) {
-    if (cave) {
-      // A blob: two or three overlapping ellipses with a wobbly edge.
-      const blobs = [{ x: r.cx, y: r.cy, rx: r.rx, ry: r.ry }];
-      if (r.kind !== 'start') {
-        for (let b = 0; b < rng.int(1, 2); b++) {
-          blobs.push({ x: r.cx + rng.int(-r.rx + 2, r.rx - 2), y: r.cy + rng.int(-1, 1), rx: Math.max(2, r.rx - rng.int(1, 3)), ry: Math.max(2, r.ry - rng.int(0, 2)) });
-        }
-      }
-      const phase = rng.next() * Math.PI * 2;
-      for (let yy = r.cy - r.ry - 3; yy <= r.cy + r.ry + 3; yy++) {
-        for (let x = r.cx - r.rx - 4; x <= r.cx + r.rx + 4; x++) {
-          for (const b of blobs) {
-            const a = Math.atan2(yy - b.y, x - b.x);
-            const wob = 1 + 0.16 * Math.sin(a * 3 + phase) + 0.08 * Math.sin(a * 5 + phase * 2);
-            const d = ((x - b.x) / b.rx) ** 2 + ((yy - b.y) / b.ry) ** 2;
-            if (d <= wob * wob) {
-              set(x, yy, FLOOR);
-              break;
-            }
-          }
-        }
-      }
-    } else {
-      for (let yy = r.cy - r.ry; yy <= r.cy + r.ry; yy++) for (let x = r.cx - r.rx; x <= r.cx + r.rx; x++) set(x, yy, FLOOR);
-    }
-  }
-
-  // --- corridors
-  const corridor = (a: Room, b: Room) => {
-    if (cave) {
-      // A wandering passage, 3 wide, with a cobbled (path) middle.
-      let x = a.cx;
-      let yy = a.cy;
-      let guard = 0;
-      while ((Math.abs(x - b.cx) > 0 || Math.abs(yy - b.cy) > 0) && guard++ < 400) {
-        const dx = Math.sign(b.cx - x);
-        const dy = Math.sign(b.cy - yy);
-        if (dx !== 0 && (dy === 0 || rng.chance(Math.abs(b.cx - x) / (Math.abs(b.cx - x) + Math.abs(b.cy - yy) + 1)))) x += dx;
-        else yy += dy;
-        if (rng.chance(0.08)) x += rng.pick([-1, 1]);
-        x = Math.max(3, Math.min(W - 4, x));
-        for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 2; ox++) set(x + ox, yy + oy, FLOOR);
-        markPath(x, yy);
-        if (rng.chance(0.5)) markPath(x + rng.pick([-1, 1]), yy);
-      }
-    } else {
-      // An L-shaped hall, 3 wide.
-      const bend = rng.chance(0.5);
-      const hx = (x0: number, x1: number, yy: number) => {
-        for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
-          for (let o = -1; o <= 1; o++) set(x, yy + o, FLOOR);
-          markPath(x, yy);
-        }
-      };
-      const vy = (y0: number, y1: number, x: number) => {
-        for (let yy = Math.min(y0, y1); yy <= Math.max(y0, y1); yy++) {
-          for (let o = -1; o <= 1; o++) set(x + o, yy, FLOOR);
-          markPath(x, yy);
-        }
-      };
-      if (bend) {
-        hx(a.cx, b.cx, a.cy);
-        vy(a.cy, b.cy, b.cx);
-      } else {
-        vy(a.cy, b.cy, a.cx);
-        hx(a.cx, b.cx, b.cy);
-      }
-    }
-  };
-  for (let i = 0; i < main.length - 1; i++) corridor(main[i], main[i + 1]);
-  for (const [p, s] of sides) corridor(p, s);
+  const set = (x: number, yy: number, v: number) => g.set(x, yy, v);
+  const markPath = (x: number, yy: number) => g.markPath(x, yy);
 
   // --- smooth caves (a couple of cellular passes), then keep only what the start reaches
   if (cave) {
@@ -306,12 +318,23 @@ export function generateFloor(opts: GenOptions): FloorMap {
       m.tiles = next;
     }
   }
-  const start = main[main.length - 1];
-  const exit = main[0];
+  // Lakes, moats, ledges, islands of cover: the design's touches that smoothing would blur.
+  plan.after?.();
+  const start = plan.start;
+  const exit = plan.exit;
   // Room centers are always open.
   for (const r of [start, exit]) for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) set(r.cx + ox, r.cy + oy, FLOOR);
-  const reach = bfs(m, start.cx, start.cy);
+  let reach = bfs(m, start.cx, start.cy);
+  if (reach[exit.cy * W + exit.cx] < 0) {
+    // (Never meant to happen: a plain hall to an exit the design left cut off.)
+    g.lane(start, { cx: start.cx, cy: exit.cy }, 1);
+    g.lane({ cx: start.cx, cy: exit.cy }, exit, 1);
+    reach = bfs(m, start.cx, start.cy);
+  }
   for (let i = 0; i < m.tiles.length; i++) if (m.tiles[i] === FLOOR && reach[i] < 0) m.tiles[i] = SOLID;
+  /** Is the floor still all one piece? (Pass the one tile just closed, if that was the only change.) */
+  const whole = new Reach(m, start.cx, start.cy);
+  const connected = (closed?: number) => (closed === undefined ? whole.all() : whole.closed(closed));
 
   // --- room plazas on the path material
   for (const r of rooms) {
@@ -341,7 +364,8 @@ export function generateFloor(opts: GenOptions): FloorMap {
   }
 
   // --- pools (never cutting the floor in two)
-  const total = () => countFloor(m);
+  const ends = rooms.filter((r) => r.kind === 'start' || r.kind === 'exit' || r.kind === 'arena');
+  const dryAt = (x: number, yy: number) => ends.some((r) => Math.abs(x - r.cx) <= 2 && (Math.abs(yy - r.cy) <= 2 || (r.kind === 'arena' && Math.abs(yy - (r.cy - 3)) <= 1)));
   // (A paved town keeps its water in canals, not in pools on the street.)
   if (biome.liquid && !biome.path.everywhere) {
     for (const r of rooms) {
@@ -358,13 +382,17 @@ export function generateFloor(opts: GenOptions): FloorMap {
           for (let x = lx - lrx - 1; x <= lx + lrx + 1; x++) {
             if (((x - lx) / (lrx + 0.5)) ** 2 + ((yy - ly) / (lry + 0.5)) ** 2 > 1) continue;
             const i = yy * W + x;
+            // Never over the middle of the start, the exit or the arena, nor where the boss stands
+            // (indoors those aren't paved, so the path doesn't keep the water off them).
+            if (dryAt(x, yy)) continue;
             if (m.tiles[i] === FLOOR && !m.path[i]) {
               m.tiles[i] = LIQUID;
               changed.push(i);
             }
           }
         }
-        if (changed.length && countReach(m, start.cx, start.cy) !== total()) for (const i of changed) m.tiles[i] = FLOOR;
+        // (Nor leaving a squeeze between the water and a wall.)
+        if (changed.length && (narrowGap(m, changed) || !connected())) for (const i of changed) m.tiles[i] = FLOOR;
       }
     }
   }
@@ -392,10 +420,10 @@ export function generateFloor(opts: GenOptions): FloorMap {
   const decor: PropKind[] = ['flowers', 'bones', 'mushroomSmall', 'reeds', 'skull', 'wheat', 'cabbage', 'sunflower', 'fern'];
   const blocking = (k: PropKind) => !decor.includes(k) && k !== 'torch';
   // Houses, yards, lamps, squares and set pieces (decor.ts).
-  dressFloor({ m, biome, rng: new Rng(Rng.hashSeed(opts.seed ^ Math.imul(floor, 40503) ^ 0xdec0)), rooms, occupied, nearCenter, connected: () => countReach(m, start.cx, start.cy) === total() });
+  dressFloor({ m, biome, rng: new Rng(Rng.hashSeed(opts.seed ^ Math.imul(floor, 40503) ^ 0xdec0)), rooms, occupied, nearCenter, connected });
   // The woods (forest.ts): clumps of trees on the solid ground, clear of the lots and buildings decor reserved.
   if (biome.solid.kind === 'trees') for (const t of placeTrees(m, biome, propRng.fork(7))) m.props.push(t);
-  if (biome.fields) plantFields(m, biome, rooms, propRng.fork(3), occupied, nearCenter, () => countReach(m, start.cx, start.cy) === total());
+  if (biome.fields) plantFields(m, biome, rooms, propRng.fork(3), occupied, nearCenter, connected);
   for (const r of rooms) {
     if (r.kind === 'start') continue;
     const area = r.rx * r.ry;
@@ -411,8 +439,9 @@ export function generateFloor(opts: GenOptions): FloorMap {
       // Solid props (and tall sunflowers) stay off the paths, and never cut the floor in two.
       if ((solid || kind === 'sunflower') && m.path[i]) continue;
       if (solid) {
+        if (squeezes(m, x, yy)) continue;
         m.tiles[i] = BLOCKED;
-        if (countReach(m, start.cx, start.cy) !== total()) {
+        if (!connected(i)) {
           m.tiles[i] = FLOOR;
           continue;
         }
@@ -444,7 +473,7 @@ export function generateFloor(opts: GenOptions): FloorMap {
   // --- spawns
   const spawnRng = rng.fork(2);
   rooms.forEach((r, ri) => {
-    if (r.kind === 'start') return;
+    if (r.kind === 'start' || r.quiet) return;
     if (r.kind === 'arena') {
       m.spawns.push({ x: r.cx * TILE + 8, y: (r.cy - 3) * TILE + 8, room: ri, elite: false, boss: true });
       return;
@@ -456,6 +485,8 @@ export function generateFloor(opts: GenOptions): FloorMap {
         const x = r.cx + spawnRng.int(-r.rx + 1, r.rx - 1);
         const yy = r.cy + spawnRng.int(-r.ry + 1, r.ry - 1);
         if (tileAt(m, x, yy) !== FLOOR) continue;
+        // Never close enough to the start to wake as the squad arrives.
+        if (Math.hypot(x - start.cx, yy - start.cy) < 8) continue;
         m.spawns.push({ x: x * TILE + 8, y: yy * TILE + 8, room: ri, elite: spawnRng.chance(eliteChance), boss: false });
         break;
       }
@@ -472,7 +503,7 @@ export function generateFloor(opts: GenOptions): FloorMap {
  * planted along its furrows (cabbages, wheat, a pumpkin patch, or only seedlings), and along the back
  * a fence (never one that cuts the floor in two) or a row of sunflowers. Crops don't block walking.
  */
-function plantFields(m: FloorMap, biome: Biome, rooms: Room[], rng: Rng, occupied: Set<number>, nearCenter: (x: number, y: number) => boolean, connected: () => boolean): void {
+function plantFields(m: FloorMap, biome: Biome, rooms: Room[], rng: Rng, occupied: Set<number>, nearCenter: (x: number, y: number) => boolean, connected: (closed?: number) => boolean): void {
   const W = m.w;
   const field = new Uint8Array(m.w * m.h);
   m.field = field;
@@ -538,8 +569,9 @@ function plantFields(m: FloorMap, biome: Biome, rooms: Room[], rng: Rng, occupie
             const i = yy * W + x;
             if (tileAt(m, x, yy) !== FLOOR || m.path[i] || occupied.has(i) || nearCenter(x, yy)) continue;
             if (back === 'fence') {
+              if (squeezes(m, x, yy)) continue;
               m.tiles[i] = BLOCKED;
-              if (!connected()) {
+              if (!connected(i)) {
                 m.tiles[i] = FLOOR;
                 continue;
               }

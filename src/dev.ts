@@ -7,8 +7,10 @@
  *   ?gold=1e6         some gold
  *   ?camp             stay at camp (the home screen) after ?floor's setup
  *   ?sky=rain         every floor's weather (clear, overcast, rain)
+ *   ?design=maze      the next floor's design (world/designs.ts), then the deck as usual
  * The game is also on window.__game.
  */
+import { isDesign } from './core/deck';
 import { knightId, type ClassId } from './core/knights';
 import { RARITIES, type Rarity } from './core/rarity';
 import { addKnight } from './core/roster';
@@ -36,6 +38,8 @@ export function devGame(): Game {
     for (const id of s.squad) if (id && s.roster[id]) s.roster[id].level = Math.max(1, Math.floor(floor * 0.8));
     game.inDungeon = true;
   }
+  const design = q.get('design');
+  if (isDesign(design)) s.run.designDeck = [design, ...s.run.designDeck.filter((d) => d !== design)];
   if (q.has('camp')) game.inDungeon = false;
   if (q.has('gold')) s.gold = Number(q.get('gold'));
   if (q.has('auto')) s.settings.autoPlay = true;
