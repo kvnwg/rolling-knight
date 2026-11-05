@@ -17,7 +17,8 @@ keep a set-up of their own off the fighting (a market stall, a tent by a campfir
 and hand out jobs, and one of them may be a demon in disguise.
 
 How every system works, with its numbers: [`DESIGN.md`](DESIGN.md). Art sources and licenses:
-[`CREDITS.md`](CREDITS.md).
+[`CREDITS.md`](CREDITS.md). Every sound by name, when it plays, and how to replace it with a
+recording: [`docs/SOUNDS.md`](docs/SOUNDS.md).
 
 ## The look
 

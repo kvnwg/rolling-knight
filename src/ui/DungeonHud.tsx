@@ -159,7 +159,8 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
           title="Skill roll (E)"
         >
           <span className="well" style={{ ['--ring' as string]: `var(--sk-slot-${roll === 'ready' || roll === 'rolling' ? 'brass' : 'iron'}-arcane)` }}>
-            <SkillRoll game={game} />
+            {/* (Its reel's sounds come from the audio, for every knight's roll: src/audio/fight.ts.) */}
+            <SkillRoll game={game} sound={false} />
             {special > 0 && me && (
               <>
                 <i className="cool" style={{ ['--cd' as string]: `${Math.ceil((special / me.specialCd!) * 8) * 12.5}%` }} />
