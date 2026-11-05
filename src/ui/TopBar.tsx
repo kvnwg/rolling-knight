@@ -40,7 +40,7 @@ export function TopBar({ game, onSettings, onLuck, left }: { game: Game; onSetti
             </span>
           )}
           {s.rebirths > 0 && (
-            <span className="pill outlined num" title="Sigils buy perks">
+            <span className="pill outlined num" title="Sigils roll perks">
               <Px icon="sigil" />
               {s.sigils}
             </span>

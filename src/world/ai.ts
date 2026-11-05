@@ -590,7 +590,9 @@ function tickRush(w: World, m: Unit, dt: number): void {
  * `landed` false: knocked out of it (stunned), it just drops.
  */
 function endRush(w: World, m: Unit, landed: boolean): void {
-  const r = m.rush!;
+  // (A hit can already have ended it: Butterfingers fumbles a dash mid-swing.)
+  const r = m.rush;
+  if (!r) return;
   m.rush = undefined;
   m.moving = false;
   m.recoverT = m.recoverDur = landed ? r.recover : r.recover * 0.5;

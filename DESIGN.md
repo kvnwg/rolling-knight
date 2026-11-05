@@ -129,13 +129,25 @@ roll, for show only; squadmates' are smaller and quieter.
 
 ## 6b. The tinker's upgrades
 
-`src/core/upgrades.ts`. Gold buys tiers of upgrade lines at Tinker Pell's counter, on two tabs:
-**Luck** (the altar's lines: luck, spins, reels, mutations, bad-luck protection, Loaded Dice; and
-fortune's: gold, Luck Potions, nights away, kills that pay out) and **Combat** (the squad's: damage,
-HP, speed, Quick Roll; and the chance lines that roll their dice in every fight). Each tab grows from
-its own root, Luck I and Whetstone I: a line opens once the tier it hangs off (always on its own
-tab) is owned, and each tier costs its line's growth times the last. Each tab is also an upgrade map
-(Dumpster Legend's honeycomb, `src/core/upgradeTree.ts`), one hex a tier. A rebirth resets them.
+`src/core/upgrades.ts`. Gold upgrades at Tinker Pell's counter, on two tabs. A rebirth resets them.
+
+- **Luck** (the altar's lines: luck, spins, reels, mutations, bad-luck protection, Loaded Dice; and
+  fortune's: gold, Luck Potions, nights away, kills that pay out) is bought, tier by tier, on its
+  upgrade map (Dumpster Legend's honeycomb, `src/core/upgradeTree.ts`), one hex a tier: it grows from
+  Luck I, a line opens once the tier it hangs off is owned, and each tier costs its line's growth
+  times the last.
+- **Combat** is rolled (`src/core/combatRoll.ts`): ROLL pays gold and lands on a random combat line
+  that isn't maxed, which gains a tier. Every line is in the roll from the start: Strength (+18%
+  damage a tier), Vitality (+18% HP), Attack Speed (-6% attack cooldown a tier, six tiers), Move
+  Speed (+6%), Quick Roll, Giant Slayer, Leechblade, the chance lines, and the one-offs (Excalibur,
+  Dragonscale, Two-Headed Coin, Lady Luck). A line weighs 0.8^(its next tier - 1), a one-off 0.2
+  (about an eighth tier): Strength III is 1.6 times rarer than Attack Speed I, Strength VIII 5 times.
+  Tiers I-II roll as Common, III-IV Uncommon, V-VI Rare, VII-VIII Epic, a one-off Legendary, and the
+  reel's drama follows (a longer crawl, a glow climbing to the result's color, sparks, rays, a
+  shake). A roll costs 150 gold × 1.12^(combat tiers owned), to two figures: about half the old
+  prices for the first thirty tiers, the same around fifty, dearer at the end, and about 11M to max
+  the tab (buying every tier was 13.6M). One roll in ten is a double (two tiers), one in twenty is
+  free.
 
 ## 7. The dungeon
 
@@ -238,7 +250,10 @@ Rebirth at floor 15 (then +10 each time): start over at floor 1 with luck ×1.25
 Codex and records stay.
 
 Perks open after the first rebirth. **Sigils** (one per rebirth at the start of a run, one per boss
-beaten for the first time in a run) buy perks from four trees; a rebirth clears them all:
+beaten for the first time in a run) roll for perks at Sage Orrin's (`src/core/perks.ts`): a roll
+lands on a random perk you don't have yet. A perk weighs 1 / its old sigil price (Common 1,
+Uncommon 1/2, Rare 1/3, Epic 1/4), and a roll costs a sigil, plus one for every five perks owned (50
+for all twenty). A rebirth clears them all. The four trees only sort them:
 
 - **Underdogs**: Humble Beginnings (Common and Uncommon level-ups ×3), Peasant Levy (every 4th spin at
   luck 1; low duplicates pay 3x), Rags to Riches (+25% stats per tier below Legendary), Peasant Revolt

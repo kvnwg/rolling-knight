@@ -3,7 +3,7 @@ import { BAL } from '../src/core/balance';
 import { KNIGHTS, knightId } from '../src/core/knights';
 import { currentLuck, oneInFor } from '../src/core/luck';
 import { canRebirth, checkpointFor, newGame, rebirth } from '../src/core/newGame';
-import { buyPerk } from '../src/core/perks';
+import { rollPerk } from '../src/core/perks';
 import { RARITIES, RARITY_ODDS, RARITY_STAT, rarityAtLeast, rarityChances, rollRarity } from '../src/core/rarity';
 import { Rng } from '../src/core/rng';
 import { chainFloor, comboSteps, performSpin, reelCount, rollTokens, spinCycle, tokenMult } from '../src/core/roller';
@@ -189,7 +189,8 @@ describe('roster', () => {
     const before = levelMult(s, 'common', 11) - 1;
     s.rebirths = 1;
     s.sigils = 5;
-    expect(buyPerk(s, 'humbleBeginnings')).toBe(true);
+    // (The first perk in the roll: a draw of 0 lands on it.)
+    expect(rollPerk(s, () => 0)?.perk.id).toBe('humbleBeginnings');
     expect(levelMult(s, 'common', 11) - 1).toBeCloseTo(before * 3, 9);
     expect(levelMult(s, 'legendary', 11) - 1).toBeCloseTo(before, 9);
   });

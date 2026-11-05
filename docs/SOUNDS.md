@@ -167,7 +167,7 @@ Older sounds (from Dumpster Legend), played as they always were.
 
 | Sound | When it plays | Placeholder | Mix |
 | --- | --- | --- | --- |
-| `coin` | Gold picked up, and the upgrade map’s repeat buys: each coin a step higher through a run of them. | A coin’s ping. | — |
+| `coin` | Gold picked up, the upgrade map’s repeat buys (each coin a step higher through a run of them), and paying for a roll at the tinker’s (and a free one coming back). | A coin’s ping. | — |
 | `pickup` | Something picked up off the floor. (Not played by the game yet.) | A bag’s rustle and a bell. | — |
 | `potion` | A Luck Potion picked up. | Three gulps, then the long jingle. | — |
 | `xp` | XP reaching a bar. (Not played by the game yet.) | A soft upward blip. | — |
@@ -190,11 +190,11 @@ The Summoning Altar.
 
 | Sound | When it plays | Placeholder | Mix |
 | --- | --- | --- | --- |
-| `reel_start` | The altar spins (quiet when the altar isn’t on screen). | A lever clack and a short whirr. | — |
-| `reel_tick` | A cell clicking past an altar reel’s line (the altar on screen), and the reveal’s odds counting. | A tick that climbs as the reel slows. | — |
-| `reel_creep` | A rare find crawling the last few cells toward the line. Recorded (`reel_creep.mp3`, gain 0.1). | Notches climbing a step each. | — |
-| `reel_land` | An altar reel lands, heavier for rarer finds. Recorded (`reel_land.mp3`, gain 0.018). | A thud and a bell. | — |
-| `glow_up` | A teased find’s glow climbs a tier. Recorded (`glow_up.mp3`, gain 0.06). | An upward flick and two bells. | — |
+| `reel_start` | The altar spins (quiet when the altar isn’t on screen), and a roll at the tinker’s or the sage’s. | A lever clack and a short whirr. | — |
+| `reel_tick` | A cell clicking past an altar reel’s line (the altar on screen) or a keeper’s roll’s, and the reveal’s odds counting. | A tick that climbs as the reel slows. | — |
+| `reel_creep` | A rare find crawling the last few cells toward the line (the altar, a keeper’s roll). Recorded (`reel_creep.mp3`, gain 0.1). | Notches climbing a step each. | — |
+| `reel_land` | An altar reel or a keeper’s roll lands, heavier for rarer finds. Recorded (`reel_land.mp3`, gain 0.018). | A thud and a bell. | — |
+| `glow_up` | A teased find’s glow climbs a tier (the altar, a keeper’s roll). Recorded (`glow_up.mp3`, gain 0.06). | An upward flick and two bells. | — |
 | `rattle` | The build-up before a reveal: the reel shakes. Recorded (`rattle.mp3`, gain 0.113). | Rattling beats with a heartbeat. | — |
 | `riser_short` | A teased find’s short build-up. Recorded (`riser_short.mp3`, gain 0.064). | A rising tone. | — |
 | `riser_long` | The long build-up before a reveal (HYPER RARE’s summoning too). Recorded (`riser_long.mp3`, gain 0.114). | A tone that seems to keep rising. | — |
@@ -219,7 +219,7 @@ The full-screen reveal of a big find.
 | `hyper_intro` | HYPER RARE’s summoning. (Not played by the game yet.) | A swelling rumble, the long riser and an alarm. | — |
 | `hyper_boom` | HYPER RARE bursts open. (Not played by the game yet.) | A huge boom and crash, a big chord and sparkles. | — |
 | `firework` | Fireworks after an INSANE or HYPER RARE reveal. | A pop and a crackle. | — |
-| `stamp` | A seal stamped down (a rarity stamp, NEW!), and an Epic or better skill landing on the HUD. | A thump, a paper slap and a small ring. | — |
+| `stamp` | A seal stamped down (a rarity stamp, NEW!), an Epic or better skill landing on the HUD, and an Epic or better roll at a keeper’s. | A thump, a paper slap and a small ring. | — |
 
 ## Menus
 
@@ -227,7 +227,7 @@ Knights, the hub’s counters and the buttons.
 
 | Sound | When it plays | Placeholder | Mix |
 | --- | --- | --- | --- |
-| `jingle` | A new knight joins; a lucky spin; the signature three notes. Recorded (`jingle.mp3`, gain 0.198). | Three bells up the chord. | — |
+| `jingle` | A new knight joins; a lucky spin; a double roll at the tinker’s; the signature three notes. Recorded (`jingle.mp3`, gain 0.198). | Three bells up the chord. | — |
 | `jingle_long` | Bigger wins: a token combo, a Luck Potion, a boss down without the music’s sting. Recorded (`jingle_long.mp3`, gain 0.217). | Five bells up the chord. | — |
 | `dupe` | A duplicate lands at the altar (on screen), and the hero sheet’s mutate button. | A small soft pop and a swish. | — |
 | `mutation` | A better mutation. | A shimmer up and a sparkle. | — |
@@ -236,8 +236,8 @@ Knights, the hub’s counters and the buttons.
 | `haul` | A big haul of gold. (Not played by the game yet.) Recorded (`haul.mp3`, gain 0.136). | A ka-ching and coins pouring in. | — |
 | `buy` | An upgrade bought. | A coin, a bright arpeggio up and a sparkle. | — |
 | `equip` | A knight takes its place in the squad (Best squad, choosing your knight). | A thump and a clank, a chime climbing with its rarity. | — |
-| `perk` | A perk picked. (Not played by the game yet.) | A sweep up into a chord. | — |
-| `unlock` | Something new opens up (a special upgrade). | A rising sparkle. | — |
+| `perk` | A perk rolled at the sage’s (fuller for a Rare or Epic one). | A sweep up into a chord. | — |
+| `unlock` | Something new opens up (a special upgrade, a Legendary roll at the tinker’s). | A rising sparkle. | — |
 | `collect` | Earnings collected. (Not played by the game yet.) | A cascade of coins and a ka-ching. | — |
 | `ding` | An upgrade maxed out. | A bright ding. | — |
 | `tap` | A button press. Recorded (`tap.mp3`, gain 0.15). | A pop, a semitone higher each tap through quick taps. | — |

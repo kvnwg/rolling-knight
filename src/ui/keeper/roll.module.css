@@ -1,0 +1,569 @@
+/*
+ * The keepers' rolls (RollMachine.tsx) on the paper of a keeper's screen: the reel in a dark wooden
+ * housing with brass paylines, the result's name beside or under it, the ROLL button, and the list
+ * of what's in the roll with its odds. Sizes are art pixels (var(--px)); the reel's are times --k
+ * (2 on a wide screen). Motion moves in whole pixels and glows are hard-edged rings. The paper's
+ * inks (--ink, --dark, --mid, --good, --bad) come from the keeper's screen.
+ */
+.body {
+  --u: var(--px);
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(2 * var(--px));
+}
+
+/* ------------------------------------------------------------ the stage: reel, label, button */
+.stage {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: calc(3 * var(--px));
+  padding: calc(1 * var(--px)) calc(1 * var(--px)) calc(2 * var(--px));
+  border-bottom: var(--px) dashed #c9ad80;
+}
+.reelBox {
+  flex: none;
+}
+.side {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(2 * var(--px));
+}
+.label {
+  min-height: calc(19 * var(--px));
+  display: flex;
+  align-items: center;
+}
+.hint {
+  font-size: calc(4.8 * var(--px));
+  line-height: 1.3;
+  color: var(--mid);
+}
+.hint b {
+  color: var(--dark);
+}
+.dots {
+  font-size: calc(9 * var(--px));
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.15em;
+  color: var(--mid);
+  animation: dots 0.75s steps(3) infinite;
+}
+@keyframes dots {
+  0% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: calc(1 * var(--px));
+  min-width: 0;
+  animation: resultIn 0.28s steps(3) both;
+}
+@keyframes resultIn {
+  from {
+    transform: translateY(calc(3 * var(--px)));
+    opacity: 0;
+  }
+}
+.nameRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: calc(1 * var(--px)) calc(2 * var(--px));
+}
+.name {
+  line-height: 1.1;
+}
+.effect {
+  font-size: calc(4.8 * var(--px));
+  font-weight: 700;
+  line-height: 1.2;
+}
+/* x2 and FREE: a stamp that pops in after the name. */
+.tag {
+  display: inline-block;
+  padding: calc(0.5 * var(--px)) calc(1.5 * var(--px));
+  font-size: calc(4.6 * var(--px));
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.06em;
+  color: #fffbe8;
+  background: #c8861c;
+  box-shadow: 0 0 0 calc(0.5 * var(--px)) var(--ink), 0 var(--px) 0 calc(0.5 * var(--px)) var(--ink);
+  transform: rotate(-4deg);
+  animation: tagPop 0.45s steps(4) 0.2s both;
+}
+.tag[data-kind='free'] {
+  background: #3f8a32;
+}
+@keyframes tagPop {
+  0% {
+    transform: rotate(-4deg) scale(2.2);
+    opacity: 0;
+  }
+  60% {
+    transform: rotate(-4deg) scale(0.9);
+    opacity: 1;
+  }
+}
+
+/* ROLL and its price: green when it can roll, paper with red writing when short, SKIP while it spins. */
+.rollWrap {
+  position: relative;
+  display: block;
+}
+.roll {
+  --sk: var(--sk-btn-leaf);
+  --skd: var(--sk-btn-leaf-down);
+  width: 100%;
+  min-height: calc(16 * var(--px)) !important;
+  padding: 0 calc(2 * var(--px)) calc(2.5 * var(--px)) !important;
+  font-size: calc(5.8 * var(--px)) !important;
+  line-height: 1.1 !important;
+  gap: calc(1.5 * var(--px)) !important;
+  letter-spacing: 0.03em !important;
+  color: #fffbe8 !important;
+  text-shadow: calc(0.5 * var(--px)) 0 0 #16300f, calc(-0.5 * var(--px)) 0 0 #16300f, 0 calc(0.5 * var(--px)) 0 #16300f, 0 calc(-0.5 * var(--px)) 0 #16300f, 0 var(--px) 0 #16300f !important;
+  filter: drop-shadow(0 var(--px) 0 rgba(60, 30, 10, 0.4)) !important;
+}
+.roll[data-kind='short'],
+.roll[data-kind='spinning'] {
+  --sk: var(--sk-btn-paper);
+  --skd: var(--sk-btn-paper-down);
+  color: var(--bad) !important;
+  text-shadow: none !important;
+}
+.roll[data-kind='spinning'] {
+  color: var(--dark) !important;
+  letter-spacing: 0.12em !important;
+}
+.roll[data-kind='off'] {
+  --sk: var(--sk-btn-ash);
+  --skd: var(--sk-btn-ash);
+  color: #f4ece0 !important;
+  text-shadow: calc(0.5 * var(--px)) 0 0 #4a4238, calc(-0.5 * var(--px)) 0 0 #4a4238, 0 calc(0.5 * var(--px)) 0 #4a4238, 0 calc(-0.5 * var(--px)) 0 #4a4238 !important;
+  font-size: calc(5 * var(--px)) !important;
+  cursor: default;
+}
+.roll:disabled {
+  filter: none !important;
+}
+.roll[data-nope] {
+  animation: nope 0.32s steps(2) 1;
+}
+@keyframes nope {
+  0%,
+  50%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(calc(-1 * var(--px)));
+  }
+  75% {
+    transform: translateX(var(--px));
+  }
+}
+.verb {
+  margin-right: calc(0.5 * var(--px));
+}
+.float {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% - 2 * var(--px));
+  z-index: 2;
+  transform: translateX(-50%);
+  pointer-events: none;
+  white-space: nowrap;
+  font-size: calc(4.6 * var(--px));
+  font-weight: 700;
+  color: #ffd0c4;
+  text-shadow: calc(0.5 * var(--px)) 0 0 #5a0e0e, calc(-0.5 * var(--px)) 0 0 #5a0e0e, 0 calc(0.5 * var(--px)) 0 #5a0e0e, 0 calc(-0.5 * var(--px)) 0 #5a0e0e, 0 var(--px) 0 #5a0e0e;
+  animation: floatUp 0.9s steps(6) both;
+}
+@keyframes floatUp {
+  from {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  70% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, calc(-12 * var(--px)));
+  }
+}
+
+/* ------------------------------------------------------------ the reel */
+.reel {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.machine {
+  --tc: #ffffff;
+  --glow: #ffc21a;
+  --edge: 0 0 0 var(--px) #1c100a, inset 0 var(--px) 0 0 #7a5233, inset 0 calc(-1 * var(--px)) 0 0 #24150e;
+  position: relative;
+  padding: calc(2 * var(--k) * var(--px)) calc(5 * var(--k) * var(--px));
+  background: linear-gradient(180deg, #4a2e1c 0 50%, #3b2416 50% 100%);
+  box-shadow: var(--edge);
+}
+.pay {
+  position: absolute;
+  top: 50%;
+  translate: 0 -50%;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+.pay:first-child {
+  margin-left: calc(0.5 * var(--k) * var(--px));
+}
+.pay:last-of-type {
+  margin-right: calc(0.5 * var(--k) * var(--px));
+}
+.win {
+  position: relative;
+  width: var(--win-w);
+  height: var(--win-h);
+  overflow: hidden;
+  background: linear-gradient(180deg, #121628 0 20%, #1a2140 20% 36%, #243058 36% 64%, #1a2140 64% 80%, #121628 80% 100%);
+  box-shadow: inset 0 0 0 var(--px) #0a0612;
+}
+/* The cells peeking above and below the payline sit in the dark. */
+.win::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(6, 4, 12, 0.55) 0 calc(7 * var(--k) * var(--px)), transparent calc(7 * var(--k) * var(--px)) calc(100% - 7 * var(--k) * var(--px)), rgba(6, 4, 12, 0.55) calc(100% - 7 * var(--k) * var(--px)) 100%);
+}
+.bump {
+  position: absolute;
+  inset: 0;
+}
+.strip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.cell {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: var(--cell);
+}
+.cell img {
+  image-rendering: pixelated;
+  filter: drop-shadow(0 var(--px) 0 rgba(0, 0, 0, 0.55));
+}
+.flash {
+  position: absolute;
+  inset: 0;
+  background: var(--tc);
+  opacity: 0;
+  pointer-events: none;
+}
+/* A rare result on its way in: hard rings in the glow's color round the housing (it climbs the tiers). */
+.machine[data-glow='1'] {
+  box-shadow: var(--edge), 0 0 0 calc(2 * var(--px)) var(--glow);
+}
+.machine[data-glow='2'] {
+  box-shadow: var(--edge), 0 0 0 calc(2 * var(--px)) var(--glow), 0 0 0 calc(3 * var(--px)) color-mix(in srgb, var(--glow) 50%, transparent);
+}
+.machine[data-glow='3'] {
+  box-shadow:
+    var(--edge),
+    0 0 0 calc(2 * var(--px)) var(--glow),
+    0 0 0 calc(3 * var(--px)) color-mix(in srgb, var(--glow) 60%, transparent),
+    0 0 0 calc(4 * var(--px)) color-mix(in srgb, var(--glow) 30%, transparent);
+  animation: glowBeat 0.24s steps(1) infinite;
+}
+@keyframes glowBeat {
+  50% {
+    box-shadow:
+      var(--edge),
+      0 0 0 calc(2 * var(--px)) var(--glow),
+      0 0 0 calc(3 * var(--px)) var(--glow),
+      0 0 0 calc(4 * var(--px)) color-mix(in srgb, var(--glow) 45%, transparent);
+  }
+}
+/* Epic and up: the machine shakes by whole pixels while it crawls in, harder at the end. */
+.machine[data-shake='1'] {
+  animation: shake1 0.2s steps(1) infinite;
+}
+.machine[data-shake='2'] {
+  animation: shake2 0.14s steps(1) infinite;
+}
+.machine[data-glow='3'][data-shake='1'] {
+  animation:
+    glowBeat 0.24s steps(1) infinite,
+    shake1 0.2s steps(1) infinite;
+}
+.machine[data-glow='3'][data-shake='2'] {
+  animation:
+    glowBeat 0.24s steps(1) infinite,
+    shake2 0.14s steps(1) infinite;
+}
+@keyframes shake1 {
+  0% {
+    transform: translateX(calc(-1 * var(--px)));
+  }
+  50% {
+    transform: translateX(var(--px));
+  }
+}
+@keyframes shake2 {
+  0% {
+    transform: translate(calc(-1 * var(--px)), 0);
+  }
+  25% {
+    transform: translate(var(--px), calc(-1 * var(--px)));
+  }
+  50% {
+    transform: translate(calc(-1 * var(--px)), var(--px));
+  }
+  75% {
+    transform: translate(var(--px), 0);
+  }
+}
+/* Sparks flying off the window (Rare and up). */
+.sparks {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.sparks img {
+  position: absolute;
+  image-rendering: pixelated;
+}
+/* Light rays behind the machine (Epic and Legendary), turning, then fading. */
+.rays {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: -1;
+  width: calc(76 * var(--k) * var(--px));
+  height: calc(76 * var(--k) * var(--px));
+  margin: calc(-38 * var(--k) * var(--px)) 0 0 calc(-38 * var(--k) * var(--px));
+  pointer-events: none;
+  animation:
+    raysIn 0.24s steps(3) backwards,
+    raysSpin 8s linear infinite,
+    raysOut 0.6s steps(4) 1.7s forwards;
+}
+@keyframes raysIn {
+  from {
+    opacity: 0;
+    scale: 0.4;
+  }
+}
+@keyframes raysSpin {
+  to {
+    rotate: 360deg;
+  }
+}
+@keyframes raysOut {
+  to {
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------------------------ the list */
+.list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+  padding: calc(0.5 * var(--px)) calc(1 * var(--px)) calc(4 * var(--px));
+  scrollbar-width: thin;
+  scrollbar-color: #9c7448 transparent;
+}
+.rows {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(86 * var(--px)), 1fr));
+  gap: calc(1.5 * var(--px)) calc(2.5 * var(--px));
+}
+.head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: calc(1.5 * var(--px));
+  padding: calc(1.5 * var(--px)) calc(0.5 * var(--px)) 0;
+  font-size: calc(4.4 * var(--px));
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--mid);
+}
+.head::after {
+  content: '';
+  flex: 1;
+  height: var(--px);
+  background: #c9ad80;
+}
+.row {
+  --rc: transparent;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: calc(2 * var(--px));
+  min-width: 0;
+  min-height: calc(16 * var(--px));
+  padding: calc(1 * var(--px)) calc(2.5 * var(--px)) calc(1 * var(--px)) calc(2 * var(--px));
+  border: 0 solid transparent;
+  border-image: var(--sk-pa-card) 4 fill / calc(4 * var(--px)) stretch;
+  image-rendering: pixelated;
+  font: inherit;
+  color: var(--dark);
+  text-align: left;
+  cursor: pointer;
+  filter: drop-shadow(0 var(--px) 0 rgba(90, 56, 28, 0.35));
+}
+/* How rare its next tier is: a stripe of its color down the left. */
+.row::before {
+  content: '';
+  position: absolute;
+  left: calc(-1 * var(--px));
+  top: calc(1 * var(--px));
+  bottom: calc(1 * var(--px));
+  width: var(--px);
+  background: var(--rc);
+}
+.row:active {
+  border-image-source: var(--sk-pa-card-dim);
+}
+.row[data-done] {
+  border-image-source: var(--sk-pa-card-dim);
+}
+.row[data-done] .rowArt img {
+  filter: saturate(0.6);
+}
+.row[data-flash] {
+  animation: rowFlash 0.9s steps(6) 1;
+}
+@keyframes rowFlash {
+  0%,
+  40% {
+    outline: calc(1 * var(--px)) solid #e8a92a;
+    background: rgba(255, 220, 120, 0.45);
+  }
+}
+.rowArt {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: calc(12 * var(--px));
+  height: calc(12 * var(--px));
+  border: 0 solid transparent;
+  border-image: var(--sk-pa-inset) 3 fill / calc(3 * var(--px)) stretch;
+  image-rendering: pixelated;
+}
+.rowName {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(1 * var(--px));
+}
+.rowName b {
+  font-size: calc(4.8 * var(--px));
+  line-height: 1.1;
+  color: var(--dark);
+  overflow-wrap: anywhere;
+}
+.pips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(1 * var(--px));
+}
+.pips i {
+  width: calc(2.5 * var(--px));
+  height: calc(2.5 * var(--px));
+  background: #d8c29a;
+  box-shadow: 0 0 0 calc(0.5 * var(--px)) #8e6842;
+}
+.pips i[data-on] {
+  background: #5fae44;
+  box-shadow: 0 0 0 calc(0.5 * var(--px)) #16300f;
+}
+.odds {
+  flex: none;
+  font-size: calc(5 * var(--px));
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.rowDone {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: calc(0.5 * var(--px));
+  font-size: calc(4.2 * var(--px));
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--good);
+}
+
+/* ------------------------------------------------------------ wide screens: the stage in a column of its own */
+@media (min-width: 800px) {
+  .body {
+    flex-direction: row;
+    gap: calc(4 * var(--px));
+  }
+  .stage {
+    flex-direction: column;
+    justify-content: center;
+    width: calc(112 * var(--px));
+    padding: calc(2 * var(--px)) calc(1 * var(--px));
+    border-bottom: 0;
+    border-right: var(--px) dashed #c9ad80;
+  }
+  .side {
+    flex: none;
+    width: 100%;
+    padding-right: calc(2 * var(--px));
+  }
+  .label {
+    justify-content: center;
+    text-align: center;
+    min-height: calc(22 * var(--px));
+  }
+  .result,
+  .nameRow {
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .result,
+  .tag,
+  .float,
+  .dots,
+  .rays {
+    animation: none;
+  }
+}

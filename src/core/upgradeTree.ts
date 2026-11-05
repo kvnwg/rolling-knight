@@ -1,19 +1,21 @@
 /**
- * The upgrade maps' honeycomb (Dumpster Legend's hexLayout.ts): every tier of every upgrade line is
- * one hex on a flat-top grid in doubled coordinates, `col` the column and `row` counting half-hex
- * steps down, so a hex's neighbors are 2 rows up or down in its column, or 1 row up or down in the
- * next column. Each of the tinker's tabs has its own map with its own root at the center (Luck I for
- * Luck, Whetstone I for Combat), and each line's path walks from the tier it hangs off.
+ * The Luck tab's upgrade map, a honeycomb (Dumpster Legend's hexLayout.ts): every tier of every Luck
+ * line is one hex on a flat-top grid in doubled coordinates, `col` the column and `row` counting
+ * half-hex steps down, so a hex's neighbors are 2 rows up or down in its column, or 1 row up or down
+ * in the next column. Luck I is the root at the center, and each line's path walks from the tier it
+ * hangs off. (The Combat tab has no map: its lines are rolled, src/core/combatRoll.ts.)
  *
  * Also the reveal rules: owned hexes and the next buyable ones show, the hexes one step past a
  * buyable one show as "?", and everything further out stays hidden.
+ *
+ * And what every line (Luck or Combat) adds up to, in a few words: `effectAt`.
  */
 import { BAL } from './balance';
 import { CHANCE, chanceFx, skillRollLuck } from './chance';
 import { luckyEvery, luckyMult } from './luck';
 import { drySpell, reelCount, spinCycle } from './roller';
 import type { GameState } from './state';
-import { UPGRADES, UPGRADES_BY_ID, UPGRADE_TABS, tier, upgradeFx, upgradeNodeState, upgradeTab, type UpgradeDef, type UpgradeId, type UpgradeTab } from './upgrades';
+import { UPGRADES, UPGRADES_BY_ID, tier, upgradeFx, upgradeNodeState, upgradeTab, type UpgradeDef, type UpgradeId, type UpgradeTab } from './upgrades';
 
 export const HEX_STEPS = {
   n: [0, -2],
@@ -54,7 +56,7 @@ export function expandPath(path: string): string[] {
 interface LineLike {
   id: string;
   max: number;
-  path: string;
+  path?: string;
   special?: boolean;
   requires?: { id: string; tier: number };
 }
@@ -79,6 +81,10 @@ export function layoutUpgradeMap(lines: readonly LineLike[]): { nodes: HexNode[]
       if (parentKey && !parent) continue;
       pending.splice(i--, 1);
       progress = true;
+      if (line.path === undefined) {
+        errors.push(`upgrade ${line.id} has no path on the map`);
+        continue;
+      }
       const steps = expandPath(line.path);
       const want = parent ? line.max : line.max - 1;
       if (steps.length !== want) errors.push(`upgrade ${line.id}: path has ${steps.length} steps, needs ${want}`);
@@ -112,31 +118,20 @@ export function layoutUpgradeMap(lines: readonly LineLike[]): { nodes: HexNode[]
   return { nodes, errors };
 }
 
-/** The lines sold on a tab, in the order UPGRADES lists them. */
+/** The lines on a tab, in the order UPGRADES lists them. */
 export function tabLines(tab: UpgradeTab): UpgradeDef[] {
   return UPGRADES.filter((u) => upgradeTab(u) === tab);
 }
 
-const LAYOUTS = Object.fromEntries(UPGRADE_TABS.map((t) => [t, layoutUpgradeMap(tabLines(t))])) as Record<UpgradeTab, ReturnType<typeof layoutUpgradeMap>>;
+const LAYOUT = layoutUpgradeMap(tabLines('luck'));
 
-/** Each tab's map: every hex of its lines, parents before children, its root at (0, 0). */
-export const UPGRADE_MAPS: Readonly<Record<UpgradeTab, readonly HexNode[]>> = { luck: LAYOUTS.luck.nodes, combat: LAYOUTS.combat.nodes };
-/** Every hex of both maps (each sits on its own tab's map). */
-export const UPGRADE_MAP: readonly HexNode[] = UPGRADE_TABS.flatMap((t) => UPGRADE_MAPS[t]);
-/** Problems with the maps' layout (none, or a test fails). A line that hangs off another tab's line counts. */
-export const UPGRADE_MAP_ERRORS: readonly string[] = UPGRADE_TABS.flatMap((t) => LAYOUTS[t].errors.map((e) => `${t} map: ${e}`));
+/** The Luck map: every hex of the Luck lines, parents before children, Luck I at (0, 0). */
+export const UPGRADE_MAP: readonly HexNode[] = LAYOUT.nodes;
+/** Problems with the map's layout (none, or a test fails). A line hanging off a line not on the map counts. */
+export const UPGRADE_MAP_ERRORS: readonly string[] = LAYOUT.errors;
 export const HEX_BY_KEY: ReadonlyMap<string, HexNode> = new Map(UPGRADE_MAP.map((n) => [n.key, n]));
-/** Each tab's root hex, the center of its map: Luck I and Whetstone I. */
-export const ROOT_KEYS: Readonly<Record<UpgradeTab, string>> = Object.fromEntries(
-  UPGRADE_TABS.map((t) => [t, nodeKey(tabLines(t).find((u) => !u.requires)?.id ?? '', 1)]),
-) as Record<UpgradeTab, string>;
-/** Luck I, the center of the Luck map. */
-export const ROOT_KEY = ROOT_KEYS.luck;
-
-/** The tab a hex is on. */
-export function hexTab(n: Pick<HexNode, 'id'>): UpgradeTab {
-  return upgradeTab(UPGRADES_BY_ID.get(n.id)!);
-}
+/** Luck I, the center of the map. */
+export const ROOT_KEY = nodeKey(tabLines('luck').find((u) => !u.requires)?.id ?? '', 1);
 
 /** Hex distance from its map's root (the opening ripple spreads ring by ring). */
 export function hexRing(n: Pick<HexNode, 'col' | 'row'>): number {
@@ -155,10 +150,10 @@ export function hexView(state: Pick<GameState, 'upgrades'>, n: HexNode): HexView
   return prev && upgradeNodeState(state, prev.id, prev.tier) === 'open' ? 'mystery' : null;
 }
 
-/** Every hex that shows (on one tab's map, or both), with what it shows. */
-export function visibleHexes(state: Pick<GameState, 'upgrades'>, tab?: UpgradeTab): Array<{ node: HexNode; view: HexView }> {
+/** Every hex that shows, with what it shows. */
+export function visibleHexes(state: Pick<GameState, 'upgrades'>): Array<{ node: HexNode; view: HexView }> {
   const out: Array<{ node: HexNode; view: HexView }> = [];
-  for (const n of tab ? UPGRADE_MAPS[tab] : UPGRADE_MAP) {
+  for (const n of UPGRADE_MAP) {
     const view = hexView(state, n);
     if (view) out.push({ node: n, view });
   }
@@ -256,7 +251,9 @@ export function effectAt(state: GameState, id: UpgradeId, level: number): string
     case 'dragonscale':
       return `+${fx.hpPct}% squad HP`;
     case 'swiftness':
-      return `+${fx.speedPct}% speed`;
+      return `+${fx.speedPct}% move speed`;
+    case 'atkSpeed':
+      return `-${fx.atkCdPct}% attack cooldown`;
     case 'quickRoll':
       return `-${fx.rollSpinPct}% roll time`;
     case 'giantSlayer':
