@@ -37,6 +37,8 @@ export type WorldEvent =
   | { type: 'kill'; gold: number; elite: boolean; boss: boolean; x: number; y: number; name: string }
   | { type: 'pickup'; kind: Pickup['kind']; amount: number }
   | { type: 'cleared' }
+  /** A boss floor's way down opened (its boss fell). */
+  | { type: 'portal' }
   | { type: 'exit' }
   | { type: 'wipe' }
   | { type: 'heroDown'; slot: number }
@@ -93,6 +95,9 @@ export function uid(): number {
 /** Seconds a foe takes to rise into a fight once it wakes (or is summoned), before it may attack. */
 export const SPAWN_IN = 0.6;
 
+/** Seconds the leader stands in the open portal to go down a floor. */
+export const EXIT_HOLD = 0.6;
+
 export class World {
   map: FloorMap;
   biome: Biome;
@@ -116,6 +121,8 @@ export class World {
   input: Input = { mx: 0, my: 0, dodge: false, special: false };
   auto = false;
   portalOpen = false;
+  /** Seconds the leader has stood in the open portal (it takes EXIT_HOLD to go down). */
+  exitHold = 0;
   cleared = false;
   exited = false;
   wiped = false;
@@ -133,6 +140,8 @@ export class World {
   goalFlow: Flow | null = null;
   private flowT = 0;
   bossUnit: Unit | null = null;
+  /** A boss floor's boss (not a demon that drops its disguise): the way down opens when it falls. */
+  floorBoss: Unit | null = null;
   /** War Banner stacks (attack speed). */
   banner = 0;
   bannerT = 0;
@@ -216,6 +225,7 @@ export class World {
       this.mobs.push(m);
       if (s.boss) {
         this.bossUnit = m;
+        this.floorBoss = m;
         // The boss arrives with a few of the floor's mobs.
         for (let k = 0; k < 3; k++) {
           const a = this.makeMob(this.rng.pick(o.mobTypes), s.x + (k - 1) * 30, s.y + 30, false, false);
@@ -224,6 +234,9 @@ export class World {
         }
       }
     }
+    // The way down is open from the start: fight what you like and leave when you like. Only a
+    // boss floor's waits for its boss to fall.
+    this.portalOpen = !o.boss;
     this.refreshFlows();
   }
 
@@ -607,7 +620,8 @@ export class World {
     this.heroFlowFly = flowFrom(this.map, alive, true);
     const lead = this.leader();
     this.leaderFlow = lead ? flowFrom(this.map, [lead]) : null;
-    const goals = this.portalOpen ? [this.map.exit] : this.livingMobs();
+    // Squad AI (and the bot) hunts foes until the floor is clear, or its boss is down; then the way out.
+    const goals = this.cleared || (this.boss && this.portalOpen) ? [this.map.exit] : this.livingMobs();
     this.goalFlow = goals.length ? flowFrom(this.map, goals) : null;
   }
 
@@ -713,7 +727,6 @@ export class World {
     this.bossUnit = m;
     this.demon = { unit: m, def: npc.def, tauntT: 1.5, enraged: false };
     this.cleared = false;
-    this.portalOpen = false;
     this.fx.push({ kind: 'blast', x: npc.x, y: npc.y - 6, color: '#ff6a3a', size: 2 });
     this.shakeIt(4, 0.4);
     this.text(npc.x, npc.y - 34, this.rng.pick(demonTauntsFor(npc.def)), '#ff9a6a', true);
@@ -849,18 +862,31 @@ export class World {
     else this.shakePower = 0;
     this.mobs = this.mobs.filter((m) => !m.dead || m.hurtT > -0.5);
     for (const m of this.mobs) if (m.dead) m.hurtT -= dt;
-    // --- floor cleared: the portal opens
-    if (!this.cleared && this.mobs.every((m) => m.dead)) {
-      this.cleared = true;
+    // --- a boss floor's way down opens when its boss falls (whatever else is still about)
+    if (!this.portalOpen && this.floorBoss && this.floorBoss.dead) {
       this.portalOpen = true;
-      this.events.push({ type: 'cleared' });
+      this.events.push({ type: 'portal' });
       this.fx.push({ kind: 'portal', x: this.map.exit.x, y: this.map.exit.y });
       this.refreshFlows();
     }
-    if (this.portalOpen && !this.exited && lead && dist(lead.x, lead.y, this.map.exit.x, this.map.exit.y) < 14) {
-      this.exited = true;
-      this.events.push({ type: 'exit' });
+    // --- every foe down: the floor is cleared
+    if (!this.cleared && this.mobs.every((m) => m.dead)) {
+      this.cleared = true;
+      if (!this.portalOpen) {
+        this.portalOpen = true;
+        this.fx.push({ kind: 'portal', x: this.map.exit.x, y: this.map.exit.y });
+      }
+      this.events.push({ type: 'cleared' });
+      this.refreshFlows();
     }
+    // Down you go after standing in the open portal a moment (so passing over it mid-fight doesn't).
+    if (this.portalOpen && !this.exited && lead && dist(lead.x, lead.y, this.map.exit.x, this.map.exit.y) < 14) {
+      this.exitHold += dt;
+      if (this.exitHold >= EXIT_HOLD) {
+        this.exited = true;
+        this.events.push({ type: 'exit' });
+      }
+    } else this.exitHold = 0;
   }
 }
 

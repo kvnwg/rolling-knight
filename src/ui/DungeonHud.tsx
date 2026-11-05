@@ -65,7 +65,9 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
             <span>
               {game.biome.name}
               <span className="sep"> · </span>
-              <span className="foes">{w ? (w.portalOpen ? <span className="t-good">portal open</span> : `${mobsLeft} foes left`) : '...'}</span>
+              <span className="foes">
+                {!w ? '...' : !w.portalOpen ? <span className="t-bad">beat the boss to leave</span> : mobsLeft > 0 ? <>{mobsLeft} foes · <span className="t-good">exit open</span></> : <span className="t-good">cleared · exit open</span>}
+              </span>
             </span>
           </div>
         }

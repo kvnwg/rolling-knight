@@ -464,6 +464,9 @@ export class Game {
         case 'cleared':
           this.emit({ type: 'floorClear', floor: w.floor });
           break;
+        case 'portal':
+          this.emit({ type: 'portalOpen', floor: w.floor });
+          break;
         case 'exit':
           this.goToFloor(w.floor + 1, false);
           break;

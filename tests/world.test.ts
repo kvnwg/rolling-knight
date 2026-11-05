@@ -7,7 +7,7 @@ import { BIOME_ORDER, BIOMES, biomeForFloor, isBossFloor } from '../src/world/bi
 import { BLOCKED, FLOOR, SOLID, TILE, bfs, generateFloor, tileAt } from '../src/world/mapgen';
 import { floorBoss, floorMobs } from '../src/world/mobgen';
 import { ROLL_TIME, rigSkill } from '../src/world/skills';
-import { World, type HeroSpec } from '../src/world/world';
+import { EXIT_HOLD, World, type HeroSpec } from '../src/world/world';
 
 function squad(ids: string[]): HeroSpec[] {
   const s = newGame(1);
@@ -185,6 +185,43 @@ describe('the squad in a fight', () => {
     for (let t = 0; t < 240 && !w.exited; t += 1 / 30) w.update(1 / 30);
     expect(w.cleared).toBe(true);
     expect(w.exited).toBe(true);
+  });
+
+  it('leaves a floor through its open exit any time, foes or not (a moment standing in the portal)', () => {
+    const w = world([knightId('rare', 'ranger')]);
+    expect(w.portalOpen).toBe(true);
+    expect(w.livingMobs().length).toBeGreaterThan(5);
+    const h = w.heroes[0];
+    h.x = w.map.exit.x;
+    h.y = w.map.exit.y;
+    w.update(1 / 30);
+    // Passing over it isn't enough...
+    expect(w.exited).toBe(false);
+    for (let t = 0; t < EXIT_HOLD + 0.1 && !w.exited; t += 1 / 30) {
+      h.x = w.map.exit.x;
+      h.y = w.map.exit.y;
+      w.update(1 / 30);
+    }
+    // ...standing in it is.
+    expect(w.exited).toBe(true);
+    expect(w.cleared).toBe(false);
+  });
+
+  it("keeps a boss floor's way down shut until its boss falls, then opens it (its minions fall with it)", () => {
+    const biome = BIOMES.hamlet;
+    const floor = 5;
+    const map = generateFloor({ floor, biome, seed: 7, boss: true });
+    const w = new World({ map, biome, floor, boss: true, mobTypes: floorMobs(biome, floor, 7), bossType: floorBoss(biome, floor, 7), squad: squad([knightId('rare', 'ranger')]), perks: [], controlled: 0, seed: 7, goldPerKill: 3 });
+    expect(w.portalOpen).toBe(false);
+    expect(w.floorBoss).not.toBeNull();
+    // Killing the rest doesn't open it...
+    for (const m of w.livingMobs()) if (m !== w.floorBoss) w.killMob(m);
+    w.update(1 / 30);
+    expect(w.portalOpen).toBe(false);
+    // ...the boss does.
+    w.killMob(w.floorBoss!);
+    w.update(1 / 30);
+    expect(w.portalOpen).toBe(true);
   });
 
   it('your knight attacks only while you hold the attack, toward your aim', () => {

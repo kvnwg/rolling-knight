@@ -151,7 +151,7 @@ floors keep the same arena with a different approach. Every floor has side rooms
 and is checked to be fully connected. Mobs are designed
 per floor: body plan, behavior (chaser, archer, charger, bomber, caster, tank, swarm), colors, size,
 features and name; bosses have three of ring, fan, charge, slam, summon, rain and leap (always a
-charge or a leap among them), and enrage at half HP. Clearing a floor opens the portal. A wiped squad
+charge or a leap among them), and enrage at half HP. The way down is open from the start: fight what you like, then stand in the portal a moment to go down (a boss floor's opens when its boss falls). A wiped squad
 is carried back to the hub, and the run goes back to the biome's first floor (on Auto it heads back
 down by itself unless you move).
 

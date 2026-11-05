@@ -277,6 +277,7 @@ class Sfx {
         this.sound('embark', 0);
         break;
       case 'floorClear':
+      case 'portalOpen':
         this.portal();
         break;
       case 'bossDown':

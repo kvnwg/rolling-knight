@@ -160,7 +160,10 @@ export function App() {
           }
           break;
         case 'floorClear':
-          toast({ text: 'Floor cleared! The portal is open.', color: '#c8a8ff' });
+          toast({ text: 'Floor cleared!', color: '#c8a8ff' });
+          break;
+        case 'portalOpen':
+          toast({ text: 'The way down is open!', color: '#c8a8ff' });
           break;
         case 'bossDown':
           show({ title: 'BOSS DEFEATED', sub: e.first && game.state.rebirths > 0 ? '+1 Sigil' : 'Checkpoint reached', grad: 'gold' });

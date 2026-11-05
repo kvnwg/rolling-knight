@@ -8,7 +8,7 @@ import { RARITY_COLOR } from '../core/rarity';
 import { BIOMES, type Biome } from '../world/biomes';
 import { norm, type Area, type FloatText, type Fx, type Shot, type Unit } from '../world/entities';
 import { TILE, type FloorMap, type Prop } from '../world/mapgen';
-import type { World } from '../world/world';
+import { EXIT_HOLD, type World } from '../world/world';
 import { flash, makeCanvas, mixHex, shade, toCanvas } from './art/draw';
 import { CLASS_HAS_SHIELD, KNIGHT_ANCHOR, knightFrame, knightGlow, knightLook, shieldArt, weaponArt, type KnightLook, type View } from './art/knights';
 import { mobFrame, poseFrames, type MobPose } from './art/mobs';
@@ -1733,7 +1733,7 @@ export class Renderer {
   private drawPortal(ctx: Ctx, em: Ctx, w: World, sx: (x: number) => number, sy: (y: number) => number): void {
     const x = sx(w.map.exit.x);
     const y = sy(w.map.exit.y);
-    // The stone ring is always there; it lights up when the floor is clear.
+    // The stone ring is always there; it lights up while the way down is open.
     ctx.fillStyle = '#2a2830';
     this.ellipse(ctx, x, y, 11, 5);
     ctx.fillStyle = '#5a5866';
@@ -1749,6 +1749,16 @@ export class Renderer {
       em.fillRect(x + Math.round(Math.cos(a) * r), y - 1 + Math.round(Math.sin(a) * r * 0.45), 1, 1);
     }
     if (Math.random() < 0.4) this.particles.push(this.p('mote', w.map.exit.x + (Math.random() - 0.5) * 14, w.map.exit.y, '#c8a8ff', 1.2, -18));
+    // Standing in it: a white ring fills round the stone, clockwise from the top, until you go down.
+    const k = Math.min(1, w.exitHold / EXIT_HOLD);
+    if (k > 0) {
+      const n = 28;
+      em.fillStyle = '#ffffff';
+      for (let i = 0; i < Math.round(n * k); i++) {
+        const a = -Math.PI / 2 + (i / n) * Math.PI * 2;
+        em.fillRect(x + Math.round(Math.cos(a) * 12), y - 1 + Math.round(Math.sin(a) * 6), 1, 1);
+      }
+    }
   }
 
   private drawLiquidShimmer(ctx: Ctx, w: World, cx: number, cy: number): void {
@@ -2193,10 +2203,12 @@ export class Renderer {
     ctx.globalAlpha = 1;
     // Lunges' and throws' tells over the mobs' heads, over the numbers.
     this.drawTells(ctx);
-    // When only a few mobs are left, arrows point to them; when the portal opens, one points there.
+    // An arrow points to the way down while it's open (you can leave any time), and when only a few
+    // mobs are left, arrows point to them too.
     const lead = w.leader();
     if (!lead) return;
-    const targets = w.portalOpen ? [{ x: w.map.exit.x, y: w.map.exit.y, color: '#c8a8ff' }] : w.livingMobs().length <= 3 ? w.livingMobs().map((m) => ({ x: m.x, y: m.y, color: '#ff6a5a' })) : [];
+    const living = w.livingMobs();
+    const targets = [...(w.portalOpen ? [{ x: w.map.exit.x, y: w.map.exit.y, color: '#c8a8ff' }] : []), ...(living.length <= 3 ? living.map((m) => ({ x: m.x, y: m.y, color: '#ff6a5a' })) : [])];
     for (const t of targets) {
       const x = sx(t.x);
       const y = sy(t.y);

@@ -26,6 +26,8 @@ export type CoreEvent =
   /** Your knight walked down the hub's steps: the dungeon is next. */
   | { type: 'descend' }
   | { type: 'floorClear'; floor: number }
+  /** A boss floor's way down opened: its boss fell. */
+  | { type: 'portalOpen'; floor: number }
   | { type: 'bossDown'; floor: number; first: boolean }
   | { type: 'wipe'; floor: number; back: number }
   | { type: 'rebirth'; count: number }
