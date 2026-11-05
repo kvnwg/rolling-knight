@@ -126,7 +126,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
     name: 'Mossy Hamlet',
     layout: 'cave',
     ground: { kind: 'grass', ramp: ['#2e6a1e', '#3e8424', '#5aa02c', '#66ae32', '#74be3a'], accent: ['#f8d838', '#f08a30', '#f4f0e0', '#f8d838'] },
-    path: { kind: 'cobble', ramp: ['#463c34', '#62564a', '#7c6f60', '#958877', '#ad9f8a'], dirt: ['#3e3022', '#5a4632', '#766041', '#917a55'], wide: 1, plaza: 0.6, everywhere: true },
+    path: { kind: 'cobble', ramp: ['#7a7064', '#91877a', '#a89d8e', '#bdb2a1', '#d1c7b5'], dirt: ['#3e3022', '#5a4632', '#766041', '#917a55'], wide: 1, plaza: 0.6, everywhere: true },
     solid: { kind: 'trees', top: ['#16251a', '#1f3322'], face: ['#2a2420', '#3f362f', '#56493e'], trees: ['oak', 'maple', 'oak'], underRamp: ['#1a2a1c', '#223522'], curb: ['#4e4a44', '#7a756c', '#a8a398', '#cac6ba'] },
     trees: ['oak', 'maple'],
     treeRamp: ['#1d3a22', '#2c5530', '#3f743b', '#5b9447', '#88b85a'],

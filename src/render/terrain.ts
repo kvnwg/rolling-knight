@@ -406,8 +406,9 @@ export function paintTerrainPixels(m: FloorMap, biome: Biome): Omit<Terrain, 'ca
   const pathMask = (x: number, y: number) => bil(isPath, x, y) + (vnoise(x, y, 6, seed + 80) - 0.5) * ragged;
   const stoneMask = new Map<number, number>();
   const warm = biome.path.ramp;
-  const grey = warm.map((c) => mixHex(c, '#86868a', 0.38));
-  const mortar = shade(warm[0], -0.25);
+  const grey = warm.map((c) => mixHex(c, '#a6a6aa', 0.38));
+  // The joints a soft shade under the darkest stone, not a black line.
+  const mortar = shade(warm[0], -0.12);
   const dirt = biome.path.dirt ?? warm.map((c, k) => mixHex(c, biome.ground.ramp[Math.min(k, biome.ground.ramp.length - 1)], 0.35));
   let onDirt = false;
   /** The road at a pixel: a stone or mortar color, packed dirt (sets `onDirt`), or null (no road here). */
@@ -428,13 +429,13 @@ export function paintTerrainPixels(m: FloorMap, biome: Biome): Omit<Terrain, 'ca
       const gap = st.d2 - st.d1;
       const dx = x + 0.5 - st.px;
       const dy = y + 0.5 - st.py;
-      // A dark mortar line round every stone, moss in a few of the joints.
-      if (gap < 0.95 || st.d1 > 3.3) return vnoise(x, y, 14, seed + 144) > 0.7 && h2(st.gx, st.gy, seed + 148) < 0.5 ? ((x + y) % 2 ? '#4a7a2a' : '#5e9234') : mortar;
+      // A soft mortar line round every stone, moss in a few of the joints.
+      if (gap < 0.95 || st.d1 > 3.3) return vnoise(x, y, 14, seed + 144) > 0.7 && h2(st.gx, st.gy, seed + 148) < 0.5 ? ((x + y) % 2 ? '#5c8a34' : '#6e9e3e') : mortar;
       const ramp = h2(st.gx, st.gy, seed + 145) < 0.35 ? grey : warm;
       let k = 2.1 + (id - 0.5) * 1.6;
       const side = dx + dy * 1.1;
-      // Each stone a flat tone, its top-left rim lit, its bottom-right rim a shade darker.
-      if (gap < 1.8) k += side < 0 ? 0.8 : -0.7;
+      // Each stone a flat tone, its top-left rim lit, its bottom-right rim a little darker.
+      if (gap < 1.8) k += side < 0 ? 0.8 : -0.45;
       return ramp[clampK(k, ramp.length)];
     }
     if (pm > 0.36) {
