@@ -1927,3 +1927,9 @@ body,
     width: calc(100vw - 30 * var(--px));
   }
 }
+@media (max-aspect-ratio: 1/1) {
+  .talk-prompt:not(.dungeon) {
+    flex-direction: column;
+    gap: calc(2 * var(--px));
+  }
+}

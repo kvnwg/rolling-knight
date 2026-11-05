@@ -238,6 +238,7 @@ export class Game {
     const layout = placeholderHub();
     const specs = this.squadSpecs();
     const controlled = specs.find((sp) => sp.knightId === id)?.slot ?? 0;
+    const was = this.hub?.leader();
     this.hub = new World({
       map: layout.map,
       biome: CAMP_BIOME,
@@ -253,6 +254,14 @@ export class Game {
       hub: true,
       stations: layout.stations,
     });
+    // A new knight takes over where the old one stood (only the start of a visit begins at the spawn).
+    const now = this.hub.leader();
+    if (was && now && !force) {
+      now.x = was.x;
+      now.y = was.y;
+      now.view = was.view;
+      now.dir = was.dir;
+    }
   }
 
   /** Back to the hub after a wipe: the squad patched up, the run back at its checkpoint. */
