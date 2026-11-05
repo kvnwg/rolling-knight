@@ -292,18 +292,14 @@ export class Game {
     this.version++;
   }
 
-  /** Into the dungeon: the floor you left off on (a new one if there's none). */
+  /** Into the dungeon: the floor you left off on, as a fresh map (every trip down is a new one, built to the next design in the deck). */
   enterDungeon(): void {
     if (!this.state.squad.some(Boolean)) return;
     this.inDungeon = true;
     this.autoReturnT = 0;
     // The hub waits with your knight back at the head of the steps (not halfway down them).
     this.syncHub(true);
-    if (!this.world) this.startFloor(this.state.run.floor);
-    else {
-      this.syncSquad();
-      this.emit({ type: 'floorStart', floor: this.world.floor, biome: this.world.biome.name, boss: this.world.boss });
-    }
+    this.startFloor(this.state.run.floor);
     this.fade = 1;
     this.fadeDir = -1;
     this.version++;
