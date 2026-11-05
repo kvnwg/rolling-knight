@@ -3005,3 +3005,24 @@ body,
     gap: calc(2 * var(--px));
   }
 }
+
+/* Settings: tabs across the top, the controls as a little table (what, keyboard, touch). */
+.settings-tabs {
+  justify-content: center;
+  margin-bottom: calc(1 * var(--px));
+}
+.controls-list {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr;
+  gap: calc(1.5 * var(--px)) calc(3 * var(--px));
+  padding: calc(3 * var(--px));
+  font-size: calc(4 * var(--px));
+  line-height: 1.25;
+}
+.controls-list .control-row {
+  display: contents;
+}
+.controls-list b {
+  color: var(--gold);
+  white-space: nowrap;
+}

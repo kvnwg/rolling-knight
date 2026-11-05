@@ -35,7 +35,7 @@ export const PERKS: PerkDef[] = [
   { id: 'peasantRevolt', tree: 'underdog', name: 'Peasant Revolt', cost: 3, requires: ['peasantLevy', 'ragsToRiches'], icon: 'torch', short: 'Low-tier squad: 2x damage', text: 'A squad of only Common, Uncommon and Rare knights deals double damage and dodges twice as often.' },
   { id: 'handMeDowns', tree: 'underdog', name: 'Hand-Me-Downs', cost: 4, requires: ['peasantRevolt'], icon: 'chest', short: 'Common level-ups cost half', text: 'Common and Uncommon knights cost half the gold to level up.' },
   // Command
-  { id: 'tagTeam', tree: 'command', name: 'Tag Team', cost: 1, requires: [], icon: 'swap', short: 'Switching lands a skill at once', text: 'Switching knights makes the incoming knight\'s skill roll land at once (once every 8 s).' },
+  { id: 'tagTeam', tree: 'command', name: 'Tag Team', cost: 1, requires: [], icon: 'swap', short: 'Switch in: +30% damage for 4 s', text: 'The knight you switch to hits 30% harder for 4 seconds (at most once every 10 s).' },
   { id: 'loneWolf', tree: 'command', name: 'Lone Wolf', cost: 2, requires: ['tagTeam'], icon: 'wolf', short: 'Fight alone: x3 HP, x2.5 damage', text: 'Your other two knights stay at camp. The one you control gets ×3 HP, ×2.5 damage and 30% faster specials.' },
   { id: 'hiveMind', tree: 'command', name: 'Hive Mind', cost: 2, requires: ['tagTeam'], icon: 'eye', short: 'The squad dodges with you', text: 'When you dodge, your whole squad dodges with you. Allies\' specials recharge twice as fast.' },
   { id: 'warBanner', tree: 'command', name: 'War Banner', cost: 3, requires: ['loneWolf', 'hiveMind'], icon: 'banner', short: 'Your hits speed up the squad', text: 'Each hit by the knight you control gives the squad +4% attack speed for 3 s, stacking to +40%.' },

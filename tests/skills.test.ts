@@ -420,7 +420,7 @@ describe('allies', () => {
     expect(got.filter((e) => e.phase === 'land' && e.hero === me).length).toBeGreaterThanOrEqual(1);
   });
 
-  it('includes your knight on Auto, and Tag Team lands the incoming roll at once', () => {
+  it('includes your knight on Auto, and Tag Team makes the knight switched to hit harder for a while', () => {
     const w = world([knightId('rare', 'arcanist'), knightId('rare', 'cleric')], ['tagTeam']);
     const [mage, cleric] = w.heroes;
     w.auto = true;
@@ -429,11 +429,14 @@ describe('allies', () => {
     run(w, 6);
     expect(mage.lastSkill?.n ?? 0).toBeGreaterThanOrEqual(1);
     w.auto = false;
-    const n = cleric.lastSkill?.n ?? 0;
     expect(w.switchControl(1)).toBe(true);
-    // It lands on the next tick, not after a whole roll.
-    run(w, 0.05);
-    expect(cleric.lastSkill?.n).toBe(n + 1);
+    // No free spell on switching (switching has no cooldown): a few seconds of harder hits instead.
+    expect(cleric.tagBoostT).toBeGreaterThan(3.9);
+    run(w, 4.1);
+    expect(cleric.tagBoostT ?? 0).toBeLessThanOrEqual(0);
+    // At most once every 10 s.
+    expect(w.switchControl(0)).toBe(true);
+    expect(mage.tagBoostT ?? 0).toBeLessThanOrEqual(0);
   });
 
   it('keep rolling through a fight, every knight: roll, fire, roll, fire', () => {

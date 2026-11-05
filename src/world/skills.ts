@@ -16,8 +16,11 @@ import { SKILLS, TIER_NAME, TIER_RARITY, rollSkill, tierStep, type SkillDef, typ
 import { dist, lineOfSight, moveUnit, norm, type Shot, type Unit } from './entities';
 import { uid, type World } from './world';
 
-/** Seconds a skill roll spins before it lands (Quick Roll shortens it: the knight's rollTimeMult). */
-export const ROLL_TIME = 0.7;
+/**
+ * Seconds a skill roll spins before it lands (Quick Roll shortens it: the knight's rollTimeMult).
+ * With no cooldowns the roll is the only wait between skills, so it takes its time.
+ */
+export const ROLL_TIME = 1.8;
 
 /** Seconds this knight's skill roll spins: ROLL_TIME, shortened by Quick Roll. */
 export function rollTime(h: Pick<Unit, 'rollTimeMult'>): number {

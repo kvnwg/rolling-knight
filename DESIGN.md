@@ -89,10 +89,10 @@ and Mythic or better.
 | Lancer | Lancer (rebirth 2) | Pierce (a line) | Vault |
 
 - **Skill rolls** (`src/core/skillbook.ts`, `src/world/skills.ts`). There is no fixed special: the
-  skill button spins a 0.7 s reel over the class's list and fires whatever it lands on (the result is
+  skill button spins a 1.8 s reel over the class's list and fires whatever it lands on (the result is
   fixed when the spin starts, as at the altar). There are no cooldowns: in a fight every knight rolls,
   fires, and rolls again at once. Quick Roll (the tinker's Combat tab) makes each tier's spin 12%
-  shorter (at 5 tiers: a 0.28 s spin). Each class has six skills; at luck 1 they weigh 30, 26, 20, 13, 8
+  shorter (at 5 tiers: a 0.72 s spin). Knights only roll with an awake foe within a screen of them. Each class has six skills; at luck 1 they weigh 30, 26, 20, 13, 8
   and 3 in 100 (two commons, an uncommon, a rare, an epic, a legendary), and luck tilts them rarer
   (weight × luck^(0.1 × tier step), luck capped at 1000; Loaded Dice adds to it). Epic and up chain
   several beats and announce their tier; legendary and up flash the screen and stop time for a beat.
@@ -244,7 +244,7 @@ beaten for the first time in a run) buy perks from four trees; a rebirth clears 
   luck 1; low duplicates pay 3x), Rags to Riches (+25% stats per tier below Legendary), Peasant Revolt
   (a low-rarity squad deals double damage and dodges twice as often), Hand-Me-Downs (Common and
   Uncommon level-ups cost half).
-- **Command**: Tag Team (switching lands the incoming knight's roll at once), Lone Wolf (solo: ×3 HP, ×2.5 damage), Hive Mind
+- **Command**: Tag Team (the knight you switch to hits 30% harder for 4 s, once every 10 s), Lone Wolf (solo: ×3 HP, ×2.5 damage), Hive Mind
   (the squad dodges with you; allies' skill rolls 2× faster), War Banner (your hits speed up the squad),
   Heirloom (keep your knight through the next rebirth).
 - **Rigged Reels**: Four-Leaf Litter, Bootleg Reel, Greased Gears, Pawn Shop, Rigged Jackpot.

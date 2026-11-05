@@ -487,6 +487,8 @@ export class World {
       // Berserker: up to +150% damage the lower the knight's HP.
       if (this.perks.has('berserker')) amount *= 1 + 1.5 * (1 - from.hp / from.maxHp);
       if (this.perks.has('peasantRevolt') && this.underdogSquad()) amount *= 2;
+      // Tag Team: the knight just switched to hits harder for a few seconds.
+      if ((from.tagBoostT ?? 0) > 0) amount *= 1.3;
     }
     amount *= 1 - target.armor;
     if (target.drT > 0) amount *= target.dr;
@@ -605,11 +607,10 @@ export class World {
     this.controlled = slot;
     this.events.push({ type: 'switch', slot });
     this.fx.push({ kind: 'spark', x: h.x, y: h.y - 10, color: '#ffe27a' });
-    // Tag Team: the incoming knight's skill roll lands at once (one starts if none is spinning).
+    // Tag Team: the incoming knight hits harder for a few seconds (at most once every 10 s).
     if (!forced && this.perks.has('tagTeam') && this.tagTeamT <= 0) {
-      this.tagTeamT = 8;
-      if (!h.skillRoll) heroSpecial(this, h, true);
-      if (h.skillRoll) h.skillRoll.t = h.skillRoll.dur;
+      this.tagTeamT = 10;
+      h.tagBoostT = 4;
     }
     return true;
   }
@@ -792,6 +793,7 @@ export class World {
       this.refreshFlows();
     }
     if (this.tagTeamT > 0) this.tagTeamT -= dt;
+    for (const h of this.heroes) if ((h.tagBoostT ?? 0) > 0) h.tagBoostT! -= dt;
     if (this.bannerT > 0) {
       this.bannerT -= dt;
       if (this.bannerT <= 0) this.banner = 0;

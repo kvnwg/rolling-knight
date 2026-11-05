@@ -227,8 +227,13 @@ function autoRoll(w: World, h: Unit, _target: Unit | null, foes: readonly Unit[]
 export function heroAutoRoll(w: World, h: Unit, dt: number): void {
   if (!h.ai) return;
   // Only in combat: an awake foe close by (on screen), not just one awake somewhere on the floor.
-  const foes = fightFoes(w, h).filter((m) => m.awake && dist(m.x, m.y, h.x, h.y) < 140);
+  const foes = closeFoes(fightFoes(w, h), h);
   autoRoll(w, h, foes.length ? w.nearestEnemy(h, 160, true) : null, foes, dt);
+}
+
+/** The foes a knight is really fighting: awake and within a screen of it. */
+function closeFoes(foes: readonly Unit[], h: Unit): Unit[] {
+  return foes.filter((m) => m.awake && dist(m.x, m.y, h.x, h.y) < 140);
 }
 
 /** One knight's decision for this frame: where to move (and maybe a dodge or a skill roll). */
@@ -251,7 +256,8 @@ function heroAiMove(w: World, h: Unit, lead: Unit | undefined, dt: number): [num
   }
   const foes = fightFoes(w, h);
   let target = foes.length ? w.nearestEnemy(h, 160, true) : null;
-  autoRoll(w, h, target, foes, dt);
+  // Skills only in a real fight: an awake foe close by, not one awake somewhere else on the floor.
+  autoRoll(w, h, target, closeFoes(foes, h), dt);
   // --- movement
   if (target && target.uid !== ai.target) {
     ai.target = target.uid;

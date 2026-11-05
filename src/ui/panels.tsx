@@ -131,10 +131,15 @@ export function HeroDetail({ game, id, onClose }: { game: Game; id: string; onCl
 
 // ------------------------------------------------------------------ settings and luck sheets
 
+const settingsMemory = { tab: 'game' as 'game' | 'controls' | 'save' | 'credits' };
+
+/** Settings, in tabs: the game's switches, the controls, your save, the credits. */
 export function SettingsSheet({ game, onClose }: { game: Game; onClose: () => void }) {
   const s = game.state;
   const [, bump] = useState(0);
   const [confirm, setConfirm] = useState(false);
+  const [tab, setTabState] = useState(settingsMemory.tab);
+  const setTab = (t: typeof tab) => ((settingsMemory.tab = t), setTabState(t));
   const set = (fn: () => void) => {
     fn();
     game.touch();
@@ -159,6 +164,22 @@ export function SettingsSheet({ game, onClose }: { game: Game; onClose: () => vo
           <Px icon="gear" size="lg" s={1} />
           <Chunky text="SETTINGS" size={10} grad="cream" />
         </div>
+        <div className="chips settings-tabs" role="tablist">
+          {(
+            [
+              ['game', 'Game'],
+              ['controls', 'Controls'],
+              ['save', 'Save'],
+              ['credits', 'Credits'],
+            ] as const
+          ).map(([id, label]) => (
+            <button key={id} role="tab" aria-selected={tab === id} className={`chip ${tab === id ? 'on' : ''}`} onClick={() => setTab(id)}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {tab === 'game' && (
+          <>
         <label className="glass setting outlined">
           <span>
             Sound
@@ -176,11 +197,31 @@ export function SettingsSheet({ game, onClose }: { game: Game; onClose: () => vo
         {toggle('Auto', 'Your knight plays itself', s.settings.autoPlay, (v) => game.setAuto(v))}
         {toggle('Tilt-shift', 'The distance goes soft, like a miniature', s.settings.tiltShift, (v) => (s.settings.tiltShift = v))}
         {toggle('Reduce motion', 'No screen shake, calmer reveals', s.settings.reduceMotion, (v) => (s.settings.reduceMotion = v))}
-        <div className="section-title outlined">Controls</div>
-        <p className="lead">
-          Move: WASD or arrows (touch: drag on the left). Attack: click or J, aim with the mouse (touch: hold Attack; it aims for you). Dodge roll: Space (touch: Dodge). Your skill rolls and fires by itself in a fight (E rolls it any time it is ready). Take control of a knight: 1, 2, 3 or tap them. Auto: T. Camp: Esc.
-        </p>
-        <div className="section-title outlined">Your save</div>
+          </>
+        )}
+        {tab === 'controls' && (
+          <div className="glass controls-list outlined">
+            {(
+              [
+                ['Move', 'WASD / arrows', 'drag on the left'],
+                ['Attack', 'click or J (aim with the mouse)', 'hold ATTACK (aims for you)'],
+                ['Dodge roll', 'Space', 'DODGE'],
+                ['Skill', 'rolls and fires by itself; E rolls now', 'SKILL'],
+                ['Switch knight', '1, 2, 3', 'tap their card'],
+                ['Auto', 'T', 'AUTO'],
+                ['Camp', 'Esc', 'CAMP'],
+              ] as const
+            ).map(([what, keys, touchKeys]) => (
+              <div key={what} className="control-row">
+                <b>{what}</b>
+                <span>{keys}</span>
+                <span className="t-muted">{touchKeys}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {tab === 'save' && (
+          <>
         <p className="lead">
           Saved in this browser every few seconds. {Math.round(s.playTimeMs / 60000)} minutes played, {fmt(s.records.kills)} foes beaten, {fmt(s.records.spins)} knights summoned.
         </p>
@@ -199,10 +240,13 @@ export function SettingsSheet({ game, onClose }: { game: Game; onClose: () => vo
             </button>
           </div>
         )}
-        <div className="section-title outlined">Credits</div>
+          </>
+        )}
+        {tab === 'credits' && (
         <p className="lead">
           Characters built on Snoblin's Pixel RPG Prototype Characters. Effects: Pixel Art Assets - Will Tice / unTied Games. {MUSIC_CREDIT} Icons and pixel tools from Dumpster Legend. Pixelify Sans (SIL OFL). v{__APP_VERSION__}
         </p>
+        )}
       </div>
     </div>
   );

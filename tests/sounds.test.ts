@@ -16,7 +16,7 @@ import { SKILLS, SKILL_IDS, SKILL_TIERS } from '../src/core/skillbook';
 import { BIOMES } from '../src/world/biomes';
 import { generateFloor } from '../src/world/mapgen';
 import { floorMobs, type MobType } from '../src/world/mobgen';
-import { onSkillRoll, startSkillRoll } from '../src/world/skills';
+import { onSkillRoll, ROLL_TIME, startSkillRoll } from '../src/world/skills';
 import { World, type HeroSpec } from '../src/world/world';
 import { soundsDoc } from '../tools/soundsDoc';
 
@@ -384,7 +384,7 @@ describe('the fight, heard', () => {
       k.skillRig = id;
       k.specialT = 0;
       expect(startSkillRoll(w, k)).toBe(true);
-      for (let i = 0; i < 40 && heard.indexOf(skillCue(id) as FightCue) < 0; i++) {
+      for (let i = 0; i < Math.ceil((ROLL_TIME + 0.6) * 30) && heard.indexOf(skillCue(id) as FightCue) < 0; i++) {
         w.update(1 / 30);
         obs.frame(w);
         w.fx.length = 0;

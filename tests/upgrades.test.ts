@@ -425,7 +425,7 @@ describe('Quick Roll', () => {
       const t0 = w.time;
       expect(startSkillRoll(w, h)).toBe(true);
       const dur = h.skillRoll!.dur;
-      for (let i = 0; i < 60 && !landed.length; i++) w.update(1 / 60);
+      for (let i = 0; i < Math.ceil((ROLL_TIME + 0.5) * 60) && !landed.length; i++) w.update(1 / 60);
       stop();
       return { dur, took: landed[0] - t0, cd: h.specialCd!, left: h.specialT!, mult: h.rollTimeMult };
     };
