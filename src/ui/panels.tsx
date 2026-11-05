@@ -33,7 +33,7 @@ const UPGRADE_ICON: Record<string, IconName> = {
   might: 'sword', vitality: 'heart', greed: 'coin', swiftness: 'boot', offline: 'book',
 };
 
-function Section({ title, sub, children, right }: { title: string; sub?: ReactNode; children: ReactNode; right?: ReactNode }) {
+export function Section({ title, sub, children, right }: { title: string; sub?: ReactNode; children: ReactNode; right?: ReactNode }) {
   return (
     <section className="stack">
       <div className="spread">
@@ -144,7 +144,7 @@ export function CampPanel({ game, onOpen, onTab }: { game: Game; onOpen: (id: st
   );
 }
 
-function DupeBar({ game }: { game: Game }) {
+export function DupeBar({ game }: { game: Game }) {
   const s = game.state;
   const n = totalDupes(s);
   const ids = Object.keys(s.roster).filter((id) => s.roster[id].dupes > 0);

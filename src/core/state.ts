@@ -98,6 +98,8 @@ export interface GameState {
     count: number;
     spinCount: number;
     sinceLucky: number;
+    /** Lucky Spins earned (jobs): each makes one of the next spins Lucky. */
+    bankedLucky?: number;
     dry: number;
     timer: number;
     current: Spin | null;

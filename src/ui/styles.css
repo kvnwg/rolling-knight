@@ -1703,3 +1703,218 @@ body,
 .mini-roller .frame {
   padding: calc(1 * var(--px));
 }
+
+/* ------------------------------------------------------------ the hub */
+
+.hub-hud .mini-roller {
+  background: none;
+}
+/* Talking: the keeper's plate and a big brass button, bottom center. */
+.talk-prompt {
+  position: absolute;
+  left: 50%;
+  bottom: calc(10 * var(--px) + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: calc(3 * var(--px));
+  animation: bannerIn 0.25s steps(4) both;
+}
+.talk-card {
+  display: flex;
+  align-items: center;
+  gap: calc(2 * var(--px));
+  padding: calc(1 * var(--px)) calc(4 * var(--px)) calc(1 * var(--px)) calc(1 * var(--px));
+}
+.talk-card .face {
+  width: calc(26 * var(--px));
+  height: calc(23 * var(--px));
+}
+.talk-card .who {
+  display: flex;
+  flex-direction: column;
+  font-size: calc(4.2 * var(--px));
+  color: var(--muted);
+  white-space: nowrap;
+}
+.talk-card .who b {
+  font-size: calc(5.5 * var(--px));
+  color: var(--gold);
+}
+
+/* A keeper's counter: their portrait and words on top, their wares below. */
+.station-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: calc(3 * var(--px));
+}
+.station-sheet .keeper {
+  display: flex;
+  align-items: center;
+  gap: calc(3 * var(--px));
+  padding-right: calc(12 * var(--px));
+}
+.station-sheet .portrait {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: calc(32 * var(--px));
+  height: calc(32 * var(--px));
+  border: 0 solid transparent;
+  border-image: var(--sk-plate-gold) 6 fill / calc(6 * var(--px)) stretch;
+  image-rendering: pixelated;
+}
+.station-sheet .portrait img {
+  width: calc(26 * var(--px));
+  height: calc(23 * var(--px));
+}
+.station-sheet .who {
+  display: flex;
+  flex-direction: column;
+  gap: calc(1 * var(--px));
+}
+.station-sheet .job {
+  font-size: calc(4.4 * var(--px));
+  color: var(--muted);
+}
+.station-sheet .say {
+  margin: 0;
+  font-size: calc(4.6 * var(--px));
+  line-height: 1.35;
+  color: var(--text);
+  font-style: italic;
+}
+.station-sheet .counter {
+  display: flex;
+  flex-direction: column;
+  gap: calc(4 * var(--px));
+}
+
+/* Who you play as: the knight big in a pool of its rarity's light, the roster below. */
+.char-select {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(4 * var(--px));
+  padding: calc(8 * var(--px)) calc(4 * var(--px));
+  background: radial-gradient(ellipse at 50% 45%, rgba(20, 10, 6, 0.1), rgba(10, 5, 3, 0.75) 70%);
+}
+.cs-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(1.5 * var(--px));
+  text-align: center;
+}
+.cs-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: calc(130 * var(--px));
+  height: calc(90 * var(--px));
+}
+.cs-stage .px {
+  position: relative;
+  filter: drop-shadow(0 calc(2 * var(--px)) 0 rgba(10, 4, 2, 0.6));
+}
+.cs-light {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 50% 22% at 50% 82%, color-mix(in srgb, var(--rc) 55%, transparent), transparent 70%),
+    radial-gradient(ellipse 45% 60% at 50% 55%, color-mix(in srgb, var(--rc) 22%, transparent), transparent 70%);
+  animation: readyPulse 1.6s steps(3) infinite;
+}
+.cs-name {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(1 * var(--px));
+  font-size: calc(5 * var(--px));
+  font-weight: 700;
+  text-transform: capitalize;
+}
+.cs-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: calc(2 * var(--px));
+  max-width: min(100%, calc(200 * var(--px)));
+}
+.cs-pick {
+  display: grid;
+  place-items: center;
+  width: calc(30 * var(--px));
+  height: calc(28 * var(--px));
+  padding: 0;
+  cursor: pointer;
+}
+.cs-pick.on {
+  border-image-source: var(--sk-plate-gold);
+}
+
+/* ------------------------------------------------------------ talking to folk */
+
+.dialog-modal {
+  align-items: flex-end;
+  background: rgba(8, 4, 2, 0.35);
+}
+.dialog-box {
+  display: flex;
+  gap: calc(3 * var(--px));
+  width: min(96vw, calc(220 * var(--px)));
+  margin-bottom: calc(8 * var(--px) + env(safe-area-inset-bottom, 0px));
+  padding: calc(1 * var(--px));
+  animation: bannerIn 0.2s steps(3) both;
+}
+.dialog-box .portrait {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: calc(34 * var(--px));
+  height: calc(34 * var(--px));
+  border: 0 solid transparent;
+  border-image: var(--sk-plate-gold) 6 fill / calc(6 * var(--px)) stretch;
+  image-rendering: pixelated;
+}
+.dialog-box .portrait img {
+  width: calc(26 * var(--px));
+  height: calc(23 * var(--px));
+}
+.dialog-box .body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: calc(2 * var(--px));
+  min-width: 0;
+}
+.dialog-box .who {
+  font-size: calc(5.5 * var(--px));
+  color: var(--gold);
+}
+.dialog-box .say {
+  margin: 0;
+  min-height: calc(14 * var(--px));
+  font-size: calc(5 * var(--px));
+  line-height: 1.4;
+  color: var(--text);
+}
+.dialog-box .caret {
+  animation: blink 0.6s steps(1) infinite;
+}
+.dialog-box .choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(2 * var(--px));
+}
+.dialog-box .choices .btn {
+  white-space: normal;
+  text-align: left;
+}
+.talk-prompt.dungeon {
+  bottom: auto;
+  top: 58%;
+}

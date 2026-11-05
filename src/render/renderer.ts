@@ -22,6 +22,8 @@ import { frameBuf } from './pixel/indexed';
 import { FX_SHEETS, type FxName } from './packs/fx';
 import { renderText, type TextStyle } from './pixel/font';
 import { paintTerrain, type Terrain } from './terrain';
+import { npcFrame, questMarker } from './art/npcs';
+import { npcMarker } from '../world/npcs';
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -196,13 +198,14 @@ export class Renderer {
 
   // ------------------------------------------------------------------ frame
 
-  render(game: Game, dt: number): void {
+  /** Draws a frame of `scene`: the floor you're on, or the hub between dives. */
+  render(game: Game, dt: number, scene: World | null = game.world): void {
     this.time += dt;
     const g = this.sctx;
     const st = this.layers.stand.x;
     const em = this.layers.emit.x;
     const ui = this.layers.ui.x;
-    const w = game.world;
+    const w = scene;
     for (const c of [g, st, em, ui]) {
       c.setTransform(1, 0, 0, 1, 0, 0);
       c.globalAlpha = 1;
@@ -324,6 +327,46 @@ export class Renderer {
     }
     for (const p of w.pickups) {
       list.push({ y: p.y, draw: () => this.drawPickup(em, p.kind, sx(p.x), sy(p.y - p.z)) });
+    }
+    // The hub's keepers, and a marker over the one you can talk to.
+    const near = w.hub ? w.nearStation() : null;
+    for (const k of w.stations) {
+      if (!visible(k.x, k.y)) continue;
+      list.push({
+        y: k.y,
+        draw: () => {
+          if (k.def) {
+            const f = npcFrame(k.def, 'idle', k.view, Math.floor(this.time * 4 + k.x));
+            const c = this.cached(`npc|${k.def.id}|${k.view}|${k.dir}|${Math.floor(this.time * 4 + k.x) % 8}`, () => toCanvas(k.dir < 0 && k.view === 'side' ? flipX(f.buf) : f.buf));
+            const ax = k.dir < 0 && k.view === 'side' ? f.buf.w - 1 - f.ax : f.ax;
+            st.drawImage(c, sx(k.x) - ax, sy(k.y) - f.ay);
+          }
+          const bob = Math.round(Math.sin(this.time * 4) * 1.5);
+          const mark = this.cached(`qmark|${near === k ? 'turnIn' : 'offer'}`, () => toCanvas(questMarker(near === k ? 'turnIn' : 'offer')));
+          if (near === k || !k.def) ui.drawImage(mark, sx(k.x) - Math.floor(mark.width / 2), sy(k.y) - (k.def ? 34 : 22) + bob);
+        },
+      });
+    }
+    // Folk on the floor, with a "!" over anyone with a job for you (a "?" when one's ready to hand in).
+    const talkTo = w.hub ? null : w.nearNpc();
+    for (const n of w.npcs) {
+      if (!visible(n.x, n.y)) continue;
+      list.push({
+        y: n.y,
+        draw: () => {
+          const fr = Math.floor(n.animT * 4);
+          const f = npcFrame(n.def, 'idle', n.view, fr);
+          const flip = n.dir < 0 && n.view === 'side';
+          const c = this.cached(`npc|${n.def.id}|${n.view}|${flip ? 1 : 0}|${fr % 8}`, () => toCanvas(flip ? flipX(f.buf) : f.buf));
+          st.drawImage(c, sx(n.x) - (flip ? f.buf.w - 1 - f.ax : f.ax), sy(n.y) - f.ay);
+          const mk = npcMarker(n, game.state.quests ?? []) ?? (talkTo === n ? 'offer' : null);
+          if (mk) {
+            const bob = Math.round(Math.sin(this.time * 4 + n.x) * 1.5);
+            const m = this.cached(`qmark|${mk}`, () => toCanvas(questMarker(mk)));
+            ui.drawImage(m, sx(n.x) - Math.floor(m.width / 2), sy(n.y) - 34 + bob);
+          }
+        },
+      });
     }
     list.sort((a, b) => a.y - b.y);
     for (const d of list) d.draw();

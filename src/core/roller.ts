@@ -125,6 +125,11 @@ export function startSpin(state: GameState, rng: Rng, nowMs: number, emit: Event
       lucky = true;
       r.sinceLucky = 0;
       luck *= luckyMult(state);
+    } else if ((r.bankedLucky ?? 0) > 0) {
+      // A Lucky Spin earned elsewhere (a job's reward) comes up on the next spin.
+      lucky = true;
+      r.bankedLucky = (r.bankedLucky ?? 0) - 1;
+      luck *= luckyMult(state);
     }
     if (fx.goldenChance > 0 && rng.chance(fx.goldenChance)) {
       golden = true;

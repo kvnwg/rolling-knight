@@ -4,6 +4,8 @@
  */
 import { CLASSES, knightDef, specialOf } from '../core/knights';
 import { CHALLENGE } from '../core/power';
+import { activeQuests, questGoal } from '../core/quests';
+import type { Npc } from '../world/npcs';
 import { RARITY_COLOR } from '../core/rarity';
 import { drySpell } from '../core/roller';
 import type { Controls } from '../input/input';
@@ -20,7 +22,7 @@ const touch = typeof window !== 'undefined' && ('ontouchstart' in window || navi
 
 const SPECIAL_ICON: Record<string, IconName> = { guardian: 'shield', blade: 'sword', ranger: 'target', cleric: 'heart', arcanist: 'bolt', lancer: 'arrowRight' };
 
-export function DungeonHud({ game, controls, press, onCamp, onSettings, onLuck, onAltar }: {
+export function DungeonHud({ game, controls, press, onCamp, onSettings, onLuck, onAltar, onTalk }: {
   game: Game;
   controls: Controls;
   press: (w: 'dodge' | 'special') => void;
@@ -28,6 +30,7 @@ export function DungeonHud({ game, controls, press, onCamp, onSettings, onLuck, 
   onSettings: () => void;
   onLuck: () => void;
   onAltar: () => void;
+  onTalk: (n: Npc) => void;
 }) {
   const s = game.state;
   const w = game.world;
@@ -40,6 +43,8 @@ export function DungeonHud({ game, controls, press, onCamp, onSettings, onLuck, 
   const showHints = s.run.floor === 1 && s.rebirths === 0 && s.playTimeMs < 150_000;
   const boss = w?.bossUnit && !w.bossUnit.dead ? w.bossUnit : null;
   const ch = game.difficulty ? CHALLENGE[game.difficulty.challenge] : null;
+  const npc = w?.nearNpc() ?? null;
+  const jobs = activeQuests(s.quests ?? []);
   return (
     <div className="dhud">
       <TopBar
@@ -160,6 +165,29 @@ export function DungeonHud({ game, controls, press, onCamp, onSettings, onLuck, 
           {!touch && <span className="key">SPACE</span>}
         </button>
       </div>
+
+      {jobs.length > 0 && (
+        <div className="quests">
+          {jobs.map((q) => (
+            <div key={q.id} className={`quest glass outlined ${q.done ? 'done' : ''}`}>
+              <b>{q.done ? `Back to ${q.giverName ?? 'the giver'}` : q.title}</b>
+              <span>{questGoal(q)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {npc && (
+        <div className="talk-prompt dungeon">
+          <button className="btn gold" onClick={() => onTalk(npc)}>
+            <Px icon="star" size="sm" />
+            <span>
+              TALK: {npc.def.name}
+              {!touch && <span className="sub">Enter or F</span>}
+            </span>
+          </button>
+        </div>
+      )}
 
       {controls.stick.active && (
         <div className="stick" style={{ left: controls.stick.ox, top: controls.stick.oy }}>

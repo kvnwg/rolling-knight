@@ -14,6 +14,8 @@ import { dist, lineOfSight, moveUnit, norm, type Area, type FloatText, type Fx, 
 import { flowFrom, type Flow } from './flow';
 import { TILE, tileAt, type FloorMap } from './mapgen';
 import { type MobType } from './mobgen';
+import { TALK_RANGE, type HubStation } from './hubWorld';
+import { demonDeathLines, demonEnrageLines, demonMobType, demonTauntsFor, type Npc, type NpcDef } from './npcs';
 import { floorPar, foeStats } from '../core/power';
 import { heroDodge, heroSpecial, heroTick } from './skills';
 
@@ -29,7 +31,7 @@ export interface HeroSpec {
 }
 
 export type WorldEvent =
-  | { type: 'kill'; gold: number; elite: boolean; boss: boolean; x: number; y: number }
+  | { type: 'kill'; gold: number; elite: boolean; boss: boolean; x: number; y: number; name: string }
   | { type: 'pickup'; kind: Pickup['kind']; amount: number }
   | { type: 'cleared' }
   | { type: 'exit' }
@@ -66,6 +68,11 @@ export interface WorldOptions {
   difficulty?: number;
   /** The camp (home screen): no mobs, the squad stands round the fire. */
   camp?: boolean;
+  /** The hub: no mobs; you walk your knight among the keepers' stations. */
+  hub?: boolean;
+  stations?: HubStation[];
+  /** Folk on this floor (npcs.ts): talk to them for jobs; one may be a demon in disguise. */
+  npcs?: Npc[];
 }
 
 let nextUid = 1;
@@ -122,9 +129,19 @@ export class World {
   rewind: { frames: Snapshot[]; t: number; dur: number } | null = null;
 
   camp: boolean;
+  /** The hub (between dives): only your knight, walking; the keepers at their stations. */
+  hub: boolean;
+  stations: HubStation[] = [];
+  /** Folk standing about on this floor. */
+  npcs: Npc[] = [];
+  /** An unmasked demon (fought like a boss, but it doesn't take the floor with it), and its banter clock. */
+  demon: { unit: Unit; def: NpcDef; tauntT: number; enraged: boolean } | null = null;
 
   constructor(o: WorldOptions) {
     this.camp = !!o.camp;
+    this.hub = !!o.hub;
+    this.stations = o.stations ?? [];
+    this.npcs = o.npcs ?? [];
     this.map = o.map;
     this.biome = o.biome;
     this.floor = o.floor;
@@ -144,7 +161,17 @@ export class World {
       const alive = this.heroes.find((h) => !h.downed);
       if (alive) this.controlled = alive.slot!;
     }
-    if (this.camp) {
+    if (this.hub) {
+      // Just your knight, at the hub's spawn.
+      this.heroes = this.heroes.filter((h) => h.slot === this.controlled).slice(0, 1);
+      for (const h of this.heroes) {
+        h.x = o.map.start.x;
+        h.y = o.map.start.y;
+        h.view = 'up';
+      }
+      this.cleared = true;
+      this.difficulty = 0;
+    } else if (this.camp) {
       // Round the fire, facing it.
       const fire = o.map.props.find((p) => p.kind === 'campfire') ?? { x: o.map.start.x, y: o.map.start.y - 20 };
       const spots: Array<[number, number, View, 1 | -1]> = [[-22, 4, 'side', 1], [22, 4, 'side', -1], [0, 20, 'up', 1]];
@@ -423,7 +450,12 @@ export class World {
     const t = m.type!;
     this.fx.push({ kind: 'death', x: m.x, y: m.y - 4, color: t.ramp[2], size: m.boss ? 3 : m.elite ? 2 : 1, src: m.boss ? 'boss' : t.plan === 'slime' ? 'slime' : undefined });
     const gold = Math.max(1, Math.round(this.goldPerKill * (m.boss ? 25 : m.elite ? 4 : 1)));
-    this.events.push({ type: 'kill', gold, elite: !!m.elite, boss: !!m.boss, x: m.x, y: m.y });
+    this.events.push({ type: 'kill', gold, elite: !!m.elite, boss: !!m.boss, x: m.x, y: m.y, name: t.name });
+    if (this.demon && this.demon.unit === m) {
+      this.text(m.x, m.y - 34, this.rng.pick(demonDeathLines), '#ff9a6a', true);
+      this.demon = null;
+      if (this.bossUnit === m) this.bossUnit = null;
+    }
     // Coins burst out and fly to the squad.
     const coins = m.boss ? 18 : m.elite ? 6 : 2 + this.rng.int(0, 1);
     for (let i = 0; i < coins; i++) this.spawnPickup(m.x, m.y, 'gold', Math.max(1, Math.round(gold / coins)));
@@ -431,7 +463,11 @@ export class World {
     if (this.rng.chance(m.boss ? d.potionBoss : m.elite ? d.potionElite : d.potionMob)) this.spawnPickup(m.x, m.y, 'potion', 1);
     if (m.boss) this.spawnPickup(m.x, m.y, 'hourglass', d.hourglassBoss);
     else if (m.elite && this.rng.chance(d.hourglassElite)) this.spawnPickup(m.x, m.y, 'hourglass', 1);
-    if (m.boss) {
+    if (m.boss && m.type?.id.startsWith('ember-')) {
+      // An unmasked demon: a big moment, but the floor's other foes don't fall with it.
+      this.shakeIt(5, 0.6);
+      this.hitStop = 0.2;
+    } else if (m.boss) {
       this.shakeIt(6, 0.8);
       this.hitStop = 0.25;
       // The boss's minions fall with it.
@@ -554,7 +590,72 @@ export class World {
     this.refreshFlows();
   }
 
+  /** The person on this floor you're close enough to talk to, or null. */
+  nearNpc(): Npc | null {
+    const h = this.leader();
+    if (!h || this.hub) return null;
+    let best: Npc | null = null;
+    let bd = TALK_RANGE;
+    for (const n of this.npcs) {
+      const d = dist(h.x, h.y, n.x, n.y);
+      if (d < bd) {
+        bd = d;
+        best = n;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * The demon drops the act: the NPC goes, and where it stood the demon stands, fought like a boss
+   * (its bar at the top), joking all the way down.
+   */
+  unmaskDemon(npc: Npc): void {
+    this.npcs = this.npcs.filter((n) => n !== npc);
+    const t = demonMobType(this.floor, this.biome.id, npc.seed);
+    const m = this.makeMob(t, npc.x, npc.y, false, true);
+    m.awake = true;
+    // Built like a boss of this floor, but a little gentler (it's a side show).
+    m.maxHp *= 0.6;
+    m.hp = m.maxHp;
+    this.mobs.push(m);
+    this.bossUnit = m;
+    this.demon = { unit: m, def: npc.def, tauntT: 1.5, enraged: false };
+    this.cleared = false;
+    this.portalOpen = false;
+    this.fx.push({ kind: 'blast', x: npc.x, y: npc.y - 6, color: '#ff6a3a', size: 2 });
+    this.shakeIt(4, 0.4);
+    this.text(npc.x, npc.y - 34, this.rng.pick(demonTauntsFor(npc.def)), '#ff9a6a', true);
+  }
+
+  /** The keeper you're close enough to talk to (the hub), or null. */
+  nearStation(): HubStation | null {
+    const h = this.leader();
+    if (!h || !this.hub) return null;
+    let best: HubStation | null = null;
+    let bd = TALK_RANGE;
+    for (const s of this.stations) {
+      const d = dist(h.x, h.y, s.x, s.y);
+      if (d < bd) {
+        bd = d;
+        best = s;
+      }
+    }
+    return best;
+  }
+
   update(dt: number): void {
+    if (this.hub) {
+      // Walking round the hub: your knight moves; the keepers idle.
+      this.time += dt;
+      const h = this.leader();
+      if (h) heroTick(this, h, dt, this.input.mx, this.input.my);
+      this.input.dodge = false;
+      this.input.special = false;
+      for (const t of this.texts) t.t += dt;
+      this.texts = this.texts.filter((t) => t.t < 1.1);
+      return;
+    }
     if (this.camp) {
       this.time += dt;
       for (const h of this.heroes) {
@@ -591,6 +692,29 @@ export class World {
       if (this.bannerT <= 0) this.banner = 0;
     }
     const lead = this.leader();
+    // --- folk: they idle, and turn to face your knight when it comes close
+    for (const n of this.npcs) {
+      n.animT += dt;
+      if (lead && dist(lead.x, lead.y, n.x, n.y) < 60) {
+        n.view = 'side';
+        n.dir = lead.x < n.x ? -1 : 1;
+      }
+    }
+    // --- an unmasked demon keeps up the banter
+    if (this.demon) {
+      const d = this.demon;
+      d.tauntT -= dt;
+      if (d.tauntT <= 0) {
+        d.tauntT = this.rng.float(4, 7);
+        this.text(d.unit.x, d.unit.y - 34, this.rng.pick(demonTauntsFor(d.def)), '#ff9a6a', false);
+      }
+      if (!d.enraged && d.unit.hp < d.unit.maxHp * 0.5) {
+        d.enraged = true;
+        d.unit.bossPhase = 1;
+        this.text(d.unit.x, d.unit.y - 34, this.rng.pick(demonEnrageLines), '#ff5a3a', true);
+        this.shakeIt(3, 0.3);
+      }
+    }
     // --- heroes
     for (const h of this.heroes) {
       tickStatus(this, h, dt);
