@@ -87,7 +87,8 @@ npm run build:artifact
 ```
 
 The second writes `artifact/rolling-knight.html`, one self-contained page (fonts, art and code
-inlined).
+inlined). A playable copy is published as a private claude.ai artifact:
+https://claude.ai/artifact/3h8iQEex8H8z78bq9GtUSQ (saves live in that page's browser storage).
 
 ## Packs
 
