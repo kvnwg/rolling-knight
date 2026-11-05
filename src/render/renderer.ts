@@ -1597,6 +1597,19 @@ const DEFAULT_GRADE: Grade = {
 /** Biomes in daylight. */
 const DAYLIGHT: ReadonlySet<string> = new Set(['hamlet', 'farmland', 'desert', 'tundra']);
 
+/** How strong the sun rays are per biome (0 none). */
+const RAYS: Readonly<Record<string, number>> = {
+  hamlet: 0.2,
+  farmland: 0.2,
+  forest: 0.26,
+  shrine: 0.2,
+  swamp: 0.16,
+  desert: 0.12,
+  tundra: 0.1,
+  crystal: 0.1,
+  graveyard: 0.09,
+};
+
 /**
  * The light the scene is multiplied by. Daylight is lifted most of the way to white (a bright, clean
  * picture, like a sunny afternoon), keeping a touch of the biome's warmth; cloud cools and dims it, rain
@@ -1629,7 +1642,9 @@ function gradeOf(b: Biome, sky: Sky | null): Grade {
   return {
     haze: wet ? [0.74, 0.79, 0.86] : v3(b.light.fog ?? b.light.gradeTop),
     hazeAmount: wet ? 0.07 : b.light.fog ? 0.2 : indoor ? 0.06 : day ? 0.04 : 0.1,
-    rays: grey ? 0 : day ? 0.05 : b.id === 'forest' ? 0.06 : b.id === 'crystal' ? 0.05 : 0,
+    // Sun rays where the sun gets in: strong in the woods and over sunny lawns, misty in the swamp,
+    // faint over snow and sand (already bright), none indoors or in rain, weaker under cloud.
+    rays: indoor || wet ? 0 : (RAYS[b.id] ?? 0) * (grey ? 0.35 : 1),
     rayColor: day ? v3(mixHex(b.light.gradeTop, '#fff6e6', 0.6)) : v3(b.light.gradeTop),
     shadowTint: grey ? tint('#4a5a7a', 0.3) : tint(b.light.gradeBottom, day ? 0.25 : 0.35),
     highlightTint: grey ? tint('#e8f0ff', 0.12) : tint(b.light.gradeTop, day ? 0.09 : 0.22),

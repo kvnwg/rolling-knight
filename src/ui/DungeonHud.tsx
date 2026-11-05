@@ -111,7 +111,7 @@ export function DungeonHud({ game, controls, press, onCamp, onSettings, onLuck, 
               onClick={() => (uiSound('tap'), game.switchTo(slot))}
             >
               <img className="px face" src={knightFaceUrl(id, s.roster[id].mutation)} alt="" draggable={false} />
-              <span className="nm outlined">{def.name}</span>
+              <span className="nm">{def.name}</span>
               <Bar value={hp} kind="hp" />
             </button>
           );

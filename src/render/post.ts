@@ -172,12 +172,32 @@ void main() {
   float n = noise(vec2(s.x * 5.0 + u_time * 0.05, s.y * 3.0 - u_time * 0.02)) * 0.6 + noise(vec2(s.x * 11.0 - u_time * 0.08, s.y * 7.0)) * 0.4;
   float h = u_hazeAmount * (0.35 + 0.65 * (1.0 - y)) * (0.55 + 0.6 * n);
   c = mix(c, u_haze, clamp(h, 0.0, 0.85));
-  // Light shafts slanting down from the top left.
+  // Sun rays: shafts of light slanting down from the top left (where the light comes from), fixed
+  // to the world so they stay put as you walk through them. Each shaft has its own width and soft
+  // edges, they brighten and fade along their length and flicker slowly (leaves moving in the
+  // canopy), and specks of dust glint inside them.
   if (u_rays > 0.0) {
-    float d = s.x * 0.8 + s.y * 0.55;
-    float r = pow(0.5 + 0.5 * sin(d * 23.0 + u_time * 0.35), 6.0) * 0.6 + pow(0.5 + 0.5 * sin(d * 9.0 - u_time * 0.22 + 1.3), 8.0) * 0.4;
-    r *= smoothstep(1.05, 0.0, y) * (0.6 + 0.4 * noise(vec2(d * 6.0, u_time * 0.1)));
-    c += u_rayColor * r * u_rays;
+    vec2 wp = a * u_artSize + u_cam;
+    // Across the shafts (perpendicular to their slant) and along them.
+    float across = dot(wp, vec2(0.894, -0.447)) / 74.0;
+    float along = dot(wp, vec2(0.447, 0.894)) / 140.0;
+    // One beam per band across (most bands have one), each at its own place, width and strength.
+    float bx = across + u_time * 0.008;
+    float bi = floor(bx);
+    float bf = fract(bx);
+    float centre = 0.25 + 0.5 * hash(vec2(bi, 1.3));
+    float halfW = mix(0.05, 0.2, hash(vec2(bi, 2.7)));
+    float lit = step(0.3, hash(vec2(bi, 4.1))) * mix(0.55, 1.0, hash(vec2(bi, 5.9)));
+    float shaft = lit * smoothstep(halfW, halfW * 0.3, abs(bf - centre));
+    // Fading in and out along each beam, and the canopy's slow flicker.
+    shaft *= 0.5 + 0.5 * smoothstep(0.25, 0.7, noise(vec2(along + bi * 3.1, 17.0 + u_time * 0.03)));
+    shaft *= 0.8 + 0.2 * noise(vec2(bi * 1.7, u_time * 0.3));
+    // Dust: a few motes glinting in the light.
+    vec2 cell = floor(wp / 3.0);
+    float mote = step(0.985, hash(cell + floor(u_time * 1.5) * 0.37)) * step(0.4, shaft);
+    // Strongest toward the top of the view (nearer the sky), never gone at the bottom.
+    float fall = 0.55 + 0.45 * smoothstep(1.1, 0.0, y);
+    c += u_rayColor * (shaft * fall + mote * 0.8) * u_rays;
   }
   o = vec4(c, 1.0);
 }`;

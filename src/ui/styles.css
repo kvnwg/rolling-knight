@@ -1583,6 +1583,61 @@ body,
   height: calc(6 * var(--px));
 }
 
+/* The squad, on light parchment (the pixel GUI's beige): a dark brown pixel border with a light inner
+   bevel, the face in a sunken beige slot, the name in brown ink, health one flat red in a dark
+   trough. The knight you steer has a green rim. */
+.member.plate {
+  border: 0;
+  border-image: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  clip-path: none;
+  background: #f0dfb8;
+  color: #3b2716;
+  padding: calc(2 * var(--px)) calc(3 * var(--px)) calc(2 * var(--px)) calc(2 * var(--px));
+  box-shadow:
+    inset var(--px) var(--px) 0 0 #fff4d8,
+    inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 0 #cfb07a,
+    0 0 0 var(--px) #4a2f1b,
+    0 calc(2 * var(--px)) 0 0 rgba(30, 16, 6, 0.35);
+}
+.member.plate.me {
+  background: #f5e8c8;
+  box-shadow:
+    inset var(--px) var(--px) 0 0 #fffbe8,
+    inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 0 #cfb07a,
+    0 0 0 var(--px) #2c6b30,
+    0 0 0 calc(2 * var(--px)) #5fbf4a,
+    0 calc(3 * var(--px)) 0 0 rgba(30, 16, 6, 0.35);
+}
+.member.plate .face {
+  background: #d9c08c;
+  box-shadow: inset 0 0 0 var(--px) #8a6640, inset 0 calc(-1 * var(--px)) 0 calc(var(--px)) var(--rc, #8a6640);
+}
+.member.plate .nm {
+  color: #3b2716;
+  text-shadow: none;
+  text-align: left;
+}
+.member.plate .bar {
+  border: 0;
+  border-image: none;
+  height: calc(5 * var(--px));
+  background: #4b3d5c;
+  box-shadow: 0 0 0 var(--px) #3b2716;
+  overflow: hidden;
+}
+.member.plate .bar > i {
+  inset: 0 auto 0 0;
+  max-width: 100%;
+  background: #e2454f;
+}
+
+/* Health is one flat color everywhere. */
+.bar.hp > i {
+  background: var(--c);
+}
+
 /* Ability slots: octagonal iron (brass when ready) round an enamel well, the icon inside, a stepped
    shadow sweeping round as it cools down; the name on a little plaque underneath. */
 .actions {

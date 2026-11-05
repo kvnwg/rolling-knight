@@ -98,9 +98,13 @@ export function App() {
       document.documentElement.style.setProperty('--px', `${uiPx()}px`);
       // The reveal and reel effects measure in --u (the same art pixel).
       document.documentElement.style.setProperty('--u', `${uiPx()}px`);
-      // The corner altar: smaller on a narrow screen, where it would cover the view.
+      // The corner altar: smaller on a narrow screen, where it would cover the view; much bigger on a
+      // desktop's wide screen, where there's room for it (in whole device pixels, so it stays crisp).
       const narrow = window.innerWidth < 600;
-      document.documentElement.style.setProperty('--mini-u', `${narrow ? Math.max(1.5, uiPx() * 0.6) : uiPx()}px`);
+      const desk = window.innerWidth >= 900 && window.innerWidth > window.innerHeight;
+      const dpr = window.devicePixelRatio || 1;
+      const miniU = narrow ? Math.max(1.5, uiPx() * 0.6) : desk ? Math.round(uiPx() * 1.7 * dpr) / dpr : uiPx();
+      document.documentElement.style.setProperty('--mini-u', `${miniU}px`);
       setWide(window.innerWidth >= 900 && window.innerWidth > window.innerHeight);
     };
     set();

@@ -1211,8 +1211,16 @@ function MiniReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
     // (Read where it's mounted: the roller sets its own --u from this.)
     const on = () => setU(readU(rootRef.current?.parentElement));
     on();
+    // Read it again once the app has set its sizes (a parent's effects run after this child's, so
+    // on the first pass --mini-u isn't there yet).
+    const raf = requestAnimationFrame(on);
+    const later = window.setTimeout(on, 300);
     window.addEventListener('resize', on);
-    return () => window.removeEventListener('resize', on);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(later);
+      window.removeEventListener('resize', on);
+    };
   }, []);
 
   useEffect(() => {
