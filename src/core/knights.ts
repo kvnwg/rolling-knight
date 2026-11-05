@@ -51,7 +51,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     id: 'blade', name: 'Blade', role: 'melee', roleName: 'Fighter',
     hp: 240, atk: 11.5, armor: 0.16, speed: 60, range: 24, atkCd: 0.55, dodgeCd: 0.5, specialCd: 9,
     auto: { name: 'Cleave', text: 'A wide sword slash where you aim; it sends foes\' shots back as your own.' },
-    dodge: { name: 'Shadowstep', text: 'A long, quick roll that leaves afterimages behind; ready again in half a second.' },
+    dodge: { name: 'Phantom Dash', text: 'A long, quick roll that leaves afterimages behind; ready again in half a second.' },
     special: { name: 'Whirlwind', text: 'Spins for 2 s, cutting everything around and moving freely.' },
     unlockRebirths: 0,
   },

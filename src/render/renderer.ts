@@ -303,7 +303,7 @@ const NO_PAINT = { recolor: {}, key: 'fx' } as const;
 
 /** How long the red flash lasts when the knight you steer is hit (s). */
 const HURT_FLASH = 0.2;
-/** The Shadowstep's afterimages: one every this many seconds of its dash, each lasting this long. */
+/** The Phantom Dash's afterimages: one every this many seconds of its dash, each lasting this long. */
 const SHADOW_EVERY = 0.035;
 const SHADOW_LIFE = 0.2;
 /** The aim's marks: the crosshair and the auto-aim's brackets, gold on an ink rim. */
@@ -397,7 +397,7 @@ export class Renderer {
   private seen = { uid: -1, grace: 0, swingT: 0 };
   /** How far above its feet each mob drawn this frame reaches (the auto-aim's brackets fit round it). */
   private mobTop = new Map<number, number>();
-  /** The Shadowstep's afterimages, by knight: silhouettes where it was drawn a moment ago (world time). */
+  /** The Phantom Dash's afterimages, by knight: silhouettes where it was drawn a moment ago (world time). */
   private heroTrails = new Map<number, { world: World; snaps: Array<{ x: number; y: number; ox: number; oy: number; c: HTMLCanvasElement; at: number }> }>();
 
   constructor(canvas: HTMLCanvasElement) {
@@ -1161,7 +1161,7 @@ export class Renderer {
       ctx.globalAlpha = pose.ghost.alpha;
       ctx.drawImage(frameCanvas(paint.sheet, pose.ghost.k, paint, true, pose.ghost.anim, pose.ghost.dir), sx(pose.ghost.x) - px, sy(pose.ghost.y) - py);
     }
-    // The Blade's Shadowstep leaves afterimages behind it: dark silhouettes, fading by steps.
+    // The Blade's Phantom Dash leaves afterimages behind it: dark silhouettes, fading by steps.
     this.shadowTrail(ctx, w, h, pose, paint, sx, sy, px, py);
     ctx.globalAlpha = pose.alpha * blink;
     ctx.drawImage(frameCanvas(paint.sheet, pose.k, paint, pose.flash, pose.anim, pose.dir), x, y);
@@ -1191,7 +1191,7 @@ export class Renderer {
   }
 
   /**
-   * The Shadowstep's afterimages (world/dash.ts): while a Blade dashes, where it was drawn a few
+   * The Phantom Dash's afterimages (world/dash.ts): while a Blade dashes, where it was drawn a few
    * frames back stays behind as a dark silhouette (Kevin's in ink), each fainter by steps, gone in a
    * moment. On the world's clock, so a hit-stop holds them too.
    */

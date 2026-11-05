@@ -74,7 +74,7 @@ const FIGHT = {
   dash_shot: def('Knights', 'The Ranger’s dash at a foe: the Power Shot it looses as the roll ends.', 'A heavy bowstring crack and a rising whistle.', 1, 2, 80),
   dash_snare: def('Knights', 'The Ranger’s dash away from the foes: the snare it leaves where it started.', 'A backflip’s whoosh and a trap set with a clack.', 0, 2, 80),
   snare_snap: def('Knights', 'A Ranger’s snare snapping shut on a foe.', 'Iron jaws snapping shut and a rope’s creak.', 1, 2, 80),
-  dash_shadow: def('Knights', 'The Blade’s dash, Shadowstep (Kevin’s too).', 'A dark, breathy swish.', 0, 2, 50),
+  dash_shadow: def('Knights', 'The Blade’s dash, Phantom Dash (Kevin’s too).', 'A dark, breathy swish.', 0, 2, 50),
   dash_bless: def('Knights', 'The Cleric’s dash, Blessed Step: the holy circle it leaves.', 'A soft whoosh into a warm chime.', 0, 2, 80),
   dash_blink: def('Knights', 'The Arcanist’s dash, Blink, and the arcane burst where it left.', 'A quick zip, a sparkle and a soft arcane pop.', 0, 2, 60),
   dash_lunge: def('Knights', 'The Lancer’s dash, Spear Lunge.', 'A fast rising rush and the spear’s sharp fwip.', 1, 2, 80),

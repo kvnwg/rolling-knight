@@ -98,7 +98,7 @@ function settle(w: World, h: Unit): void {
 
 describe('each class dashes its own way', () => {
   it('labels the dodge key with the class\'s move, and gives every class one', () => {
-    const want: Record<ClassId, string> = { guardian: 'SHIELD BASH', ranger: 'SHOT/SNARE', blade: 'SHADOWSTEP', cleric: 'BLESSED STEP', arcanist: 'BLINK', lancer: 'LUNGE' };
+    const want: Record<ClassId, string> = { guardian: 'SHIELD BASH', ranger: 'SHOT/SNARE', blade: 'PHANTOM', cleric: 'BLESSED STEP', arcanist: 'BLINK', lancer: 'LUNGE' };
     for (const cls of Object.keys(want) as ClassId[]) {
       expect(dashLabel({ cls })).toBe(want[cls]);
       expect(CLASSES[cls].dodge.name.length).toBeGreaterThan(3);
@@ -218,7 +218,7 @@ describe('each class dashes its own way', () => {
     expect(w.areas.filter((a) => a.kind === 'snare')).toHaveLength(0);
   });
 
-  it('blade (and Kevin): SHADOWSTEP, ready again in half a second, a little longer than a plain roll', () => {
+  it('blade (and Kevin): PHANTOM DASH, ready again in half a second, a little longer than a plain roll', () => {
     for (const id of [knightId('rare', 'blade'), KEVIN_ID]) {
       const w = world([id]);
       const h = w.heroes[0];

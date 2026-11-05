@@ -186,7 +186,7 @@ export function dodgeAnim(kind: NonNullable<Unit['rolling']>['kind'], sheet: PFS
     flip: [['backflip', true], ['roll', false], ['vault', false], ['dodge', true]],
     vault: [['vault', false], ['roll', false], ['backflip', true], ['dodge', true]],
     blink: [['dodge', true], ['roll', false], ['backflip', true], ['vault', false]],
-    // The Guardian's Shield Bash: shield up, charging; the Blade's Shadowstep: its roll; the Lancer's
+    // The Guardian's Shield Bash: shield up, charging; the Blade's Phantom Dash: its roll; the Lancer's
     // lunge: the thrust, held (heroPose holds these two rather than playing them through).
     bash: [['block_hold', false], ['roll', false], ['dodge', true]],
     shadow: [['roll', false], ['dodge', true], ['vault', false], ['backflip', true]],

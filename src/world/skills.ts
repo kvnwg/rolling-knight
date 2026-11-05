@@ -283,7 +283,7 @@ function shoot(w: World, h: Unit, dx: number, dy: number, o: { kind: 'arrow' | '
 export const ROLL_SAFE = 0.8;
 
 /**
- * The dodge: each class's dash (dash.ts: a Shield Bash, a Power Shot or a snare, a Shadowstep, a
+ * The dodge: each class's dash (dash.ts: a Shield Bash, a Power Shot or a snare, a Phantom Dash, a
  * Blessed Step, a Blink, a Spear Lunge) toward where you're moving (standing still: toward your aim;
  * a squadmate dashes the way its AI says), untouchable for most of it (ROLL_SAFE), then a short
  * landing; no attacking until it's over.

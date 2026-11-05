@@ -9,7 +9,7 @@
  *   ranger    SHOT/SNARE    toward the nearest foe: a POWER SHOT at it as the roll ends (a big piercing
  *                           arrow); away from it (or none near): a SNARE trap where the roll started, that
  *                           roots the first foe to step in (a boss is only slowed); two at a time
- *   blade     SHADOWSTEP    quick (the Blade's dodge cooldown is half a second), a little longer,
+ *   blade     PHANTOM       quick (the Blade's dodge cooldown is half a second), a little longer,
  *                           afterimages behind it (Kevin, a Blade, too)
  *   cleric    BLESSED STEP  a holy circle where it started that heals allies inside
  *   arcanist  BLINK         straight there, further, never through a wall; an arcane burst where it left
@@ -38,7 +38,7 @@ export interface DashDef {
 
 export const DASHES: Readonly<Record<ClassId, DashDef>> = {
   guardian: { name: 'Shield Bash', label: 'SHIELD BASH', kind: 'bash', dur: 0.3, dist: 46 },
-  blade: { name: 'Shadowstep', label: 'SHADOWSTEP', kind: 'shadow', dur: 0.34, dist: 66 },
+  blade: { name: 'Phantom Dash', label: 'PHANTOM', kind: 'shadow', dur: 0.34, dist: 66 },
   ranger: { name: 'Power Shot or Snare', label: 'SHOT/SNARE', kind: 'flip', dur: 0.36, dist: 78 },
   cleric: { name: 'Blessed Step', label: 'BLESSED STEP', kind: 'roll', dur: 0.3, dist: 54 },
   arcanist: { name: 'Blink', label: 'BLINK', kind: 'blink', dur: 0.2, dist: 78 },
