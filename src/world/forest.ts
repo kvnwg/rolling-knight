@@ -52,10 +52,20 @@ const DIM: Record<TreeKind, Record<TreeSize, readonly [w: number, h: number, und
   cactus: { bush: [10, 12, 0, 6], small: [16, 20, 0, 10], medium: [26, 34, 0, 7], huge: [36, 48, 0, 10] },
 };
 
-export function treeDims(kind: TreeKind, size: TreeSize): { w: number; h: number; under: number; trunk: number } {
-  const [w, h, under, trunk] = DIM[kind][size];
-  return { w, h, under, trunk };
+type Dims = Readonly<{ w: number; h: number; under: number; trunk: number }>;
+
+/** The sizes as records, made once (placing a floor's trees asks for them many thousand times). */
+const DIMS = Object.fromEntries(
+  Object.entries(DIM).map(([kind, sizes]) => [kind, Object.fromEntries(Object.entries(sizes).map(([size, [w, h, under, trunk]]) => [size, Object.freeze({ w, h, under, trunk })]))]),
+) as Record<TreeKind, Record<TreeSize, Dims>>;
+
+export function treeDims(kind: TreeKind, size: TreeSize): Dims {
+  return DIMS[kind][size];
 }
+
+/** The widest crown and the thickest trunk of any tree (how far apart two trees can still meet). */
+const MAX_W = Math.max(...Object.values(DIM).flatMap((s) => Object.values(s).map(([w]) => w)));
+const MAX_TRUNK = Math.max(...Object.values(DIM).flatMap((s) => Object.values(s).map(([, , , t]) => t)));
 
 type Style = 'garden' | 'orchard' | 'woods' | 'grove';
 
@@ -119,6 +129,26 @@ export function placeTrees(m: FloorMap, biome: Biome, rng: Rng): TreeProp[] {
   const H = m.h;
   const solidAt = (tx: number, ty: number) => tx < 0 || ty < 0 || tx >= W || ty >= H || m.tiles[ty * W + tx] === SOLID;
   const reservedAt = (tx: number, ty: number) => tx >= 0 && ty >= 0 && tx < W && ty < H && !!m.reserved?.[ty * W + tx];
+  // How many tiles a crown may not simply spread over (open floor, or a house's lot) lie in each
+  // rectangle from the map's corner, so any box of tiles can be asked about at once.
+  const sat = new Int32Array((W + 1) * (H + 1));
+  for (let ty = 0; ty < H; ty++) {
+    let row = 0;
+    for (let tx = 0; tx < W; tx++) {
+      if (!solidAt(tx, ty) || reservedAt(tx, ty)) row++;
+      sat[(ty + 1) * (W + 1) + tx + 1] = sat[ty * (W + 1) + tx + 1] + row;
+    }
+  }
+  /** Nothing but plain solid ground (or the dark past the map's edge) in this box of tiles? */
+  const clearBox = (tx0: number, ty0: number, tx1: number, ty1: number): boolean => {
+    const a = Math.max(0, tx0);
+    const b = Math.max(0, ty0);
+    const c = Math.min(W - 1, tx1);
+    const e = Math.min(H - 1, ty1);
+    if (a > c || b > e) return true;
+    const S = W + 1;
+    return sat[(e + 1) * S + c + 1] - sat[b * S + c + 1] - sat[(e + 1) * S + a] + sat[b * S + a] === 0;
+  };
   // Distance (tiles) from every solid tile to the nearest open one (two-pass chamfer).
   const dist = new Float32Array(W * H);
   for (let i = 0; i < W * H; i++) dist[i] = m.tiles[i] === SOLID ? 1e6 : 0;
@@ -148,8 +178,9 @@ export function placeTrees(m: FloorMap, biome: Biome, rng: Rng): TreeProp[] {
   const species = speciesOf(biome);
   // Species grow in patches (a stand of pines here, oaks there), not salt-and-pepper.
   const patchSeed = rng.int(0, 1 << 30);
+  const weight = species.reduce((a, [, w]) => a + w, 0);
   const kindAt = (px: number, py: number, salt: number): TreeKind => {
-    const n = (noise(px / 120, py / 120, patchSeed) * 0.75 + hashf(Math.floor(px), Math.floor(py), salt) * 0.25) * species.reduce((a, [, w]) => a + w, 0);
+    const n = (noise(px / 120, py / 120, patchSeed) * 0.75 + hashf(Math.floor(px), Math.floor(py), salt) * 0.25) * weight;
     let acc = 0;
     for (const [k, w] of species) {
       acc += w;
@@ -162,15 +193,16 @@ export function placeTrees(m: FloorMap, biome: Biome, rng: Rng): TreeProp[] {
   // Planned trees by 32 px cell, so neighbor checks only look nearby.
   const CELL = 32;
   const gw = Math.ceil((W * TILE) / CELL) + 1;
-  const buckets = new Map<number, Planned[]>();
-  const nearby = (x: number, y: number, reach: number, fn: (p: Planned) => boolean): boolean => {
+  const buckets: Array<Planned[] | undefined> = [];
+  /** Is `fn` true of any planned tree within `reach` px across (and `reachY` up and down)? */
+  const nearby = (x: number, y: number, reach: number, fn: (p: Planned) => boolean, reachY = reach): boolean => {
     const c0 = Math.max(0, Math.floor((x - reach) / CELL));
     const c1 = Math.floor((x + reach) / CELL);
-    const r0 = Math.max(0, Math.floor((y - reach) / CELL));
-    const r1 = Math.floor((y + reach) / CELL);
+    const r0 = Math.max(0, Math.floor((y - reachY) / CELL));
+    const r1 = Math.floor((y + reachY) / CELL);
     for (let r = r0; r <= r1; r++) {
       for (let c = c0; c <= c1; c++) {
-        const b = buckets.get(r * gw + c);
+        const b = buckets[r * gw + c];
         if (b) for (const p of b) if (fn(p)) return true;
       }
     }
@@ -186,8 +218,8 @@ export function placeTrees(m: FloorMap, biome: Biome, rng: Rng): TreeProp[] {
     const tx = Math.floor(x / TILE);
     const ty = Math.floor((y - 1) / TILE);
     // The foot and the trunk on solid ground, off any house's lot.
-    for (const ox of [-d.trunk / 2, 0, d.trunk / 2]) {
-      const fx = Math.floor((x + ox) / TILE);
+    for (let k = -1; k <= 1; k++) {
+      const fx = Math.floor((x + (k * d.trunk) / 2) / TILE);
       if (!solidAt(fx, ty) || reservedAt(fx, ty)) return false;
     }
     if (!solidAt(tx, Math.floor((y + 3) / TILE))) {
@@ -199,6 +231,8 @@ export function placeTrees(m: FloorMap, biome: Biome, rng: Rng): TreeProp[] {
     const x1 = x + d.w / 2;
     const y0 = y - d.h;
     const y1 = y - d.under;
+    // (A crown whose box is over plain solid ground everywhere fits without looking closer.)
+    if (clearBox(Math.floor(x0 / TILE), Math.floor(y0 / TILE), Math.floor(x1 / TILE), Math.floor(y1 / TILE))) return true;
     for (let py = y0; py <= y1; py += 5) {
       for (let px = x0; px <= x1; px += 5) {
         // An ellipse inside the crown box.
@@ -219,8 +253,10 @@ export function placeTrees(m: FloorMap, biome: Biome, rng: Rng): TreeProp[] {
   /** Does a crown of the new tree hide an existing tree's trunk, or the reverse? Are trunks too close? */
   const clashes = (x: number, y: number, kind: TreeKind, size: TreeSize, minGap: number): boolean => {
     const d = treeDims(kind, size);
-    // The farthest a clash can reach: the biggest crown's height or width.
-    return nearby(x, y, 110, (p) => {
+    // The farthest a clash can reach: up and down, the tallest crown; across, the widest crown's
+    // middle and a trunk (or two trunks and the gap).
+    const across = Math.max(MAX_W * 0.42 + MAX_TRUNK / 2, MAX_TRUNK + minGap) + 1;
+    return nearby(x, y, across, (p) => {
       const e = treeDims(p.kind, p.size);
       const gap = Math.hypot(p.x - x, (p.y - y) * 1.3);
       if (gap < (d.trunk + e.trunk) / 2 + minGap) return true;
@@ -234,7 +270,7 @@ export function placeTrees(m: FloorMap, biome: Biome, rng: Rng): TreeProp[] {
       const bd = frontIsNew ? e : d;
       const trunkTop = by - bd.under;
       return Math.abs(fx - bx) < fd.w * 0.42 + bd.trunk / 2 && by > fy - fd.h + 2 && trunkTop < fy - fd.under + 2;
-    });
+    }, 110);
   };
   const add = (x: number, y: number, kind: TreeKind, size: TreeSize, depth: number) => {
     // On raised ground, a tree whose foot would land on the ledge's face stands on its top edge.
@@ -246,9 +282,9 @@ export function placeTrees(m: FloorMap, biome: Biome, rng: Rng): TreeProp[] {
     const p: Planned = { x: Math.round(x), y: Math.round(y), kind, size, depth };
     planned.push(p);
     const k = Math.floor(p.y / CELL) * gw + Math.floor(p.x / CELL);
-    const b = buckets.get(k);
+    const b = buckets[k];
     if (b) b.push(p);
-    else buckets.set(k, [p]);
+    else buckets[k] = [p];
   };
 
   // ---- candidate spots: every solid tile, best first (near the floor), shuffled within a band
@@ -265,12 +301,31 @@ export function placeTrees(m: FloorMap, biome: Biome, rng: Rng): TreeProp[] {
     // together deeper in (the backdrop reads as woodland, never as an empty lawn).
     spots.sort((a, b) => a.d + a.r * 3 - (b.d + b.r * 3));
     const centers: Array<{ x: number; y: number; d: number }> = [];
+    // The centers so far by 104 px cell (wider than the widest spacing), so the spacing check looks
+    // only at the nine cells round a spot.
+    const CG = 104;
+    const cgw = Math.ceil((W * TILE) / CG) + 3;
+    const cgrid: Array<Array<{ x: number; y: number }> | undefined> = [];
+    const crowded = (x: number, y: number, gap: number) => {
+      const gx = Math.floor(x / CG) + 1;
+      const gy = Math.floor(y / CG) + 1;
+      for (let yy = gy - 1; yy <= gy + 1; yy++) {
+        for (let xx = gx - 1; xx <= gx + 1; xx++) {
+          const b = cgrid[yy * cgw + xx];
+          if (b) for (const c of b) if (Math.hypot(c.x - x, (c.y - y) * 1.15) < gap) return true;
+        }
+      }
+      return false;
+    };
     for (const s of spots) {
       // Open lawns here and there: no clumps where the low noise dips.
       if (s.d > 1.5 && noise(s.x / 140, s.y / 140, patchSeed + 13) < (grove ? 0.26 : 0.2)) continue;
       const spacing = (grove ? 5.6 : s.d <= 4 ? 5.2 : 4.5) * TILE;
-      if (centers.some((c) => Math.hypot(c.x - s.x, (c.y - s.y) * 1.15) < spacing * (0.85 + s.r * 0.3))) continue;
-      centers.push({ x: s.x + rng.int(-6, 6), y: s.y + rng.int(-4, 4), d: s.d });
+      if (crowded(s.x, s.y, spacing * (0.85 + s.r * 0.3))) continue;
+      const c = { x: s.x + rng.int(-6, 6), y: s.y + rng.int(-4, 4), d: s.d };
+      centers.push(c);
+      const k = (Math.floor(c.y / CG) + 1) * cgw + Math.floor(c.x / CG) + 1;
+      (cgrid[k] ??= []).push(c);
     }
     for (const c of centers) {
       // One big tree with smaller ones round it, often a dark conifer tucked in, bushes at its feet.
@@ -294,7 +349,7 @@ export function placeTrees(m: FloorMap, biome: Biome, rng: Rng): TreeProp[] {
           const r = k === 0 ? rng.next() * 6 : (d0.w * 0.4 + treeDims(leadKind, sizes[0]).w * 0.26) * (0.8 + rng.next() * 0.3);
           const x = c.x + Math.cos(a) * r;
           const y = c.y + Math.sin(a) * r * 0.6;
-          if (!fits(x, y, kind, size, 10) || clashes(x, y, kind, size, grove ? 8 : 3)) continue;
+          if (clashes(x, y, kind, size, grove ? 8 : 3) || !fits(x, y, kind, size, 10)) continue;
           add(x, y, kind, size, 0);
           members.push({ x, y, kind, size });
           done = true;
@@ -311,7 +366,7 @@ export function placeTrees(m: FloorMap, biome: Biome, rng: Rng): TreeProp[] {
           for (let tries = 0; tries < 6; tries++) {
             const x = m0.x + (rng.next() - 0.5) * d0.w * 0.9;
             const y = m0.y + 4 + rng.next() * 8;
-            if (!fits(x, y, kind, 'bush', 8) || clashes(x, y, kind, 'bush', 2)) continue;
+            if (clashes(x, y, kind, 'bush', 2) || !fits(x, y, kind, 'bush', 8)) continue;
             add(x, y, kind, 'bush', 0);
             break;
           }
@@ -371,9 +426,12 @@ export function placeTrees(m: FloorMap, biome: Biome, rng: Rng): TreeProp[] {
       for (const size of sizes) {
         const d = treeDims(kind, size);
         // Trunks keep a tree's width or so apart (crowns overlap), more deeper in.
-        const near = nearby(x, y, 70, (p) => Math.hypot(p.x - x, (p.y - y) * 1.5) < (d.w + treeDims(p.kind, p.size).w) * (depth === 0 ? 0.3 : 0.36));
+        const apart = depth === 0 ? 0.3 : 0.36;
+        // (Only a tree this close across, and two thirds of that up and down, can be too close.)
+        const across = Math.min(70, (d.w + MAX_W) * apart + 1);
+        const near = nearby(x, y, across, (p) => Math.hypot(p.x - x, (p.y - y) * 1.5) < (d.w + treeDims(p.kind, p.size).w) * apart, Math.min(70, across / 1.5 + 1));
         if (near) continue;
-        if (!fits(x, y, kind, size, 14) || clashes(x, y, kind, size, 3)) continue;
+        if (clashes(x, y, kind, size, 3) || !fits(x, y, kind, size, 14)) continue;
         add(x, y, kind, size, depth);
         break;
       }
@@ -404,12 +462,15 @@ export function placeTrees(m: FloorMap, biome: Biome, rng: Rng): TreeProp[] {
 /** True if (px, py) lies on the floor more than `overhang` px from any solid tile. */
 function floorDepth(m: FloorMap, px: number, py: number, overhang: number): boolean {
   const r = overhang;
-  for (const [ox, oy] of [[-r, 0], [r, 0], [0, -r], [0, r], [-r * 0.7, -r * 0.7], [r * 0.7, -r * 0.7], [-r * 0.7, r * 0.7], [r * 0.7, r * 0.7]] as const) {
-    const tx = Math.floor((px + ox) / TILE);
-    const ty = Math.floor((py + oy) / TILE);
-    if (tx < 0 || ty < 0 || tx >= m.w || ty >= m.h || m.tiles[ty * m.w + tx] === SOLID) return false;
-  }
-  return true;
+  const d = r * 0.7;
+  return open(m, px - r, py) && open(m, px + r, py) && open(m, px, py - r) && open(m, px, py + r) && open(m, px - d, py - d) && open(m, px + d, py - d) && open(m, px - d, py + d) && open(m, px + d, py + d);
+}
+
+/** On the map and not solid. */
+function open(m: FloorMap, x: number, y: number): boolean {
+  const tx = Math.floor(x / TILE);
+  const ty = Math.floor(y / TILE);
+  return !(tx < 0 || ty < 0 || tx >= m.w || ty >= m.h || m.tiles[ty * m.w + tx] === SOLID);
 }
 
 function hashf(x: number, y: number, s: number): number {

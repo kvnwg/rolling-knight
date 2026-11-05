@@ -124,6 +124,16 @@ export interface GameState {
     checkpoint: number;
     biomeSeed: number;
     deaths: number;
+    /**
+     * The deck of floor designs (core/deck.ts): those still to deal, next first. Every floor entered
+     * takes the top one; an empty deck is shuffled anew.
+     */
+    designDeck: string[];
+    /** The design the last floor was built to (a fresh deck never opens with it). */
+    lastDesign: string | null;
+    /** Floors entered this run, every return to one counted: part of each floor's seed, so a floor
+     * you come back to is a new map. */
+    visits: number;
   };
 
   codex: Record<string, { count: number; best: MutationId | null; firstAt: number }>;
@@ -144,4 +154,5 @@ export interface GameState {
   quests: Quest[];
 }
 
-export const SAVE_VERSION = 1;
+/** 2: the run keeps a deck of floor designs (designDeck, lastDesign) and counts floor visits. */
+export const SAVE_VERSION = 2;

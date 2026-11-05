@@ -818,9 +818,15 @@ function tickStatus(w: World, u: Unit, dt: number): void {
   }
 }
 
-/** Units push each other apart a little (heroes and mobs alike). */
+/**
+ * Units push each other apart a little (heroes and mobs alike). The knight in the lead shoulders its
+ * squadmates aside and they barely push it back: turning back through a corridor, it's never pinned
+ * by the squad trailing it.
+ */
 function separate(w: World): void {
   const all = [...w.heroes.filter((h) => !h.downed && !h.rolling), ...w.mobs.filter((m) => !m.dead)];
+  const lead = w.leader();
+  const give = (u: Unit, other: Unit) => (u.boss ? 0.1 : u === lead && other.team === 'hero' ? 0.15 : 1);
   for (let i = 0; i < all.length; i++) {
     for (let j = i + 1; j < all.length; j++) {
       const a = all[i];
@@ -834,8 +840,8 @@ function separate(w: World): void {
       const push = (min - d) * 0.5;
       const nx = dx / d;
       const ny = dy / d;
-      const wa = a.boss ? 0.1 : 1;
-      const wb = b.boss ? 0.1 : 1;
+      const wa = give(a, b);
+      const wb = give(b, a);
       moveUnit(w.map, a, -nx * push * wa, -ny * push * wa);
       moveUnit(w.map, b, nx * push * wb, ny * push * wb);
     }

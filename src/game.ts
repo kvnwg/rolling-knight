@@ -3,6 +3,7 @@
  * the renderer read from here; input and menu actions call in. Nothing here touches the DOM.
  */
 import { BAL } from './core/balance';
+import { drawDesign } from './core/deck';
 import type { CoreEvent } from './core/events';
 import { knightDef } from './core/knights';
 import { currentLuck } from './core/luck';
@@ -137,8 +138,12 @@ export class Game {
     const biome = biomeForFloor(floor, s.run.biomeSeed);
     this.biome = biome;
     const boss = isBossFloor(floor);
-    const seed = (s.run.biomeSeed ^ Math.imul(floor, 2654435761) ^ Math.imul(s.run.deaths + 1, 40503)) >>> 0;
-    const map = generateFloor({ floor, biome, seed, boss });
+    // Every time a floor is entered (a return to one too) it's a new map, built to the next design in
+    // the deck: none comes round again until all have been played.
+    s.run.visits = (s.run.visits ?? 0) + 1;
+    const design = drawDesign(s.run, Rng.hashSeed(s.run.biomeSeed ^ Math.imul(s.run.visits, 0x9e3779b1)));
+    const seed = (s.run.biomeSeed ^ Math.imul(floor, 2654435761) ^ Math.imul(s.run.deaths + 1, 40503) ^ Math.imul(s.run.visits, 0x2c1b3c6d)) >>> 0;
+    const map = generateFloor({ floor, biome, seed, boss, design });
     const mobTypes = floorMobs(biome, floor, seed);
     this.difficulty = floorDifficulty(floor, squadPower(s));
     s.quests ??= [];
@@ -167,6 +172,8 @@ export class Game {
     this.fadeDir = -1;
     // The tutorial's beginner's luck comes about 45 s after the first floor opens.
     if (s.roll.tutorial === 'beginner' && s.roll.beginnerAt === null) s.roll.beginnerAt = s.playTimeMs + BAL.tutorial.beginnerAfterSeconds * 1000;
+    // Saved now, so the card just dealt stays dealt even if the game closes straight away.
+    saveGame(s);
     this.emit({ type: 'floorStart', floor, biome: biome.name, boss });
     this.version++;
   }

@@ -124,21 +124,26 @@ if (what === 'houses') {
   console.log('wrote', out);
 }
 
-if (what === 'floor') {
-  // A whole floor, ground, props and mobs, under the biome's ambient light:
-  //   npx tsx tools/preview.ts floor out.png farmland 7 1234 [y0] [h]
+/**
+ * A whole floor, ground, props and mobs, under the biome's light: 'ambient' (the scene's light
+ * multiplied over it, as in the game), 'soft' (most of the way to daylight, for reading a dark
+ * floor's layout) or 'raw'. `design` picks the floor design (designs.ts; the chain when left out).
+ */
+async function paintFloor(biomeId: string, floor: number, seed: number, design: string | undefined, light: 'ambient' | 'soft' | 'raw', amb?: number) {
   const { BIOMES, isBossFloor } = await import('../src/world/biomes');
   const { generateFloor } = await import('../src/world/mapgen');
+  const { isDesign } = await import('../src/core/deck');
   const { floorMobs, floorBoss } = await import('../src/world/mobgen');
   const { paintTerrainPixels } = await import('../src/render/terrain');
   const { propArt, treeArt } = await import('../src/render/art/props');
   const { mobFrame } = await import('../src/render/art/mobs');
   const { rgb } = await import('../src/render/pixel/buf');
-  const biome = BIOMES[(process.argv[4] ?? 'farmland') as keyof typeof BIOMES];
-  const floor = Number(process.argv[5] ?? 7);
-  const seed = Number(process.argv[6] ?? 1234);
+  const biome = BIOMES[biomeId as keyof typeof BIOMES];
   const boss = isBossFloor(floor);
-  const m = generateFloor({ floor, biome, seed, boss });
+  if (design !== undefined && !isDesign(design)) throw new Error(`no design called ${design}`);
+  const t0 = performance.now();
+  const m = generateFloor({ floor, biome, seed, boss, design });
+  const ms = performance.now() - t0;
   const t = paintTerrainPixels(m, biome);
   const img: PixelBuf = { w: t.w, h: t.h, px: t.px };
   const types = floorMobs(biome, floor, seed);
@@ -157,10 +162,10 @@ if (what === 'floor') {
   });
   list.sort((a, b) => a.y - b.y);
   for (const d of list) d.draw();
-  if (process.env.AMB) {
+  if (amb !== undefined) {
     // The ambient life at a moment (AMB=seconds), painted into the picture.
     const { Ambient } = await import('../src/render/ambient');
-    const amb = new Ambient(m, biome);
+    const ambient = new Ambient(m, biome);
     let style = '#000000';
     let alpha = 1;
     const paint = {
@@ -178,23 +183,112 @@ if (what === 'floor') {
         }
       },
     };
-    const t = Number(process.env.AMB);
-    amb.drawGround(paint as never, 0, 0, img.w, img.h, t);
-    amb.drawAir(paint as never, 0, 0, img.w, img.h, t);
+    ambient.drawGround(paint as never, 0, 0, img.w, img.h, amb);
+    ambient.drawAir(paint as never, 0, 0, img.w, img.h, amb);
   }
   // The light, roughly: the ambient multiplied over everything.
-  const [ar, ag, ab] = process.env.RAW ? [255, 255, 255] : rgb(biome.light.ambient);
+  let [ar, ag, ab] = light === 'raw' ? [255, 255, 255] : rgb(biome.light.ambient);
+  if (light === 'soft') [ar, ag, ab] = [ar, ag, ab].map((c) => (c + 255 * 1.4) / 2.4);
   for (let i = 0; i < img.px.length; i += 4) {
-    img.px[i] = (img.px[i] * ar) / 255;
-    img.px[i + 1] = (img.px[i + 1] * ag) / 255;
-    img.px[i + 2] = (img.px[i + 2] * ab) / 255;
+    img.px[i] = Math.min(255, (img.px[i] * ar) / 255);
+    img.px[i + 1] = Math.min(255, (img.px[i + 1] * ag) / 255);
+    img.px[i + 2] = Math.min(255, (img.px[i + 2] * ab) / 255);
   }
+  return { img, m, types, bossType, ms };
+}
+
+/** A smaller copy (each k by k block averaged). */
+function shrink(b: PixelBuf, k: number): PixelBuf {
+  const out = blank(Math.floor(b.w / k), Math.floor(b.h / k));
+  for (let y = 0; y < out.h; y++) {
+    for (let x = 0; x < out.w; x++) {
+      let r = 0;
+      let g = 0;
+      let bl = 0;
+      for (let yy = 0; yy < k; yy++) {
+        for (let xx = 0; xx < k; xx++) {
+          const i = ((y * k + yy) * b.w + x * k + xx) * 4;
+          r += b.px[i];
+          g += b.px[i + 1];
+          bl += b.px[i + 2];
+        }
+      }
+      const o = (y * out.w + x) * 4;
+      out.px[o] = r / (k * k);
+      out.px[o + 1] = g / (k * k);
+      out.px[o + 2] = bl / (k * k);
+      out.px[o + 3] = 255;
+    }
+  }
+  return out;
+}
+
+if (what === 'floor') {
+  // A whole floor, ground, props and mobs, under the biome's ambient light:
+  //   npx tsx tools/preview.ts floor out.png farmland 7 1234 [y0] [h] [scale]
+  // DESIGN=loop picks the floor design (designs.ts), RAW=1 skips the light, SOFT=1 softens it, and
+  // AMB=seconds paints the ambient life at that moment.
+  const light = process.env.RAW ? 'raw' : process.env.SOFT ? 'soft' : 'ambient';
+  const amb = process.env.AMB ? Number(process.env.AMB) : undefined;
+  const { img, m, types, bossType, ms } = await paintFloor(process.argv[4] ?? 'farmland', Number(process.argv[5] ?? 7), Number(process.argv[6] ?? 1234), process.env.DESIGN, light, amb);
   const y0 = Number(process.argv[7] ?? 0);
   const h = Math.min(img.h - y0, Number(process.argv[8] ?? img.h));
   const crop = blank(img.w, h);
   crop.px.set(img.px.subarray(y0 * img.w * 4, (y0 + h) * img.w * 4));
   writePng(out, crop, Number(process.argv[9] ?? 1));
-  console.log('wrote', out, `${m.w}x${m.h} tiles`, types.map((x) => `${x.name} (${x.plan}/${x.behavior})`).join(', '), bossType ? `boss: ${bossType.name}, ${bossType.boss!.title}` : '');
+  console.log('wrote', out, `${m.design}, ${m.w}x${m.h} tiles, built in ${ms.toFixed(1)} ms;`, types.map((x) => `${x.name} (${x.plan}/${x.behavior})`).join(', '), bossType ? `boss: ${bossType.name}, ${bossType.boss!.title}` : '');
+}
+
+if (what === 'designs') {
+  // A contact sheet: every floor design (columns) in a few biomes (rows), and a row of boss floors,
+  // each shrunk k times and labeled:
+  //   npx tsx tools/preview.ts designs shots/floors_designs.png [hamlet,forest,crypt,desert] [floor] [seed] [k] [bossBiome]
+  const { FLOOR_DESIGNS } = await import('../src/core/deck');
+  const { DESIGNS } = await import('../src/world/designs');
+  const { BIOMES } = await import('../src/world/biomes');
+  const { renderText } = await import('../src/render/pixel/font');
+  const biomes = (process.argv[4] ?? 'hamlet,forest,crypt,desert').split(',');
+  const floor = Number(process.argv[5] ?? 7);
+  const seed = Number(process.argv[6] ?? 1234);
+  const k = Number(process.argv[7] ?? 4);
+  const bossBiome = process.argv[8] ?? 'shrine';
+  const rows: Array<{ biome: string; floor: number }> = [...biomes.map((b) => ({ biome: b, floor })), ...(bossBiome === 'none' ? [] : [{ biome: bossBiome, floor: Math.ceil(floor / 5) * 5 + 5 }])];
+  // DESIGNS=loop,maze shows just those.
+  const shown = process.env.DESIGNS ? FLOOR_DESIGNS.filter((d) => process.env.DESIGNS!.split(',').includes(d)) : FLOOR_DESIGNS;
+  const cells: PixelBuf[][] = [];
+  for (const row of rows) {
+    const line: PixelBuf[] = [];
+    for (const d of shown) {
+      const { img, ms } = await paintFloor(row.biome, row.floor, seed + row.floor, d, 'soft');
+      line.push(shrink(img, k));
+      console.log(`${row.biome} ${row.floor} ${d}: ${ms.toFixed(1)} ms`);
+    }
+    cells.push(line);
+  }
+  const pad = 6;
+  const label = 12;
+  const left = 64;
+  const colW = shown.map((_, c) => Math.max(...cells.map((line) => line[c].w)));
+  const rowH = cells.map((line) => Math.max(...line.map((b) => b.h)) + label);
+  const sheet = blank(colW.reduce((a, w) => a + w + pad, pad + left), rowH.reduce((a, h) => a + h + pad, pad + 14));
+  fill(sheet, '#1b1d26');
+  const text = (s: string, x: number, y: number, color: string) => blit(sheet, renderText(s.toUpperCase(), { face: 'small', fill: color }), x, y);
+  text('Rolling Knight: floor designs, dealt from a shuffled deck (none repeats till all are played)', pad, 3, '#ffd27a');
+  let y = pad + 14;
+  cells.forEach((line, r) => {
+    const { biome, floor: f } = rows[r];
+    text(BIOMES[biome as keyof typeof BIOMES].name, 3, y + label + 2, '#c8d0e0');
+    text(f % 5 === 0 ? `boss floor ${f}` : `floor ${f}`, 3, y + label + 10, f % 5 === 0 ? '#ff9a7a' : '#8a92a8');
+    let x = pad + left;
+    line.forEach((b, c) => {
+      text(DESIGNS[shown[c]].name, x, y, '#f2e6c8');
+      blit(sheet, b, x + Math.floor((colW[c] - b.w) / 2), y + label);
+      x += colW[c] + pad;
+    });
+    y += rowH[r] + pad;
+  });
+  writePng(out, sheet, 1);
+  console.log('wrote', out, `${sheet.w}x${sheet.h}`);
 }
 
 if (what === 'farm') {
