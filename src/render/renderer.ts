@@ -71,8 +71,9 @@ const FX_LIGHT: Partial<Record<FxName, [string, number]>> = {
   lightning: ['#d88aff', 36], heal: ['#fff0a0', 44], electric: ['#b08aff', 60], slash: ['#ffffff', 18],
 };
 
-/** Target art pixels on the screen's short side. */
+/** Target art pixels on the screen's short side; a phone comes in closer (about 236 across a 3x iPhone, was 295). */
 const SHORT_SIDE = 270;
+const PHONE_SHORT_SIDE = 230;
 /**
  * At the hub the view comes in much closer (a phone held upright shows about 150 art px across, and
  * a desktop the same from its short side): the hub is one cozy shop front, painted to fill the screen.
@@ -171,7 +172,8 @@ export class Renderer {
     const dpr = Math.min(3, window.devicePixelRatio || 1);
     const cw = Math.floor(window.innerWidth * dpr);
     const ch = Math.floor(window.innerHeight * dpr);
-    let P = Math.max(2, Math.round(Math.min(cw, ch) / (this.hubZoom ? HUB_SHORT_SIDE : SHORT_SIDE)));
+    const phone = Math.min(window.innerWidth, window.innerHeight) < 600;
+    let P = Math.max(2, Math.round(Math.min(cw, ch) / (this.hubZoom ? HUB_SHORT_SIDE : phone ? PHONE_SHORT_SIDE : SHORT_SIDE)));
     // The hub is one painting: closer still where the view would reach past its edges (no void).
     if (this.hubZoom) P = Math.max(P, Math.ceil(cw / HUB_W), Math.ceil(ch / HUB_H));
     this.P = P;
@@ -1597,17 +1599,12 @@ const DEFAULT_GRADE: Grade = {
 /** Biomes in daylight. */
 const DAYLIGHT: ReadonlySet<string> = new Set(['hamlet', 'farmland', 'desert', 'tundra']);
 
-/** How strong the sun rays are per biome (0 none). */
+/** How strong the sun rays are per biome: only where there's daylight (none in the dark ones). */
 const RAYS: Readonly<Record<string, number>> = {
   hamlet: 0.2,
   farmland: 0.2,
-  forest: 0.26,
-  shrine: 0.2,
-  swamp: 0.16,
   desert: 0.12,
   tundra: 0.1,
-  crystal: 0.1,
-  graveyard: 0.09,
 };
 
 /**
@@ -1642,9 +1639,9 @@ function gradeOf(b: Biome, sky: Sky | null): Grade {
   return {
     haze: wet ? [0.74, 0.79, 0.86] : v3(b.light.fog ?? b.light.gradeTop),
     hazeAmount: wet ? 0.07 : b.light.fog ? 0.2 : indoor ? 0.06 : day ? 0.04 : 0.1,
-    // Sun rays where the sun gets in: strong in the woods and over sunny lawns, misty in the swamp,
-    // faint over snow and sand (already bright), none indoors or in rain, weaker under cloud.
-    rays: indoor || wet ? 0 : (RAYS[b.id] ?? 0) * (grey ? 0.35 : 1),
+    // Sun rays only where it's daylight: over the hamlet and the farm, fainter over sand and snow
+    // (already bright); none in the dark places, indoors or in rain, weaker under cloud.
+    rays: indoor || wet || !day ? 0 : (RAYS[b.id] ?? 0) * (grey ? 0.35 : 1),
     rayColor: day ? v3(mixHex(b.light.gradeTop, '#fff6e6', 0.6)) : v3(b.light.gradeTop),
     shadowTint: grey ? tint('#4a5a7a', 0.3) : tint(b.light.gradeBottom, day ? 0.25 : 0.35),
     highlightTint: grey ? tint('#e8f0ff', 0.12) : tint(b.light.gradeTop, day ? 0.09 : 0.22),

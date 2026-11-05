@@ -41,13 +41,14 @@ How every system works, with its numbers: [`DESIGN.md`](DESIGN.md). Art sources 
   lanterns, braziers, lava, crystals, spells and the knights themselves light it in stepped bands
   with bloom, then a grade and a vignette. Daylight is lifted near white; out in the open each floor
   rolls its weather (clear, overcast, or rain with splashes, rings on water and a rain sound), and
-  cloud shadows drift over sunny floors. Weather per biome too: fireflies, snow, embers, petals, fog.
+  cloud shadows drift over sunny floors, with shafts of sunlight slanting down through the air in
+  daylight (never in the dark places, indoors or in rain). Weather per biome too: fireflies, snow, embers, petals, fog.
 - Tilt-shift: the picture goes soft above and below the band your knight stands in (trees, props and
   all, the ground most), so the dungeon looks like a miniature; a soft glow lets every light bleed a
   little into the shadows round it. Gentler indoors (crypts, lava caves); the hub is softer and
   glowier still. A switch in Settings turns the tilt-shift off.
-- One pixel size: everything is drawn at art resolution (about 270 art pixels on the screen's short
-  side) and scaled up by a whole number. The camera follows on a critically damped spring and scrolls
+- One pixel size: everything is drawn at art resolution (about 270 art pixels on a desktop's short
+  side, about 230 across a phone, 150 at the hub) and scaled up by a whole number. The camera follows on a critically damped spring and scrolls
   by sub-pixels in the shader, so the world glides while every sprite stays on the grid.
 - The UI wears the medieval pack's materials, painted in code at startup (`src/ui/skin.ts`): bevelled
   wooden, brass, crimson, steel and arcane buttons with a lip; dark plates with iron bolts; the pack's
