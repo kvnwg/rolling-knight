@@ -27,6 +27,7 @@ import { paintTerrain, type Terrain } from './terrain';
 import { Rain } from './rain';
 import { Ambient } from './ambient';
 import { HubPaint } from './hubPaint';
+import { HUB_H, HUB_W } from '../world/hub';
 import type { Sky } from '../world/sky';
 import { npcFrame, questMarker } from './art/npcs';
 import { npcMarker } from '../world/npcs';
@@ -72,6 +73,13 @@ const FX_LIGHT: Partial<Record<FxName, [string, number]>> = {
 
 /** Target art pixels on the screen's short side. */
 const SHORT_SIDE = 270;
+/**
+ * At the hub the view comes in much closer (a phone held upright shows about 150 art px across, and
+ * a desktop the same from its short side): the hub is one cozy shop front, painted to fill the screen.
+ */
+const HUB_SHORT_SIDE = 150;
+/** Where your knight sits on the hub's screen, top to bottom: low, looking up the court at the shop. */
+const HUB_FOCUS_Y = 0.72;
 
 /** PixelForge FX are drawn in their own colors. */
 const NO_PAINT = { recolor: {}, key: 'fx' } as const;
@@ -131,6 +139,8 @@ export class Renderer {
   private ambient: Ambient | null = null;
   /** The painted hub, built the first time it's shown. */
   private hubPaint: HubPaint | null = null;
+  /** The layers are sized for the hub's closer zoom (true) or everywhere else's. */
+  private hubZoom = false;
   /** The view's whole-pixel top-left in world pixels, this frame. */
   private origin = { x: 0, y: 0 };
   private flashT = 0;
@@ -156,17 +166,22 @@ export class Renderer {
     this.resize();
   }
 
+  /** Fits the canvas to the window and the art layers to the zoom (call again when either changes). */
   resize(): void {
     const dpr = Math.min(3, window.devicePixelRatio || 1);
     const cw = Math.floor(window.innerWidth * dpr);
     const ch = Math.floor(window.innerHeight * dpr);
-    this.P = Math.max(2, Math.round(Math.min(cw, ch) / SHORT_SIDE));
+    let P = Math.max(2, Math.round(Math.min(cw, ch) / (this.hubZoom ? HUB_SHORT_SIDE : SHORT_SIDE)));
+    // The hub is one painting: closer still where the view would reach past its edges (no void).
+    if (this.hubZoom) P = Math.max(P, Math.ceil(cw / HUB_W), Math.ceil(ch / HUB_H));
+    this.P = P;
     this.W = Math.ceil(cw / this.P);
     this.H = Math.ceil(ch / this.P);
     this.vw = cw / this.P;
     this.vh = ch / this.P;
-    this.canvas.width = cw;
-    this.canvas.height = ch;
+    // (Setting a canvas's size clears it even when it's the same: only when the window changed.)
+    if (this.canvas.width !== cw) this.canvas.width = cw;
+    if (this.canvas.height !== ch) this.canvas.height = ch;
     this.canvas.style.width = `${window.innerWidth}px`;
     this.canvas.style.height = `${window.innerHeight}px`;
     this.scene.width = this.LW;
@@ -238,6 +253,11 @@ export class Renderer {
   /** Draws a frame of `scene`: the floor you're on, or the hub between dives. */
   render(game: Game, dt: number, scene: World | null = game.world): void {
     this.time += dt;
+    // Going into or out of the hub changes the zoom, and with it the size of every art layer.
+    if (scene && scene.hub !== this.hubZoom) {
+      this.hubZoom = scene.hub;
+      this.resize();
+    }
     const g = this.sctx;
     const st = this.layers.stand.x;
     const em = this.layers.emit.x;
@@ -269,7 +289,9 @@ export class Renderer {
       viewW: this.vw,
       viewH: this.vh,
       focusX: this.focus.x,
-      focusY: this.focus.y,
+      focusY: w.hub ? HUB_FOCUS_Y : this.focus.y,
+      // The hub is a painting with nothing past its edges: the view stays inside it.
+      margin: w.hub ? 0 : undefined,
       lead,
       foes: w.mobs,
       rewinding: !!w.rewind,
@@ -316,7 +338,8 @@ export class Renderer {
     }
     this.ambient?.drawGround(g, cx, cy, this.LW, this.LH, this.time);
     if (!shader && game.state.settings.tiltShift && lead) this.tiltShift(g, sy(lead.y) - 6, w.biome.layout === 'rooms' ? 0.5 : 1);
-    this.drawPortal(g, em, w, sx, sy);
+    // (The hub paints its own way down: its steps, and the glow at their foot.)
+    if (!hub) this.drawPortal(g, em, w, sx, sy);
     for (const a of w.areas) this.drawArea(g, em, a, sx, sy);
 
     // --- PixelForge: knight poses for this frame, and mobs that just died start their deaths
@@ -1248,7 +1271,8 @@ export class Renderer {
     // The squad carries a little light; in bright places hardly any (it would wash the scene out).
     const [ar, ag, ab] = rgb(biome.light.ambient);
     const ambLum = (ar * 0.299 + ag * 0.587 + ab * 0.114) / 255;
-    const carry = Math.max(0.06, Math.min(0.75, (0.72 - ambLum) * 1.5));
+    // (At the hub the shop lights the court: a knight there carries less.)
+    const carry = Math.max(0.06, Math.min(0.75, (0.72 - ambLum) * 1.5)) * (w.hub ? 0.55 : 1);
     for (const h of w.heroes) {
       if (h.downed) continue;
       const mine = h.slot === w.controlled;

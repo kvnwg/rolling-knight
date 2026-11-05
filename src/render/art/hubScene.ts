@@ -1,17 +1,30 @@
 /**
- * Puts the hub together: paints the ground, every standing piece (with its glowing parts and the
- * lights it carries), the framing leaves, and places the keepers. world/hub.ts wraps this with the
- * collision grid and caches it. All positions are hub pixels (480 x 640).
+ * Puts the hub together: one cozy shop front at night, painted to fill a phone held upright. The
+ * Gilded Reel's timber front under its dark roof across the top (the reel sign glowing in the gable,
+ * the lit window, the open door with the Oracle in it, the curio cabinet, the notice board, the
+ * tinker's shelves); a short court of big warm flagstones in front of it with the quartermaster at
+ * her round table, the sage in his chair, the priestess at her candle shrine and the smith at his
+ * anvil and coals, every bit of floor next to something; the dark stone steps going down at the foot
+ * of the court, the warden beside them; lush leaves framing it all, going dark toward the edges.
+ *
+ * It paints the ground, every standing piece (with its glowing parts and the lights it carries), the
+ * framing leaves, and places the keepers; world/hub.ts wraps this with the collision grid and caches
+ * it. All positions are hub pixels (HUB_ART_W x HUB_ART_H): the court is the middle 168 px or so, and
+ * past it leaves and the roof fill out what a wide screen shows.
  */
 import type { HubFigure, HubFore, HubGlow, HubGrade, HubLight, HubMotes, HubSprite, HubStation } from '../../world/hub';
 import { bounds, crop, type PixelBuf } from '../pixel/buf';
 import { paintHubGround, type GroundSpec, type ShadowSpec } from './hubGround';
 import { vnoise, type Layer } from './hubKit';
-import { paintShop } from './hubShop';
+import { paintShop, SHOP } from './hubShop';
 import { HUB_CAST } from './hubNpcs';
-import { canopy, edgeGreens, fireflies, frontLeaves } from './hubFoliage';
-import { barrelPiece, bench, cat, crateStack, gate, lampPost, lightString, noticeBoard, pottedPalm, sageCorner, scrapStall, shrine, smithy } from './hubStations';
-import { chair, chalkboard, flowerBench, outfitterShelves, planter, pottedBush, stool, stumpTable, tavernStall } from './hubStalls';
+import { canopy, courtGreens, edgeGreens, fireflies, frontLeaves, stepsGarden } from './hubFoliage';
+import { barrelPiece, cat, chair, crates, flowerPot, GLAZE, postLamp, pottedBush, pottedPlant, roundTable, sageChair, scrapCrate, stool } from './hubStalls';
+import { shrine, sigilStone, smithNook, stepsHead } from './hubStations';
+
+/** The painting's size (hub px): a phone's screen of court and shop, leaves and roof round it. */
+export const HUB_ART_W = 256;
+export const HUB_ART_H = 336;
 
 /** Where a piece stands on the ground (blocks walking), hub pixels. */
 export interface Foot {
@@ -50,7 +63,7 @@ export class HubOut {
    * ground it covers (default: its opaque width over the bottom few rows, `depth` px deep); null for
    * nothing (things hanging overhead, flat rugs).
    */
-  piece(L: Layer, id: string, sort: number, foot?: Foot | null, depth = 8): void {
+  piece(L: Layer, id: string, sort: number, foot?: Foot | null, depth = 6): void {
     const bb = bounds(L.buf);
     if (bb.w > 0) {
       const buf = crop(L.buf, bb.x, bb.y, bb.w, bb.h);
@@ -60,7 +73,7 @@ export class HubOut {
       else if (foot === undefined) {
         let x0 = Infinity;
         let x1 = -Infinity;
-        for (let y = Math.max(0, sort - L.y0 - 4); y <= Math.min(L.h - 1, sort - L.y0); y++) {
+        for (let y = Math.max(0, sort - L.y0 - 3); y <= Math.min(L.h - 1, sort - L.y0); y++) {
           for (let xx = 0; xx < L.w; xx++) {
             if (!L.buf.px[(y * L.w + xx) * 4 + 3]) continue;
             x0 = Math.min(x0, xx + L.x0);
@@ -112,106 +125,111 @@ export class HubOut {
   }
 }
 
-// ------------------------------------------------------------------ the ground's shape
+// ------------------------------------------------------------------ the court's shape
 
-/** The paving's left and right edges at a given height (they close in toward the steps at the bottom). */
+/** The court's middle: the door, the walk up the court and the steps all line up on it. */
+export const HUB_CX = 128;
+/** The shop's front wall stands on this line: the court begins below it. */
+const FRONT = SHOP.front;
+/** The curb along the foot of the court, where the steps go down. */
+const CURB = 240;
+/** The steps down: their left edge, width, how many, and each one's tread and riser. */
+const STEPS = { x: 108, y: CURB, w: 40, n: 9, tread: 6, riser: 4 };
+/** A little stone landing beside the head of the steps, where the warden keeps watch. */
+const LANDING = { x0: 155, x1: 180, y1: CURB + 15 };
+
+/** Where the dungeon takes you, walking down the steps (feet, hub px). */
+export const HUB_DESCEND_Y = 268;
+/** Where the steps begin (feet): below this, the court darkens as you go down. */
+export const HUB_STEPS_Y = CURB + 2;
+
+/** The paving's left and right edges at a given height (wandering a little; leaves grow over them). */
 function edgesAt(y: number): [number, number] {
-  const wob = (vnoise(0, y, 1, 23, 9) - 0.5) * 6;
-  const wob2 = (vnoise(5, y, 1, 19, 10) - 0.5) * 6;
-  let l = 40 + wob;
-  let r = 440 + wob2;
-  if (y > 470) {
-    const t = (y - 470) / 75;
-    l += t * t * 150;
-    r -= t * t * 150;
-  }
-  return [l, r];
+  const wob = (vnoise(0, y, 1, 17, 9) - 0.5) * 4;
+  const wob2 = (vnoise(5, y, 1, 15, 10) - 0.5) * 4;
+  return [46 + wob, 210 + wob2];
 }
 
-const PAVE_TOP = 138;
-const PAVE_BOTTOM = 553;
-
 function paved(x: number, y: number): boolean {
-  if (y < PAVE_TOP || y >= PAVE_BOTTOM) return false;
+  if (y >= CURB && y < LANDING.y1 && x >= LANDING.x0 - 2 && x < LANDING.x1) return true;
+  if (y < FRONT - 10 || y >= CURB) return false;
   const [l, r] = edgesAt(y);
   return x >= l && x <= r;
 }
 
-/** How far down the steps you walk before the dungeon takes you (feet, art px). */
-export const HUB_DESCEND_Y = 604;
-/** Where the steps begin (feet): below this, the square darkens as you go down. */
-export const HUB_STEPS_Y = PAVE_BOTTOM + 6;
-
-/** Ground you can walk on (before anything standing is taken out): the paving in front of the
- * buildings, and the steps down to the dungeon (walk far enough down them and you're in). */
+/**
+ * Ground you can walk on (before anything standing is taken out): the court in front of the shop,
+ * and the steps down to the dungeon (walk far enough down them and you're in).
+ */
 export function hubWalkable(x: number, y: number): boolean {
-  if (y >= 180 && paved(x, y)) {
-    const [l, r] = edgesAt(y);
-    return x >= l + 6 && x <= r - 6;
-  }
-  return y >= PAVE_BOTTOM - 8 && y < HUB_DESCEND_Y + 20 && x > 204 && x < 276;
+  if (y >= FRONT && y < CURB) return x >= 64 && x <= 192;
+  return y >= CURB - 8 && y < HUB_DESCEND_Y + 20 && x > STEPS.x && x < STEPS.x + STEPS.w;
 }
 
 function edgeDist(x: number, y: number): number {
+  if (y >= CURB) return Math.min(x - LANDING.x0 + 2, LANDING.x1 - x, LANDING.y1 - y) * 2;
   const [l, r] = edgesAt(y);
-  return Math.min(x - l, r - x, y - PAVE_TOP, (PAVE_BOTTOM - y) * (Math.abs(x - 240) < 44 ? 6 : 1));
+  return Math.min(x - l, r - x, (CURB - y) * (Math.abs(x - HUB_CX) < 24 || (x > LANDING.x0 && x < LANDING.x1) ? 8 : 1.5));
 }
 
+// ------------------------------------------------------------------ the keepers
+
+/** The keepers: where each stands (or sits), where you stand to talk, and what says what they do. */
 /** The keepers: where each stands (or sits), where you stand to talk, and what says what they do. */
 const STATIONS: HubStation[] = [
   {
     id: 'altar', name: 'Oracle Vesper', job: 'The Gilded Reel: summon knights',
     greeting: 'Welcome to the Gilded Reel, dear. The reels never stop. Shall we see who turns up?',
-    x: 240, y: 191, dir: 1, view: 'down', def: HUB_CAST.oracle, pose: 'stand', talk: { x: 240, y: 206 },
-    sign: 'The shop itself: the big round reel sign glowing in the gable, the name in gold over the door.',
-  },
-  {
-    id: 'squad', name: 'Quartermaster Hilde', job: 'Your squad: pick three and who leads',
-    greeting: 'Three to a squad, dear. Pick who fights and who leads, and I\'ll see them fed and shod.',
-    x: 100, y: 224, dir: 1, view: 'down', def: HUB_CAST.squad, pose: 'sit', tool: undefined, talk: { x: 116, y: 238 },
-    sign: 'The chalkboard menu by the tavern stall, three little helmets chalked on it.',
-  },
-  {
-    id: 'upgrades', name: 'Tinker Pell', job: 'Upgrades: spend gold on better everything',
-    greeting: 'Faster reels, luckier spins, deeper pockets. All for a little gold. Have a look at the board.',
-    x: 372, y: 212, dir: 1, view: 'down', def: HUB_CAST.upgrades, pose: 'sit', tool: 'wrench', talk: { x: 372, y: 228 },
-    sign: 'The slate board of painted item icons over his shelves of jars.',
-  },
-  {
-    id: 'smith', name: 'Brannoc the Smith', job: 'The smithy: level up and reforge knights',
-    greeting: 'Shards and gold, and I\'ll beat any knight into something better. Mind the sparks.',
-    x: 122, y: 350, dir: 1, view: 'down', def: HUB_CAST.smith, pose: 'stand', tool: 'hammer', talk: { x: 124, y: 368 },
-    sign: 'The forge glowing under the lean-to, the anvil, crossed hammers on the hanging sign.',
-  },
-  {
-    id: 'scrap', name: 'Rusty Mags', job: 'Scrap: break down or sell duplicates',
-    greeting: 'Doubles? Spares? Bring them here. I\'ll break them into shards or pay you gold.',
-    x: 350, y: 336, dir: 1, view: 'down', def: HUB_CAST.scrap, pose: 'stand', tool: 'tongs', talk: { x: 366, y: 350 },
-    sign: 'The green-striped stall heaped with junk, the scrap bins and the brass scale.',
-  },
-  {
-    id: 'perks', name: 'Sage Orrin', job: 'Sigils: perks for the reborn',
-    greeting: 'You have been reborn. The sigils will listen to you now. Sit, and choose.',
-    x: 96, y: 452, dir: 1, view: 'down', def: HUB_CAST.perks, pose: 'sit', talk: { x: 98, y: 472 },
-    sign: 'The standing stones round his bench, their runes glowing teal.',
-  },
-  {
-    id: 'rebirth', name: 'Sister Maren', job: 'The shrine: rebirth',
-    greeting: 'Every ending is a door. Lay it all down here, and rise again stronger.',
-    x: 362, y: 462, dir: 1, view: 'down', def: HUB_CAST.rebirth, pose: 'stand', tool: 'candle', talk: { x: 364, y: 478 },
-    sign: 'The little stone shrine with the rose-gold rising sun, candles on its steps.',
+    x: HUB_CX, y: FRONT + 3, dir: 1, view: 'down', def: HUB_CAST.oracle, pose: 'stand', talk: { x: HUB_CX, y: FRONT + 20 },
+    sign: 'The shop itself: the round reel sign glowing in the gable, the lit window of goods, the open door.',
   },
   {
     id: 'quests', name: 'Notice Board', job: 'Jobs and bounties',
     greeting: 'Help wanted. Some of it urgent. Some of it about a chicken.',
-    x: 176, y: 512, dir: 1, view: 'down', def: null, pose: 'stand', talk: { x: 178, y: 528 },
-    sign: 'The roofed board of pinned papers with a gold exclamation mark on top.',
+    x: (SHOP.board.x0 + SHOP.board.x1) >> 1, y: FRONT + 2, dir: 1, view: 'down', def: null, pose: 'stand', talk: { x: 99, y: FRONT + 22 },
+    sign: 'The board by the door: chalked jobs, pinned notes, a gold exclamation mark over it.',
+  },
+  {
+    id: 'scrap', name: 'Rusty Mags', job: 'Scrap: break down or sell duplicates',
+    greeting: 'Doubles? Spares? Bring them here. I\'ll break them into shards or pay you gold.',
+    x: 70, y: FRONT + 9, dir: 1, view: 'down', def: HUB_CAST.scrap, pose: 'stand', tool: 'tongs', talk: { x: 73, y: FRONT + 26 },
+    sign: 'The lit curio cabinet of junk in the shop\'s left wing.',
+  },
+  {
+    id: 'upgrades', name: 'Tinker Pell', job: 'Upgrades: spend gold on better everything',
+    greeting: 'Faster reels, luckier spins, deeper pockets. All for a little gold. Have a look at the board.',
+    x: 186, y: FRONT + 9, dir: 1, view: 'down', def: HUB_CAST.upgrades, pose: 'stand', tool: 'wrench', talk: { x: 184, y: FRONT + 26 },
+    sign: 'The slate of painted upgrades over his shelves of bottles and gadgets in the right wing.',
+  },
+  {
+    id: 'squad', name: 'Quartermaster Hilde', job: 'Your squad: pick three and who leads',
+    greeting: 'Three to a squad, dear. Pick who fights and who leads, and I\'ll see them fed and shod.',
+    x: 81, y: 189, dir: 1, view: 'down', def: HUB_CAST.squad, pose: 'sit', talk: { x: 105, y: 194 },
+    sign: 'Her round table, the ledger open on it by a candle, the traveller across from her.',
+  },
+  {
+    id: 'perks', name: 'Sage Orrin', job: 'Sigils: perks for the reborn',
+    greeting: 'You have been reborn. The sigils will listen to you now. Sit, and choose.',
+    x: 175, y: 189, dir: -1, view: 'side', def: HUB_CAST.perks, pose: 'sit', talk: { x: 152, y: 194 },
+    sign: 'His high-backed chair, the sigil stones glowing teal beside it.',
+  },
+  {
+    id: 'rebirth', name: 'Sister Maren', job: 'The shrine: rebirth',
+    greeting: 'Every ending is a door. Lay it all down here, and rise again stronger.',
+    x: 85, y: 233, dir: 1, view: 'side', def: HUB_CAST.rebirth, pose: 'stand', tool: 'candle', talk: { x: 104, y: 228 },
+    sign: 'The little candle shrine with the rose-gold rising sun, potted flowers round it.',
+  },
+  {
+    id: 'smith', name: 'Brannoc the Smith', job: 'The smithy: level up and reforge knights',
+    greeting: 'Shards and gold, and I\'ll beat any knight into something better. Mind the sparks.',
+    x: 182, y: 228, dir: -1, view: 'side', def: HUB_CAST.smith, pose: 'stand', tool: 'hammer', talk: { x: 162, y: 216 },
+    sign: 'The anvil on its stump and the brazier of glowing coals in the nook, crossed hammers over them.',
   },
   {
     id: 'gate', name: 'Warden Tobb', job: 'The stairs down: into the dungeon',
     greeting: 'Stairs go down, monsters come up. Ready when you are.',
-    x: 306, y: 550, dir: -1, view: 'down', def: HUB_CAST.gate, pose: 'stand', talk: { x: 296, y: 534 },
-    sign: 'The arch over the wooden steps, DUNGEON on its sign, the violet glow at the bottom.',
+    x: 165, y: 251, dir: -1, view: 'side', def: HUB_CAST.gate, pose: 'stand', talk: { x: 141, y: 250 },
+    sign: 'The dark stone steps at the foot of the court, lanterns on their posts, the violet glow below.',
   },
 ];
 
@@ -219,15 +237,30 @@ export function buildHub(): HubArt {
   const out = new HubOut();
 
   const ground: GroundSpec = {
-    w: 480,
-    h: 640,
+    w: HUB_ART_W,
+    h: HUB_ART_H,
     paved,
     edgeDist,
-    soil: (x, y) => x < 26 || x > 454 || y < 70 || (y > 560 && Math.abs(x - 240) > 60),
-    wear: { x: 240, half: 46, y0: 196, y1: 556 },
-    decks: [{ x: 212, y: 186, w: 56, h: 13, riser: 3, seed: 31 }],
-    mats: [{ x: 229, y: 190, w: 22, h: 5, colors: ['#3a1416', '#6a2224', '#9a3a2a', '#c8743a', '#e8b860'], seed: 5 }],
-    steps: { x: 200, y: 553, w: 80, n: 7, tread: 9, riser: 5 },
+    soil: (x, y) => y < FRONT - 12 || ((x < 26 || x > 230) && vnoise(x, y, 9, 9, 3) > 0.45),
+    wear: { x: HUB_CX, half: 22, y0: FRONT, y1: CURB },
+    mats: [{ x: HUB_CX - 9, y: FRONT + 1, w: 18, h: 4, colors: ['#3a1416', '#6a2224', '#9a3a2a', '#c8743a', '#e8b860'], seed: 5 }],
+    steps: STEPS,
+    curbs: [
+      { y: CURB, x0: 46, x1: STEPS.x - 5 },
+      { y: LANDING.y1, x0: LANDING.x0 - 2, x1: LANDING.x1 },
+      { y: CURB, x0: LANDING.x1, x1: 211 },
+    ],
+    litter: [
+      // Petals by the flower pots and the shrine, leaves blown in from the planting, a few under the
+      // table and the chair.
+      { x: 99, y: 236, r: 12, n: 14, colors: ['#ff5a6a', '#ff8a8a', '#ffd0d8'] },
+      { x: 70, y: 226, r: 16, n: 12, colors: ['#ff8ab0', '#fff0f4', '#ffd0a0'] },
+      { x: 60, y: 200, r: 12, n: 10, colors: ['#62ae34', '#8ccb3e', '#c8a040', '#a8682a'] },
+      { x: 196, y: 196, r: 12, n: 10, colors: ['#62ae34', '#8ccb3e', '#c8a040', '#a8682a'] },
+      { x: 86, y: 160, r: 10, n: 6, colors: ['#43922c', '#8ccb3e', '#fff6f0'] },
+      { x: 152, y: 160, r: 10, n: 6, colors: ['#43922c', '#62ae34', '#c8a040'] },
+      { x: 128, y: 205, r: 26, n: 8, colors: ['#a8682a', '#c8a040', '#62ae34'] },
+    ],
     shadows: out.shadows,
     seed: 77,
   };
@@ -236,42 +269,35 @@ export function buildHub(): HubArt {
   paintShop(out);
   edgeGreens(out);
   frontLeaves(out);
-  tavernStall(out);
-  outfitterShelves(out);
-  chalkboard(out, 152, 208);
-  pottedBush(out, 56, 198, 3);
-  pottedBush(out, 46, 184, 5, 0.8);
-  chair(out, 100, 222, 'qmChair');
-  stumpTable(out, 100, 238);
-  stool(out, 98, 254, 'travellerStool');
-  chair(out, 372, 212, 'tinkerChair');
-  flowerBench(out, 420, 238);
-  planter(out, 170, 222, 22, 81, ['#ff6a8a', '#ffd0e0', '#ffffff']);
-  planter(out, 288, 222, 22, 82, ['#ffd84a', '#ff9a4a', '#ffffff']);
-  smithy(out);
-  scrapStall(out);
-  sageCorner(out);
-  shrine(out);
-  noticeBoard(out, 176, 512);
-  gate(out);
-  cat(out, 262, 197);
-  const lamps: Array<[number, number]> = [[176, 300], [304, 300], [176, 420], [304, 420]];
-  const tops = lamps.map(([x, y], i) => lampPost(out, x, y, `lamp${i}`));
-  lightString(out, tops[0], tops[1], 10, 300, 'string0');
-  lightString(out, tops[2], tops[3], 10, 420, 'string1');
-  lampPost(out, 404, 198, 'lampTinker', 30);
-  lampPost(out, 70, 206, 'lampTavern', 30);
-  planter(out, 188, 372, 18, 83, ['#ff8ab0', '#ffffff', '#ffd0e0']);
-  planter(out, 274, 372, 18, 84, ['#b07aff', '#ffffff', '#ffd84a']);
   fireflies(out);
-  bench(out, 112, 400, 'benchL');
-  pottedPalm(out, 62, 392, 'palmL', 11);
-  crateStack(out, 424, 384, 'cratesR');
-  barrelPiece(out, 402, 392, 'barrelR', 7);
-  barrelPiece(out, 330, 186, 'barrelShop', 9);
-  pottedPalm(out, 152, 186, 'palmShop', 12);
+  // Along the shop front: the junk dealer's scrap, a round bush by the board, a leafy plant by the
+  // door, the tinker's crates.
+  courtGreens(out);
+  scrapCrate(out, 55, FRONT + 12);
+  pottedBush(out, 86, FRONT + 10, 3, 5);
+  pottedPlant(out, 153, FRONT + 9, 12, 8);
+  cat(out, 144, FRONT + 5);
+  crates(out, 202, FRONT + 13, 'tinkerCrates', 21);
+  barrelPiece(out, 214, FRONT + 18, 'tinkerBarrel', 7);
+  // The quartermaster's table (her chair behind her, the traveller's stool in front).
+  chair(out, 81, 189, 'qmChair', 22);
+  roundTable(out, 81, 189);
+  stool(out, 93, 212, 'travellerStool');
+  // The sage's chair and his stones.
+  sageChair(out, 177, 189);
+  sigilStone(out, 195, 186, 1, 10);
+  sigilStone(out, 199, 199, 2, 7);
+  // The priestess's shrine and its flowers; the smith's nook.
+  shrine(out, 66, 235);
+  flowerPot(out, 48, 240, 81, ['#ff6a8a', '#ffd0e0', '#ffffff'], 7);
+  flowerPot(out, 99, 248, 83, ['#ff3a4a', '#ff8a8a', '#ffd0d0'], 9, GLAZE);
+  smithNook(out, 199, 236, 168, 231);
+  // Lamps on the court's corners, and the head of the steps.
+  postLamp(out, 57, 186, 'lampL');
+  postLamp(out, 200, 176, 'lampR');
+  stepsHead(out, STEPS.x - 3, STEPS.x + STEPS.w + 3, CURB + 4, CURB + 58);
+  stepsGarden(out, STEPS.x, STEPS.x + STEPS.w, CURB, LANDING);
   const lights: HubLight[] = out.lights;
-  // Placeholder lights while the pieces are built.
 
   return {
     ground: paintHubGround(ground),
@@ -279,17 +305,17 @@ export function buildHub(): HubArt {
     emissive: out.emissive,
     fore: out.fore,
     lights,
-    ambient: '#544a6a',
+    ambient: '#5e6078',
     motes: out.motes,
     stations: STATIONS,
-    extras: [{ def: HUB_CAST.traveller, x: 98, y: 254, dir: 1, view: 'up', pose: 'sit', tool: 'cup' }],
+    extras: [{ def: HUB_CAST.traveller, x: 93, y: 212, dir: 1, view: 'up', pose: 'sit', tool: 'cup' }],
     feet: out.feet,
     grade: {
       haze: [0.12, 0.1, 0.2],
       hazeAmount: 0.05,
-      shadowTint: [0.9, 0.92, 1.18],
-      highlightTint: [1.12, 1.0, 0.84],
-      saturation: 1.15,
+      shadowTint: [0.9, 0.94, 1.14],
+      highlightTint: [1.08, 1.0, 0.88],
+      saturation: 1.1,
       contrast: 1.06,
       vignette: 0.62,
       bloom: 0.8,

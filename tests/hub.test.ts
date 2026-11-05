@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { keeperFrame, HUB_CAST, HUB_TOOLS } from '../src/render/art/hubNpcs';
-import { HUB_DESCEND_Y, HUB_STEPS_Y, buildHub } from '../src/render/art/hubScene';
+import { HUB_CX, HUB_DESCEND_Y, HUB_STEPS_Y, buildHub } from '../src/render/art/hubScene';
 import { Game } from '../src/game';
-import { HUB_COLS, HUB_H, HUB_ROWS, HUB_W, hubScene } from '../src/world/hub';
+import { HUB_COLS, HUB_H, HUB_ROWS, HUB_W, hubScene, type HubStation } from '../src/world/hub';
+import { TALK_RANGE } from '../src/world/hubWorld';
 import { FLOOR, TILE, bfs, tileAt } from '../src/world/mapgen';
 
 /** Everything a keeper says is drawable in the bitmap font too. */
 const FONT_SAFE = /^[A-Za-z0-9 .,!?:'"\-+/%()]+$/;
-/** world/hubWorld.ts talks to a keeper within this many px. */
-const TALK_RANGE = 26;
+
+/** How far a spot is from talking to a station, the way World.nearStation measures it. */
+function talkDist(st: HubStation, x: number, y: number): number {
+  return Math.min(Math.hypot(x - st.x, y - st.y), Math.hypot(x - st.talk.x, y - st.talk.y) + 6);
+}
 
 function checksum(px: Uint8ClampedArray): number {
   let h = 0x811c9dc5;
@@ -73,10 +77,41 @@ describe('hub', () => {
     }
   });
 
+  it('gives each keeper a talk spot of their own: standing on it you talk to them, not a neighbour', () => {
+    const s = hubScene();
+    for (const st of s.stations) {
+      const mine = talkDist(st, st.talk.x, st.talk.y);
+      expect(mine, st.id).toBeLessThan(TALK_RANGE);
+      for (const other of s.stations) {
+        if (other === st) continue;
+        expect(talkDist(other, st.talk.x, st.talk.y), `${st.id} vs ${other.id}`).toBeGreaterThan(mine);
+        // Not stacked: every talk spot on its own tile.
+        const same = Math.floor(other.talk.x / TILE) === Math.floor(st.talk.x / TILE) && Math.floor(other.talk.y / TILE) === Math.floor(st.talk.y / TILE);
+        expect(same, `${st.id} and ${other.id} share a tile`).toBe(false);
+      }
+    }
+    // Arriving at the hub, nobody is in talking range yet (the hint shows first).
+    for (const st of s.stations) expect(talkDist(st, s.spawn.x, s.spawn.y), st.id).toBeGreaterThanOrEqual(TALK_RANGE);
+  });
+
+  it('is a compact court: a phone-sized core with leaves and roof round it', () => {
+    const s = hubScene();
+    // Wide enough for a landscape screen at the hub's zoom (about 240 px), tall enough for an
+    // upright phone's (about 320).
+    expect(s.w).toBeGreaterThanOrEqual(240);
+    expect(s.h).toBeGreaterThanOrEqual(320);
+    // Every keeper (and every talk spot) within the phone-sized middle.
+    for (const st of s.stations) {
+      expect(Math.abs(st.x - HUB_CX), st.id).toBeLessThan(85);
+      expect(Math.abs(st.talk.x - HUB_CX), st.id).toBeLessThan(85);
+      expect(st.y, st.id).toBeLessThan(HUB_DESCEND_Y);
+    }
+  });
+
   it('lets you walk down the steps far enough to go into the dungeon', () => {
     const s = hubScene();
     const d = bfs(s.map, Math.floor(s.spawn.x / TILE), Math.floor(s.spawn.y / TILE));
-    const tx = Math.floor(240 / TILE);
+    const tx = Math.floor(HUB_CX / TILE);
     const ty = Math.floor((HUB_DESCEND_Y + 4) / TILE);
     expect(tileAt(s.map, tx, ty)).toBe(FLOOR);
     expect(d[ty * s.map.w + tx]).toBeGreaterThanOrEqual(0);
@@ -84,7 +119,7 @@ describe('hub', () => {
     expect(s.spawn.y).toBeLessThan(HUB_STEPS_Y);
   });
 
-  it('takes you into the dungeon when you walk down the steps, and back to the top of the square after', () => {
+  it('takes you into the dungeon when you walk down the steps, and back to the head of the steps after', () => {
     const g = new Game(true);
     for (let t = 0; t < 3; t += 1 / 30) g.tick(1 / 30);
     expect(g.inDungeon).toBe(false);

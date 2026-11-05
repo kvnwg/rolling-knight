@@ -290,7 +290,7 @@ export class Game {
     if (!this.state.squad.some(Boolean)) return;
     this.inDungeon = true;
     this.autoReturnT = 0;
-    // The hub waits with your knight back at the top of the square (not halfway down the steps).
+    // The hub waits with your knight back at the head of the steps (not halfway down them).
     this.syncHub(true);
     if (!this.world) this.startFloor(this.state.run.floor);
     else {
@@ -303,7 +303,7 @@ export class Game {
   }
 
   /**
-   * The hub's steps: the square darkens as your knight goes down them, and at the bottom the screen
+   * The hub's steps: the court darkens as your knight goes down them, and at the bottom the screen
    * fades out and the dungeon begins (the same as telling the warden you're ready).
    */
   private walkDown(): void {
