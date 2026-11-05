@@ -1,0 +1,147 @@
+# Rolling Knight: how it works
+
+A top-down (3/4 view) pixel action roguelite with a rolling game on top. A free altar rolls knights
+forever; you field a squad of three in endless procedural dungeons, control one, and the other two
+fight by their class's AI. Every number lives in `src/core/balance.ts`.
+
+## 1. The Summoning Altar (rolling)
+
+Dumpster Legend's dumpster, with knights instead of items.
+
+- **The spin.** Free and never stops. Each spin rolls one knight per reel. Every result is decided the
+  instant the spin starts; the spinning reels are only the animation, and they land one by one.
+  A spin is 2.6 s plus a 0.9 s rest (3.5 s). Spin Speed's 8 tiers bring that to about 1 s, never
+  under 0.7 s; the Greased Gears perk doubles the speed past that limit.
+- **Turbo spins.** Each Hourglass (elites 25%, bosses 5) makes one spin run twice as fast (Turbo
+  Power more, down to 0.45 s). A spin building up to a rare find plays at normal speed and the
+  Hourglass waits.
+- **Reels.** 1 to start; Extra Reel adds up to 4 (5 at most); the Bootleg Reel perk adds one and
+  slows spins by 50%.
+
+## 2. Luck decides the rarity
+
+Tiers are tried rarest first; each hits with a chance of luck ÷ X; the first hit wins, else Common.
+
+| Tier | 1 in X at luck 1 |
+| --- | --- |
+| Uncommon | 3 |
+| Rare | 12 |
+| Epic | 80 |
+| Legendary | 1,000 |
+| Mythic | 25,000 |
+| Ancient | 60,000 |
+| Exalted | 150,000 |
+| Celestial | 400,000 |
+| Astral | 1,000,000 |
+| Divine | 5,000,000 |
+| Eternal | 25,000,000 |
+| Primordial | 250,000,000 |
+
+Side effect: once luck reaches a tier's X, everything below it stops dropping (luck 3: no Commons).
+
+**Luck** = (1 + Luck upgrades + Depth) × rebirths × Luck Potion
+
+- Luck upgrade: +15% per tier, 8 tiers.
+- Depth: +5% for every boss beaten this run, up to +145%.
+- Rebirths: ×1.25 after one, ×1.5 after two, and so on.
+- Luck Potion: ×2 for 60 s (Potion Time adds 20 s a tier). Drops from mobs (0.3%), elites (5%) and
+  bosses (30%).
+
+Per spin: every 10th is a **Lucky Spin** (×2; upgrades bring it to every 4th and ×4); the Golden
+Wheel gives each spin a 2% chance (up to 10%) of a **Golden Spin** (×5).
+
+## 3. Luck tokens
+
+Before a reel lands its knight it has a 5% chance (×3 with Four-Leaf Litter, 50% max) of a token:
+×2 (60%), ×3 (25%), ×5 (11%), ×10 (4%). The reel then spins again with a 50% chance of another, up
+to 4 in a row, multiplying (max ×10,000). Tokens landing in the same round on two or more reels make
+a **combo**: each counts the round's product. Chains of ×25, ×50 and ×250 guarantee Epic, Legendary
+and Mythic or better.
+
+## 4. Safety nets
+
+- Bad-luck protection: after 40 rolls without Epic or better, the next is at least Epic (Pity Shield
+  takes 4 off per tier, down to 8). Shown as "Epic+ guaranteed in N".
+- Rigged Jackpot (perk): every 25th spin, every reel lands Legendary or better.
+
+## 5. Knights
+
+- **78 knights**: one of each of the 6 classes in every tier, each with a name and its own colors.
+- **Mutations** (a second roll, independent of luck; Alchemy raises it): Gilded (1 in 25, +20%),
+  Shadow (1 in 150, +45%), Radiant (1 in 1,000, +90%), Void (1 in 10,000, +200%). A duplicate with a
+  better mutation upgrades the knight you have.
+- **"1 in X"** on a knight: its tier at luck 1 times its mutation's odds.
+- **Stats**: class base × rarity (Common 1 … Primordial 30) × level × mutation × rebirths × upgrades.
+- **Duplicates**: every copy after the first piles up; break it into **shards** (1 each; 2 for
+  Commons and Uncommons with Peasant Levy) or **sell** it for gold. Rules per rarity can do it as
+  they land. **Levels** cost L shards and gold; each adds 10% of base stats (30% for Commons and
+  Uncommons with Humble Beginnings).
+- **Classes** (the kit is the same for every knight of a class):
+
+| Class | Role | Auto attack | Dodge | Special |
+| --- | --- | --- | --- | --- |
+| Guardian | Tank | Shield Bash (knockback) | Bulwark Roll (short, then half damage) | Rallying Taunt |
+| Blade | Fighter | Cleave (wide arc) | Combat Roll | Whirlwind |
+| Ranger | Archer | Longshot | Backflip (long) | Arrow Rain |
+| Cleric | Healer | Holy Orb (heals the most hurt ally) | Blessed Step (healing glow) | Sanctuary (heal 35%, raise a fallen knight) |
+| Arcanist | Mage (rebirth 1) | Arcane Bolt (seeking, splash) | Blink | Meteor |
+| Lancer | Lancer (rebirth 2) | Pierce (a line) | Vault | Dragon Lunge |
+
+- **Signature specials.** A few rare knights replace their class's special. **Chronomancer Aeon**
+  (Mythic Arcanist) has **Rewind**: the squad goes back 4 seconds (positions, HP, fallen knights),
+  enemy shots and spells in the air vanish, and damage dealt stays.
+
+## 6. The squad
+
+Three slots. You control one (switch any time); the other two run their role's AI: tanks wade in and
+taunt when the squad is pressed, fighters chase, archers and mages kite, healers stay by whoever is
+hurt and save Sanctuary for when it counts. Everyone dodges what they see coming, most of the time.
+Auto hands your knight to the AI too (and it is on while a menu is open). Empty slots fill with your
+strongest free knight; anything else is your call (or Best squad).
+
+## 7. The dungeon
+
+Endless floors, a new biome every 5 floors (a boss on every 5th): Mossy Hamlet, Gloomwood, Frostfang
+Tundra, Sunken Crypt, Mirewater Bog, Sunscorch Ruins, Hollow Graves, Ember Depths, Prism Grotto,
+Moonlit Shrine; after the first lap the order is reshuffled. Each floor is a chain of rooms from the
+start to the exit with side rooms, pools and props, checked to be fully connected. Mobs are designed
+per floor: body plan, behavior (chaser, archer, charger, bomber, caster, tank, swarm), colors, size,
+features and name; bosses have three of ring, fan, charge, slam, summon and rain, and enrage at
+half HP. Clearing a floor opens the portal; a wiped squad goes back to the biome's first floor.
+
+## 8. Rebirth and perks
+
+Rebirth at floor 15 (then +10 each time): start over at floor 1 with luck ×1.25, gold ×1.5 and stats
++30% per rebirth (stacking), and new classes to roll. Knights, gold, upgrades and perks go; the
+Codex and records stay.
+
+Perks open after the first rebirth. **Sigils** (one per rebirth at the start of a run, one per boss
+beaten for the first time in a run) buy perks from four trees; a rebirth clears them all:
+
+- **Underdogs**: Humble Beginnings (Common and Uncommon level-ups ×3), Peasant Levy (every 4th spin at
+  luck 1; 2 shards per low dupe), Rags to Riches (+25% stats per tier below Legendary), Peasant Revolt
+  (a low-rarity squad deals double damage and dodges twice as often), Hand-Me-Downs (shards spread to
+  the whole class).
+- **Command**: Tag Team (switching fires the special), Lone Wolf (solo: ×3 HP, ×2.5 damage), Hive Mind
+  (the squad dodges with you; allies' specials 2× faster), War Banner (your hits speed up the squad),
+  Heirloom (keep your knight through the next rebirth).
+- **Rigged Reels**: Four-Leaf Litter, Bootleg Reel, Greased Gears, Pawn Shop, Rigged Jackpot.
+- **Bad Ideas**: Glass Cannon, Roll Dancer, Blood Pact, Berserker, Kamikaze.
+
+## 9. What's real and what's show
+
+Results are fixed when a spin starts. The scrolling silhouettes are decoration and lean far rarer
+than the real odds; 65% of the time a near miss sits right next to the real result. Full-screen
+reveals are judged against your own recent finds: the tier must be at least 1 in 20 at your luck and
+rarer, for you, than everything in the last 5 (BIG), 50 (HUGE) or 500 (INSANE) minutes. HYPER RARE is
+the rarest find of your whole game, at least 1 in 100,000 for your luck, after 10 minutes of play.
+Build-ups use 30-second and 2-minute windows, and nothing is judged in a new game's first 2 minutes.
+
+## 10. Away, and the first minute
+
+Offline rolling uses the same rules at 1/10 speed and 75% efficiency (Night Watch +40% a tier), up to
+1,000 rolls or 8 hours, keeping only Epic or better; the squad's gold income runs on too.
+
+The tutorial: three quick spins (a Common Guardian, an Uncommon Ranger, a Rare Cleric) make the
+squad; then a Legendary Blade; about 45 seconds into floor 1, beginner's luck: a ×3 then ×5 chain into
+an Exalted Ranger, clearly labeled. Both join the squad.

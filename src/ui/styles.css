@@ -812,3 +812,29 @@ input[type='range'] {
     width: min(48vw, calc(200 * var(--u)));
   }
 }
+
+/* Dark ink on parchment: no outline (that's for light text on wood and on the dungeon). */
+.parchment,
+.parchment * {
+  text-shadow: none;
+}
+
+.parchment .muted {
+  opacity: 0.7;
+}
+
+.parchment .rar {
+  text-shadow:
+    calc(var(--u) * 0.4) 0 0 var(--ink),
+    calc(var(--u) * -0.4) 0 0 var(--ink),
+    0 calc(var(--u) * 0.4) 0 var(--ink),
+    0 calc(var(--u) * -0.4) 0 var(--ink);
+}
+
+.parchment .wbtn {
+  text-shadow:
+    calc(var(--u) * 0.4) 0 0 var(--ink),
+    calc(var(--u) * -0.4) 0 0 var(--ink),
+    0 calc(var(--u) * 0.4) 0 var(--ink),
+    0 calc(var(--u) * -0.4) 0 var(--ink);
+}

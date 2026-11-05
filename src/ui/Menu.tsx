@@ -465,7 +465,7 @@ function Settings({ game }: { game: Game }) {
       )}
       <h3>Credits</h3>
       <p className="muted">
-        Character skeleton: Snoblin, Pixel RPG Prototype Characters. Interface: the Medieval and Cozy UI sheets. Farm animals: the supplied pig and sheep sheets. Everything else drawn in code for the game. Pixelify Sans (SIL OFL).
+        Character skeleton: Snoblin, Pixel RPG Prototype Characters. Effects: Pixel Art Assets - Will Tice / unTied Games. Interface: the Medieval and Cozy UI sheets. Farm animals: the supplied pig and sheep sheets. Everything else drawn in code for the game. Pixelify Sans (SIL OFL).
       </p>
       <p className="muted">v{__APP_VERSION__}</p>
     </>

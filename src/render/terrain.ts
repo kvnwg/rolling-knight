@@ -241,7 +241,6 @@ export function paintTerrain(m: FloorMap, biome: Biome): Terrain {
     if (mc[1] === 'cobble') mc[0].courses = new Courses(mc[0].seed, 5, 4, 8);
     if (mc[1] === 'flagstone') mc[0].courses = new Courses(mc[0].seed, 9, 9, 15);
   }
-  const under = biome.solid.underRamp ?? biome.solid.top;
   const face = biome.solid.face;
   const top = biome.solid.top;
   const liquid = biome.liquid;
@@ -263,6 +262,7 @@ export function paintTerrain(m: FloorMap, biome: Biome): Terrain {
   };
   const isLiquid = (tx: number, ty: number) => (tile(tx, ty) === LIQUID ? 1 : 0);
   const isPath = (tx: number, ty: number) => pathAt(tx, ty);
+  const isOpen = (tx: number, ty: number) => (tile(tx, ty) === SOLID ? 0 : 1);
   const set = (i: number, hex: string, dark = 0) => {
     const [r, g, b] = hexToRgb(hex);
     const f = 1 - dark;
@@ -271,7 +271,6 @@ export function paintTerrain(m: FloorMap, biome: Biome): Terrain {
     px[i + 2] = b * f;
     px[i + 3] = 255;
   };
-  const wallFaceH = biome.solid.kind === 'trees' ? 6 : TILE;
 
   for (let y = 0; y < H; y++) {
     const ty = Math.floor(y / TILE);
@@ -285,13 +284,11 @@ export function paintTerrain(m: FloorMap, biome: Biome): Terrain {
         const below = tile(tx, ty + 1);
         const faceTile = below !== SOLID;
         if (biome.solid.kind === 'trees') {
-          // Under the trees: dark forest floor, with a bushy rim where it meets the open ground.
-          const n = vnoise(x, y, 10, seed + 50);
-          const rim = faceTile && ly >= TILE - wallFaceH + Math.round((vnoise(x, ty * 16, 5, seed + 51) - 0.5) * 6);
-          if (rim) {
-            const k = ly >= TILE - 2 ? 0 : n > 0.5 ? 2 : 1;
-            set(i, [under[0], biome.treeRamp[1], biome.treeRamp[2]][k] ?? under[1]);
-          } else set(i, under[n > 0.55 ? 1 : 0]);
+          // Under the trees: the same ground, sinking into deep shade away from the open floor (no hard
+          // tile edges where a gap in the trees shows through).
+          const open = bil(isOpen, x, y) + (vnoise(x, y, 6, seed + 51) - 0.5) * 0.35;
+          const shadeAmt = Math.max(0.28, Math.min(0.78, 0.78 - open * 0.75));
+          set(i, paint(biome.ground.kind, x, y, ground), Math.round(shadeAmt * 8) / 8);
           continue;
         }
         if (faceTile) {
