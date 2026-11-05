@@ -127,7 +127,7 @@ let popKeys = 0;
  * follows a squad slot instead of the knight you control; `size` is the well's size in art pixels
  * (34 for the special slot); `sound` plays the reel's ticks and thud (on by default).
  */
-export function SkillRoll({ game, slot, size = 34, sound = true }: { game: Game; slot?: number; size?: number; sound?: boolean }) {
+export function SkillRoll({ game, slot, size = 34, sound = true, well, round }: { game: Game; slot?: number; size?: number; sound?: boolean; well?: number; round?: boolean }) {
   const rootRef = useRef<HTMLSpanElement>(null);
   const stripRef = useRef<HTMLSpanElement>(null);
   const bumpRef = useRef<HTMLSpanElement>(null);
@@ -135,7 +135,8 @@ export function SkillRoll({ game, slot, size = 34, sound = true }: { game: Game;
   const sparksRef = useRef<HTMLSpanElement>(null);
   const imgs = useRef<(HTMLImageElement | null)[]>([]);
   const [pop, setPop] = useState<Pop | null>(null);
-  const inset = Math.round((size * 5) / 34);
+  // The window's inset from the slot's edge: `well` when given (a wooden key's round inlay), else the octagon's.
+  const inset = well ?? Math.round((size * 5) / 34);
   const win = size - 2 * inset;
   const scale = Math.max(1, Math.floor((win - 2) / 10));
   const geo = useRef({ win, scale });
@@ -365,6 +366,7 @@ export function SkillRoll({ game, slot, size = 34, sound = true }: { game: Game;
     <span
       ref={rootRef}
       className={s.root}
+      data-round={round || undefined}
       data-state="off"
       style={{ ['--inset' as string]: `calc(${inset} * var(--px))`, ['--cell' as string]: `calc(${win} * var(--px))`, ['--size' as string]: size } as CSSProperties}
     >

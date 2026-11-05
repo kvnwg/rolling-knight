@@ -1,7 +1,9 @@
 /**
  * The HUD in the dungeon: the floor, the currencies and luck, the altar's mini roller, the squad (tap
- * to take control), quests, and the pixel action buttons: the special, the dodge roll, Auto and Camp.
+ * to take control), quests, and the action keys: chunky wooden blocks that sink when pressed (the
+ * attack on touch screens, the skill roll, the dodge roll, Auto and Camp).
  */
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { knightDef } from '../core/knights';
 import { CHALLENGE } from '../core/power';
 import { activeQuests, questGoal } from '../core/quests';
@@ -17,9 +19,119 @@ import { AltarReels } from './fx/AltarReels';
 import daggerUrl from '../assets/ui/dagger.png';
 import { uiSound } from './sound';
 import { knightFaceUrl } from './sprites';
+import { CLASS_ICON } from './keeper/KnightShops';
 import { TopBar } from './TopBar';
+import { keyWell, type KeySize } from './skin';
 
 const touch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+
+/** How long a key stays down at the least, so a quick tap (or a key on the keyboard) is seen. */
+const MIN_DOWN_MS = 120;
+
+/**
+ * A wooden action key: the block (skin.ts woodKey, up or pressed), the icon in its inlay, its name
+ * under it and, with a keyboard, its key. It sinks while a finger or the mouse holds it, and for a
+ * moment when `flash` changes (its keyboard key was pressed).
+ */
+function Key({
+  size,
+  rim,
+  label,
+  hint,
+  flash,
+  className,
+  title,
+  onDown,
+  onUp,
+  onClick,
+  capture,
+  children,
+}: {
+  size: KeySize;
+  rim: 'brass' | 'iron';
+  label: ReactNode;
+  hint?: string;
+  flash?: number;
+  className?: string;
+  title?: string;
+  onDown?: () => void;
+  onUp?: () => void;
+  onClick?: () => void;
+  /** Keep the pointer while it's held, even if it slides off (the attack). */
+  capture?: boolean;
+  children: ReactNode;
+}) {
+  const [down, setDown] = useState(false);
+  const since = useRef(0);
+  const timer = useRef(0);
+  const held = useRef(false);
+  const release = () => {
+    if (!held.current) return;
+    held.current = false;
+    onUp?.();
+    const left = MIN_DOWN_MS - (performance.now() - since.current);
+    window.clearTimeout(timer.current);
+    if (left > 0) timer.current = window.setTimeout(() => setDown(false), left);
+    else setDown(false);
+  };
+  useEffect(() => {
+    if (!flash) return;
+    setDown(true);
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setDown(false), MIN_DOWN_MS);
+  }, [flash]);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  return (
+    <button
+      className={`wkey ${size} ${className ?? ''}`}
+      data-rim={rim}
+      data-down={down || undefined}
+      title={title}
+      onPointerDown={(e) => {
+        e.stopPropagation();
+        if (capture) {
+          try {
+            (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+          } catch {
+            /* no capture: sliding off the key releases it instead */
+          }
+        }
+        held.current = true;
+        since.current = performance.now();
+        window.clearTimeout(timer.current);
+        setDown(true);
+        onDown?.();
+      }}
+      onPointerUp={release}
+      onPointerCancel={release}
+      onPointerLeave={release}
+      onLostPointerCapture={release}
+      onClick={onClick}
+    >
+      <span className="body">
+        <span className="face">{children}</span>
+      </span>
+      <span className="lbl">{label}</span>
+      {hint && !touch && <span className="key">{hint}</span>}
+    </button>
+  );
+}
+
+/** The keyboard's action keys, as the last time each was pressed (the keys on screen sink with them). */
+function useKeyFlash(): Record<string, number> {
+  const [flash, setFlash] = useState<Record<string, number>>({});
+  useEffect(() => {
+    const map: Record<string, string> = { ' ': 'dodge', shift: 'dodge', e: 'skill', q: 'skill', t: 'auto', escape: 'camp' };
+    const on = (e: KeyboardEvent) => {
+      if (e.repeat) return;
+      const id = map[e.key.toLowerCase()];
+      if (id) setFlash((f) => ({ ...f, [id]: performance.now() }));
+    };
+    window.addEventListener('keydown', on);
+    return () => window.removeEventListener('keydown', on);
+  }, []);
+  return flash;
+}
 
 
 export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, onLuck, onAltar, onTalk }: {
@@ -46,6 +158,7 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
   const ch = game.difficulty ? CHALLENGE[game.difficulty.challenge] : null;
   const npc = w?.nearNpc() ?? null;
   const jobs = activeQuests(s.quests ?? []);
+  const flash = useKeyFlash();
   return (
     <div className={`dhud ${boss ? 'has-boss' : ''}`}>
       <TopBar
@@ -116,8 +229,23 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
               style={{ ['--rc' as string]: RARITY_COLOR[def.rarity] }}
               onClick={() => (uiSound('tap'), game.switchTo(slot))}
             >
-              <img className="px face" src={knightFaceUrl(id, s.roster[id].mutation)} alt="" draggable={false} />
-              <span className="nm">{def.name}</span>
+              <span className="portrait">
+                <img className="px face" src={knightFaceUrl(id, s.roster[id].mutation)} alt="" draggable={false} />
+                {w?.controlled === slot && (
+                  <span className="crown" title="The knight you play">
+                    <Px icon="crown" size="sm" />
+                  </span>
+                )}
+                {h?.downed && (
+                  <span className="downed" title="Down">
+                    <Px icon="skull" size="sm" />
+                  </span>
+                )}
+              </span>
+              <span className="nm">
+                <span>{def.name}</span>
+                <Px icon={CLASS_ICON[def.cls]} size="xs" />
+              </span>
               <Bar value={hp} kind="hp" />
             </button>
           );
@@ -126,70 +254,40 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
 
       <div className={`actions ${touch ? 'touch' : ''}`}>
         {touch && (
-          <button
-            className={`slot-btn attack ${me ? 'ready' : 'cooling'}`}
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              // Keep the finger's events even if it slides off the button (released when it lifts).
-              try {
-                (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-              } catch {
-                /* no capture: sliding off the button releases it instead */
-              }
-              hold(true);
-            }}
-            onPointerUp={() => hold(false)}
-            onPointerCancel={() => hold(false)}
-            onPointerLeave={() => hold(false)}
-            onLostPointerCapture={() => hold(false)}
-            title="Attack"
-          >
-            <span className="well" style={{ ['--ring' as string]: 'var(--sk-slot-brass-steel)' }}>
-              <Px icon="swords" s={2} />
-            </span>
-            <span className="lbl">ATTACK</span>
-          </button>
+          <Key size="lg" rim={me ? 'brass' : 'iron'} className="k-attack" label="ATTACK" title="Attack" capture onDown={() => hold(true)} onUp={() => hold(false)}>
+            <Px icon="swords" s={2} />
+          </Key>
         )}
-        <button className={`slot-btn small ${s.settings.autoPlay ? 'on' : ''}`} onClick={() => (uiSound('tap'), game.setAuto(!s.settings.autoPlay))} title="Auto (T)">
-          <span className="well" style={{ ['--ring' as string]: `var(--sk-slot-sm-${s.settings.autoPlay ? 'brass' : 'iron'}-dark)` }}>
-            <Px icon="reel" size="sm" s={1} />
-          </span>
-          <span className="lbl">{s.settings.autoPlay ? 'AUTO ON' : 'AUTO'}</span>
-          {!touch && <span className="key">T</span>}
-        </button>
-        <button
-          className={`slot-btn ${roll === 'ready' ? 'ready' : 'cooling'}`}
-          onPointerDown={(e) => (e.stopPropagation(), press('special'))}
-          title="Skill roll (E)"
+        <Key
+          size="sm"
+          rim={s.settings.autoPlay ? 'brass' : 'iron'}
+          className={`k-auto ${s.settings.autoPlay ? 'on' : ''}`}
+          label={s.settings.autoPlay ? 'AUTO ON' : 'AUTO'}
+          hint="T"
+          flash={flash.auto}
+          title="Auto (T)"
+          onClick={() => (uiSound('tap'), game.setAuto(!s.settings.autoPlay))}
         >
-          <span className="well" style={{ ['--ring' as string]: `var(--sk-slot-${roll === 'ready' || roll === 'rolling' ? 'brass' : 'iron'}-arcane)` }}>
-            {/* (Its reel's sounds come from the audio, for every knight's roll: src/audio/fight.ts.) */}
-            <SkillRoll game={game} sound={false} />
-            {special > 0 && me && (
-              <>
-                <i className="cool" style={{ ['--cd' as string]: `${Math.ceil((special / me.specialCd!) * 8) * 12.5}%` }} />
-                <span className="secs">{Math.ceil(special)}</span>
-              </>
-            )}
-          </span>
-          <span className="lbl">{me ? skillSlotLabel(me) : 'SKILL'}</span>
-          {!touch && <span className="key">E</span>}
-        </button>
-        <button className="slot-btn small" onClick={() => (uiSound('close'), onCamp())} title="Camp (Esc)">
-          <span className="well" style={{ ['--ring' as string]: 'var(--sk-slot-sm-iron-wood)' }}>
-            <Px icon="tent" size="md" s={0.75} />
-          </span>
-          <span className="lbl">CAMP</span>
-          {!touch && <span className="key">ESC</span>}
-        </button>
-        <button className={`slot-btn ${dodge <= 0 && me ? 'ready' : 'cooling'}`} onPointerDown={(e) => (e.stopPropagation(), press('dodge'))} title="Dodge roll (Space)">
-          <span className="well" style={{ ['--ring' as string]: `var(--sk-slot-${dodge <= 0 && me ? 'brass' : 'iron'}-steel)` }}>
-            <Px icon="boot" s={2} />
-            {dodge > 0 && me && <i className="cool" style={{ ['--cd' as string]: `${Math.ceil((dodge / me.dodgeCd!) * 8) * 12.5}%` }} />}
-          </span>
-          <span className="lbl">DODGE</span>
-          {!touch && <span className="key">SPACE</span>}
-        </button>
+          <Px icon="reel" size="sm" s={1} />
+          {s.settings.autoPlay && <i className="lamp" />}
+        </Key>
+        <Key size="md" rim={roll === 'ready' || roll === 'rolling' ? 'brass' : 'iron'} className={`k-skill ${roll === 'ready' ? 'ready' : 'cooling'}`} label={me ? skillSlotLabel(me) : 'SKILL'} hint="E" flash={flash.skill} title="Skill roll (E)" onDown={() => press('special')}>
+          {/* (Its reel's sounds come from the audio, for every knight's roll: src/audio/fight.ts.) */}
+          <SkillRoll game={game} sound={false} size={28} well={keyWell('md')} round />
+          {special > 0 && me && (
+            <>
+              <i className="cool" style={{ ['--cd' as string]: `${Math.ceil((special / me.specialCd!) * 8) * 12.5}%` }} />
+              <span className="secs">{Math.ceil(special)}</span>
+            </>
+          )}
+        </Key>
+        <Key size="sm" rim="iron" className="k-camp" label="CAMP" hint="ESC" flash={flash.camp} title="Camp (Esc)" onClick={() => (uiSound('close'), onCamp())}>
+          <Px icon="flame" size="sm" s={1} />
+        </Key>
+        <Key size="md" rim={dodge <= 0 && me ? 'brass' : 'iron'} className={`k-dodge ${dodge <= 0 && me ? 'ready' : 'cooling'}`} label="DODGE" hint="SPACE" flash={flash.dodge} title="Dodge roll (Space)" onDown={() => press('dodge')}>
+          <Px icon="boot" s={1} />
+          {dodge > 0 && me && <i className="cool" style={{ ['--cd' as string]: `${Math.ceil((dodge / me.dodgeCd!) * 8) * 12.5}%` }} />}
+        </Key>
       </div>
 
       {jobs.length > 0 && (

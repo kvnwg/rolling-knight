@@ -79,7 +79,8 @@ recording: [`docs/SOUNDS.md`](docs/SOUNDS.md).
   by sub-pixels in the shader, so the world glides while every sprite stays on the grid.
 - The UI wears the medieval pack's materials, painted in code at startup (`src/ui/skin.ts`): bevelled
   wooden, brass, crimson, steel and arcane buttons with a lip; dark plates with iron bolts; the pack's
-  copper-rimmed bars; parchment cards; octagonal iron ability slots that turn brass when ready; wax
+  copper-rimmed bars; parchment cards; chunky wooden action keys (plank tops, corner nails, an inlay
+  that turns brass when ready) that sink into their blocks when pressed; wax
   seals for difficulty. The keepers' screens (`src/ui/keeper/`) are lighter: beige paper in a dark
   brown border with torn corners, green tabs and buttons, slots pressed into the paper and dark brown
   pixel text. Each counter says in a line what it's for, every number says what it is ("Luck x1.20",

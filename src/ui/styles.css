@@ -1334,7 +1334,17 @@ select.select {
   gap: calc(2 * var(--px));
 }
 .squad.top .member {
-  width: calc(50 * var(--px));
+  width: calc(56 * var(--px));
+}
+.member.plate .nm > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.member.plate .nm > img {
+  margin-left: auto;
+  opacity: 0.8;
 }
 .member {
   display: grid;
@@ -2091,38 +2101,81 @@ body,
   height: calc(6 * var(--px));
 }
 
-/* The squad, on light parchment (the pixel GUI's beige): a dark brown pixel border with a light inner
-   bevel, the face in a sunken beige slot, the name in brown ink, health one flat red in a dark
-   trough. The knight you steer has a green rim. */
+/* The squad, on the keepers' paper (a pixel card with a dark brown edge and a light bevel): the
+   knight's head in a portrait frame of its rarity's color, lit from above; its name and class; a heart
+   and its health, one flat red in a dark trough. The knight you steer: a gold card and a crown. */
 .member.plate {
-  border: 0;
-  border-image: none;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: calc(2.5 * var(--px));
+  row-gap: calc(1.5 * var(--px));
+  align-items: center;
+  padding: calc(1 * var(--px)) calc(2 * var(--px)) calc(1 * var(--px)) calc(1 * var(--px));
+  background: none;
+  border: 0 solid transparent;
+  border-image: var(--sk-pa-card) 4 fill / calc(4 * var(--px)) stretch;
+  image-rendering: pixelated;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   clip-path: none;
-  background: #f0dfb8;
   color: #3b2716;
-  padding: calc(2 * var(--px)) calc(3 * var(--px)) calc(2 * var(--px)) calc(2 * var(--px));
-  box-shadow:
-    inset var(--px) var(--px) 0 0 #fff4d8,
-    inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 0 #cfb07a,
-    0 0 0 var(--px) #4a2f1b,
-    0 calc(2 * var(--px)) 0 0 rgba(30, 16, 6, 0.35);
+  box-shadow: none;
+  filter: drop-shadow(0 var(--px) 0 rgba(30, 16, 6, 0.45));
 }
 .member.plate.me {
-  background: #f5e8c8;
+  border-image-source: var(--sk-pa-card-gold);
+  box-shadow: none;
+  filter: drop-shadow(0 0 0 #e8b04a) drop-shadow(0 var(--px) 0 rgba(30, 16, 6, 0.45));
+  outline: var(--px) solid #e8b04a;
+  outline-offset: 0;
+}
+.member.plate .portrait {
+  position: relative;
+  grid-row: 1 / 3;
+  display: block;
+  width: calc(18 * var(--px));
+  height: calc(18 * var(--px));
+  /* A frame: ink, the rarity's color, a dark inner line; inside, the rarity's light from above. */
+  background: linear-gradient(180deg, color-mix(in srgb, var(--rc) 45%, #fff4dc) 0%, color-mix(in srgb, var(--rc) 70%, #3a2414) 100%);
   box-shadow:
-    inset var(--px) var(--px) 0 0 #fffbe8,
-    inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 0 #cfb07a,
-    0 0 0 var(--px) #2c6b30,
-    0 0 0 calc(2 * var(--px)) #5fbf4a,
-    0 calc(3 * var(--px)) 0 0 rgba(30, 16, 6, 0.35);
+    0 0 0 var(--px) #2b170c,
+    inset 0 0 0 var(--px) var(--rc),
+    inset 0 0 0 calc(2 * var(--px)) rgba(43, 23, 12, 0.55);
 }
 .member.plate .face {
-  background: #d9c08c;
-  box-shadow: inset 0 0 0 var(--px) #8a6640, inset 0 calc(-1 * var(--px)) 0 calc(var(--px)) var(--rc, #8a6640);
+  position: absolute;
+  left: var(--px);
+  top: var(--px);
+  width: calc(16 * var(--px));
+  height: calc(16 * var(--px));
+  background: none;
+  box-shadow: none;
+  object-fit: fill;
 }
+
+.member.plate .crown {
+  position: absolute;
+  left: calc(-2 * var(--px));
+  top: calc(-3 * var(--px));
+  line-height: 0;
+  filter: drop-shadow(0 var(--px) 0 #2b170c);
+}
+.member.plate .downed {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(20, 10, 6, 0.55);
+}
+/* The name, and its class's little picture at the end of the line. */
 .member.plate .nm {
+  display: flex;
+  align-items: center;
+  gap: calc(1.5 * var(--px));
+  min-width: 0;
+  font-size: calc(4 * var(--px));
+  font-weight: 700;
   color: #3b2716;
   text-shadow: none;
   text-align: left;
@@ -2132,7 +2185,7 @@ body,
   border-image: none;
   height: calc(5 * var(--px));
   background: #4b3d5c;
-  box-shadow: 0 0 0 var(--px) #3b2716;
+  box-shadow: 0 0 0 var(--px) #3b2716, inset 0 var(--px) 0 0 rgba(0, 0, 0, 0.3);
   overflow: hidden;
 }
 .member.plate .bar > i {
@@ -2140,85 +2193,179 @@ body,
   max-width: 100%;
   background: #e2454f;
 }
+.member.plate.down .nm {
+  color: #7a6450;
+}
 
 /* Health is one flat color everywhere. */
 .bar.hp > i {
   background: var(--c);
 }
 
-/* Ability slots: octagonal iron (brass when ready) round an enamel well, the icon inside, a stepped
-   shadow sweeping round as it cools down; the name on a little plaque underneath. */
+/* The action keys: chunky wooden blocks (skin.ts woodKey) that sink when pressed, the icon in a
+   round inlay (brass when ready or on, iron when not), a stepped shadow sweeping round the inlay as
+   it cools down, the name underneath. Sizes in art pixels match KEY_SIZES. */
 .actions {
   gap: calc(2 * var(--px)) calc(3 * var(--px));
+  grid-template-columns: auto auto;
+  grid-template-areas:
+    'auto skill'
+    'camp dodge';
 }
-/* Touch screens: the Attack button, biggest, in the corner under the right thumb; the rest beside it. */
+/* Touch screens: the Attack key, biggest, in the corner under the right thumb; the skill above the
+   dodge beside it; Auto and Camp, small, on the outside. */
 .actions.touch {
   grid-template-columns: auto auto auto;
+  grid-template-areas:
+    'auto skill attack'
+    'camp dodge attack';
 }
-.actions.touch .attack {
-  grid-column: 3;
-  grid-row: 1 / 3;
+.k-attack {
+  grid-area: attack;
   align-self: end;
-  transform: scale(1.3);
-  transform-origin: 100% 100%;
-  touch-action: none;
 }
-.slot-btn {
+.k-auto {
+  grid-area: auto;
+}
+.k-skill {
+  grid-area: skill;
+}
+.k-camp {
+  grid-area: camp;
+}
+.k-dodge {
+  grid-area: dodge;
+}
+.wkey {
+  --n: 28;
+  --t: 5;
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: calc(1 * var(--px));
+  padding: 0;
+  border: 0;
   background: none;
-  cursor: pointer;
   color: var(--text);
-  filter: drop-shadow(0 var(--px) 0 rgba(12, 5, 2, 0.55));
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  filter: drop-shadow(0 var(--px) 0 rgba(12, 5, 2, 0.55)) drop-shadow(0 calc(2 * var(--px)) 0 rgba(12, 5, 2, 0.25));
 }
-.slot-btn .well {
+.wkey.lg {
+  --n: 34;
+  --t: 6;
+}
+.wkey.md {
+  --n: 28;
+  --t: 5;
+}
+.wkey.sm {
+  --n: 20;
+  --t: 4;
+}
+.wkey.lg[data-rim='brass'] {
+  --up: var(--sk-key-lg-brass);
+  --down: var(--sk-key-lg-brass-down);
+}
+.wkey.lg[data-rim='iron'] {
+  --up: var(--sk-key-lg-iron);
+  --down: var(--sk-key-lg-iron-down);
+}
+.wkey.md[data-rim='brass'] {
+  --up: var(--sk-key-md-brass);
+  --down: var(--sk-key-md-brass-down);
+}
+.wkey.md[data-rim='iron'] {
+  --up: var(--sk-key-md-iron);
+  --down: var(--sk-key-md-iron-down);
+}
+.wkey.sm[data-rim='brass'] {
+  --up: var(--sk-key-sm-brass);
+  --down: var(--sk-key-sm-brass-down);
+}
+.wkey.sm[data-rim='iron'] {
+  --up: var(--sk-key-sm-iron);
+  --down: var(--sk-key-sm-iron-down);
+}
+.wkey .body {
   position: relative;
-  display: grid;
-  place-items: center;
-  width: calc(34 * var(--px));
-  height: calc(34 * var(--px));
-  background: var(--ring) center / 100% 100% no-repeat;
+  display: block;
+  width: calc(var(--n) * var(--px));
+  height: calc((var(--n) + var(--t)) * var(--px));
+  background: var(--up) 0 0 / 100% 100% no-repeat;
   image-rendering: pixelated;
 }
-.slot-btn.small .well {
-  width: calc(24 * var(--px));
-  height: calc(24 * var(--px));
+.wkey[data-down] .body {
+  background-image: var(--down);
 }
-.slot-btn:active .well {
-  transform: translateY(var(--px));
-}
-.slot-btn .well > .cool {
+/* The top face: the icon in its inlay. Pressed, it sinks with the top. */
+.wkey .face {
   position: absolute;
-  inset: calc(5 * var(--px));
+  left: 0;
+  top: 0;
+  display: grid;
+  place-items: center;
+  width: calc(var(--n) * var(--px));
+  height: calc(var(--n) * var(--px));
+}
+.wkey[data-down] .face {
+  transform: translateY(calc((var(--t) - 1) * var(--px)));
+}
+.wkey .face > img {
+  filter: drop-shadow(0 var(--px) 0 rgba(20, 8, 4, 0.8));
+}
+.wkey .face > .cool {
+  position: absolute;
+  inset: 0;
   background: conic-gradient(rgba(10, 4, 2, 0.72) var(--cd, 0%), transparent 0);
-  clip-path: polygon(28% 0, 72% 0, 100% 28%, 100% 72%, 72% 100%, 28% 100%, 0 72%, 0 28%);
+  clip-path: circle(30% at 50% 50%);
   pointer-events: none;
 }
-.slot-btn .well > .secs {
+.wkey.lg .face > .cool {
+  clip-path: circle(31% at 50% 50%);
+}
+.wkey .face > .secs {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
-  font-size: calc(10 * var(--px));
+  font-size: calc(8 * var(--px));
   font-weight: 700;
   color: var(--text);
   text-shadow: var(--pixel-text);
 }
-.slot-btn .lbl {
-  padding: 0 calc(2 * var(--px)) calc(0.5 * var(--px));
+/* Auto on: a little green lamp on the key's top right. */
+.wkey .face > .lamp {
+  position: absolute;
+  top: calc(2 * var(--px));
+  right: calc(2 * var(--px));
+  width: calc(3 * var(--px));
+  height: calc(3 * var(--px));
+  background: #8cf06a;
+  box-shadow: 0 0 0 calc(0.5 * var(--px)) #1a3a10, inset calc(-0.6 * var(--px)) calc(-0.6 * var(--px)) 0 #3caa2c;
+}
+.wkey .lbl {
+  padding: 0 calc(1.5 * var(--px));
   font-size: calc(3.8 * var(--px));
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   white-space: nowrap;
   color: var(--text);
   text-shadow: var(--pixel-text);
 }
-.slot-btn .key {
+.wkey.lg .lbl {
+  font-size: calc(4.4 * var(--px));
+}
+.wkey.cooling .lbl {
+  color: var(--muted);
+}
+.wkey .key {
   position: absolute;
-  top: calc(-1 * var(--px));
+  top: calc(-1.5 * var(--px));
   right: calc(-2 * var(--px));
   padding: 0 calc(1.2 * var(--px)) calc(0.5 * var(--px));
   font-size: calc(3.2 * var(--px));
@@ -2227,17 +2374,6 @@ body,
   background: #f4e6c8;
   box-shadow: var(--pixel-edge);
   text-shadow: none;
-}
-.slot-btn.ready .well {
-  animation: slotGlint 1.2s steps(2) infinite;
-}
-@keyframes slotGlint {
-  50% {
-    filter: brightness(1.18) drop-shadow(0 0 calc(2 * var(--px)) rgba(255, 210, 90, 0.55));
-  }
-}
-.slot-btn.cooling .lbl {
-  color: var(--muted);
 }
 
 /* The boss: a name plate between two daggers, the bar in the copper rim. */

@@ -21,6 +21,10 @@
   overflow: hidden;
   clip-path: polygon(17% 0, 83% 0, 100% 17%, 100% 83%, 83% 100%, 17% 100%, 0 83%, 0 17%);
 }
+/* In a wooden key: the round recess of its inlay. */
+.root[data-round] .win {
+  clip-path: circle(50%);
+}
 .bump {
   position: absolute;
   inset: 0;

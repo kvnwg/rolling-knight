@@ -102,7 +102,13 @@ export function knightUrl(id: string, mutation: MutationId | null, opts: { view?
   return url;
 }
 
-/** Head and shoulders, 14 x 14 (the dungeon HUD's squad faces), centered on the top of the head. */
+/** The squad portraits' size (art pixels, square). */
+export const FACE_PX = 16;
+
+/**
+ * The head, whole (helmet or hat to chin) and a little of the shoulders, FACE_PX square: the dungeon
+ * HUD's squad portraits. Centered on the head across, and from just above its top down.
+ */
 export function knightFaceUrl(id: string, mutation: MutationId | null): string {
   const key = `face|${id}|${mutation}|${pfReady() ? 'pf' : ''}`;
   let url = cache.get(key);
@@ -112,7 +118,7 @@ export function knightFaceUrl(id: string, mutation: MutationId | null): string {
     // The head's top from the sheet's rig (helmets and hats differ in height).
     const k = SHEETS[paint.sheet].clip('idle', 's')[0][0];
     const [hx, hy] = headTop(paint.sheet, k);
-    url = bufToUrl(cut(buf, hx - 7, Math.max(0, hy - 1), 14, 14));
+    url = bufToUrl(cut(buf, hx - FACE_PX / 2, Math.max(0, hy - 1), FACE_PX, FACE_PX));
   } else url = knightUrl(id, mutation);
   cache.set(key, url);
   return url;

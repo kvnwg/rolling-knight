@@ -318,6 +318,118 @@ function seal(color: Hex): string {
   return p.url();
 }
 
+/** The HUD's wooden keys: `n` across, `t` thick, the inlay's radius `r` (art pixels). */
+export const KEY_SIZES = {
+  lg: { n: 34, t: 6, r: 11.5 },
+  md: { n: 28, t: 5, r: 9.5 },
+  sm: { n: 20, t: 4, r: 6.5 },
+} as const;
+export type KeySize = keyof typeof KEY_SIZES;
+
+/** The dark recess inside a key's inlay, as an inset from the key's face (art pixels; the skill reel's window). */
+export function keyWell(size: KeySize): number {
+  const k = KEY_SIZES[size];
+  return Math.round(k.n / 2 - (k.r - 1.6));
+}
+
+/**
+ * A wooden key for the HUD's actions: a square block `n` pixels across, `t` thick, seen a little from
+ * above (its top face, then its front edge below it), lit from the top left. The top is three oak
+ * boards with grain, a bevel (light on the top and left, shade on the bottom and right) and a nail in
+ * each corner; in its middle a round inlay (a brass ring when ready, iron when not) round a dark
+ * recess the icon sits in. Pressed, the top sinks into the block: it's drawn `t - 1` lower and only a
+ * pixel of the front shows, so the key goes down without the picture changing size.
+ */
+function woodKey(n: number, t: number, down: boolean, rim: Mat, r: number): string {
+  const H = n + t;
+  const p = new Pix(n, H);
+  const W = MATS.wood;
+  const top = down ? t - 1 : 0;
+  const faceBottom = top + n - 1;
+  const c = n >= 28 ? 4 : 3; // the corners' chamfer
+  // Inside the silhouette: a chamfered rect from `top` to H - 1 (the face and what's left of the front).
+  const inside = (x: number, y: number) => {
+    if (y < top || y > H - 1 || x < 0 || x > n - 1) return false;
+    const dy = Math.min(y - top, H - 1 - y);
+    const dx = Math.min(x, n - 1 - x);
+    return dx + dy >= c - 1;
+  };
+  const edge = (x: number, y: number) => inside(x, y) && (!inside(x - 1, y) || !inside(x + 1, y) || !inside(x, y - 1) || !inside(x, y + 1));
+  // Boards: three across, seams between them.
+  const seams = [Math.round(n / 3), Math.round((2 * n) / 3)];
+  const cx = (n - 1) / 2;
+  const cy = top + (n - 1) / 2;
+  for (let y = top; y < H; y++) {
+    for (let x = 0; x < n; x++) {
+      if (!inside(x, y)) continue;
+      if (edge(x, y)) {
+        p.set(x, y, W.ink);
+        continue;
+      }
+      if (y > faceBottom) {
+        // The front edge: darker boards, their ends' grain running down, a dark foot.
+        const foot = y === H - 2;
+        const grain = (x * 7 + 3) % 5 === 0;
+        p.set(x, y, foot ? mixHex(W.lip, W.ink, 0.45) : grain ? mixHex(W.lip, W.ink, 0.25) : W.lip);
+        continue;
+      }
+      const fy = y - top;
+      // The bevel round the top face.
+      const insideTop = (xx: number, yy: number) => inside(xx, yy) && yy <= faceBottom;
+      const nearL = !insideTop(x - 2, y) || !insideTop(x - 1, y - 1);
+      const nearT = !insideTop(x, y - 2) || !insideTop(x + 1, y - 1);
+      const nearR = !insideTop(x + 2, y) || !insideTop(x + 1, y + 1);
+      const nearB = y >= faceBottom - 1;
+      let col: Hex;
+      if (nearT || nearL) col = nearT && fy <= 1 ? W.hi : mixHex(W.face, W.hi, 0.55);
+      else if (nearB) col = y === faceBottom ? mixHex(W.lo, W.lip, 0.5) : W.lo;
+      else if (nearR) col = W.lo;
+      else if (seams.includes(x)) col = mixHex(W.lip, W.ink, 0.15);
+      else if (seams.includes(x - 1)) col = mixHex(W.face, W.hi, 0.3);
+      else {
+        // Grain: long streaks down each board, a knot here and there.
+        const b = x < seams[0] ? 0 : x < seams[1] ? 1 : 2;
+        const g = Math.sin(fy * 0.55 + b * 2.3 + x * 0.9) + Math.sin(fy * 0.21 + b * 4.1);
+        col = g > 1.35 ? mixHex(W.face, W.lo, 0.7) : g < -1.45 ? mixHex(W.face, W.hi, 0.3) : W.face;
+      }
+      p.set(x, y, col);
+    }
+  }
+  // The inlay: a ring of metal round a dark recess, lit from the top left.
+  for (let y = top; y <= faceBottom; y++) {
+    for (let x = 0; x < n; x++) {
+      const d = Math.hypot(x - cx, y - cy);
+      if (d > r + 1.6) continue;
+      const lit = x - cx + (y - cy) < 0;
+      if (d > r + 0.6) p.set(x, y, mixHex(W.lip, W.ink, 0.35)); // the cut round it
+      else if (d > r - 0.6) p.set(x, y, lit ? rim.hi : rim.lo);
+      else if (d > r - 1.6) p.set(x, y, lit ? rim.face : rim.lip);
+      else {
+        // The recess: dark, a touch lighter at the bottom where the light falls in.
+        const k = (y - (cy - r)) / (2 * r);
+        p.set(x, y, k > 0.75 ? '#4a2416' : k > 0.4 ? '#3a1c12' : '#2c140c');
+      }
+    }
+  }
+  // A nail in each corner of the top.
+  const m = c + 1;
+  for (const [nx, ny] of [
+    [m, top + m],
+    [n - 1 - m - 1, top + m],
+    [m, faceBottom - m - 1],
+    [n - 1 - m - 1, faceBottom - m - 1],
+  ]) {
+    p.set(nx, ny, '#c9bcad');
+    p.set(nx + 1, ny, '#6d625a');
+    p.set(nx, ny + 1, '#6d625a');
+    p.set(nx + 1, ny + 1, '#2a2220');
+  }
+  // A glint on the top left edge.
+  p.set(c + 1, top + 1, '#ffffff', 0.5);
+  p.set(c + 2, top + 1, '#ffffff', 0.3);
+  return p.url();
+}
+
 // ------------------------------------------------------------------ the keepers' paper
 
 /** A tiny position hash in [0, 1) (the paper's speckle and the torn corners' ragged edges). */
@@ -491,6 +603,14 @@ export function installSkin(): void {
   ] as Array<[MatName, MatName]>) {
     add(`slot-${ring}-${enamel}`, slot(34, MATS[ring], MATS[enamel]));
     add(`slot-sm-${ring}-${enamel}`, slot(24, MATS[ring], MATS[enamel]));
+  }
+  // The HUD's wooden action keys: three sizes, up and pressed, a brass inlay (ready, on) or iron.
+  // (Sizes and inlays as KEY_SIZES says; the HUD's CSS sizes the keys to match.)
+  for (const [size, k] of Object.entries(KEY_SIZES)) {
+    for (const rim of ['brass', 'iron'] as const) {
+      add(`key-${size}-${rim}`, woodKey(k.n, k.t, false, MATS[rim], k.r));
+      add(`key-${size}-${rim}-down`, woodKey(k.n, k.t, true, MATS[rim], k.r));
+    }
   }
   for (const [name, color] of Object.entries({ deadly: '#d0262e', hard: '#e0702a', fair: '#d8a020', easy: '#4caa3c', trivial: '#3a8ad0' })) add(`seal-${name}`, seal(color));
   // The keepers' screens.
