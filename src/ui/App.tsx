@@ -109,8 +109,16 @@ export function App() {
       const narrow = window.innerWidth < 600;
       const desk = window.innerWidth >= 900 && window.innerWidth > window.innerHeight;
       const dpr = window.devicePixelRatio || 1;
-      const miniU = narrow ? Math.max(1.5, uiPx() * 0.6) : desk ? Math.round(uiPx() * 1.7 * dpr) / dpr : uiPx();
+      const miniU = narrow ? Math.max(1.25, Math.round(uiPx() * 0.5 * dpr) / dpr) : desk ? Math.round(uiPx() * 1.7 * dpr) / dpr : uiPx();
       document.documentElement.style.setProperty('--mini-u', `${miniU}px`);
+      // The dungeon HUD on a phone: about 70% of the UI's pixel (less on a short screen), in whole
+      // device pixels; its text comes down less, never under about 10 px.
+      const phone = Math.min(window.innerWidth, window.innerHeight) < 600;
+      const k = window.innerHeight < 680 ? 0.62 : 0.7;
+      const hudPx = phone ? Math.max(1.5, Math.round(uiPx() * k * dpr) / dpr) : uiPx();
+      const hudFpx = phone ? Math.max(hudPx, Math.round(uiPx() * 0.82 * dpr) / dpr) : uiPx();
+      document.documentElement.style.setProperty('--hud-px', `${hudPx}px`);
+      document.documentElement.style.setProperty('--hud-fpx', `${hudFpx}px`);
       setWide(window.innerWidth >= 900 && window.innerWidth > window.innerHeight);
     };
     set();

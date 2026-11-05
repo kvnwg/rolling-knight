@@ -200,7 +200,7 @@
   }
 }
 .tier {
-  font-size: calc(3.6 * var(--px));
+  font-size: calc(3.6 * var(--fpx, var(--px)));
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--tc);
@@ -235,7 +235,7 @@
   align-items: baseline;
   gap: calc(3 * var(--px));
   padding: 0 calc(1 * var(--px));
-  font-size: calc(4.3 * var(--px));
+  font-size: calc(4.3 * var(--fpx, var(--px)));
   color: #b3b6d8;
 }
 .head b {
@@ -254,7 +254,7 @@
     0 var(--px) 0 0 #1a1326,
     calc(-1 * var(--px)) 0 0 0 #1a1326,
     var(--px) 0 0 0 #1a1326;
-  font-size: calc(4.3 * var(--px));
+  font-size: calc(4.3 * var(--fpx, var(--px)));
   line-height: 1.3;
   color: #b3b6d8;
 }
@@ -278,7 +278,7 @@
 }
 .name .tier {
   margin-left: calc(1.5 * var(--px));
-  font-size: calc(3.4 * var(--px));
+  font-size: calc(3.4 * var(--fpx, var(--px)));
   text-shadow: none;
 }
 .odds {

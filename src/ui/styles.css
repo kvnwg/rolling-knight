@@ -165,7 +165,7 @@ canvas.vista {
   min-height: calc(15 * var(--px));
   padding: 0 calc(5 * var(--px));
   font-weight: 700;
-  font-size: calc(6 * var(--px));
+  font-size: calc(6 * var(--fpx, var(--px)));
   letter-spacing: 0.04em;
   color: #fff;
   text-shadow: var(--pixel-text);
@@ -209,13 +209,13 @@ canvas.vista {
 }
 .btn.small {
   min-height: calc(12 * var(--px));
-  font-size: calc(5 * var(--px));
+  font-size: calc(5 * var(--fpx, var(--px)));
   padding: 0 calc(3.5 * var(--px));
   gap: calc(1.5 * var(--px));
 }
 .btn.big {
   min-height: calc(22 * var(--px));
-  font-size: calc(9 * var(--px));
+  font-size: calc(9 * var(--fpx, var(--px)));
   padding: 0 calc(8 * var(--px));
 }
 .btn.square {
@@ -272,7 +272,7 @@ canvas.vista {
   -webkit-backdrop-filter: blur(8px) saturate(1.3);
   box-shadow: var(--pixel-edge);
   font-weight: 700;
-  font-size: calc(5.5 * var(--px));
+  font-size: calc(5.5 * var(--fpx, var(--px)));
   white-space: nowrap;
   color: var(--text);
 }
@@ -323,7 +323,7 @@ button.pill {
 .badge {
   position: absolute;
   z-index: 2;
-  font-size: calc(4 * var(--px));
+  font-size: calc(4 * var(--fpx, var(--px)));
   font-weight: 700;
   line-height: 1;
   padding: calc(1 * var(--px)) calc(1.5 * var(--px));
@@ -379,7 +379,7 @@ button.pill {
   gap: calc(2 * var(--px));
   padding: calc(1 * var(--px));
   padding-right: calc(3 * var(--px));
-  font-size: calc(4.5 * var(--px));
+  font-size: calc(4.5 * var(--fpx, var(--px)));
   min-width: calc(62 * var(--px));
 }
 .lvl .n {
@@ -387,7 +387,7 @@ button.pill {
   place-items: center;
   min-width: calc(11 * var(--px));
   height: calc(11 * var(--px));
-  font-size: calc(6 * var(--px));
+  font-size: calc(6 * var(--fpx, var(--px)));
   font-weight: 700;
   text-shadow: var(--pixel-text);
   background: linear-gradient(180deg, #ffe08a 0 var(--px), #f5a623 var(--px) calc(100% - var(--px)), #b86a0e calc(100% - var(--px)) 100%);
@@ -461,20 +461,20 @@ button.pill {
   gap: calc(2 * var(--px));
   flex-wrap: wrap;
   font-weight: 700;
-  font-size: calc(6.5 * var(--px));
+  font-size: calc(6.5 * var(--fpx, var(--px)));
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text);
 }
 .section-title small {
-  font-size: calc(4.5 * var(--px));
+  font-size: calc(4.5 * var(--fpx, var(--px)));
   letter-spacing: 0.04em;
   text-transform: none;
   color: var(--gold);
   font-weight: 500;
 }
 .lead {
-  font-size: calc(4.5 * var(--px));
+  font-size: calc(4.5 * var(--fpx, var(--px)));
   color: var(--muted);
   line-height: 1.35;
   margin: 0;
@@ -526,7 +526,7 @@ button.pill {
   justify-content: flex-end;
   gap: calc(1 * var(--px));
   padding: calc(2 * var(--px)) 0 calc(1.5 * var(--px));
-  font-size: calc(4.2 * var(--px));
+  font-size: calc(4.2 * var(--fpx, var(--px)));
   font-weight: 700;
   color: var(--muted);
 }
@@ -567,7 +567,7 @@ button.pill {
   padding: calc(2 * var(--px));
   gap: calc(1.5 * var(--px));
   text-align: center;
-  font-size: calc(4 * var(--px));
+  font-size: calc(4 * var(--fpx, var(--px)));
   line-height: 1.15;
   color: var(--text);
   background: linear-gradient(180deg, #2a1c1f, #1c1215);
@@ -637,14 +637,14 @@ button.kcard:active {
 }
 .kcard .kc-name {
   font-weight: 700;
-  font-size: calc(4.8 * var(--px));
+  font-size: calc(4.8 * var(--fpx, var(--px)));
   line-height: 1.1;
   color: var(--text);
   text-shadow: var(--pixel-text);
   overflow-wrap: anywhere;
 }
 .kcard .kc-meta {
-  font-size: calc(4.2 * var(--px));
+  font-size: calc(4.2 * var(--fpx, var(--px)));
   color: var(--muted);
 }
 .kcard .kc-foot {
@@ -655,7 +655,7 @@ button.kcard:active {
   margin-top: auto;
   padding-top: calc(1.5 * var(--px));
   border-top: var(--px) solid color-mix(in srgb, var(--rc) 22%, #3a2a2c);
-  font-size: calc(4.4 * var(--px));
+  font-size: calc(4.4 * var(--fpx, var(--px)));
   font-weight: 700;
   white-space: nowrap;
 }
@@ -675,7 +675,7 @@ button.kcard:active {
   align-items: center;
   gap: calc(0.5 * var(--px));
   padding: 0 var(--px);
-  font-size: calc(3.4 * var(--px));
+  font-size: calc(3.4 * var(--fpx, var(--px)));
   font-weight: 700;
   line-height: calc(5 * var(--px));
   letter-spacing: 0.08em;
@@ -712,7 +712,7 @@ button.kcard:active {
   box-shadow: 0 0 0 var(--px) var(--ink), inset 0 0 0 var(--px) #b97a26;
 }
 .kspare b {
-  font-size: calc(4.6 * var(--px));
+  font-size: calc(4.6 * var(--fpx, var(--px)));
   font-weight: 700;
   line-height: 1;
 }
@@ -729,7 +729,7 @@ button.kcard:active {
   flex-wrap: wrap;
 }
 .chip {
-  font-size: calc(4.2 * var(--px));
+  font-size: calc(4.2 * var(--fpx, var(--px)));
   font-weight: 700;
   padding: calc(1.5 * var(--px)) calc(2.5 * var(--px));
   background: var(--navy-2);
@@ -741,7 +741,7 @@ button.kcard:active {
   color: #fff;
 }
 select.select {
-  font-size: calc(4.2 * var(--px));
+  font-size: calc(4.2 * var(--fpx, var(--px)));
   font-weight: 700;
   padding: calc(1 * var(--px)) calc(2 * var(--px));
   background: var(--navy-2);
@@ -771,7 +771,7 @@ select.select {
   justify-content: center;
   gap: calc(0.5 * var(--px));
   padding: calc(1.5 * var(--px)) var(--px);
-  font-size: calc(4.8 * var(--px));
+  font-size: calc(4.8 * var(--fpx, var(--px)));
   font-weight: 700;
   white-space: nowrap;
   color: var(--text);
@@ -779,7 +779,7 @@ select.select {
   box-shadow: 0 0 0 var(--px) var(--ink);
 }
 .kstats > span > small {
-  font-size: calc(3.6 * var(--px));
+  font-size: calc(3.6 * var(--fpx, var(--px)));
   letter-spacing: 0.06em;
   color: var(--muted);
 }
@@ -793,12 +793,12 @@ select.select {
   display: inline-flex;
   align-items: center;
   gap: calc(2 * var(--px));
-  font-size: calc(4.4 * var(--px));
+  font-size: calc(4.4 * var(--fpx, var(--px)));
   font-weight: 700;
 }
 .kspare-why {
   margin: calc(-1 * var(--px)) 0 0;
-  font-size: calc(4.2 * var(--px));
+  font-size: calc(4.2 * var(--fpx, var(--px)));
   line-height: 1.3;
   color: var(--muted);
 }
@@ -818,13 +818,13 @@ select.select {
   display: flex;
   align-items: baseline;
   gap: calc(0.5 * var(--px));
-  font-size: calc(7 * var(--px));
+  font-size: calc(7 * var(--fpx, var(--px)));
   font-weight: 700;
   line-height: 1;
   color: var(--gold);
 }
 .klv small {
-  font-size: calc(4 * var(--px));
+  font-size: calc(4 * var(--fpx, var(--px)));
   color: var(--muted);
 }
 .kshards {
@@ -833,7 +833,7 @@ select.select {
   flex-direction: column;
   gap: var(--px);
   min-width: 0;
-  font-size: calc(4.4 * var(--px));
+  font-size: calc(4.4 * var(--fpx, var(--px)));
   font-weight: 700;
   color: var(--text);
 }
@@ -884,7 +884,7 @@ select.select {
   }
 }
 .ksquad {
-  font-size: calc(4.4 * var(--px));
+  font-size: calc(4.4 * var(--fpx, var(--px)));
   font-weight: 700;
   color: var(--muted);
 }
@@ -893,7 +893,7 @@ select.select {
 }
 .kforge-msg {
   align-self: flex-end;
-  font-size: calc(4.4 * var(--px));
+  font-size: calc(4.4 * var(--fpx, var(--px)));
 }
 .stage-art .stage-gold {
   position: absolute;
@@ -910,7 +910,7 @@ select.select {
   place-items: center;
   width: calc(9 * var(--px));
   height: calc(9 * var(--px));
-  font-size: calc(5.5 * var(--px));
+  font-size: calc(5.5 * var(--fpx, var(--px)));
   font-weight: 700;
   color: var(--text);
   background: #3a2a2c;
@@ -933,7 +933,7 @@ select.select {
   gap: calc(2 * var(--px));
   width: min(100%, calc(150 * var(--px)));
   padding: calc(4 * var(--px)) calc(5 * var(--px));
-  font-size: calc(4.6 * var(--px));
+  font-size: calc(4.6 * var(--fpx, var(--px)));
   line-height: 1.35;
   color: var(--text);
   animation: popIn 0.18s steps(3) both;
@@ -965,14 +965,14 @@ select.select {
   flex-direction: column;
   gap: calc(2 * var(--px));
   padding: calc(3 * var(--px)) calc(4 * var(--px));
-  font-size: calc(4.4 * var(--px));
+  font-size: calc(4.4 * var(--fpx, var(--px)));
   color: var(--text);
 }
 .kconfirm > b {
   display: flex;
   align-items: center;
   gap: var(--px);
-  font-size: calc(5 * var(--px));
+  font-size: calc(5 * var(--fpx, var(--px)));
 }
 .kconfirm ul {
   display: flex;
@@ -1000,7 +1000,7 @@ select.select {
   padding: calc(2 * var(--px)) calc(3 * var(--px));
 }
 .krules label {
-  font-size: calc(4.2 * var(--px));
+  font-size: calc(4.2 * var(--fpx, var(--px)));
 }
 
 /* Feedback for every press (fx/Pops.tsx): "+3 shards" or "+120 gold" jumps off the button and flies
@@ -1012,7 +1012,7 @@ select.select {
   align-items: center;
   gap: var(--px);
   translate: -50% -50%;
-  font-size: calc(5.5 * var(--px));
+  font-size: calc(5.5 * var(--fpx, var(--px)));
   font-weight: 700;
   white-space: nowrap;
   color: #ffe08a;
@@ -1135,7 +1135,7 @@ select.select {
   display: flex;
   flex-direction: column;
   gap: calc(3 * var(--px));
-  font-size: calc(4.6 * var(--px));
+  font-size: calc(4.6 * var(--fpx, var(--px)));
   animation: popIn 0.22s steps(4) both;
 }
 .modal .x {
@@ -1185,7 +1185,7 @@ select.select {
   display: flex;
   justify-content: space-between;
   gap: calc(2 * var(--px));
-  font-size: calc(4.6 * var(--px));
+  font-size: calc(4.6 * var(--fpx, var(--px)));
   color: var(--muted);
 }
 .stat-line b {
@@ -1195,7 +1195,7 @@ select.select {
   padding: calc(2 * var(--px)) calc(3 * var(--px));
   background: rgba(10, 8, 22, 0.45);
   box-shadow: var(--pixel-edge);
-  font-size: calc(4.3 * var(--px));
+  font-size: calc(4.3 * var(--fpx, var(--px)));
   line-height: 1.3;
   color: var(--muted);
 }
@@ -1214,12 +1214,12 @@ select.select {
   gap: calc(1 * var(--px)) calc(3 * var(--px));
   align-items: center;
   padding: calc(2.5 * var(--px)) calc(3 * var(--px));
-  font-size: calc(4.3 * var(--px));
+  font-size: calc(4.3 * var(--fpx, var(--px)));
   color: var(--muted);
 }
 .upg .name {
   font-weight: 700;
-  font-size: calc(5.2 * var(--px));
+  font-size: calc(5.2 * var(--fpx, var(--px)));
   color: var(--text);
 }
 .pips {
@@ -1244,12 +1244,12 @@ select.select {
 .perk {
   position: relative;
   padding: calc(2.5 * var(--px));
-  font-size: calc(4 * var(--px));
+  font-size: calc(4 * var(--fpx, var(--px)));
   line-height: 1.3;
   cursor: pointer;
 }
 .perk b {
-  font-size: calc(4.6 * var(--px));
+  font-size: calc(4.6 * var(--fpx, var(--px)));
 }
 .perk.owned {
   outline: var(--px) solid var(--good);
@@ -1265,6 +1265,11 @@ select.select {
   position: fixed;
   inset: 0;
   pointer-events: none;
+  /* In a fight a phone's HUD comes down to its own smaller pixel (App sets --hud-px, in whole device
+     pixels so the art stays crisp), and its text a little less (--hud-fpx): the middle of the screen
+     is where you play. Desktops keep the UI's pixel. */
+  --px: var(--hud-px, 3px);
+  --fpx: var(--hud-fpx, var(--hud-px, 3px));
 }
 .dhud > * {
   pointer-events: auto;
@@ -1274,11 +1279,11 @@ select.select {
   flex-direction: column;
   gap: calc(0.5 * var(--px));
   padding: calc(1.5 * var(--px)) calc(3 * var(--px));
-  font-size: calc(4.2 * var(--px));
+  font-size: calc(4.2 * var(--fpx, var(--px)));
   color: var(--muted);
 }
 .floor-pill b {
-  font-size: calc(6 * var(--px));
+  font-size: calc(6 * var(--fpx, var(--px)));
   color: var(--gold);
   letter-spacing: 0.08em;
 }
@@ -1289,7 +1294,7 @@ select.select {
   align-items: center;
   gap: calc(1 * var(--px));
   margin-left: calc(2 * var(--px));
-  font-size: calc(4 * var(--px));
+  font-size: calc(4 * var(--fpx, var(--px)));
   font-weight: 700;
   letter-spacing: 0.06em;
   color: var(--cc, var(--gold));
@@ -1310,7 +1315,7 @@ select.select {
   flex-wrap: wrap;
   gap: calc(1.5 * var(--px)) calc(3.5 * var(--px));
   padding: calc(1.5 * var(--px)) calc(3 * var(--px));
-  font-size: calc(4.4 * var(--px));
+  font-size: calc(4.4 * var(--fpx, var(--px)));
   color: var(--text);
 }
 .power-check b {
@@ -1355,7 +1360,7 @@ select.select {
   padding: calc(1.5 * var(--px));
   padding-right: calc(2.5 * var(--px));
   cursor: pointer;
-  font-size: calc(3.8 * var(--px));
+  font-size: calc(3.8 * var(--fpx, var(--px)));
   color: var(--muted);
 }
 .member.me {
@@ -1406,14 +1411,14 @@ select.select {
   width: calc(26 * var(--px));
   height: calc(26 * var(--px));
   padding: 0;
-  font-size: calc(3.8 * var(--px));
+  font-size: calc(3.8 * var(--fpx, var(--px)));
   line-height: 1;
   overflow: hidden;
 }
 .act.big {
   width: calc(34 * var(--px));
   height: calc(34 * var(--px));
-  font-size: calc(4.4 * var(--px));
+  font-size: calc(4.4 * var(--fpx, var(--px)));
 }
 .act .cool {
   position: absolute;
@@ -1425,7 +1430,7 @@ select.select {
 }
 .act .secs {
   position: relative;
-  font-size: calc(9 * var(--px));
+  font-size: calc(9 * var(--fpx, var(--px)));
   line-height: calc(10 * var(--px));
   font-weight: 700;
   color: var(--text);
@@ -1469,7 +1474,7 @@ select.select {
   animation: readyPulse 0.5s steps(2) infinite;
 }
 .bossbar .title {
-  font-size: calc(4.2 * var(--px));
+  font-size: calc(4.2 * var(--fpx, var(--px)));
   font-weight: 700;
   color: var(--muted);
   letter-spacing: 0.04em;
@@ -1490,7 +1495,7 @@ select.select {
   }
 }
 .act .key {
-  font-size: calc(3.2 * var(--px));
+  font-size: calc(3.2 * var(--fpx, var(--px)));
   color: rgba(255, 255, 255, 0.85);
 }
 .act.ready {
@@ -1523,7 +1528,7 @@ select.select {
   --u: var(--mini-u, var(--px));
 }
 .mini-roller .note {
-  font-size: calc(3.8 * var(--px));
+  font-size: calc(3.8 * var(--fpx, var(--px)));
   padding: calc(0.5 * var(--px)) calc(2 * var(--px));
 }
 
@@ -1567,7 +1572,7 @@ select.select {
   gap: calc(1.5 * var(--px));
   min-width: 0;
   padding: calc(0.5 * var(--px)) calc(2 * var(--px)) calc(0.5 * var(--px)) calc(1.5 * var(--px));
-  font-size: calc(3.6 * var(--px));
+  font-size: calc(3.6 * var(--fpx, var(--px)));
   font-weight: 700;
   line-height: 1.3;
   color: #3b2716;
@@ -1629,7 +1634,7 @@ canvas.game.aiming {
   transform: translateX(-50%);
   max-width: 92vw;
   text-align: center;
-  font-size: calc(4.2 * var(--px));
+  font-size: calc(4.2 * var(--fpx, var(--px)));
   padding: calc(1.5 * var(--px)) calc(3 * var(--px));
   pointer-events: none !important;
   color: var(--text);
@@ -1651,7 +1656,7 @@ canvas.game.aiming {
   grid-template-columns: auto 1fr;
   gap: calc(2 * var(--px)) calc(4 * var(--px));
   padding: calc(4 * var(--px));
-  font-size: calc(4.8 * var(--px));
+  font-size: calc(4.8 * var(--fpx, var(--px)));
   line-height: 1.35;
   animation: popIn 0.22s steps(4) both;
 }
@@ -1679,16 +1684,16 @@ canvas.game.aiming {
 /* Narrow screens: the floor's plate on three lines (floor, place, foes left) rather than a ragged wrap. */
 @media (max-width: 480px) {
   .floor-pill {
-    font-size: calc(3.8 * var(--px));
+    font-size: calc(3.8 * var(--fpx, var(--px)));
     padding: calc(1 * var(--px)) calc(2.5 * var(--px));
   }
   .floor-pill b {
-    font-size: calc(5 * var(--px));
+    font-size: calc(5 * var(--fpx, var(--px)));
     white-space: nowrap;
   }
   .floor-pill .dchip {
     margin-left: calc(1 * var(--px));
-    font-size: calc(3.6 * var(--px));
+    font-size: calc(3.6 * var(--fpx, var(--px)));
   }
   .floor-pill .dchip::before {
     width: calc(9 * var(--px));
@@ -1726,7 +1731,7 @@ canvas.game.aiming {
   display: flex;
   align-items: center;
   gap: calc(2 * var(--px));
-  font-size: calc(4.6 * var(--px));
+  font-size: calc(4.6 * var(--fpx, var(--px)));
   font-weight: 700;
   padding: calc(1.5 * var(--px)) calc(3 * var(--px));
   color: var(--text);
@@ -1778,7 +1783,7 @@ canvas.game.aiming {
   animation: bannerIn 0.35s steps(5) both, toastOut 0.5s steps(4) 1.9s both;
 }
 .banner .sub {
-  font-size: calc(5.5 * var(--px));
+  font-size: calc(5.5 * var(--fpx, var(--px)));
   font-weight: 700;
   padding: calc(1 * var(--px)) calc(4 * var(--px));
   color: var(--text);
@@ -1804,14 +1809,14 @@ input[type='checkbox'] {
   align-items: center;
   justify-content: space-between;
   gap: calc(3 * var(--px));
-  font-size: calc(4.6 * var(--px));
+  font-size: calc(4.6 * var(--fpx, var(--px)));
   padding: calc(2 * var(--px)) calc(3 * var(--px));
   color: var(--text);
 }
 .setting small {
   display: block;
   color: var(--muted);
-  font-size: calc(3.8 * var(--px));
+  font-size: calc(3.8 * var(--fpx, var(--px)));
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1853,7 +1858,7 @@ input[type='checkbox'] {
 .reveal .kick {
   position: relative;
   font-weight: 700;
-  font-size: calc(6 * var(--px));
+  font-size: calc(6 * var(--fpx, var(--px)));
   letter-spacing: 0.1em;
   color: var(--rc);
   text-shadow: var(--pixel-text);
@@ -1861,7 +1866,7 @@ input[type='checkbox'] {
 .reveal .name {
   position: relative;
   font-weight: 700;
-  font-size: calc(9 * var(--px));
+  font-size: calc(9 * var(--fpx, var(--px)));
   text-align: center;
   padding: 0 calc(6 * var(--px));
   text-shadow: var(--pixel-text);
@@ -1869,7 +1874,7 @@ input[type='checkbox'] {
 .reveal .odds {
   position: relative;
   font-weight: 700;
-  font-size: calc(9 * var(--px));
+  font-size: calc(9 * var(--fpx, var(--px)));
   color: var(--gold);
   text-shadow: var(--pixel-text);
 }
@@ -1887,7 +1892,7 @@ input[type='checkbox'] {
 .reveal .tapnote {
   position: absolute;
   bottom: calc(10 * var(--px));
-  font-size: calc(4.5 * var(--px));
+  font-size: calc(4.5 * var(--fpx, var(--px)));
   color: var(--muted);
 }
 .reveal .muted {
@@ -2229,7 +2234,7 @@ body,
   align-items: center;
   gap: calc(1.5 * var(--px));
   min-width: 0;
-  font-size: calc(4 * var(--px));
+  font-size: calc(4 * var(--fpx, var(--px)));
   font-weight: 700;
   color: #3b2716;
   text-shadow: none;
@@ -2408,7 +2413,7 @@ body,
   inset: 0;
   display: grid;
   place-items: center;
-  font-size: calc(8 * var(--px));
+  font-size: calc(8 * var(--fpx, var(--px)));
   font-weight: 700;
   color: var(--text);
   text-shadow: var(--pixel-text);
@@ -2425,7 +2430,7 @@ body,
 }
 .wkey .lbl {
   padding: 0 calc(1.5 * var(--px));
-  font-size: calc(3.8 * var(--px));
+  font-size: calc(3.8 * var(--fpx, var(--px)));
   font-weight: 700;
   letter-spacing: 0.06em;
   white-space: nowrap;
@@ -2433,7 +2438,7 @@ body,
   text-shadow: var(--pixel-text);
 }
 .wkey.lg .lbl {
-  font-size: calc(4.4 * var(--px));
+  font-size: calc(4.4 * var(--fpx, var(--px)));
 }
 .wkey.cooling .lbl {
   color: var(--muted);
@@ -2443,7 +2448,7 @@ body,
   top: calc(-1.5 * var(--px));
   right: calc(-2 * var(--px));
   padding: 0 calc(1.2 * var(--px)) calc(0.5 * var(--px));
-  font-size: calc(3.2 * var(--px));
+  font-size: calc(3.2 * var(--fpx, var(--px)));
   font-weight: 700;
   color: var(--text-dark);
   background: #f4e6c8;
@@ -2523,12 +2528,12 @@ body,
 .talk-card .who {
   display: flex;
   flex-direction: column;
-  font-size: calc(4.2 * var(--px));
+  font-size: calc(4.2 * var(--fpx, var(--px)));
   color: var(--muted);
   white-space: nowrap;
 }
 .talk-card .who b {
-  font-size: calc(5.5 * var(--px));
+  font-size: calc(5.5 * var(--fpx, var(--px)));
   color: var(--gold);
 }
 
@@ -2564,12 +2569,12 @@ body,
   gap: calc(1 * var(--px));
 }
 .station-sheet .job {
-  font-size: calc(4.4 * var(--px));
+  font-size: calc(4.4 * var(--fpx, var(--px)));
   color: var(--muted);
 }
 .station-sheet .say {
   margin: 0;
-  font-size: calc(4.6 * var(--px));
+  font-size: calc(4.6 * var(--fpx, var(--px)));
   line-height: 1.35;
   color: var(--text);
   font-style: italic;
@@ -2637,7 +2642,7 @@ body,
   flex-direction: column;
   align-items: center;
   gap: calc(1 * var(--px));
-  font-size: calc(5 * var(--px));
+  font-size: calc(5 * var(--fpx, var(--px)));
   font-weight: 700;
   text-transform: capitalize;
 }
@@ -2712,13 +2717,13 @@ body,
   padding-top: calc(1 * var(--px));
 }
 .dialog-box .who {
-  font-size: calc(5.5 * var(--px));
+  font-size: calc(5.5 * var(--fpx, var(--px)));
   color: var(--gold);
 }
 .dialog-box .say {
   margin: 0;
   min-height: calc(14 * var(--px));
-  font-size: calc(5 * var(--px));
+  font-size: calc(5 * var(--fpx, var(--px)));
   line-height: 1.4;
   color: var(--text);
 }
@@ -2749,7 +2754,7 @@ body,
   min-height: calc(12 * var(--px));
   padding: calc(1.5 * var(--px)) calc(2.5 * var(--px)) calc(1.5 * var(--px)) calc(1 * var(--px));
   text-align: left;
-  font-size: calc(5 * var(--px));
+  font-size: calc(5 * var(--fpx, var(--px)));
   line-height: 1.25;
   color: var(--text);
   background: rgba(255, 240, 210, 0.035);
@@ -2776,7 +2781,7 @@ body,
   place-items: center;
   min-width: calc(6 * var(--px));
   height: calc(6.5 * var(--px));
-  font-size: calc(3.8 * var(--px));
+  font-size: calc(3.8 * var(--fpx, var(--px)));
   font-weight: 700;
   color: var(--muted);
   background: rgba(0, 0, 0, 0.4);
@@ -2865,7 +2870,7 @@ body,
   margin-bottom: calc(1.5 * var(--px));
   padding: calc(2.5 * var(--px)) calc(4 * var(--px)) calc(2.5 * var(--px)) calc(3 * var(--px));
   text-align: left;
-  font-size: calc(4.4 * var(--px));
+  font-size: calc(4.4 * var(--fpx, var(--px)));
   color: var(--text-dark);
   background: linear-gradient(180deg, #faf0d8 0, #f4e6c8 45%, #ecdab4 100%);
   box-shadow: 0 0 0 var(--px) #2a120c, inset 0 0 0 var(--px) #9a6440, inset var(--px) var(--px) 0 var(--px) #fffaea,
@@ -2901,7 +2906,7 @@ body,
   align-items: center;
   gap: calc(2 * var(--px));
   padding-right: calc(16 * var(--px));
-  font-size: calc(5.5 * var(--px));
+  font-size: calc(5.5 * var(--fpx, var(--px)));
   font-weight: 700;
 }
 .dialog-box .job-mark {
@@ -2981,15 +2986,15 @@ body,
   gap: calc(1 * var(--px));
   padding-top: calc(1.5 * var(--px));
   border-top: var(--px) dashed rgba(126, 70, 52, 0.45);
-  font-size: calc(4.4 * var(--px));
+  font-size: calc(4.4 * var(--fpx, var(--px)));
   line-height: 1.3;
   animation: dlgRowIn 0.15s steps(3) both;
 }
 .dialog-box .job-words b {
-  font-size: calc(5 * var(--px));
+  font-size: calc(5 * var(--fpx, var(--px)));
 }
 .dialog-box .job-fine {
-  font-size: calc(2.4 * var(--px));
+  font-size: calc(2.4 * var(--fpx, var(--px)));
   line-height: 1.2;
   letter-spacing: 0;
   color: rgba(46, 37, 35, 0.6);
@@ -3034,22 +3039,22 @@ body,
   flex-direction: column;
   min-width: 0;
   gap: calc(0.5 * var(--px));
-  font-size: calc(4.6 * var(--px));
+  font-size: calc(4.6 * var(--fpx, var(--px)));
   line-height: 1.15;
   color: #fff3d8;
 }
 .buy-what b {
-  font-size: calc(5.4 * var(--px));
+  font-size: calc(5.4 * var(--fpx, var(--px)));
   color: #ffd86a;
 }
 .buy-what small {
-  font-size: calc(4.2 * var(--px));
+  font-size: calc(4.2 * var(--fpx, var(--px)));
   color: #e8dcc0;
 }
 .buy-btn {
   flex: none;
   min-height: calc(16 * var(--px)) !important;
-  font-size: calc(5.6 * var(--px)) !important;
+  font-size: calc(5.6 * var(--fpx, var(--px))) !important;
   gap: calc(1 * var(--px)) !important;
 }
 /* What you bought from merchants this run, under the squad. */
@@ -3073,7 +3078,7 @@ body,
   position: absolute;
   right: calc(-1 * var(--px));
   bottom: calc(-1.5 * var(--px));
-  font-size: calc(3.6 * var(--px));
+  font-size: calc(3.6 * var(--fpx, var(--px)));
   color: #fff;
   text-shadow: 1px 0 0 #1a1326, -1px 0 0 #1a1326, 0 1px 0 #1a1326, 0 -1px 0 #1a1326;
 }
@@ -3093,14 +3098,14 @@ body,
     height: calc(18 * var(--px));
   }
   .buy-what b {
-    font-size: calc(4.8 * var(--px));
+    font-size: calc(4.8 * var(--fpx, var(--px)));
   }
   .buy-what small {
-    font-size: calc(3.7 * var(--px));
+    font-size: calc(3.7 * var(--fpx, var(--px)));
   }
   .buy-btn {
     min-height: calc(13 * var(--px)) !important;
-    font-size: calc(4.8 * var(--px)) !important;
+    font-size: calc(4.8 * var(--fpx, var(--px))) !important;
     padding-left: calc(2 * var(--px)) !important;
     padding-right: calc(2 * var(--px)) !important;
   }
@@ -3147,7 +3152,7 @@ body,
   grid-template-columns: auto 1fr 1fr;
   gap: calc(1.5 * var(--px)) calc(3 * var(--px));
   padding: calc(3 * var(--px));
-  font-size: calc(4 * var(--px));
+  font-size: calc(4 * var(--fpx, var(--px)));
   line-height: 1.25;
 }
 .controls-list .control-row {
