@@ -4,6 +4,7 @@
  * Upgrades, Perks, Rebirth; plus the hero detail, luck and settings sheets.
  */
 import { useMemo, useState, type ReactNode } from 'react';
+import { MUSIC_CREDIT } from '../audio/tracks';
 import { BAL } from '../core/balance';
 import { CLASSES, CLASS_IDS, KNIGHTS, knightDef, unlockedClasses, type ClassId } from '../core/knights';
 import { luckBreakdown, lowestDroppable, oneInFor, revealBar } from '../core/luck';
@@ -745,7 +746,7 @@ export function SettingsSheet({ game, onClose }: { game: Game; onClose: () => vo
         )}
         <div className="section-title outlined">Credits</div>
         <p className="lead">
-          Characters built on Snoblin's Pixel RPG Prototype Characters. Effects: Pixel Art Assets - Will Tice / unTied Games. Icons and pixel tools from Dumpster Legend. Pixelify Sans (SIL OFL). v{__APP_VERSION__}
+          Characters built on Snoblin's Pixel RPG Prototype Characters. Effects: Pixel Art Assets - Will Tice / unTied Games. {MUSIC_CREDIT} Icons and pixel tools from Dumpster Legend. Pixelify Sans (SIL OFL). v{__APP_VERSION__}
         </p>
       </div>
     </div>

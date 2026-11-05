@@ -1,67 +1,82 @@
 /**
- * The music: Dumpster Legend's step sequencer (scheduled a moment ahead on the audio clock, picking
- * the beat back up if the page stalls, ducking and swelling under big moments), grown into a small
- * band. Each scene plays a looping theme from songs.ts with its own lead instrument, tempo and
- * ambience (the camp's fire and crickets, the swamp's frogs...); a new scene crossfades in over the
- * old. A boss falling plays a victory sting over the music. Silent until `unlock` (the first tap);
- * nothing here touches the browser at import.
+ * The music: a recorded track for each scene (tracks.ts: Kevin MacLeod's, cut into seamless loops),
+ * with the place's own sounds under it (ambience.ts: the camp's fire and crickets, the swamp's
+ * frogs...); a new scene crossfades in over the old. A boss falling plays a victory sting over the
+ * boss's theme, ducked low, then the music goes back to the place's own. Big moments duck it and
+ * swell it back.
+ *
+ * Tracks are decoded when a scene first wants one (that scene's first, one at a time), and the last
+ * few kept decoded; while a track decodes, the scene before plays on. Silent until `unlock` (the
+ * first tap); nothing here touches the browser at import.
  */
 import type { BiomeId } from '../world/biomes';
 import { BIOMES } from '../world/biomes';
-import { engine, guarded, makeRnd, type Graph } from './engine';
-import { ambience, bed, drum, play, strum, toneFor, warmDrums, type Out } from './instruments';
-import {
-  SONGS, VICTORY, arpNote, atOrAbove, parseLine, songChords, thirdBelow, voice,
-  type AmbienceId, type DrumId, type InstId, type Song, type SongId, type When,
-} from './songs';
+import { ambience, bed, C_PENTATONIC, type AmbienceId, type Out } from './ambience';
+import { bytesOf, decode, engine, guarded, makeRnd, type Graph } from './engine';
+import { MUSIC_FILES, STINGS, TRACKS, type StingId, type TrackId } from './tracks';
 
 export type MusicScene = 'camp' | 'boss' | BiomeId | 'farmland';
 
 interface SceneDef {
-  song: SongId;
-  /** In place of the song's lead. */
-  lead?: InstId;
-  /** Times the song's tempo. */
-  tempo?: number;
+  track: TrackId;
   ambience?: AmbienceId[];
+  /** Pitch classes the place's tuned sounds (glints, chimes) pick from, in the track's key (default C major pentatonic). */
+  tones?: number[];
   /** Seconds to fade in over the scene before (default 2.5). */
   fade?: number;
 }
 
-/** Which theme each scene plays, and how. */
+/** G minor pentatonic (G Bb C D F): The Snow Queen's key, for the crystal caves' glints. */
+const G_MINOR_PENTATONIC = [7, 10, 0, 2, 5];
+
+/** Which track each scene plays, and the place's sounds under it. */
 export const SCENES: Record<MusicScene, SceneDef> = {
-  camp: { song: 'camp', ambience: ['crackle', 'crickets'], fade: 3 },
-  hamlet: { song: 'meadow', ambience: ['birds'] },
-  farmland: { song: 'meadow', lead: 'fiddle', tempo: 1.05, ambience: ['birds', 'crickets'] },
-  desert: { song: 'desert', ambience: ['wind'] },
-  forest: { song: 'gloom', ambience: ['owl', 'crickets'] },
-  swamp: { song: 'gloom', lead: 'reed', tempo: 0.92, ambience: ['frogs'] },
-  graveyard: { song: 'gloom', lead: 'celesta', tempo: 0.9, ambience: ['wind', 'toll'] },
-  tundra: { song: 'frost', ambience: ['wind'] },
-  crystal: { song: 'frost', lead: 'bell', tempo: 1.08, ambience: ['glints'] },
-  crypt: { song: 'deep', lead: 'organ', tempo: 0.9, ambience: ['drips'] },
-  ember: { song: 'deep', lead: 'horn', tempo: 1.12, ambience: ['lava'] },
-  shrine: { song: 'shrine', ambience: ['chimes'] },
-  boss: { song: 'boss', fade: 0.9 },
+  camp: { track: 'tavern', ambience: ['crackle', 'crickets'], fade: 3 },
+  hamlet: { track: 'village', ambience: ['birds'] },
+  farmland: { track: 'inn', ambience: ['birds', 'crickets'] },
+  desert: { track: 'desert', ambience: ['wind'] },
+  forest: { track: 'celtic', ambience: ['owl', 'crickets'] },
+  swamp: { track: 'celtic', ambience: ['frogs'] },
+  graveyard: { track: 'angevin', ambience: ['wind', 'toll'] },
+  tundra: { track: 'snow', ambience: ['wind'] },
+  crystal: { track: 'snow', ambience: ['glints'], tones: G_MINOR_PENTATONIC },
+  crypt: { track: 'angevin', ambience: ['drips'] },
+  ember: { track: 'emperor', ambience: ['lava'] },
+  shrine: { track: 'village', ambience: ['chimes'] },
+  boss: { track: 'axes', fade: 0.9 },
 };
 
 const isScene = (s: string): s is MusicScene => Object.prototype.hasOwnProperty.call(SCENES, s);
 
-/** How far ahead the music is scheduled (s): a busy moment shorter than this never makes it skip. */
+/** How far ahead the places' sounds are scheduled (s): a busy moment shorter than this never makes them skip. */
 const AHEAD = 0.3;
 /** Seconds the old scene takes to fade out under the new one. */
 const FADE_OUT = 2.2;
-/** The music's level under the sound effects (at full volume), as Dumpster Legend's sat. */
+/**
+ * The music's level under the sound effects (at full volume). The tracks are at -18 LUFS: this puts
+ * them a little under where the synthesized themes before them sat (about -24 LUFS here).
+ */
 const LEVEL = 0.45;
+/** The places' sounds under a track (as loud as they were under the old themes), and their room's share. */
+const AMB_LEVEL = 0.88;
+const AMB_WET = 0.32;
+/** The places' sounds step on their own clock: a step and a bar (s, steps). */
+const AMB_STEP = 0.3;
+const AMB_BAR = 8;
+/** Decoded tracks kept (each about 20 to 40 MB of samples): the one playing and the one before. */
+const KEEP = 2;
+/** Seconds before the victory sting's end that the place's own track starts coming back in. */
+const STING_BACK = 1.2;
 
 // ------------------------------------------------------------------ the graph
-/** The music's nodes: the loops (ducked) and the stings (not), both into a shared reverb and tone filter. */
+/** The music's nodes: the scenes (ducked) and the sting (not), into one level. */
 export interface MusicGraph {
   ctx: BaseAudioContext;
   noise: AudioBuffer;
-  /** Players' dry and reverb sends land here; both are ducked together. */
+  /** The scenes' tracks and sounds play into this; it's what ducks. */
   loop: GainNode;
-  loopWet: GainNode;
+  /** A room for the places' sounds (into `loop`). */
+  room: AudioNode;
   sting: GainNode;
 }
 
@@ -85,276 +100,20 @@ function impulse(ctx: BaseAudioContext, seconds: number, rnd: () => number): Aud
 
 /** Builds the music's chain on `ctx`, into `dest` (the engine's music volume; a test's destination). */
 export function buildMusicGraph(ctx: BaseAudioContext, dest: AudioNode, noise: AudioBuffer): MusicGraph {
-  const rnd = makeRnd(0xc0ffee);
   const level = ctx.createGain();
   level.gain.value = LEVEL;
   level.connect(dest);
-  const tone = ctx.createBiquadFilter();
-  tone.type = 'lowpass';
-  tone.frequency.value = 10000;
-  tone.Q.value = 0.5;
-  tone.connect(level);
-  const verb = ctx.createConvolver();
-  verb.buffer = impulse(ctx, 2.3, rnd);
+  const loop = ctx.createGain();
+  loop.connect(level);
+  const room = ctx.createConvolver();
+  room.buffer = impulse(ctx, 2.3, makeRnd(0xc0ffee));
   const ret = ctx.createGain();
   ret.gain.value = 0.7;
-  verb.connect(ret);
-  ret.connect(tone);
-  const loop = ctx.createGain();
-  loop.connect(tone);
-  const loopWet = ctx.createGain();
-  loopWet.connect(verb);
+  room.connect(ret);
+  ret.connect(loop);
   const sting = ctx.createGain();
-  sting.connect(tone);
-  const stingWet = ctx.createGain();
-  stingWet.gain.value = 0.35;
-  sting.connect(stingWet);
-  stingWet.connect(verb);
-  return { ctx, noise, loop, loopWet, sting };
-}
-
-// ------------------------------------------------------------------ compiled songs
-type Ev =
-  | { kind: 'note'; part: number; inst: InstId | 'lead'; notes: number[]; len: number; vel: number; strum?: 'down' | 'up' }
-  | { kind: 'drum'; part: number; inst: DrumId; vel: number };
-
-interface Compiled {
-  song: Song;
-  /** Events at each step of the 16 bars. */
-  steps: Ev[][];
-  when: Array<When | undefined>;
-  pans: number[];
-  /** Each bar's chord root, from A3 up (what a tuned drum rings on). */
-  roots: number[];
-}
-
-const VEL: Record<string, number> = { X: 1, x: 0.72, o: 0.42 };
-const BARS = 16;
-const compiled = new Map<SongId, Compiled>();
-
-/** Turns a song's chords, melodies and patterns into events, step by step (once per song). */
-export function compile(song: Song): Compiled {
-  const hit = compiled.get(song.id);
-  if (hit) return hit;
-  const chords = songChords(song);
-  if (chords.length !== BARS) throw new Error(`${song.id}: ${chords.length} chords, want ${BARS}`);
-  const total = BARS * song.barSteps;
-  const steps: Ev[][] = Array.from({ length: total }, () => []);
-  const accent = (at: number) => (at % song.barSteps === 0 ? 1 : at % song.beatSteps === 0 ? 0.9 : 0.78);
-  song.parts.forEach((p, part) => {
-    switch (p.kind) {
-      case 'line': {
-        for (const e of parseLine(p.notes, song.barSteps, BARS, `${song.id} ${p.inst}`)) {
-          const n = e.n + 12 * (p.oct ?? 0);
-          const h = p.harmony ? thirdBelow(n, song.scale) : n;
-          if (h === null) continue;
-          steps[e.at].push({ kind: 'note', part, inst: p.inst, notes: [h], len: e.len, vel: p.gain * accent(e.at) });
-        }
-        break;
-      }
-      case 'arp':
-      case 'bass':
-      case 'pad':
-      case 'drum': {
-        const pat = p.kind === 'pad' ? (p.pattern ?? 'X' + '.'.repeat(song.barSteps - 1)) : p.pattern;
-        for (let s = 0; s < total; s++) {
-          const c = pat[s % pat.length];
-          if (c === '.') continue;
-          const bar = Math.floor(s / song.barSteps);
-          const ch = chords[bar];
-          if (p.kind === 'drum') {
-            steps[s].push({ kind: 'drum', part, inst: p.inst, vel: p.gain * (VEL[c] ?? 0.7) });
-            continue;
-          }
-          if (p.kind === 'pad') {
-            const len = p.len ?? song.barSteps;
-            steps[s].push({ kind: 'note', part, inst: p.inst, notes: voice(ch, p.center), len, vel: p.gain * (VEL[c] ?? 1) });
-            continue;
-          }
-          if (p.kind === 'bass') {
-            const root = atOrAbove(ch.bass, p.low);
-            const third = ch.tones[1] ?? ch.tones[0];
-            const n = c === 'R' ? root : c === '5' ? atOrAbove((ch.root + 7) % 12, root) : c === '8' ? root + 12 : c === '3' ? atOrAbove(third, root) : root;
-            steps[s].push({ kind: 'note', part, inst: p.inst, notes: [n], len: p.len ?? song.beatSteps, vel: p.gain * accent(s) });
-            continue;
-          }
-          // An arpeggio or strum.
-          const v = voice(ch, p.center);
-          const low = atOrAbove(ch.bass, p.low ?? p.center - 18);
-          const len = p.len ?? 2;
-          let notes: number[];
-          let st: 'down' | 'up' | undefined;
-          if (c === 'b') notes = [low];
-          else if (c === 'B') notes = [low + 12];
-          else if (c === 'f') notes = [atOrAbove((ch.root + 7) % 12, low + 1)];
-          else if (c === 's' || c === 'u') {
-            notes = v;
-            st = c === 's' ? 'down' : 'up';
-          } else notes = [arpNote(v, Number(c))];
-          steps[s].push({ kind: 'note', part, inst: p.inst, notes, len, vel: p.gain * accent(s), strum: st });
-        }
-        break;
-      }
-    }
-  });
-  const out: Compiled = {
-    song, steps, when: song.parts.map((p) => p.when), pans: song.parts.map((p) => p.pan ?? 0), roots: chords.map((c) => atOrAbove(c.root, 57)),
-  };
-  compiled.set(song.id, out);
-  return out;
-}
-
-// ------------------------------------------------------------------ a scene playing
-/** One scene's theme playing: its own channels into the music graph, scheduled step by step. */
-export class Player {
-  readonly scene: MusicScene;
-  readonly c: Compiled;
-  private readonly def: SceneDef;
-  private readonly mg: MusicGraph;
-  private readonly out: GainNode;
-  private readonly wet: GainNode;
-  private readonly channels = new Map<string, AudioNode>();
-  private readonly rnd: () => number;
-  private readonly beds: AudioScheduledSourceNode[] = [];
-  readonly stepSec: number;
-  private step = 0;
-  private pass = 0;
-  /** Audio time of the next step. */
-  next: number;
-  /** Audio time it's silent and can go (Infinity while it plays). */
-  endsAt = Infinity;
-
-  constructor(mg: MusicGraph, scene: MusicScene, at: number, fadeIn: number, seed = 1) {
-    this.mg = mg;
-    this.scene = scene;
-    this.def = SCENES[scene];
-    this.c = compile(SONGS[this.def.song]);
-    const song = this.c.song;
-    this.rnd = makeRnd(seed);
-    this.stepSec = 60 / (song.bpm * (this.def.tempo ?? 1)) / song.beatSteps;
-    const ctx = mg.ctx;
-    this.out = ctx.createGain();
-    this.out.gain.value = 0;
-    this.out.gain.setValueAtTime(0, at);
-    this.out.gain.linearRampToValueAtTime(song.gain, at + Math.max(0.05, fadeIn));
-    this.out.connect(mg.loop);
-    this.wet = ctx.createGain();
-    this.wet.gain.value = song.reverb;
-    this.out.connect(this.wet);
-    this.wet.connect(mg.loopWet);
-    this.next = at;
-    for (const a of this.def.ambience ?? []) this.beds.push(...bed(this.voiceFor('amb', 0), a, at));
-  }
-
-  /** The node a part's notes go into: one per instrument and pan. */
-  private voiceFor(key: string, pan: number): Out {
-    const k = `${key}:${pan}`;
-    let node = this.channels.get(k);
-    if (!node) {
-      const ctx = this.mg.ctx;
-      const g = ctx.createGain();
-      let tail: AudioNode = g;
-      // A plucked string's tone filter, once for the channel rather than once a note.
-      const tone = toneFor(key as InstId);
-      if (tone) {
-        const f = ctx.createBiquadFilter();
-        f.type = 'lowpass';
-        f.frequency.value = tone;
-        f.Q.value = 0.5;
-        tail.connect(f);
-        tail = f;
-      }
-      if (pan && typeof ctx.createStereoPanner === 'function') {
-        const p = ctx.createStereoPanner();
-        p.pan.value = pan;
-        tail.connect(p);
-        tail = p;
-      }
-      tail.connect(this.out);
-      node = g;
-      this.channels.set(k, node);
-    }
-    return { ctx: this.mg.ctx, dest: node, noise: this.mg.noise, rnd: this.rnd };
-  }
-
-  /** Schedules every step that starts before `until` (audio time). */
-  tick(until: number): void {
-    const now = this.mg.ctx.currentTime;
-    const steps = this.c.steps.length;
-    // Fell behind (the page was too busy, or the audio was asleep): pick the beat up where it is now
-    // rather than playing every missed note at once.
-    if (this.next < now - 0.05) {
-      const missed = Math.ceil((now - this.next) / this.stepSec);
-      this.next += missed * this.stepSec;
-      const s = this.step + missed;
-      this.pass += Math.floor(s / steps);
-      this.step = s % steps;
-    }
-    while (this.next < until && this.next < this.endsAt) {
-      this.playStep(this.step, this.next);
-      this.next += this.stepSec;
-      this.step += 1;
-      if (this.step >= steps) {
-        this.step = 0;
-        this.pass += 1;
-      }
-    }
-  }
-
-  private playStep(s: number, at: number): void {
-    const song = this.c.song;
-    const bar = Math.floor(s / song.barSteps);
-    const swing = s % 2 === 1 ? (song.swing ?? 0) * this.stepSec : 0;
-    const t = at + swing;
-    for (const ev of this.c.steps[s]) {
-      const when = this.c.when[ev.part];
-      if (when && !when(this.pass, bar)) continue;
-      const pan = this.c.pans[ev.part];
-      // A hair of looseness in time and touch, so it plays like hands and not a grid.
-      const jitter = (this.rnd() * 2 - 1) * 0.004;
-      const vel = ev.vel * (0.92 + this.rnd() * 0.16);
-      if (ev.kind === 'drum') {
-        const n = ev.inst === 'bowl' || ev.inst === 'timpani' ? this.c.roots[bar] - (ev.inst === 'timpani' ? 24 : 0) : undefined;
-        drum(this.voiceFor(ev.inst, pan), ev.inst, Math.max(at, t + jitter), vel, n);
-        continue;
-      }
-      const inst: InstId = ev.inst === 'lead' ? (this.def.lead ?? song.lead) : ev.inst;
-      const out = this.voiceFor(inst, pan);
-      const dur = ev.len * this.stepSec;
-      if (ev.strum) strum(out, inst, ev.notes, Math.max(at, t + jitter), dur, vel, ev.strum === 'up');
-      else for (const n of ev.notes) play(out, inst, n, Math.max(at, t + jitter), dur, vel);
-    }
-    const ambOut = this.def.ambience?.length ? this.voiceFor('amb', 0) : null;
-    if (ambOut) for (const a of this.def.ambience!) ambience(ambOut, a, t, this.stepSec, s % song.barSteps === 0, this.pass * BARS + bar);
-  }
-
-  /** Fades out over `seconds` from `at`, then stops scheduling. */
-  fadeOut(at: number, seconds: number): void {
-    const g = this.out.gain;
-    hold(g, at);
-    g.linearRampToValueAtTime(0, at + seconds);
-    this.endsAt = at + seconds;
-    for (const b of this.beds) {
-      try {
-        b.stop(at + seconds + 0.1);
-      } catch {
-        /* already stopped */
-      }
-    }
-  }
-
-  /** Lets go of its nodes once silent. */
-  dispose(): void {
-    this.out.disconnect();
-    this.wet.disconnect();
-  }
-
-  /** Seconds from audio time `now` to its next beat. */
-  toBeat(now: number): number {
-    const bs = this.c.song.beatSteps;
-    const k = (bs - (this.step % bs)) % bs;
-    return this.next + k * this.stepSec - now;
-  }
+  sting.connect(level);
+  return { ctx, noise, loop, room, sting };
 }
 
 /** Holds an automated value where it is at `at`, so a new ramp starts from there. */
@@ -368,24 +127,145 @@ function hold(p: AudioParam, at: number): void {
   }
 }
 
-/** Plays the victory sting into `out` from audio time `at`. */
-export function playVictory(out: Out, at: number): void {
-  for (const [t, notes, len] of VICTORY.brass) {
-    // (A chord's notes share the loudness of the call's single ones.)
-    const v = 0.26 / Math.sqrt(notes.length);
-    for (const n of notes) play(out, 'brass', n, at + t, len, v);
-    if (notes.length > 1) play(out, 'horn', notes[0] - 12, at + t, len, 0.16);
+// ------------------------------------------------------------------ a scene playing
+/**
+ * One scene playing: its track looping (if it decoded) and the place's sounds, fading in at `at`;
+ * the track from its loop's start, or from `from` (s into the file: where the same track already
+ * playing is, so a scene with the same track takes over with no seam).
+ */
+export class Player {
+  readonly scene: MusicScene;
+  readonly track: TrackId;
+  readonly buf: AudioBuffer | null;
+  private readonly def: SceneDef;
+  private readonly mg: MusicGraph;
+  /** The scene's fades: the track's, and the place's sounds' (into their room too). */
+  private readonly fades: GainNode[] = [];
+  /** Every node of its own, to let go of at the end. */
+  private readonly nodes: AudioNode[] = [];
+  private readonly src: AudioBufferSourceNode | null = null;
+  private readonly amb: Out | null = null;
+  private readonly beds: AudioScheduledSourceNode[] = [];
+  /** Audio time the loop's start played (or would have): its position and its beats count from there. */
+  private readonly zero: number;
+  private readonly bpm: number | null;
+  /** Audio time of the places' sounds' next step, and its number. */
+  private next: number;
+  private step = 0;
+  /** Audio time it's silent and can go (Infinity while it plays). */
+  endsAt = Infinity;
+
+  constructor(mg: MusicGraph, scene: MusicScene, buf: AudioBuffer | null, at: number, fadeIn: number, seed = 1, from?: number) {
+    this.mg = mg;
+    this.scene = scene;
+    this.def = SCENES[scene];
+    this.track = this.def.track;
+    this.buf = buf;
+    const tr = TRACKS[this.track];
+    const ctx = mg.ctx;
+    const fade = () => {
+      const g = ctx.createGain();
+      g.gain.value = 0;
+      g.gain.setValueAtTime(0, at);
+      g.gain.linearRampToValueAtTime(1, at + Math.max(0.05, fadeIn));
+      g.connect(mg.loop);
+      this.fades.push(g);
+      this.nodes.push(g);
+      return g;
+    };
+    const offset = from ?? tr.loopStart;
+    this.zero = at - (offset - tr.loopStart);
+    this.next = at;
+    this.bpm = buf ? tr.bpm : null;
+    if (buf) {
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      src.loopStart = tr.loopStart;
+      src.loopEnd = tr.loopEnd;
+      src.connect(fade());
+      src.start(at, offset);
+      this.src = src;
+      this.nodes.push(src);
+    }
+    if (this.def.ambience?.length) {
+      const f = fade();
+      const g = ctx.createGain();
+      g.gain.value = AMB_LEVEL;
+      g.connect(f);
+      const wet = ctx.createGain();
+      wet.gain.value = AMB_WET;
+      f.connect(wet);
+      wet.connect(mg.room);
+      this.nodes.push(g, wet);
+      this.amb = { ctx, dest: g, noise: mg.noise, rnd: makeRnd(seed) };
+      for (const a of this.def.ambience) this.beds.push(...bed(this.amb, a, at));
+    }
   }
-  VICTORY.harp.forEach((n, k) => play(out, 'harp', n, at + 0.5 + k * 0.055, 1.2, 0.18));
-  for (const [t, n] of VICTORY.bells) play(out, 'celesta', n, at + t, 1.6, 0.2);
-  for (const [t, n] of VICTORY.timpani) drum(out, 'timpani', at + t, 0.55, n);
-  // A timpani roll into the last chord, and a cymbal on it.
-  for (let k = 0; k < 8; k++) drum(out, 'timpani', at + 1.05 + k * 0.055, 0.15 + k * 0.03, 43);
-  drum(out, 'cymbal', at + 1.5, 0.5);
-  for (const n of [60, 64, 67, 72]) play(out, 'strings', n, at + 1.5, 1.8, 0.12);
+
+  /** Schedules the places' sounds for every step that starts before `until` (audio time). */
+  tick(until: number): void {
+    const amb = this.amb;
+    const list = this.def.ambience;
+    if (!amb || !list) return;
+    const now = this.mg.ctx.currentTime;
+    // Fell behind (the page was too busy, or the audio was asleep): pick up where it is now.
+    if (this.next < now - 0.05) {
+      const missed = Math.ceil((now - this.next) / AMB_STEP);
+      this.next += missed * AMB_STEP;
+      this.step += missed;
+    }
+    const tones = this.def.tones ?? C_PENTATONIC;
+    while (this.next < until && this.next < this.endsAt) {
+      const bar = Math.floor(this.step / AMB_BAR);
+      for (const a of list) ambience(amb, a, this.next, AMB_STEP, this.step % AMB_BAR === 0, bar, tones);
+      this.next += AMB_STEP;
+      this.step += 1;
+    }
+  }
+
+  /** Fades out over `seconds` from `at`, then stops. */
+  fadeOut(at: number, seconds: number): void {
+    for (const f of this.fades) {
+      hold(f.gain, at);
+      f.gain.linearRampToValueAtTime(0, at + seconds);
+    }
+    this.endsAt = at + seconds;
+    for (const s of [...this.beds, ...(this.src ? [this.src] : [])]) {
+      try {
+        s.stop(at + seconds + 0.1);
+      } catch {
+        /* already stopped */
+      }
+    }
+  }
+
+  /** Lets go of its nodes once silent. */
+  dispose(): void {
+    for (const n of this.nodes) n.disconnect();
+  }
+
+  /** Where in its file the track plays at audio time `at` (s). */
+  position(at: number): number {
+    const tr = TRACKS[this.track];
+    const len = tr.loopEnd - tr.loopStart;
+    const rel = (((at - this.zero) % len) + len) % len;
+    return tr.loopStart + rel;
+  }
+
+  /** Seconds from audio time `now` to the track's next beat (Infinity for a track with no steady beat). */
+  toBeat(now: number): number {
+    if (!this.bpm) return Infinity;
+    // (Every loop is a whole number of beats, so the beat runs on round it.)
+    const beat = 60 / this.bpm;
+    const k = Math.ceil((now - this.zero) / beat - 1e-6);
+    return this.zero + k * beat - now;
+  }
 }
 
 // ------------------------------------------------------------------ the music
+type Rec = TrackId | StingId;
+
 class Music {
   private mg: MusicGraph | null = null;
   private graph: Graph | null = null;
@@ -397,6 +277,14 @@ class Music {
   /** The last scene that wasn't the boss's: the music goes back to it after a victory. */
   private calm: MusicScene | null = null;
   private backTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Decoded recordings, the latest wanted last (KEEP tracks, and the sting), the decodes under way, and those that won't decode. */
+  private bufs = new Map<Rec, AudioBuffer>();
+  private loading = new Map<Rec, Promise<AudioBuffer | null>>();
+  private failed = new Set<Rec>();
+  /** Decodes run one at a time (a phone decoding several big files at once runs short of memory). */
+  private queue: Promise<unknown> = Promise.resolve();
+  /** The scene waiting on its track to decode. */
+  private pending: MusicScene | null = null;
 
   /** Call from a user gesture (safe to call again): starts the audio and the scene set so far. */
   unlock(): void {
@@ -415,8 +303,8 @@ class Music {
   }
 
   /**
-   * Crossfades to `scene`'s theme (the same scene again changes nothing). Before the audio is
-   * unlocked it's remembered, and starts with it.
+   * Crossfades to `scene`'s track (the same scene again changes nothing), once it's decoded. Before
+   * the audio is unlocked it's remembered, and starts with it.
    */
   setScene(scene: MusicScene): void {
     if (!isScene(scene) || scene === this.want) return;
@@ -426,12 +314,13 @@ class Music {
       clearTimeout(this.backTimer);
       this.backTimer = null;
     }
+    // (A track that failed to decode gets another try.)
+    this.failed.delete(SCENES[scene].track);
     const g = engine.live;
-    if (!g || !this.mg || engine.musicVolume <= 0) {
-      this.sync();
-      return;
-    }
-    this.start(scene, g.ctx.currentTime + 0.05);
+    if (!g || !this.mg || engine.musicVolume <= 0) this.sync();
+    else this.begin(scene);
+    // The victory sting decodes after the boss's track, ready for its fall.
+    if (scene === 'boss') void this.load('victory');
   }
 
   /** The scene for a biome by id or by name (floorStart events carry the name), if it has one. */
@@ -452,17 +341,17 @@ class Music {
     const g = engine.live;
     if (!mg || !g) return;
     const now = g.ctx.currentTime;
-    for (const p of [mg.loop.gain, mg.loopWet.gain]) {
-      p.cancelScheduledValues(now);
-      p.setTargetAtTime(Math.max(0.0001, depth), now, 0.03);
-      p.setTargetAtTime(1.15, now + Math.max(0, seconds), 0.25);
-      p.setTargetAtTime(1, now + Math.max(0, seconds) + 1.2, 0.4);
-    }
+    const p = mg.loop.gain;
+    p.cancelScheduledValues(now);
+    p.setTargetAtTime(Math.max(0.0001, depth), now, 0.03);
+    p.setTargetAtTime(1.15, now + Math.max(0, seconds), 0.25);
+    p.setTargetAtTime(1, now + Math.max(0, seconds) + 1.2, 0.4);
   }
 
   /** Fades the music out and stops it (setScene starts it again). */
   stop(): void {
     this.want = null;
+    this.pending = null;
     if (this.backTimer) {
       clearTimeout(this.backTimer);
       this.backTimer = null;
@@ -478,17 +367,23 @@ class Music {
   victory(): boolean {
     const mg = this.mg;
     const g = engine.live;
-    if (!mg || !g || engine.musicVolume <= 0) return false;
+    const buf = this.bufs.get('victory');
+    if (!mg || !g || !buf || engine.musicVolume <= 0) return false;
+    const len = STINGS.victory.duration;
     const at = g.ctx.currentTime + 0.05;
-    this.duck(VICTORY.length, 0.12);
-    playVictory({ ctx: g.ctx, dest: mg.sting, noise: mg.noise, rnd: makeRnd(this.seed++) }, at);
+    this.duck(len, 0.12);
+    const src = g.ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(mg.sting);
+    src.onended = () => src.disconnect();
+    src.start(at);
     const back = this.calm;
     if (this.want === 'boss' && back) {
       if (this.backTimer) clearTimeout(this.backTimer);
       this.backTimer = setTimeout(() => {
         this.backTimer = null;
         if (this.want === 'boss') this.setScene(back);
-      }, (VICTORY.length - 1.2) * 1000);
+      }, (len - STING_BACK) * 1000);
     }
     return true;
   }
@@ -504,24 +399,103 @@ class Music {
 
   // ------------------------------------------------------------------ inside
   private rebuilt(g: Graph): void {
-    // A new audio graph (the first, or one replacing a broken context): the old players went with the old one.
+    // A new audio graph (the first, or one replacing a broken context): the old players went with
+    // the old one. Decoded tracks carry over (a buffer plays in any context).
     this.players = [];
     this.graph = g;
     this.mg = buildMusicGraph(g.ctx, g.music, g.noise);
-    void warmDrums(g.noise);
     this.sync();
   }
 
-  private start(scene: MusicScene, at: number): void {
+  /** The decoded recording `id` (decoding it first, after any decodes before it); null if it can't be. */
+  private load(id: Rec): Promise<AudioBuffer | null> {
+    const hit = this.bufs.get(id);
+    if (hit) {
+      this.bufs.delete(id);
+      this.bufs.set(id, hit);
+      return Promise.resolve(hit);
+    }
+    if (this.failed.has(id)) return Promise.resolve(null);
+    let p = this.loading.get(id);
+    if (!p) {
+      p = this.queue.then(() => this.decodeRec(id)).then((buf) => {
+        this.loading.delete(id);
+        if (buf) this.keep(id, buf);
+        else this.failed.add(id);
+        return buf;
+      });
+      this.queue = p.catch(() => null);
+      this.loading.set(id, p);
+    }
+    return p;
+  }
+
+  private async decodeRec(id: Rec): Promise<AudioBuffer | null> {
+    const url = MUSIC_FILES[id];
+    if (!url || typeof window === 'undefined') return null;
+    try {
+      const bytes = await bytesOf(url);
+      // Decoded at the rate the audio plays at (nothing to resample as it loops); before the first
+      // tap there's no context yet, and an offline one at 48 kHz (most devices' rate) stands in.
+      const live = engine.graph?.ctx;
+      let ctx: BaseAudioContext | null = live ?? null;
+      if (!ctx) {
+        const OAC = window.OfflineAudioContext ?? (window as unknown as { webkitOfflineAudioContext?: typeof OfflineAudioContext }).webkitOfflineAudioContext;
+        if (!OAC) return null;
+        ctx = new OAC(2, 1, 48000);
+      }
+      const buf = await decode(ctx, bytes);
+      if (import.meta.env?.DEV) console.info(`music: decoded ${id} (${buf.duration.toFixed(1)} s, ${buf.sampleRate} Hz)`);
+      return buf;
+    } catch (e) {
+      if (import.meta.env?.DEV) console.warn('music: could not decode', id, e);
+      return null;
+    }
+  }
+
+  /** Keeps a decoded recording, letting go of the least lately wanted track past KEEP (the sting stays: it's small). */
+  private keep(id: Rec, buf: AudioBuffer): void {
+    this.bufs.set(id, buf);
+    const tracks = [...this.bufs.keys()].filter((k) => k !== 'victory');
+    for (const k of tracks.slice(0, Math.max(0, tracks.length - KEEP))) this.bufs.delete(k);
+  }
+
+  /** Starts `scene` now if its track is decoded, else once it is (if it's still wanted then). */
+  private begin(scene: MusicScene): void {
+    const g = engine.live;
+    if (!g || !this.mg) return;
+    const id = SCENES[scene].track;
+    const buf = this.bufs.get(id);
+    if (buf || this.failed.has(id)) {
+      // (A track that won't decode leaves the place's own sounds.)
+      this.start(scene, buf ?? null, g.ctx.currentTime + 0.05);
+      return;
+    }
+    if (this.pending === scene) return;
+    this.pending = scene;
+    void this.load(id).then((b) => {
+      if (this.pending === scene) this.pending = null;
+      const live = engine.live;
+      if (!live || !this.mg || this.want !== scene || engine.musicVolume <= 0) return;
+      if (this.players.some((p) => p.endsAt === Infinity && p.scene === scene)) return;
+      this.start(scene, b, live.ctx.currentTime + 0.05);
+    });
+  }
+
+  private start(scene: MusicScene, buf: AudioBuffer | null, at: number): void {
     const mg = this.mg;
     if (!mg) return;
-    const fadeIn = this.players.length ? (SCENES[scene].fade ?? 2.5) : Math.min(1.5, SCENES[scene].fade ?? 1.5);
+    const fade = SCENES[scene].fade;
+    const fadeIn = this.players.length ? (fade ?? 2.5) : Math.min(1.5, fade ?? 1.5);
     // Two scenes at most: a third change mid-crossfade cuts the oldest short.
     const live = this.players.filter((p) => p.endsAt === Infinity);
-    for (const p of live) p.fadeOut(at, scene === 'boss' ? 0.8 : FADE_OUT);
+    // A scene with the track already playing takes it over where it is (only the place's sounds
+    // crossfade: the same music in step, faded across over the same time, sums to itself).
+    const same = buf ? live.find((p) => p.track === SCENES[scene].track && p.buf === buf) : undefined;
+    for (const p of live) p.fadeOut(at, p === same ? fadeIn : scene === 'boss' ? 0.8 : FADE_OUT);
     const fading = this.players.filter((p) => p.endsAt !== Infinity && !live.includes(p));
     for (const p of fading) p.fadeOut(at, 0.15);
-    this.players.push(new Player(mg, scene, at, fadeIn, this.seed++));
+    this.players.push(new Player(mg, scene, buf, at, fadeIn, this.seed++, same?.position(at)));
     this.run();
   }
 
@@ -548,11 +522,11 @@ class Music {
       if (ctx.state !== 'running') return;
       const now = ctx.currentTime;
       const playing = this.players.some((p) => p.endsAt === Infinity);
-      if (!playing && this.want && engine.musicVolume > 0) this.start(this.want, now + 0.05);
+      if (!playing && this.want && engine.musicVolume > 0) this.begin(this.want);
       for (const p of this.players) p.tick(now + AHEAD);
       for (const p of this.players) if (p.endsAt + 3 < now) p.dispose();
       this.players = this.players.filter((p) => p.endsAt + 3 >= now);
-      if (!this.players.length && (!this.want || engine.musicVolume <= 0) && this.timer) {
+      if (!this.players.length && !this.pending && (!this.want || engine.musicVolume <= 0) && this.timer) {
         clearInterval(this.timer);
         this.timer = null;
       }

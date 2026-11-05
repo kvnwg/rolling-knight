@@ -55,6 +55,23 @@ How every system works, with its numbers: [`DESIGN.md`](DESIGN.md). Art sources 
   copper-rimmed bars; parchment cards; octagonal iron ability slots that turn brass when ready; wax
   seals for difficulty.
 
+## The sound
+
+- Music: recorded tracks by Kevin MacLeod, one per mood (`src/audio/tracks.ts`, credits in
+  [`CREDITS.md`](CREDITS.md) and Settings): a lute and guitar by the tavern's fire at the hub, a
+  medieval village consort in the hamlet and at the shrine, a lively inn dance on the farm, Celtic
+  dulcimer and harp in the forest and the bog, a dark Renaissance dance with choir in the graveyard
+  and the crypt, a wintry fairy tale on celesta in the tundra and the crystal caves, dulcimer and
+  hand drums in the desert, taiko drums in the ember depths, a full orchestra for bosses, and an
+  orchestral sting when one falls. Each loops seamlessly (whole bars, crossfaded where the music
+  repeats itself), and scenes crossfade (`src/audio/music.ts`). Tracks are decoded when a scene
+  first wants one, the last two kept.
+- Under it, each place's own sounds, synthesized: the hub's fire and crickets, birdsong, an owl,
+  frogs, wind, drips, lava, glints and chimes in the track's key (`src/audio/ambience.ts`).
+- Sound effects: Dumpster Legend's recordings and synthesized sounds (`src/audio/sfx.ts`), all of
+  it silent until the first tap and brought back by a watchdog if a phone knocks the audio out
+  (`src/audio/engine.ts`).
+
 ## Play
 
 Requires Node 20+.
@@ -88,7 +105,7 @@ every floor's weather. `?fresh` starts a new game. The game is on
 npm test
 ```
 
-132 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
+144 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
 timing, extra reels, the tutorial's scripted rolls, bad-luck protection, Lucky Spins, duplicates,
 shards, selling, levels and reforging, Humble Beginnings' 3x, rebirth; every biome's floors fully
 connected with spawns reachable and deterministic by seed, mob and boss design, a squad clearing a
@@ -97,7 +114,14 @@ curve, the camera, the weather, the hub's map and keepers, folk and quests, the 
 chance upgrade in a fight, a full game starting up; and the PixelForge art: every sheet holding what
 the game plays in four directions, the body plan to monster mapping, the material recolors, every
 rarity's and mutation's ramps, and the animations the sim's state picks (attacks on the hit's tick,
-windups over the mobs' telegraphs, dodges, walks stepped by distance, deaths and revives).
+windups over the mobs' telegraphs, dodges, walks stepped by distance, deaths and revives); and the
+music: a track for every scene and floor, each one's file, credit and loop points, the 5 MB budget.
+
+```bash
+npx tsx tools/music.ts
+```
+
+Checks the music files too: each one's length and loudness (with ffmpeg installed).
 
 ```bash
 npm run sim -- --minutes 40
@@ -150,4 +174,12 @@ PNGs with every color's material and shade, for the runtime recolors):
 
 ```bash
 python3 -I tools/packs/pixelforge.py "<pixelforge>" src/assets/pf
+```
+
+The music loops (`src/assets/music/`), from a folder of the original MP3s, named as downloaded from
+the sources in [`CREDITS.md`](CREDITS.md) (needs numpy and ffmpeg; the loop points are in the
+script):
+
+```bash
+python3 -I tools/packs/music.py "<folder of mp3s>" src/assets/music
 ```
