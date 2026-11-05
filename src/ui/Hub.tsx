@@ -14,7 +14,7 @@ import { knightDef } from '../core/knights';
 import { CHALLENGE, floorDifficulty, knightRating, squadPower } from '../core/power';
 import { activeQuests, questGoal, rewardText } from '../core/quests';
 import { RARITY_COLOR, RARITY_NAME } from '../core/rarity';
-import { bestSquad, rankedKnights } from '../core/roster';
+import { bestSquad, rankedKnights, totalDupes } from '../core/roster';
 import type { Game } from '../game';
 import { npcFrame } from '../render/art/npcs';
 import { toCanvas } from '../render/art/draw';
@@ -23,10 +23,13 @@ import { HUB_STEPS_Y, type HubStation, type StationId } from '../world/hubWorld'
 import { Chunky, HeroArt, HeroLive } from './common';
 import { AltarReels } from './fx/AltarReels';
 import { fmt } from './format';
-import { DupeBar, HeroCard, HeroesPanel, PerksPanel, RebirthPanel, Section, SummonPanel, UpgradesPanel } from './panels';
+import { useRosterFx } from './fx/Pops';
+import { HeroCard, HeroesPanel, PerksPanel, RebirthPanel, Section, SummonPanel, UpgradesPanel } from './panels';
 import { Px, type IconName } from './px';
 import { KNIGHT_PIC_H, KNIGHT_PIC_W } from './sprites';
 import { uiSound } from './sound';
+import { SpareChip } from './KnightCard';
+import { BulkSpares, HelpButton, SpareRules } from './Spares';
 import { TopBar } from './TopBar';
 
 const touch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
@@ -184,19 +187,28 @@ function StationBody({ game, station, onOpen, onClose }: { game: Game; station: 
   }
 }
 
+/**
+ * The scrap dealer: the knights that have spare copies (tap one to break down or sell its own), and
+ * every spare at once, which lists exactly what goes and asks first.
+ */
 function ScrapPanel({ game, onOpen }: { game: Game; onOpen: (id: string) => void }) {
   const s = game.state;
+  const fx = useRosterFx(s.settings.reduceMotion);
   const ids = rankedKnights(s).filter((id) => s.roster[id].dupes > 0);
   return (
     <>
-      <DupeBar game={game} />
-      <Section title="Duplicates" sub={ids.length ? 'tap a knight to break down or sell its copies' : 'nothing to scrap yet'}>
-        <div className="heroes-grid">
-          {ids.map((id) => (
-            <HeroCard key={id} game={game} id={id} onOpen={onOpen} />
-          ))}
-        </div>
+      <Section title="Spare copies" sub={totalDupes(s) > 0 ? <SpareChip n={totalDupes(s)} /> : undefined} right={<HelpButton />}>
+        {ids.length > 0 && (
+          <div className="heroes-grid">
+            {ids.map((id) => (
+              <HeroCard key={id} game={game} id={id} onOpen={onOpen} />
+            ))}
+          </div>
+        )}
       </Section>
+      <BulkSpares game={game} fx={fx} />
+      <SpareRules game={game} />
+      {fx.layer}
     </>
   );
 }
@@ -207,7 +219,12 @@ function SquadPanel({ game, onOpen }: { game: Game; onOpen: (id: string) => void
     <>
       <Section
         title="Your squad"
-        sub={`Power ${fmt(squadPower(s))}`}
+        sub={
+          <span className="row num" title="Squad power">
+            <Px icon="might" size="sm" />
+            {fmt(squadPower(s))}
+          </span>
+        }
         right={
           <button className="btn small" onClick={() => (bestSquad(s), game.syncHub(true), uiSound('equip', 3))}>
             Best squad
@@ -215,9 +232,8 @@ function SquadPanel({ game, onOpen }: { game: Game; onOpen: (id: string) => void
         }
       >
         <div className="squad-row">
-          {s.squad.map((id, slot) => (id ? <HeroCard key={slot} game={game} id={id} onOpen={onOpen} slot={slot === s.controlled ? 0 : undefined} /> : null))}
+          {s.squad.map((id, slot) => (id ? <HeroCard key={slot} game={game} id={id} onOpen={onOpen} /> : null))}
         </div>
-        <p className="lead">The knight in the gold frame is the one you play. Tap a knight to swap it, or pick who leads below.</p>
       </Section>
       <HeroesPanel game={game} onOpen={onOpen} />
     </>
@@ -279,7 +295,7 @@ function GatePanel({ game, onClose }: { game: Game; onClose: () => void }) {
       </div>
       <Section title="Going down with you">
         <div className="squad-row">
-          {s.squad.map((id, slot) => (id ? <HeroCard key={slot} game={game} id={id} onOpen={() => {}} slot={slot === s.controlled ? 0 : undefined} /> : null))}
+          {s.squad.map((id, slot) => (id ? <HeroCard key={slot} game={game} id={id} onOpen={() => {}} /> : null))}
         </div>
       </Section>
     </>

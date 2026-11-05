@@ -21,6 +21,7 @@ import { DungeonHud } from './DungeonHud';
 import { fmt, secs } from './format';
 import { CharacterSelect, HubHud, StationSheet } from './Hub';
 import { UpgradeMap } from './upgrades/UpgradeMap';
+import { KnightTile, SpareTag } from './KnightCard';
 import { HeroDetail, LuckSheet, SettingsSheet } from './panels';
 import { hubLayout, type HubStation } from '../world/hubWorld';
 import type { Npc } from '../world/npcs';
@@ -362,13 +363,15 @@ export function App() {
             {offline.kept.length > 0 && (
               <div className="heroes-grid">
                 {offline.kept.slice(0, 12).map((k, i) => (
-                  <div key={i} className="card hero-card" style={{ ['--rc' as string]: RARITY_COLOR[k.rarity] }}>
-                    <div className="art">
-                      <HeroArt id={k.knightId} mutation={k.mutation} />
-                    </div>
-                    <div className="rar-strip" />
-                    <div className="name">{knightDef(k.knightId).name}</div>
-                  </div>
+                  <KnightTile
+                    key={i}
+                    id={k.knightId}
+                    mutation={k.mutation}
+                    rarity={k.rarity}
+                    name={knightDef(k.knightId).name}
+                    top={k.isNew ? <span className="ktag new">NEW</span> : undefined}
+                    tl={k.isNew ? undefined : <SpareTag />}
+                  />
                 ))}
               </div>
             )}

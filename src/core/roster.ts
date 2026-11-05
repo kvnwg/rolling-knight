@@ -1,6 +1,7 @@
 /**
- * Your knights: the first copy of a knight joins the roster; every later copy is a duplicate you
- * either sell for gold or break into shards, and shards (plus gold) level that knight up.
+ * Your knights: you own each knight once (its first pull); every later pull of it is a spare copy
+ * you either break down into that knight's shards or sell for gold, and shards (plus gold) level
+ * that knight up. Neither ever touches the knight itself: only its spares go.
  * Also the squad: three slots, one of them yours to control. Empty slots fill themselves with your
  * strongest free knight; anything else is your choice (or Best squad).
  */
@@ -80,8 +81,9 @@ export function knightStats(state: GameState, id: string): KnightStats {
   return { hp, atk, armor: cls.armor, speed: cls.speed * speedMult, atkCd, range: cls.range, dodgeCd, specialCd: skillRollCd(id) };
 }
 
-// ------------------------------------------------------------------ duplicates
+// ------------------------------------------------------------------ spare copies (duplicates)
 
+/** Shards one spare copy breaks down into. */
 export function shardsPerDupe(state: Pick<GameState, 'perks'>, rarity: Rarity): number {
   return hasPerk(state, 'peasantLevy') && isUnderdog(rarity) ? 2 : 1;
 }
@@ -146,10 +148,30 @@ export function sellValue(state: GameState, id: string): number {
   return Math.max(1, Math.round(v));
 }
 
+/** How many spare copies a request for `n` of them takes: a whole number, never more than the knight has. */
+function spareCount(rec: KnightRec | undefined, n: number): number {
+  if (!rec) return 0;
+  const k = Math.floor(Math.min(n, rec.dupes));
+  return Number.isFinite(k) && k > 0 ? k : 0;
+}
+
+/**
+ * What `n` of a knight's spare copies (all of them by default) would give: the shards breaking them
+ * down adds to this knight, or the gold selling them pays. `copies` is how many that really is.
+ */
+export function spareYield(state: GameState, id: string, n = Infinity): { copies: number; shards: number; gold: number } {
+  const copies = spareCount(state.roster[id], n);
+  if (copies === 0) return { copies, shards: 0, gold: 0 };
+  return { copies, shards: copies * shardsPerDupe(state, knightDef(id).rarity), gold: sellValue(state, id) * copies };
+}
+
+/**
+ * Breaks `n` of a knight's spare copies (all by default) down into its shards. Returns the shards
+ * this knight got. The knight itself always stays; with no spares nothing happens.
+ */
 export function shardDupes(state: GameState, id: string, n = Infinity): number {
   const rec = state.roster[id];
-  if (!rec) return 0;
-  const k = Math.min(n, rec.dupes);
+  const k = spareCount(rec, n);
   if (k <= 0) return 0;
   const def = knightDef(id);
   rec.dupes -= k;
@@ -161,10 +183,10 @@ export function shardDupes(state: GameState, id: string, n = Infinity): number {
   return k * per;
 }
 
+/** Sells `n` of a knight's spare copies (all by default). Returns the gold. The knight itself always stays. */
 export function sellDupes(state: GameState, id: string, n = Infinity): number {
   const rec = state.roster[id];
-  if (!rec) return 0;
-  const k = Math.min(n, rec.dupes);
+  const k = spareCount(rec, n);
   if (k <= 0) return 0;
   rec.dupes -= k;
   const g = sellValue(state, id) * k;
@@ -176,12 +198,22 @@ export function totalDupes(state: GameState): number {
   return Object.values(state.roster).reduce((s, r) => s + r.dupes, 0);
 }
 
+/** Every knight that has spare copies (most spares first), with what all of them would give. */
+export function spareList(state: GameState): Array<{ id: string; copies: number; shards: number; gold: number }> {
+  return Object.keys(state.roster)
+    .map((id) => ({ id, ...spareYield(state, id) }))
+    .filter((x) => x.copies > 0)
+    .sort((a, b) => b.copies - a.copies || rarityIndex(knightDef(b.id).rarity) - rarityIndex(knightDef(a.id).rarity));
+}
+
+/** Breaks down every knight's spare copies (the scrap dealer's "all at once", after you confirm). Returns the shards. */
 export function shardAll(state: GameState): number {
   let n = 0;
   for (const id of Object.keys(state.roster)) n += shardDupes(state, id);
   return n;
 }
 
+/** Sells every knight's spare copies (the scrap dealer's "all at once", after you confirm). Returns the gold. */
 export function sellAll(state: GameState): number {
   let g = 0;
   for (const id of Object.keys(state.roster)) g += sellDupes(state, id);
@@ -213,6 +245,17 @@ export function levelUp(state: GameState, id: string): boolean {
 
 // ------------------------------------------------------------------ adding knights
 
+/** How long a knight wears its NEW tag after it first joins your roster (real time). */
+export const NEW_FOR_MS = 30_000;
+
+/** First joined within the last 30 seconds of real time (`now` is the wall clock), so it still wears its NEW tag. */
+export function isNewKnight(rec: Pick<KnightRec, 'gotAt'> | null | undefined, now: number): boolean {
+  const at = rec?.gotAt;
+  if (typeof at !== 'number' || !Number.isFinite(at)) return false;
+  const age = now - at;
+  return age >= 0 && age < NEW_FOR_MS;
+}
+
 export type AddResult = { kind: 'new' } | { kind: 'dupe'; auto: 'keep' | 'shard' | 'sell'; gold: number; shards: number; mutationUp: boolean };
 
 function betterMutation(a: MutationId | null, b: MutationId | null): boolean {
@@ -221,15 +264,18 @@ function betterMutation(a: MutationId | null, b: MutationId | null): boolean {
   return MUTATIONS.indexOf(a) > MUTATIONS.indexOf(b);
 }
 
-/** A rolled knight arrives: a new knight joins, a duplicate goes to the pile (or its auto rule). */
-export function addKnight(state: GameState, id: string, mutation: MutationId | null): AddResult {
+/**
+ * A rolled knight arrives: a new knight joins (stamped with the wall clock `now`, for its NEW tag),
+ * a repeat becomes a spare copy (or goes by its rarity's rule straight away).
+ */
+export function addKnight(state: GameState, id: string, mutation: MutationId | null, now = Date.now()): AddResult {
   const def = knightDef(id);
   const codex = (state.codex[id] ??= { count: 0, best: null, firstAt: state.playTimeMs });
   codex.count += 1;
   if (betterMutation(mutation, codex.best)) codex.best = mutation;
   const rec = state.roster[id];
   if (!rec) {
-    state.roster[id] = { id, level: 1, shards: 0, dupes: 0, mutation, copies: 1, firstAt: state.playTimeMs, isNew: true };
+    state.roster[id] = { id, level: 1, shards: 0, dupes: 0, mutation, copies: 1, firstAt: state.playTimeMs, gotAt: now };
     fillSquad(state);
     return { kind: 'new' };
   }

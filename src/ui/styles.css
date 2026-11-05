@@ -546,71 +546,175 @@ button.pill {
   right: 16%;
 }
 
-/* ------------------------------------------------------------ hero cards and the squad */
+/* ------------------------------------------------------------ knight cards and the squad
+ * One card wherever knights are listed (KnightCard.tsx): the rarity's color as a crisp one-pixel
+ * frame round a softly lit picture (the knight at a whole number of screen pixels per sprite pixel),
+ * the name, then class and level, then power and odds at fixed ends. Badges have fixed spots clear
+ * of the knight: squad in the picture's top left, spare copies top right, NEW on the top edge. */
 
 .heroes-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(calc(38 * var(--px)), 1fr));
-  gap: calc(3 * var(--px));
+  grid-template-columns: repeat(auto-fill, minmax(calc(50 * var(--px)), 1fr));
+  gap: calc(5 * var(--px)) calc(3 * var(--px));
 }
-.hero-card {
+.kcard {
+  --rc: #a8a8b0;
+  --kc-ring: 0 0 0 var(--px) var(--ink);
   position: relative;
   display: flex;
   flex-direction: column;
-  align-items: stretch;
+  min-width: 0;
+  padding: calc(2 * var(--px));
+  gap: calc(1.5 * var(--px));
   text-align: center;
-  padding: calc(1 * var(--px));
-  gap: calc(1 * var(--px));
-  cursor: pointer;
   font-size: calc(4 * var(--px));
   line-height: 1.15;
+  color: var(--text);
+  background: linear-gradient(180deg, #2a1c1f, #1c1215);
+  box-shadow: var(--kc-ring), inset 0 0 0 var(--px) var(--rc), inset 0 0 0 calc(2 * var(--px)) color-mix(in srgb, var(--rc) 22%, #120a0c),
+    0 calc(2 * var(--px)) 0 var(--px) rgba(10, 4, 2, 0.5);
 }
-.hero-card .art {
+button.kcard {
+  cursor: pointer;
+}
+button.kcard:active {
+  transform: translateY(var(--px));
+}
+@media (hover: hover) and (pointer: fine) {
+  button.kcard:hover {
+    filter: brightness(1.12);
+  }
+}
+.kcard.lead {
+  --kc-ring: 0 0 0 var(--px) var(--ink), 0 0 0 calc(2 * var(--px)) var(--gold), 0 0 0 calc(3 * var(--px)) var(--ink);
+}
+.kcard.dim {
+  filter: saturate(0.4) brightness(0.85);
+}
+.kcard .kc-art {
   position: relative;
-  display: grid;
-  place-items: end center;
-  height: calc(28 * var(--px));
-  background: radial-gradient(ellipse at 50% 85%, color-mix(in srgb, var(--rc) 70%, #fff) 0 18%, transparent 19%),
-    linear-gradient(180deg, color-mix(in srgb, var(--rc) 55%, #24203a) 0 62%, color-mix(in srgb, var(--rc) 30%, #181428) 62% 100%);
-  box-shadow: inset 0 0 0 var(--px) color-mix(in srgb, var(--rc) 70%, #000);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: calc(40 * var(--px));
   overflow: hidden;
+  background: radial-gradient(ellipse 60% 52% at 50% 66%, color-mix(in srgb, var(--rc) 36%, transparent), transparent 74%),
+    linear-gradient(180deg, color-mix(in srgb, var(--rc) 22%, #1e1519), color-mix(in srgb, var(--rc) 8%, #150e11));
 }
-.hero-card .art img {
-  position: relative;
+.kcard .kc-art > img {
+  margin-bottom: var(--px);
 }
-.hero-card .name {
+.kcard.empty .kc-art {
+  align-items: center;
+}
+.kcard .kc-corner {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+}
+.kcard .kc-corner.tl {
+  top: var(--px);
+  left: var(--px);
+}
+.kcard .kc-corner.tr {
+  top: var(--px);
+  right: var(--px);
+}
+.kcard .kc-top {
+  position: absolute;
+  z-index: 2;
+  top: calc(-3 * var(--px));
+  left: 50%;
+  display: flex;
+  transform: translateX(-50%);
+}
+.kcard .kc-info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--px);
+  padding: 0 var(--px) calc(0.5 * var(--px));
+}
+.kcard .kc-name {
   font-weight: 700;
+  font-size: calc(4.8 * var(--px));
+  line-height: 1.1;
+  color: var(--text);
+  text-shadow: var(--pixel-text);
+  overflow-wrap: anywhere;
+}
+.kcard .kc-meta {
+  font-size: calc(3.8 * var(--px));
+  color: var(--muted);
+}
+.kcard .kc-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--px);
+  margin-top: auto;
+  padding-top: calc(1.5 * var(--px));
+  border-top: var(--px) solid color-mix(in srgb, var(--rc) 22%, #3a2a2c);
   font-size: calc(4 * var(--px));
-  color: var(--text-dark);
+  font-weight: 700;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+.kcard .kc-foot .l {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--px);
+  color: var(--text);
+}
+.kcard .kc-foot .r {
+  color: var(--rc);
+}
+
+/* Tags on a card: the leader's crown, NEW, SPARE (a pull that came in as a spare), a token's ×. */
+.ktag {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(0.5 * var(--px));
   padding: 0 var(--px);
+  font-size: calc(3.4 * var(--px));
+  font-weight: 700;
+  line-height: calc(5 * var(--px));
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  color: #fff;
+  text-shadow: none;
+  background: #3e5fa8;
+  box-shadow: 0 0 0 var(--px) var(--ink);
 }
-.hero-card .meta {
-  color: var(--muted-dark);
-  font-size: calc(3.6 * var(--px));
-  padding-bottom: calc(0.5 * var(--px));
+.ktag.lead {
+  padding: var(--px);
+  background: #3a2410;
+  box-shadow: 0 0 0 var(--px) var(--ink), inset 0 0 0 var(--px) var(--gold);
 }
-.hero-card .rar-strip {
-  height: var(--px);
-  background: var(--rc);
+.ktag.new {
+  background: #2f9e3f;
 }
-.hero-card.sel {
-  outline: var(--px) solid var(--gold);
-  outline-offset: var(--px);
+.ktag.spare {
+  background: #7a5230;
 }
-.hero-card .badge.tl {
-  left: calc(-1.5 * var(--px));
-  top: calc(-1.5 * var(--px));
+.ktag.mult {
+  background: #e07a12;
 }
-.hero-card .badge.tr {
-  right: calc(-1.5 * var(--px));
-  top: calc(-1.5 * var(--px));
+/* The spare copies chip: two cards and "×4", brass on dark, the same on every card and in the sheet. */
+.kspare {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--px);
+  padding: var(--px) calc(1.5 * var(--px)) var(--px) var(--px);
+  white-space: nowrap;
+  color: #ffe08a;
+  text-shadow: none;
+  background: #2b1a0c;
+  box-shadow: 0 0 0 var(--px) var(--ink), inset 0 0 0 var(--px) #b97a26;
 }
-.hero-card .badge.bl {
-  left: calc(-1.5 * var(--px));
-  top: calc(20 * var(--px));
+.kspare b {
+  font-size: calc(4.6 * var(--px));
+  font-weight: 700;
+  line-height: 1;
 }
 
 .squad-row {
@@ -646,14 +750,333 @@ select.select {
   box-shadow: var(--pixel-edge);
 }
 
-.dupe-bar {
+/* The knight sheet, in icons and numbers: power, HP, attack and odds in a strip; the level, its shard
+   bar and Level up in one row; the spare copies and their four trades; squad slots and Reforge. */
+.krank {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--px);
+  font-weight: 700;
+}
+.kstats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: calc(1.5 * var(--px));
+  align-self: stretch;
+}
+.kstats > span {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  gap: var(--px);
+  padding: calc(1.5 * var(--px)) var(--px);
+  font-size: calc(4.8 * var(--px));
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--text);
+  background: rgba(10, 6, 8, 0.5);
+  box-shadow: 0 0 0 var(--px) var(--ink);
+}
+.kpanel {
+  display: flex;
+  flex-direction: column;
+  gap: calc(2.5 * var(--px));
+  padding: calc(3 * var(--px));
+  background: rgba(10, 6, 8, 0.5);
+  box-shadow: 0 0 0 var(--px) var(--ink), inset 0 0 0 var(--px) rgba(255, 230, 190, 0.12);
+}
+.kpanel.klevel {
+  flex-direction: row;
+  align-items: center;
+}
+.klv {
+  display: flex;
+  align-items: baseline;
+  gap: calc(0.5 * var(--px));
+  font-size: calc(7 * var(--px));
+  font-weight: 700;
+  line-height: 1;
+  color: var(--gold);
+}
+.klv small {
+  font-size: calc(4 * var(--px));
+  color: var(--muted);
+}
+.kshards {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--px);
+  min-width: 0;
+  font-size: calc(4.4 * var(--px));
+  font-weight: 700;
+  color: var(--text);
+}
+.kshard-n {
+  color: #8cd0ff;
+}
+.kbar {
+  position: relative;
+}
+.kcost {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(0.5 * var(--px));
+  font-size: 0.85em;
+}
+.kcost.short {
+  color: var(--bad);
+}
+.kspare-count.none {
+  opacity: 0.5;
+}
+.kspare-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: calc(2.5 * var(--px)) calc(2 * var(--px));
+}
+/* A trade on a button: [copies] 3 → [shard] +3. */
+.ktrade {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--px);
+  white-space: nowrap;
+}
+.ktrade .kto {
+  margin: 0 var(--px);
+  opacity: 0.85;
+}
+.btn.kready {
+  animation: kReady 1s steps(2) infinite;
+}
+@keyframes kReady {
+  50% {
+    filter: brightness(1.22) drop-shadow(0 0 calc(2 * var(--px)) rgba(150, 255, 120, 0.7));
+  }
+}
+.ksquad {
+  font-size: calc(4.4 * var(--px));
+  font-weight: 700;
+  color: var(--muted);
+}
+.ksquad .kforge {
+  margin-left: auto;
+}
+.kforge-msg {
+  align-self: flex-end;
+  font-size: calc(4.4 * var(--px));
+}
+.stage-art .stage-gold {
+  position: absolute;
+  top: calc(3 * var(--px));
+  left: calc(3 * var(--px));
+}
+.knowrap {
+  flex-wrap: nowrap;
+}
+/* "?": the legend (what spare copies are, what each icon stands for), one tap away. */
+.khelp {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: calc(9 * var(--px));
+  height: calc(9 * var(--px));
+  font-size: calc(5.5 * var(--px));
+  font-weight: 700;
+  color: var(--text);
+  background: #3a2a2c;
+  box-shadow: 0 0 0 var(--px) var(--ink), inset 0 0 0 var(--px) rgba(255, 230, 190, 0.25);
+  cursor: pointer;
+}
+.kpop-back {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: calc(8 * var(--px));
+  background: rgba(8, 4, 2, 0.45);
+  animation: fadeIn 0.15s steps(3) both;
+}
+.kpop {
+  display: flex;
+  flex-direction: column;
   gap: calc(2 * var(--px));
-  flex-wrap: wrap;
-  padding: calc(2.5 * var(--px)) calc(3 * var(--px));
+  width: min(100%, calc(150 * var(--px)));
+  padding: calc(4 * var(--px)) calc(5 * var(--px));
   font-size: calc(4.6 * var(--px));
+  line-height: 1.35;
+  color: var(--text);
+  animation: popIn 0.18s steps(3) both;
+}
+.kpop p {
+  display: flex;
+  align-items: flex-start;
+  gap: calc(2 * var(--px));
+  margin: 0;
+}
+.kpop p > img {
+  margin-top: calc(0.5 * var(--px));
+}
+.kpop-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(1.5 * var(--px)) calc(4 * var(--px));
+  padding-top: calc(2 * var(--px));
+  border-top: var(--px) solid rgba(255, 230, 190, 0.15);
+  color: var(--muted);
+}
+.kpop-icons > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--px);
+}
+.kconfirm {
+  display: flex;
+  flex-direction: column;
+  gap: calc(2 * var(--px));
+  padding: calc(3 * var(--px)) calc(4 * var(--px));
+  font-size: calc(4.4 * var(--px));
+  color: var(--text);
+}
+.kconfirm > b {
+  display: flex;
+  align-items: center;
+  gap: var(--px);
+  font-size: calc(5 * var(--px));
+}
+.kconfirm ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--px);
+  max-height: 50vh;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  touch-action: pan-y;
+}
+.kconfirm li {
+  display: flex;
+  align-items: center;
+  gap: calc(1.5 * var(--px));
+}
+.kconfirm li > :last-child {
+  margin-left: auto;
+}
+.krules {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(58 * var(--px)), 1fr));
+  gap: calc(1.5 * var(--px)) calc(4 * var(--px));
+  padding: calc(2 * var(--px)) calc(3 * var(--px));
+}
+.krules label {
+  font-size: calc(4.2 * var(--px));
+}
+
+/* Feedback for every press (fx/Pops.tsx): "+3 shards" or "+120 gold" jumps off the button and flies
+   to where it lands; numbers bump as they change; the shard bar flashes as it fills; notes up top. */
+.rk-pop {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: var(--px);
+  translate: -50% -50%;
+  font-size: calc(5.5 * var(--px));
+  font-weight: 700;
+  white-space: nowrap;
+  color: #ffe08a;
+  text-shadow: var(--pixel-text);
+  pointer-events: none;
+  animation: rkPopFly 1s both;
+}
+.rk-pop.shard {
+  color: #a8e4ff;
+}
+.rk-pop.still {
+  animation-name: rkPopRise;
+}
+@keyframes rkPopFly {
+  0% {
+    transform: translate(0, 0) scale(0.5);
+    opacity: 0;
+  }
+  12% {
+    transform: translate(0, calc(-7 * var(--px))) scale(1.25);
+    opacity: 1;
+  }
+  30% {
+    transform: translate(0, calc(-9 * var(--px))) scale(1);
+    opacity: 1;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.7, 0.7);
+  }
+  100% {
+    transform: translate(var(--dx), var(--dy)) scale(0.6);
+    opacity: 0.25;
+  }
+}
+@keyframes rkPopRise {
+  0% {
+    transform: translate(0, 0) scale(0.5);
+    opacity: 0;
+  }
+  14% {
+    transform: translate(0, calc(-9 * var(--px))) scale(1.25);
+    opacity: 1;
+  }
+  70% {
+    transform: translate(0, calc(-14 * var(--px))) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(0, calc(-18 * var(--px))) scale(1);
+    opacity: 0;
+  }
+}
+.rk-notes {
+  position: fixed;
+  z-index: 60;
+  top: calc(14 * var(--px) + env(safe-area-inset-top, 0px));
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(1.5 * var(--px));
+  width: max-content;
+  max-width: 92vw;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.rk-bump {
+  display: inline-block;
+  animation: rkBump 0.36s steps(4) both;
+}
+@keyframes rkBump {
+  0% {
+    transform: scale(1.7);
+  }
+  50% {
+    transform: scale(0.85);
+  }
+}
+.rk-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: rgba(190, 235, 255, 0.85);
+  animation: rkFlash 0.45s steps(3) both;
+}
+@keyframes rkFlash {
+  to {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn.kready,
+  .rk-bump {
+    animation: none;
+  }
 }
 
 /* ------------------------------------------------------------ modals (hero detail, settings, dialog) */
@@ -703,18 +1126,26 @@ select.select {
     opacity: 0;
   }
 }
+/* The knight sheet's picture: the card's look, big (a crisp rarity frame round a soft pool of light). */
 .stage-art {
   position: relative;
-  display: grid;
-  place-items: end center;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
   /* (A scrolling sheet's flex column would otherwise squeeze it to nothing.) */
   flex: none;
-  height: calc(58 * var(--px));
-  background: radial-gradient(ellipse at 50% 82%, color-mix(in srgb, var(--rc) 70%, #fff) 0 16%, transparent 17%),
-    radial-gradient(ellipse at 50% 60%, color-mix(in srgb, var(--rc) 45%, transparent) 0 45%, transparent 46%),
-    linear-gradient(180deg, color-mix(in srgb, var(--rc) 35%, #1a1630) 0 72%, color-mix(in srgb, var(--rc) 18%, #100d1e) 72% 100%);
-  box-shadow: var(--pixel-edge);
+  height: calc(62 * var(--px));
+  padding-bottom: calc(2 * var(--px));
+  background: radial-gradient(ellipse 46% 50% at 50% 64%, color-mix(in srgb, var(--rc) 40%, transparent), transparent 74%),
+    linear-gradient(180deg, color-mix(in srgb, var(--rc) 24%, #1e1519), color-mix(in srgb, var(--rc) 8%, #150e11));
+  box-shadow: 0 0 0 var(--px) var(--ink), inset 0 0 0 var(--px) var(--rc), inset 0 0 0 calc(2 * var(--px)) color-mix(in srgb, var(--rc) 22%, #120a0c);
   overflow: hidden;
+}
+.stage-art .stage-new {
+  position: absolute;
+  top: calc(3 * var(--px));
+  left: 50%;
+  transform: translateX(-50%);
 }
 .stats-grid {
   display: grid;

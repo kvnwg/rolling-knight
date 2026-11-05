@@ -30,6 +30,12 @@ export function mend(raw: unknown): GameState {
   out.settings = { ...fresh.settings, ...(s.settings ?? {}) };
   out.seen = { ...fresh.seen, ...(s.seen ?? {}) };
   out.dupeRules = { ...fresh.dupeRules, ...(s.dupeRules ?? {}) };
+  if (!out.roster || typeof out.roster !== 'object') out.roster = {};
+  // Older saves flagged knights NEW until you opened each one; NEW now lasts 30 s from `gotAt`
+  // (which those knights don't have), so the old flag goes and nothing from them shows NEW.
+  for (const rec of Object.values(out.roster)) {
+    if (rec && typeof rec === 'object') delete (rec as { isNew?: unknown }).isNew;
+  }
   if (!Array.isArray(out.quests)) out.quests = [];
   if (!Array.isArray(out.squad) || out.squad.length !== 3) out.squad = [null, null, null];
   out.squad = out.squad.map((id) => (id && out.roster[id] ? id : null));

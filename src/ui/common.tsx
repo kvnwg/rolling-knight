@@ -76,6 +76,22 @@ export function HeroLive(props: { id: string; mutation?: MutationId | null; s?: 
   return <HeroArt {...props} frame={f} />;
 }
 
+/** A titled section of a panel, with an optional note after the title and something on the right. */
+export function Section({ title, sub, children, right }: { title: string; sub?: ReactNode; children: ReactNode; right?: ReactNode }) {
+  return (
+    <section className="stack">
+      <div className="spread">
+        <div className="section-title outlined">
+          {title}
+          {sub && <small>{sub}</small>}
+        </div>
+        {right}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 export function rarityStyle(r: Rarity): CSSProperties {
   return { ['--rc' as string]: RARITY_COLOR[r] } as CSSProperties;
 }

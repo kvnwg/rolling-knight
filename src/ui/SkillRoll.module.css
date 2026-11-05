@@ -209,7 +209,7 @@
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 0 calc(2.5 * var(--px));
-  padding: calc(1.5 * var(--px)) calc(2.5 * var(--px)) calc(1.5 * var(--px)) calc(2 * var(--px));
+  padding: var(--px) calc(2.5 * var(--px)) var(--px) var(--px);
   background: rgba(10, 8, 22, 0.45);
   box-shadow:
     inset var(--px) 0 0 var(--tc),
@@ -225,11 +225,10 @@
   background: rgba(255, 207, 74, 0.14);
 }
 .icon {
-  grid-row: span 2;
   display: grid;
   place-items: center;
-  width: calc(14 * var(--px));
-  height: calc(14 * var(--px));
+  width: calc(12 * var(--px));
+  height: calc(12 * var(--px));
   background: rgba(10, 8, 22, 0.5);
   box-shadow: inset 0 0 0 var(--px) var(--tc);
 }
@@ -249,7 +248,4 @@
   font-weight: 700;
   color: var(--tc);
   text-align: right;
-}
-.text {
-  grid-column: 2 / 4;
 }
