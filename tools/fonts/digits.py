@@ -1,8 +1,9 @@
 """
 Builds the UI's digits font (src/assets/fonts/rk-digits-{400,700}.woff2): Pixelify Sans's digits with
 a new 2 and 5. Pixelify's own 2 is a backwards S with a curled foot and its 5 an S with a round top,
-so numbers read as letters; these are drawn on the same 5 x 7 pixel grid with a flat base on the 2 and
-a flat top and square corner on the 5. The face covers only the digits (the CSS gives it
+so numbers read as letters. These are built from bars as heavy as each weight's own 0 and 3 (read off
+those glyphs, so the bold 2 and 5 are as bold as the bold 3): a 2 with a flat base and a 5 with a flat
+top and square corners, the shapes on any clock. The face covers only the digits (the CSS gives it
 unicode-range U+0030-0039, in front of Pixelify Sans), so everything else is Pixelify as before.
 
   python3 -I tools/fonts/digits.py <rolling-knight checkout>
@@ -21,47 +22,78 @@ ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else '.')
 SRC = ROOT / 'node_modules/@fontsource/pixelify-sans/files'
 OUT = ROOT / 'src/assets/fonts'
 
-GLYPHS = {
-    'two': ['.###.', '#...#', '....#', '...#.', '..#..', '.#...', '#####'],
-    'five': ['#####', '#....', '####.', '....#', '....#', '#...#', '.###.'],
-}
-
-# Each weight's 5 x 7 grid in font units: left, right, bottom, top (measured from its own 0 and 3).
-GRID = {'400': (60, 525, -12, 631), '700': (61, 542, -11, 638)}
+from fontTools.pens.recordingPen import RecordingPen
 
 
-def draw(rows, grid):
-    x0, x1, y0, y1 = grid
-    cw = (x1 - x0) / 5
-    rh = (y1 - y0) / 7
+def edges(font, name):
+    """The x and y coordinates a glyph's outline uses, sorted (Pixelify draws digits from bars)."""
+    pen = RecordingPen()
+    font.getGlyphSet()[name].draw(pen)
+    xs, ys = set(), set()
+    for _, args in pen.value:
+        for pt in args:
+            xs.add(round(pt[0]))
+            ys.add(round(pt[1]))
+    return sorted(xs), sorted(ys)
+
+
+def metrics(font, weight):
+    """
+    The weight's own strokes, read off its 0 and its 3: the outer left and right, the inner edges of
+    the side strokes, the bottom and top bars, and the middle bar (so the new digits are exactly as
+    heavy as the others in this weight).
+    """
+    zx, zy = edges(font, 'zero')
+    _, ty = edges(font, 'three')
+    # (The regular weight's strokes are a pixel wide with their corner cuts inside; the bold's are
+    # wider with the cuts outside: so the inner edge is the 2nd coordinate in, or the 3rd.)
+    k = 1 if weight == '400' else 2
+    L, R = zx[0], zx[-1]
+    Li, Ri = zx[k], zx[-1 - k]
+    B, T = zy[0], zy[-1]
+    Bi, Ti = zy[k], zy[-1 - k]
+    # The 3's middle bar, as thick as the others.
+    mid = (B + T) / 2
+    lower = [y for y in ty if Bi < y < mid]
+    M0 = lower[-2]
+    return L, Li, Ri, R, B, Bi, M0, M0 + (Bi - B), Ti, T
+
+
+def rects(boxes):
     pen = TTGlyphPen(None)
-    for r, row in enumerate(rows):
-        top = y1 - r * rh
-        bot = top - rh
-        c = 0
-        while c < 5:
-            if row[c] != '#':
-                c += 1
-                continue
-            start = c
-            while c < 5 and row[c] == '#':
-                c += 1
-            # One rectangle per run, a unit taller each way so rows join without seams.
-            a, b = round(x0 + start * cw), round(x0 + c * cw)
-            lo, hi = round(bot - 1), round(top + 1)
-            pen.moveTo((a, lo))
-            pen.lineTo((a, hi))
-            pen.lineTo((b, hi))
-            pen.lineTo((b, lo))
-            pen.closePath()
+    for a, lo, b, hi in boxes:
+        pen.moveTo((a, lo))
+        pen.lineTo((a, hi))
+        pen.lineTo((b, hi))
+        pen.lineTo((b, lo))
+        pen.closePath()
     return pen.glyph()
 
 
-for weight, grid in GRID.items():
+def two(m):
+    """A 2 that can't be read as anything else: top bar, right side down to the middle, the middle
+    bar, left side down to the base, a flat base."""
+    L, Li, Ri, R, B, Bi, M0, M1, Ti, T = m
+    return rects([(L, Ti, R, T), (Ri, M0, R, T), (L, M0, R, M1), (L, B, Li, M1), (L, B, R, Bi)])
+
+
+def five(m):
+    """A 5 with a flat top and square corners: top bar, left side down to the middle, the middle bar,
+    right side down to the base, a flat base."""
+    L, Li, Ri, R, B, Bi, M0, M1, Ti, T = m
+    return rects([(L, Ti, R, T), (L, M0, Li, T), (L, M0, R, M1), (Ri, B, R, M1), (L, B, R, Bi)])
+
+
+GLYPHS = {'two': two, 'five': five}
+
+
+for weight in ('400', '700'):
     font = TTFont(SRC / f'pixelify-sans-latin-{weight}-normal.woff2')
     glyf = font['glyf']
-    for name, rows in GLYPHS.items():
-        glyf[name] = draw(rows, grid)
+    m = metrics(font, weight)
+    print(weight, 'strokes', m)
+    for name, make in GLYPHS.items():
+        glyf[name] = make(m)
         adv, _ = font['hmtx'][name]
         glyf[name].recalcBounds(glyf)
         font['hmtx'][name] = (adv, glyf[name].xMin)

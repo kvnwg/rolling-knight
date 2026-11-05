@@ -71,12 +71,13 @@ export const BAL = {
   },
   roster: {
     /**
-     * Gold for level L -> L+1: goldBase * goldGrowth^(L-1), times (1 + rarityStep * the rarity's
-     * index) so a rare knight costs more to raise than a common one. Gold is all it takes.
+     * Gold for level L -> L+1: goldBase * goldGrowth^(L-1), times rarityGrowth^(the rarity's index):
+     * every tier up costs nearly twice as much to raise (a Legendary about 13x a Common, a Mythic 25x),
+     * since its levels add far more (they're a share of far bigger stats). Gold is all it takes.
      */
     goldBase: 40,
     goldGrowth: 1.32,
-    rarityStep: 0.5,
+    rarityGrowth: 1.9,
     maxLevel: 60,
     /** Each level adds this share of the knight's base stats (additive). */
     levelPct: 0.1,

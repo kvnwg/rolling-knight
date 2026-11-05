@@ -74,7 +74,7 @@ and Mythic or better.
 - **Stats**: class base × rarity (Common 1 … Primordial 30) × level × mutation × rebirths × upgrades.
 - **Duplicates**: every copy after the first turns straight into gold as it lands (kills' worth by
   rarity; 3x for Commons and Uncommons with Peasant Levy); a better mutation it rolled sticks to the
-  knight. **Levels** cost gold only: 40 x 1.32^(L-1), times 1 + 0.5 per rarity tier (half for Commons
+  knight. **Levels** cost gold only: 40 x 1.32^(L-1), times 1.9 per rarity tier (half for Commons
   and Uncommons with Hand-Me-Downs); each adds 10% of base stats (30% for Commons and Uncommons with
   Humble Beginnings). Old saves' spare copies and shards were cashed in as gold.
 - **Classes** (the kit is the same for every knight of a class):

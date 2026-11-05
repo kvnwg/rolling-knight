@@ -163,7 +163,8 @@ describe('roster', () => {
     expect(knightPower(s, s.roster[id])).toBeGreaterThan(p);
     addKnight(s, knightId('common', 'ranger'), null);
     addKnight(s, knightId('legendary', 'ranger'), null);
-    expect(levelCost(s, knightId('legendary', 'ranger'))).toBeGreaterThan(levelCost(s, knightId('common', 'ranger')));
+    // Much, much more for a higher tier: a Legendary over 10x a Common at the same level.
+    expect(levelCost(s, knightId('legendary', 'ranger'))).toBeGreaterThan(10 * levelCost(s, knightId('common', 'ranger')));
     s.gold = 0;
     expect(levelUp(s, id)).toBe(false);
   });

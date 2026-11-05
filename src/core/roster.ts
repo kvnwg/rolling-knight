@@ -154,7 +154,7 @@ export function levelCost(state: GameState, id: string): number {
   const R = BAL.roster;
   const rec = state.roster[id];
   const rarity = knightDef(id).rarity;
-  let g = R.goldBase * Math.pow(R.goldGrowth, (rec?.level ?? 1) - 1) * (1 + R.rarityStep * rarityIndex(rarity));
+  let g = R.goldBase * Math.pow(R.goldGrowth, (rec?.level ?? 1) - 1) * Math.pow(R.rarityGrowth, rarityIndex(rarity));
   if (hasPerk(state, 'handMeDowns') && isUnderdog(rarity)) g *= 0.5;
   return Math.max(1, Math.round(g));
 }

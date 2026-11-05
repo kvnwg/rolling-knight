@@ -142,7 +142,7 @@ as usual). `?fresh` starts a new game. The game is on
 npm test
 ```
 
-275 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
+278 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
 timing, extra reels, the start's ordinary quick spins, bad-luck protection, Lucky Spins, duplicates
 turning into gold, gold-only levels and reforging, old saves' spares cashed in, Humble Beginnings' 3x,
 rebirth; every biome's floors fully
