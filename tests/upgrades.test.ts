@@ -98,9 +98,13 @@ describe('the upgrade map', () => {
     for (const id of ['luck', 'spinSpeed', 'pity', 'luckySpin', 'goldenSpin', 'alchemy', 'turbo', 'potionTime', 'extraReel', 'might', 'vitality', 'greed', 'swiftness', 'offline'] as const) {
       expect(UPGRADES_BY_ID.has(id), id).toBe(true);
     }
-    for (const id of ['luckyStrike', 'doubleOrNothing', 'ricochet', 'pratfall', 'secondWind', 'coinShower', 'jackpot', 'loadedDice', 'butterfingers', 'wildMagic'] as const) {
-      expect(UPGRADES_BY_ID.get(id)?.group, id).toBeDefined();
+    // The quirky combat lines roll their dice in the fight; Loaded Dice leans the skill rolls instead.
+    for (const id of ['luckyStrike', 'doubleOrNothing', 'ricochet', 'pratfall', 'secondWind', 'coinShower', 'jackpot', 'butterfingers', 'wildMagic'] as const) {
+      expect(UPGRADES_BY_ID.get(id)?.rolls, id).toBe(true);
     }
+    expect(UPGRADES_BY_ID.get('loadedDice')?.rolls).toBeUndefined();
+    // The old flat list's two groups still hold every line (screens that list by them show them all).
+    expect(UPGRADES.every((u) => u.group === 'altar' || u.group === 'squad')).toBe(true);
     for (const u of UPGRADES) {
       expect(u.name.length, u.id).toBeGreaterThan(2);
       expect(u.desc.length, u.id).toBeGreaterThan(10);
@@ -171,6 +175,18 @@ describe('costs', () => {
     buyUpgrade(s, 'spinSpeed');
     buyUpgrade(s, 'spinSpeed');
     expect(buyUpgrade(s, 'luckySpin')).toBe(true);
+  });
+
+  it('open a line deep in the map once every tier on the way to it is owned', () => {
+    for (const id of ['ladyLuck', 'jackpot', 'goldenSpin', 'loadedDice', 'pratfall', 'twoHeaded'] as const) {
+      const s = game(openLine(id), 1e12);
+      expect(upgradeUnlocked(s, id), id).toBe(true);
+      expect(hexView(s, HEX_BY_KEY.get(nodeKey(id, 1))!), id).toBe('open');
+      expect(buyUpgrade(s, id), id).toBe(true);
+      const d = UPGRADES_BY_ID.get(id)!.requires!;
+      s.upgrades[d.id] = d.tier - 1;
+      expect(upgradeUnlocked(s, id), id).toBe(false);
+    }
   });
 
   it('tidy an old flat-list save: unknown lines go, tiers clamp, orphaned lines are cleared', () => {
@@ -587,8 +603,13 @@ describe('the chance hooks in a fight', () => {
       t.y = w2.heroes[0].y;
       const tHp = t.hp;
       expect(castWildMagic(w2, w2.heroes[0], t, spell)).toBe(spell);
-      const changed = w2.areas.length + w2.shots.length > before || t.hp < tHp || w2.heroes.some((x, i) => x.hp > hp[i]);
+      // Nothing is hit there and then (it runs inside World.damage): spells land as areas and shots.
+      expect(t.hp, spell).toBe(tHp);
+      const changed = w2.areas.length + w2.shots.length > before || w2.heroes.some((x, i) => x.hp > hp[i]);
       expect(changed, spell).toBe(true);
+      if (spell === 'light') continue;
+      for (let k = 0; k < 40; k++) w2.update(1 / 30);
+      expect(t.hp < tHp || t.dead, spell).toBe(true);
     }
   });
 

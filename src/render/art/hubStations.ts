@@ -20,82 +20,79 @@ const ROSE: Ramp = ['#6a2a3a', '#a84a5a', '#e07a7a', '#ffb0a0', '#ffd8c0', '#fff
 // ------------------------------------------------------------------ the smithy
 
 export function smithy(out: HubOut): void {
-  const L = new Layer(36, 236, 136, 110);
-  const base = 330;
+  const base = 344;
+  const x0 = 46;
+  const x1 = 142;
+  const L = new Layer(x0 - 8, 250, x1 - x0 + 18, base - 250 + 4);
   // Back wall: rough stone.
-  blocks(L, 48, 262, 104, 50, { bw: 9, bh: 6, seed: 3, base: 3.2, moss: LEAF });
+  blocks(L, x0 + 4, 290, x1 - x0 - 8, base - 290, { bw: 9, bh: 6, seed: 3, base: 3.2, moss: LEAF });
   // The lean-to roof on its posts: shingles sloping toward us.
-  const rx0 = 40;
-  const rx1 = 164;
-  const ry0 = 246;
-  const ry1 = 276;
-  scales(L, rx0, ry0, rx1, ry1, () => true, { w: 6, h: 5, ramp: ROOF, seed: 5, base: 4.4, moss: LEAF, rowShade: (y) => (y - ry0) / (ry1 - ry0) * 0.8 - 0.4 });
-  timber(L, rx0 - 1, ry1, rx1 - rx0 + 2, 4, 6, TIMBER, 3.8);
-  for (const px of [44, 156]) timber(L, px, ry1 + 4, 4, base - ry1 - 4, 7 + px);
+  const ry0 = 272;
+  const ry1 = 296;
+  scales(L, x0 - 4, ry0, x1 + 4, ry1, () => true, { w: 6, h: 5, ramp: ROOF, seed: 5, base: 4.6, moss: LEAF, rowShade: (y) => ((y - ry0) / (ry1 - ry0)) * 0.8 - 0.4 });
+  timber(L, x0 - 5, ry1, x1 - x0 + 10, 4, 6, TIMBER, 3.8);
+  for (const px of [x0 - 2, x1 - 2]) timber(L, px, ry1 + 4, 4, base - ry1 - 4, 7 + px);
   // The forge: a stone hearth with a lit top, a fire pit of coals, an arched mouth glowing.
-  const fx0 = 52;
-  const fx1 = 92;
-  const ftop = 298;
+  const fx0 = x0 + 4;
+  const fx1 = x0 + 38;
+  const ftop = 314;
   blocks(L, fx0, ftop + 5, fx1 - fx0, base - ftop - 5, { bw: 8, bh: 5, seed: 9, base: 2.8 });
   for (let x = fx0; x < fx1; x++) for (let y = ftop; y < ftop + 5; y++) L.px(x, y, rk(STONE, y === ftop ? 6 : 4.6 + (h2(x, y, 3) - 0.5)));
-  // Coals in the pit on top.
   for (let x = fx0 + 4; x < fx1 - 4; x++) {
     for (let y = ftop + 1; y < ftop + 4; y++) {
       const hot = vnoise(x, y, 3, 2, 11);
       L.gl(x, y, rk(EMBER, 2 + hot * 4 - (y === ftop + 3 ? 1 : 0)));
     }
   }
-  // The mouth: an arch of darker stone, the fire inside.
-  const mx = (fx0 + fx1) / 2;
-  for (let y = ftop + 10; y < base - 1; y++) {
-    for (let x = mx - 9; x <= mx + 9; x++) {
+  const mx = Math.round((fx0 + fx1) / 2);
+  for (let y = ftop + 9; y < base - 1; y++) {
+    for (let x = mx - 8; x <= mx + 8; x++) {
       const dx = x + 0.5 - mx;
-      const dy = Math.max(0, ftop + 16 - y);
-      if (dx * dx + dy * dy * 1.6 > 81) continue;
-      const inner = dx * dx + dy * dy * 1.6 < 49;
+      const dy = Math.max(0, ftop + 15 - y);
+      if (dx * dx + dy * dy * 1.6 > 64) continue;
+      const inner = dx * dx + dy * dy * 1.6 < 36;
       if (!inner) {
         L.px(x, y, rk(STONE, 1.2));
         continue;
       }
-      const t = (y - (ftop + 10)) / (base - ftop - 11);
+      const t = (y - (ftop + 9)) / (base - ftop - 10);
       L.gl(x, y, rk(EMBER, 1.5 + t * 3 + (vnoise(x, y, 3, 3, 12) - 0.5) * 2));
     }
   }
-  // The hood and chimney above the forge, up through the roof.
-  for (let y = 232; y < ftop; y++) {
-    const half = y > 280 ? 14 - (y - 280) * 0.0 : 6;
-    const hw = y > 284 ? 16 : y > 278 ? 12 : 6;
-    void half;
+  // The chimney up through the roof.
+  for (let y = 256; y < ftop; y++) {
+    const hw = y > 300 ? 12 : y > 296 ? 9 : 5;
     for (let x = mx - hw; x < mx + hw; x++) {
       const t = (x - (mx - hw)) / (2 * hw);
-      const row = Math.floor((y - 232) / 3);
-      const joint = (x + (row % 2) * 2) % 5 === 0 || (y - 232) % 3 === 2;
+      const row = Math.floor((y - 256) / 3);
+      const joint = (x + (row % 2) * 2) % 5 === 0 || (y - 256) % 3 === 2;
       L.px(x, y, joint ? '#2a1612' : rk(['#3a1a14', '#5a2a1e', '#7a3a28', '#9a4e34', '#b8664a'], 3 - t * 2.2 + (t < 0.2 ? 0.8 : 0)));
     }
   }
-  hline(L, mx - 8, mx + 7, 231, '#b8664a');
+  hline(L, mx - 6, mx + 5, 255, '#b8664a');
+  hline(L, mx - 6, mx + 5, 254, '#2a1612');
   // Bellows beside the forge.
-  for (let y = 0; y < 8; y++) for (let x = 0; x < 10; x++) {
-    if (y < 2 && x > 7) continue;
-    L.px(fx1 + 2 + x, base - 12 + y, y % 3 === 0 ? '#3a2014' : rk(['#3a2014', '#5e3820', '#84542e', '#a8703e'], 2.6 - x * 0.15 + (y < 3 ? 0.6 : 0)));
+  for (let y = 0; y < 7; y++) for (let x = 0; x < 9; x++) {
+    if (y < 2 && x > 6) continue;
+    L.px(fx1 + 2 + x, base - 11 + y, y % 3 === 0 ? '#3a2014' : rk(['#3a2014', '#5e3820', '#84542e', '#a8703e'], 2.6 - x * 0.15 + (y < 3 ? 0.6 : 0)));
   }
-  hline(L, fx1 + 2, fx1 + 11, base - 4, rk(PLANK, 4));
+  hline(L, fx1 + 2, fx1 + 10, base - 4, rk(PLANK, 4));
   // A rack of blades and hammers on the back wall.
   for (let i = 0; i < 4; i++) {
-    const x = 104 + i * 8;
-    vline(L, x, 270, 290, (y) => (y < 272 ? IRON[3] : i % 2 ? IRON[5] : IRON[4]));
-    L.px(x + 1, 274, IRON[2]);
-    hline(L, x - 1, x + 1, 290, rk(GOLD, 2));
-    vline(L, x, 291, 295, rk(PLANK, 2));
+    const x = fx1 + 6 + i * 7;
+    vline(L, x, 300, 318, (y) => (y < 302 ? IRON[3] : i % 2 ? IRON[5] : IRON[4]));
+    L.px(x + 1, 304, IRON[2]);
+    hline(L, x - 1, x + 1, 318, rk(GOLD, 2));
+    vline(L, x, 319, 322, rk(PLANK, 2));
   }
-  hline(L, 100, 136, 269, rk(PLANK, 5));
-  hline(L, 100, 136, 270, rk(PLANK, 2));
+  hline(L, fx1 + 3, fx1 + 31, 299, rk(PLANK, 5));
+  hline(L, fx1 + 3, fx1 + 31, 300, rk(PLANK, 2));
   // Horseshoes on the post.
-  for (const [hx, hy] of [[150, 290], [150, 298]] as const) {
+  for (const [hx, hy] of [[x1 - 2, 314], [x1 - 2, 322]] as const) {
     for (const [dx, dy] of [[0, 0], [1, -1], [2, -1], [3, 0], [0, 1], [3, 1]] as const) L.px(hx + dx, hy + dy, IRON[5]);
   }
   // The sign: crossed hammers on a board hanging from the roof's edge.
-  const sx = 150;
+  const sx = x1 - 4;
   const sy = ry1 + 6;
   hline(L, sx - 1, sx + 12, sy - 1, IRON[2]);
   for (let y = sy; y < sy + 10; y++) for (let x = sx; x < sx + 12; x++) L.px(x, y, rk(PLANK, y === sy ? 6 : x === sx ? 5 : x === sx + 11 || y === sy + 9 ? 2.2 : 4));
@@ -106,15 +103,15 @@ export function smithy(out: HubOut): void {
   hline(L, sx + 1, sx + 4, sy + 2, IRON[6]);
   hline(L, sx + 7, sx + 10, sy + 2, IRON[6]);
   L.outlineTinted(0.75);
-  L.light(mx, ftop + 6, 96, '#ff7a2a', 0.95, 0.7);
-  L.light(mx, base + 4, 70, '#ff8a3a', 0.6, 0.7);
-  out.piece(L, 'smithy', base);
-  out.shadows.push({ kind: 'band', x: 102, y: base, rx: 62, ry: 5, strength: 0.35 });
+  L.light(mx, ftop + 8, 92, '#ff7a2a', 0.8, 0.7);
+  L.light(mx + 10, base + 8, 64, '#ff8a3a', 0.4, 0.7);
+  out.piece(L, 'smithy', base, { x0: x0 - 4, y0: 280, x1: x1 + 2, y1: base + 1 });
+  out.shadows.push({ kind: 'band', x: (x0 + x1) / 2 + 4, y: base, rx: (x1 - x0) / 2 + 4, ry: 5, strength: 0.35 });
 
   // The anvil on its stump, in front (its own piece so the smith stands behind it).
-  const A = new Layer(84, 318, 32, 26);
-  const ax = 100;
-  const ay = 340;
+  const ax = 102;
+  const ay = 358;
+  const A = new Layer(ax - 16, ay - 24, 32, 26);
   for (let y = ay - 7; y <= ay; y++) {
     for (let x = ax - 5 - (y > ay - 2 ? 1 : 0); x <= ax + 5 + (y > ay - 2 ? 1 : 0); x++) {
       const t = (x - (ax - 6)) / 12;
@@ -122,34 +119,34 @@ export function smithy(out: HubOut): void {
     }
   }
   oval(A, ax, ay - 8, 5.6, 2, (x, y, nx, ny) => rk(['#6a4a2a', '#8a6838', '#a8844c', '#c4a068'], 2.4 - ny - nx * 0.3));
-  // The anvil: a waist, a flat face, a horn to the left.
   A.rect(ax - 3, ay - 12, 7, 3, (x, y) => rk(IRON, 3.4 - (x - ax) * 0.3 + (y === ay - 12 ? 0.6 : 0)));
   A.rect(ax - 6, ay - 16, 13, 4, (x, y) => rk(IRON, y === ay - 16 ? 6 : y === ay - 15 ? 4.6 : 3 - (x - ax) * 0.15));
   hline(A, ax - 10, ax - 7, ay - 15, IRON[4]);
   hline(A, ax - 9, ax - 7, ay - 14, IRON[2]);
   A.px(ax - 11, ay - 15, IRON[3]);
   // A glowing blade on the face.
-  hline(A, ax - 4, ax + 3, ay - 17, '#ffb040');
   A.gl(ax - 4, ay - 17, '#ffe080');
   A.gl(ax - 3, ay - 17, '#ffd060');
   A.gl(ax - 2, ay - 17, '#ffb040');
   A.gl(ax - 1, ay - 17, '#ff8a20');
+  A.gl(ax, ay - 17, '#e06010');
+  hline(A, ax + 1, ax + 3, ay - 17, IRON[4]);
   A.halo(ax - 3, ay - 18, '#ff9a30', 0.4);
   A.halo(ax - 2, ay - 18, '#ff9a30', 0.3);
   A.outlineTinted(0.75);
-  A.light(ax - 2, ay - 18, 26, '#ff9a3a', 0.6, 0.5);
+  A.light(ax - 2, ay - 18, 26, '#ff9a3a', 0.5, 0.5);
   out.piece(A, 'anvil', ay);
   out.shadows.push({ kind: 'oval', x: ax + 3, y: ay + 1, rx: 8, ry: 2.5, strength: 0.45 });
 
   // The quench barrel.
-  const Q = new Layer(128, 318, 16, 22);
-  barrel(Q, 130, 340, 33);
-  for (let x = 131; x < 138; x++) Q.px(x, 326, x < 133 ? '#4a8aa8' : '#2a5a7a');
+  const Q = new Layer(136, 334, 16, 22);
+  barrel(Q, 138, 354, 33);
+  for (let x = 139; x < 146; x++) Q.px(x, 341, x < 141 ? '#4a8aa8' : '#2a5a7a');
   Q.outlineTinted(0.75);
-  out.piece(Q, 'quench', 340);
-  out.shadows.push({ kind: 'oval', x: 138, y: 341, rx: 6, ry: 2, strength: 0.4 });
-  out.motes.push({ x: 100, y: 318, rx: 10, ry: 6, kind: 'spark', color: '#ffb040', count: 6 });
-  out.motes.push({ x: 72, y: 292, rx: 8, ry: 10, kind: 'ember', color: '#ff8a3a', count: 5 });
+  out.piece(Q, 'quench', 354);
+  out.shadows.push({ kind: 'oval', x: 146, y: 355, rx: 6, ry: 2, strength: 0.4 });
+  out.motes.push({ x: 102, y: 338, rx: 10, ry: 6, kind: 'spark', color: '#ffb040', count: 6 });
+  out.motes.push({ x: mx, y: 300, rx: 8, ry: 14, kind: 'ember', color: '#ff8a3a', count: 5 });
 }
 
 // ------------------------------------------------------------------ the junk dealer
@@ -202,8 +199,8 @@ export function scrapStall(out: HubOut): void {
   // A lantern on a hook under the awning.
   lanternBox(L, x0 + 10, 288);
   L.outlineTinted(0.75);
-  L.light(x0 + 10, 296, 70, '#ffb860', 0.85, 0.25);
-  out.piece(L, 'scrapStall', base);
+  L.light(x0 + 10, 296, 70, '#ffae4c', 0.58, 0.25);
+  out.piece(L, 'scrapStall', base, { x0: x0 - 8, y0: 280, x1: x1 + 4, y1: base + 1 });
   out.shadows.push({ kind: 'band', x: (x0 + x1) / 2 + 4, y: base, rx: (x1 - x0) / 2 + 2, ry: 4, strength: 0.38 });
 
   // Scrap bins in front: open crates spilling over with metal.
@@ -298,10 +295,10 @@ export function sageCorner(out: HubOut): void {
       const border = ix < 2 || iy < 2 || ix > 53 || iy > 15;
       const mid = Math.abs(ix - 28) * 0.45 + Math.abs(iy - 8.5) < 5;
       const k = border ? (iy === 0 || ix === 0 ? 3 : 1.6) : mid ? 3.4 : (ix + iy) % 4 === 0 ? 1.8 : 1.1;
-      R.px(x, y, rk(['#0e1438', '#1a2458', '#2a3a7a', '#c8a048', '#f0d070'], k));
+      R.px(x, y, rk(['#16182a', '#24263e', '#343452', '#9a7a3a', '#c8a458'], k));
     }
   }
-  out.piece(R, 'sageRug', 300);
+  out.piece(R, 'sageRug', 300, null);
 
   // The bench: a lit seat, legs, a back with a carved sigil.
   const B = new Layer(70, 424, 54, 32);
@@ -337,7 +334,7 @@ export function sageCorner(out: HubOut): void {
   }
   for (const [dx, dy, c] of [[0, -11, '#e0fff8'], [-1, -11, '#7af0e0'], [1, -11, '#7af0e0'], [0, -12, '#b8fff0'], [-1, -12, '#4ad0c0'], [1, -13, '#4ad0c0'], [0, -14, '#7af0e0'], [-2, -10, '#2aa8a0'], [2, -10, '#2aa8a0']] as const) F.gl(fx + dx, fy + dy, c);
   F.outlineTinted(0.75);
-  F.light(fx, fy - 12, 64, '#6af0d8', 0.75, 0.4);
+  F.light(fx, fy - 12, 64, '#5ae8d0', 0.6, 0.4);
   out.piece(F, 'sageBrazier', fy);
   out.motes.push({ x: 96, y: 440, rx: 40, ry: 18, kind: 'mote', color: '#8af8e8', count: 8 });
 }
@@ -444,9 +441,9 @@ export function shrine(out: HubOut): void {
     L.px(cx + dx, base - 14, rk(LEAF, 4));
   }
   L.outlineTinted(0.75);
-  L.light(ex, ey, 74, '#ffa890', 0.85, 0.15);
-  L.light(cx, base - 8, 46, '#ffb070', 0.6, 0.5);
-  out.piece(L, 'shrine', base);
+  L.light(ex, ey, 74, '#ff9a88', 0.6, 0.15);
+  L.light(cx, base - 8, 46, '#ffa860', 0.42, 0.5);
+  out.piece(L, 'shrine', base, { x0: cx - 28, y0: base - 40, x1: cx + 28, y1: base + 1 });
   out.shadows.push({ kind: 'band', x: cx + 4, y: base, rx: 28, ry: 4, strength: 0.4 });
   out.motes.push({ x: ex, y: ey, rx: 20, ry: 14, kind: 'mote', color: '#ffc0a8', count: 6 });
 }
@@ -472,6 +469,10 @@ export function noticeBoard(out: HubOut, x: number, y: number): void {
   });
   // The chicken.
   for (const [dx, dy, c] of [[2, 3, '#ffffff'], [3, 3, '#ffffff'], [3, 2, '#e8302a'], [4, 4, '#ffb030'], [2, 4, '#ffffff'], [3, 4, '#ffffff']] as const) L.px(x - 11 + dx, y - 22 + dy, c);
+  // A lantern hanging off the roof's corner.
+  L.px(x + 18, y - 37, IRON[3]);
+  lanternBox(L, x + 18, y - 36);
+  L.light(x + 18, y - 28, 58, '#ffae4c', 0.5, 0.25);
   // A gold "!" on top for the job board.
   L.rect(x - 1, y - 45, 3, 4, '#ffd84a');
   L.rect(x - 1, y - 40, 3, 1, '#ffd84a');
@@ -495,7 +496,8 @@ export function gate(out: HubOut): void {
     // A lantern on top of the post.
     lanternBox(L, px, base - 68);
     L.outlineTinted(0.75);
-    L.light(px, base - 60, 72, '#ffb860', 0.85, 0.3);
+    L.light(px, base - 56, 76, '#ffae4c', 0.58, 0.3);
+    L.light(px, base - 6, 40, '#ffa040', 0.3, 0.3);
     out.piece(L, id, base);
     out.shadows.push({ kind: 'oval', x: px + 4, y: base + 1, rx: 7, ry: 2.5, strength: 0.45 });
   }
@@ -515,7 +517,7 @@ export function gate(out: HubOut): void {
     B.gl(sx + 4 + x, sy + 2 + y, `#${f(name.px[i])}${f(name.px[i + 1])}${f(name.px[i + 2])}`);
   }
   B.outlineTinted(0.75);
-  out.piece(B, 'gateBeam', base + 1);
+  out.piece(B, 'gateBeam', base + 1, null);
   // The portal's glow rising from the bottom steps: a violet haze over the last treads, runes.
   const P = new Layer(196, 596, 88, 44);
   for (let y = 600; y < 640; y++) {
@@ -530,8 +532,8 @@ export function gate(out: HubOut): void {
     for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [-1, 0], [0, -1]] as const) P.gl(rx + dx, ry + dy, dx || dy ? '#b890ff' : '#f0e0ff');
   }
   out.glowOf(P, 'portal', 640);
-  out.lights.push({ x: 240, y: 646, r: 110, color: '#8a5aff', intensity: 0.95, flicker: 0.15 });
-  out.lights.push({ x: 240, y: 610, r: 50, color: '#b890ff', intensity: 0.6 });
+  out.lights.push({ x: 240, y: 648, r: 112, color: '#8a5aff', intensity: 0.85, flicker: 0.15 });
+  out.lights.push({ x: 240, y: 612, r: 50, color: '#b890ff', intensity: 0.5 });
   out.motes.push({ x: 240, y: 616, rx: 36, ry: 18, kind: 'mote', color: '#c8a8ff', count: 10 });
 }
 
@@ -551,8 +553,8 @@ export function lampPost(out: HubOut, x: number, y: number, id: string, h = 34):
   L.px(x + 2, y - h + 2, IRON[2]);
   lanternBox(L, x, y - h - 9);
   L.outlineTinted(0.75);
-  L.light(x, y - h - 2, 84, '#ffb860', 0.9, 0.2);
-  L.light(x, y + 2, 46, '#ffa850', 0.5, 0.2);
+  L.light(x, y - h - 2, 80, '#ffae4c', 0.58, 0.2);
+  L.light(x, y + 2, 40, '#ff9a40', 0.22, 0.2);
   out.piece(L, id, y);
   out.shadows.push({ kind: 'oval', x: x + 3, y: y + 1, rx: 5, ry: 2, strength: 0.45 });
   return [x, y - h - 8];
@@ -579,9 +581,9 @@ export function lightString(out: HubOut, a: [number, number], b: [number, number
     L.gl(x, y + 3, '#fff6d8');
     L.gl(x + 1, y + 3, c);
     for (const [dx, dy, al] of [[-1, 2, 0.4], [2, 2, 0.4], [-1, 3, 0.4], [2, 3, 0.4], [0, 4, 0.45], [1, 4, 0.45], [0, 1, 0.25], [1, 1, 0.25], [-2, 3, 0.15], [3, 3, 0.15], [0, 5, 0.2], [1, 5, 0.2]] as const) L.halo(x + dx, y + dy, c, al);
-    if (i % 10 === 2) L.light(x, y + 3, 22, c, 0.4);
+    if (i % 10 === 2) L.light(x, y + 3, 14, c, 0.2);
   });
-  out.piece(L, id, sort);
+  out.piece(L, id, sort, null);
 }
 
 /** Small stuff dotted about: a planter, crates, a cat. */
@@ -609,7 +611,7 @@ export function cat(out: HubOut, x: number, y: number): void {
   hline(L, x + 2, x + 6, y - 1, '#1c1824');
   L.px(x - 3, y - 4, '#f0c040');
   L.outlineTinted(0.6);
-  out.piece(L, 'cat', y);
+  out.piece(L, 'cat', y, null);
 }
 
 void CANVAS;

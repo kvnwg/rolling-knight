@@ -6,7 +6,7 @@
  * behind and below them, leaving deep blue-green crevices. The trunk forks just under the crown and
  * flares into buttress roots; willows hang curtains of strands from the crown's rim.
  */
-import { EMPTY, Paint, Scene, h2, leafCell, quant, rand, type Ramp } from './core';
+import { EMPTY, LeafGrid, Paint, Scene, h2, quant, rand, type Ramp } from './core';
 import { WOOD, buildTrunk, shadeBark, type Limb } from './wood';
 
 export const LEAF = 1;
@@ -204,7 +204,8 @@ export function paintBroadleaf(s: BroadSpec): Built {
   const P = new Paint(SW, SH, ramps);
 
   // ---- shade
-  const grain = s.grain;
+  // The garden look's leaves are chunky horizontal bars (voxel tops); the wild look's are small.
+  const lc = new LeafGrid(s.grain, s.seed + 5, s.outline ? 1.7 : 1.12, SW, SH);
   for (let y = 0; y < SH; y++) {
     for (let x = 0; x < SW; x++) {
       const i = y * SW + x;
@@ -222,21 +223,20 @@ export function paintBroadleaf(s: BroadSpec): Built {
       const gx = (x + 0.5 - CX) / RX;
       const gy = (y + 0.5 - CY) / RY;
       const gz = Math.sqrt(Math.max(0.04, 1 - gx * gx - gy * gy));
-      const lamG = (gx * -0.62 + gy * -0.74 + gz * 0.58) / Math.hypot(gx, gy, gz);
+      const lamG = (gx * -0.62 + gy * -0.74 + gz * 0.58) / Math.sqrt(gx * gx + gy * gy + gz * gz);
       let lamL = 0;
       if (cl) {
         const L = lobes[cl.lobe];
         const lx = (x + 0.5 - L.x) / (L.r * 1.25);
         const ly = (y + 0.5 - L.y) / (L.r * 1.25);
         const lz = Math.sqrt(Math.max(0.05, 1 - lx * lx - ly * ly));
-        lamL = (lx * -0.62 + ly * -0.74 + lz * 0.58) / Math.hypot(lx, ly, lz);
+        lamL = (lx * -0.62 + ly * -0.74 + lz * 0.58) / Math.sqrt(lx * lx + ly * ly + lz * lz);
       }
       const lamC = sc.nx[i] * -0.69 + sc.ny[i] * -0.69 + sc.nz[i] * 0.22;
       const sh = sc.shadow(x, y, 0.8, 16);
       const ao = sc.occlusion(x, y, 2.2);
       // Leaves: a little dome per leaf, lit on its top left, so tone edges break into leaf clusters.
-      // The garden look's leaves are chunky horizontal bars (voxel tops); the wild look's are small.
-      const lc = leafCell(x, y, grain, s.seed + 5, s.outline ? 1.7 : 1.12);
+      lc.at(x, y);
       const dome = 1 - 2 * Math.min(1, (lc.ox * lc.ox + lc.oy * lc.oy * 1.4) / 0.42);
       const bevel = s.outline ? -lc.oy * 1.6 : -(lc.ox + lc.oy);
       let v: number;
@@ -293,41 +293,21 @@ export function paintBroadleaf(s: BroadSpec): Built {
   const leafTop = by - s.trunkVis;
   for (let y = 1; y < SH - 1 && !s.outline; y++) {
     for (let x = 1; x < SW - 1; x++) {
-      if (src[y * SW + x] >= 0 || y > leafTop) continue;
-      for (const [qx, qy] of [[x, y - 1], [x + 1, y], [x - 1, y], [x, y + 1]] as const) {
-        const qi = qy * SW + qx;
-        if (src[qi] < 0 || !leafPals.has(P.pal[qi])) continue;
-        const hang = qy < y;
-        const r = h2(x, y, s.seed + 61);
-        if ((hang && r < 0.13) || (!hang && r < 0.05)) P.set(x, y, P.pal[qi], hang ? 0 : Math.max(0, P.lev[qi] - 1));
-        break;
-      }
+      const i = y * SW + x;
+      if (src[i] >= 0 || y > leafTop) continue;
+      // The neighbor it would grow from: above (a leaf hanging), then the sides, then below.
+      const qi = src[i - SW] >= 0 ? i - SW : src[i + 1] >= 0 ? i + 1 : src[i - 1] >= 0 ? i - 1 : src[i + SW] >= 0 ? i + SW : -1;
+      if (qi < 0 || !leafPals.has(P.pal[qi])) continue;
+      const hang = qi === i - SW;
+      const r = h2(x, y, s.seed + 61);
+      if ((hang && r < 0.13) || (!hang && r < 0.05)) P.set(x, y, P.pal[qi], hang ? 0 : Math.max(0, P.lev[qi] - 1));
     }
   }
   P.cleanOrphans(leafPals, (_p, lev) => lev === 5);
 
   // ---- the garden look's outline: a ring round the whole tree, dark green round the crown (a shade
   // lighter on the sun's side), dark brown round the wood
-  if (INK_P >= 0) {
-    const before = P.lev.slice();
-    const solid = (x: number, y: number) => x >= 0 && y >= 0 && x < SW && y < SH && before[y * SW + x] >= 0;
-    for (let y = 0; y < SH; y++) {
-      for (let x = 0; x < SW; x++) {
-        if (solid(x, y)) continue;
-        let n = -1;
-        let litSide = false;
-        for (const [qx, qy, lit] of [[x + 1, y, true], [x, y + 1, true], [x - 1, y, false], [x, y - 1, false]] as const) {
-          if (!solid(qx, qy)) continue;
-          n = qy * SW + qx;
-          litSide = lit;
-          break;
-        }
-        if (n < 0) continue;
-        const wood = P.pal[n] === BARK_P || P.pal[n] === MOSS_P;
-        P.set(x, y, INK_P, wood ? 2 : litSide ? 1 : 0);
-      }
-    }
-  }
+  if (INK_P >= 0) P.ring(INK_P, (np, lit) => (np === BARK_P || np === MOSS_P ? 2 : lit ? 1 : 0));
 
   // ---- blossoms: pale dots spread evenly over the crown, white where the sun is, pink in the shade
   if (s.blossom && BLOSSOM_P >= 0) {

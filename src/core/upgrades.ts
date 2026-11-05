@@ -29,12 +29,15 @@ export type UpgradeId =
   // chance
   | 'luckyStrike' | 'doubleOrNothing' | 'twoHeaded' | 'wildMagic' | 'ladyLuck' | 'ricochet' | 'secondWind' | 'butterfingers' | 'pratfall';
 
-export type UpgradeGroup = 'altar' | 'squad' | 'fortune' | 'chance';
+/** What a line changes: the altar's rolls, the squad's numbers, gold and fortune, or combat by chance. */
+export type UpgradeKind = 'altar' | 'squad' | 'fortune' | 'chance';
 
 export interface UpgradeDef {
   id: UpgradeId;
   name: string;
-  group: UpgradeGroup;
+  kind: UpgradeKind;
+  /** The old flat list's two groups (the reels, and everything else), kept for screens that list by them. */
+  group: 'altar' | 'squad';
   max: number;
   /** Price of the first tier; each tier after costs `growth` times the last. */
   cost: number;
@@ -53,224 +56,226 @@ export interface UpgradeDef {
   path: string;
   /** A gold hex: a one-off (or the Extra Reel line). */
   special?: boolean;
+  /** It rolls dice in the fight (src/world/chance.ts): its card says "Chance". */
+  rolls?: boolean;
 }
 
 export const UPGRADES: UpgradeDef[] = [
   // ---------------------------------------------------------------- the root and the altar (north)
   {
-    id: 'luck', name: 'Luck', group: 'altar', max: 8, cost: 120, growth: 3, icon: 'clover', path: 'n*7',
+    id: 'luck', name: 'Luck', kind: 'altar', group: 'altar', max: 8, cost: 120, growth: 3, icon: 'clover', path: 'n*7',
     desc: 'More luck on every spin. The root of the whole map.',
     text: () => '+15% luck',
   },
   {
-    id: 'horseshoe', name: 'Lucky Horseshoe', group: 'altar', max: 1, cost: 400_000, growth: 1, icon: 'horseshoe', path: 'n', special: true,
+    id: 'horseshoe', name: 'Lucky Horseshoe', kind: 'altar', group: 'altar', max: 1, cost: 400_000, growth: 1, icon: 'horseshoe', path: 'n', special: true,
     requires: { id: 'luck', tier: 8 },
     desc: 'Nailed over the altar for good: a big jump in luck on top of Luck VIII.',
     text: () => '+30% luck',
   },
   {
-    id: 'spinSpeed', name: 'Spin Speed', group: 'altar', max: 8, cost: 100, growth: 3, icon: 'reel', path: 'ne*8',
+    id: 'spinSpeed', name: 'Spin Speed', kind: 'altar', group: 'altar', max: 8, cost: 100, growth: 3, icon: 'reel', path: 'ne*8',
     requires: { id: 'luck', tier: 1 },
     desc: 'The altar spins faster: more knights a minute (never under 0.7 s a spin).',
     text: () => 'Spins 14% faster',
   },
   {
-    id: 'sands', name: 'Sands of Fortune', group: 'altar', max: 5, cost: 800, growth: 3.4, icon: 'sandglass', path: 'se ne se ne se',
+    id: 'sands', name: 'Sands of Fortune', kind: 'altar', group: 'altar', max: 5, cost: 800, growth: 3.4, icon: 'sandglass', path: 'se ne se ne se', rolls: true,
     requires: { id: 'spinSpeed', tier: 2 },
     desc: 'Any kill can drop an Hourglass: one spin at turbo speed.',
     text: () => '+1% of kills drop an Hourglass',
   },
   {
-    id: 'luckySpin', name: 'Lucky Spins', group: 'altar', max: 6, cost: 300, growth: 3.2, icon: 'dice', path: 'n*6',
+    id: 'luckySpin', name: 'Lucky Spins', kind: 'altar', group: 'altar', max: 6, cost: 300, growth: 3.2, icon: 'dice', path: 'n*6',
     requires: { id: 'spinSpeed', tier: 3 },
     desc: 'Lucky Spins (extra luck for one spin) come around more often.',
     text: () => 'Lucky Spins come 1 spin sooner',
   },
   {
-    id: 'luckyStreak', name: 'Lucky Streak', group: 'altar', max: 4, cost: 1500, growth: 3.5, icon: 'star', path: 'ne*4',
+    id: 'luckyStreak', name: 'Lucky Streak', kind: 'altar', group: 'altar', max: 4, cost: 1500, growth: 3.5, icon: 'star', path: 'ne*4',
     requires: { id: 'luckySpin', tier: 2 },
     desc: 'Lucky Spins get luckier.',
     text: () => '+0.5x luck on Lucky Spins',
   },
   {
-    id: 'goldenWheel', name: 'Golden Wheel', group: 'altar', max: 1, cost: 20_000, growth: 1, icon: 'wheel', path: 'n', special: true,
+    id: 'goldenWheel', name: 'Golden Wheel', kind: 'altar', group: 'altar', max: 1, cost: 20_000, growth: 1, icon: 'wheel', path: 'n', special: true,
     requires: { id: 'luckyStreak', tier: 2 },
     desc: 'Unlocks Golden Spins: any spin can turn golden, for x5 luck.',
     text: () => '2% of spins are Golden (x5 luck)',
   },
   {
-    id: 'goldenSpin', name: 'Golden Spins', group: 'altar', max: 4, cost: 8000, growth: 4, icon: 'reelGold', path: 'n n ne ne',
+    id: 'goldenSpin', name: 'Golden Spins', kind: 'altar', group: 'altar', max: 4, cost: 8000, growth: 4, icon: 'reelGold', path: 'n n ne ne',
     requires: { id: 'goldenWheel', tier: 1 },
     desc: 'Golden Spins come up more often.',
     text: () => '+2% Golden Spin chance',
   },
   {
-    id: 'turbo', name: 'Turbo Power', group: 'altar', max: 4, cost: 700, growth: 3, icon: 'bolt', path: 'se*4',
+    id: 'turbo', name: 'Turbo Power', kind: 'altar', group: 'altar', max: 4, cost: 700, growth: 3, icon: 'bolt', path: 'se*4',
     requires: { id: 'spinSpeed', tier: 6 },
     desc: 'Hourglass spins go even faster (down to 0.45 s).',
     text: () => 'Hourglass spins +50% faster',
   },
   {
-    id: 'extraReel', name: 'Extra Reel', group: 'altar', max: 4, cost: 6000, growth: 15, icon: 'reelGold', path: 'nw*4', special: true,
+    id: 'extraReel', name: 'Extra Reel', kind: 'altar', group: 'altar', max: 4, cost: 6000, growth: 15, icon: 'reelGold', path: 'nw*4', special: true,
     requires: { id: 'luck', tier: 1 },
     desc: 'One more reel on every spin: one more knight each time. Very expensive.',
     text: () => '+1 reel: one more knight every spin',
   },
   {
-    id: 'alchemy', name: 'Alchemy', group: 'altar', max: 6, cost: 600, growth: 3.3, icon: 'flask', path: 'nw*6',
+    id: 'alchemy', name: 'Alchemy', kind: 'altar', group: 'altar', max: 6, cost: 600, growth: 3.3, icon: 'flask', path: 'nw*6',
     requires: { id: 'luck', tier: 3 },
     desc: 'Mutations (Gilded, Shadow, Radiant, Void) come up more often.',
     text: () => 'Mutations 25% more likely',
   },
   {
-    id: 'pity', name: 'Pity Shield', group: 'altar', max: 8, cost: 900, growth: 2.6, icon: 'shield', path: 'n*8',
+    id: 'pity', name: 'Pity Shield', kind: 'altar', group: 'altar', max: 8, cost: 900, growth: 2.6, icon: 'shield', path: 'n*8',
     requires: { id: 'alchemy', tier: 2 },
     desc: 'Bad-luck protection kicks in sooner.',
     text: () => 'Epic+ guaranteed 4 rolls sooner',
   },
   {
-    id: 'loadedDice', name: 'Loaded Dice', group: 'altar', max: 5, cost: 3000, growth: 3.5, icon: 'loadedDice', path: 'n*5',
+    id: 'loadedDice', name: 'Loaded Dice', kind: 'altar', group: 'altar', max: 5, cost: 3000, growth: 3.5, icon: 'loadedDice', path: 'n*5',
     requires: { id: 'alchemy', tier: 4 },
     desc: "Your knights' skill rolls lean rarer.",
     text: () => '+40% skill-roll luck',
   },
   {
-    id: 'philosopher', name: "Philosopher's Stone", group: 'altar', max: 1, cost: 300_000, growth: 1, icon: 'stone', path: 'nw', special: true,
+    id: 'philosopher', name: "Philosopher's Stone", kind: 'altar', group: 'altar', max: 1, cost: 300_000, growth: 1, icon: 'stone', path: 'nw', special: true,
     requires: { id: 'alchemy', tier: 6 },
     desc: 'Mutations twice as likely, on top of Alchemy.',
     text: () => 'Mutations x2',
   },
   // ---------------------------------------------------------------- fortune (south-east)
   {
-    id: 'greed', name: 'Greed', group: 'fortune', max: 8, cost: 150, growth: 2.8, icon: 'coin', path: 'se*8',
+    id: 'greed', name: 'Greed', kind: 'fortune', group: 'squad', max: 8, cost: 150, growth: 2.8, icon: 'coin', path: 'se*8',
     requires: { id: 'luck', tier: 1 },
     desc: 'More gold from everything.',
     text: () => '+15% gold',
   },
   {
-    id: 'treasury', name: 'Royal Treasury', group: 'fortune', max: 1, cost: 500_000, growth: 1, icon: 'treasure', path: 'se', special: true,
+    id: 'treasury', name: 'Royal Treasury', kind: 'fortune', group: 'squad', max: 1, cost: 500_000, growth: 1, icon: 'treasure', path: 'se', special: true,
     requires: { id: 'greed', tier: 8 },
     desc: 'A huge gold bonus on top of Greed.',
     text: () => '+100% gold',
   },
   {
-    id: 'coinShower', name: 'Coin Shower', group: 'fortune', max: 5, cost: 600, growth: 3.4, icon: 'coinShower', path: 'ne se ne se ne',
+    id: 'coinShower', name: 'Coin Shower', kind: 'fortune', group: 'squad', max: 5, cost: 600, growth: 3.4, icon: 'coinShower', path: 'ne se ne se ne', rolls: true,
     requires: { id: 'greed', tier: 2 },
     desc: 'Any kill can burst into a shower of gold: three times its coins.',
     text: () => '+4% of kills shower gold',
   },
   {
-    id: 'jackpot', name: 'Jackpot', group: 'fortune', max: 3, cost: 25_000, growth: 5, icon: 'jackpot', path: 'se*3',
+    id: 'jackpot', name: 'Jackpot', kind: 'fortune', group: 'squad', max: 3, cost: 25_000, growth: 5, icon: 'jackpot', path: 'se*3', rolls: true,
     requires: { id: 'coinShower', tier: 5 },
     desc: 'A tiny chance a kill wins a Lucky Spin at the altar (a Luck Potion if one is due anyway).',
     text: () => '+0.25% of kills win a Lucky Spin',
   },
   {
-    id: 'potionTime', name: 'Potion Time', group: 'fortune', max: 6, cost: 500, growth: 3, icon: 'potion', path: 's*6',
+    id: 'potionTime', name: 'Potion Time', kind: 'fortune', group: 'squad', max: 6, cost: 500, growth: 3, icon: 'potion', path: 's*6',
     requires: { id: 'greed', tier: 4 },
     desc: 'Luck Potions last longer.',
     text: () => 'Luck Potions last 20 s longer',
   },
   {
-    id: 'offline', name: 'Night Watch', group: 'fortune', max: 5, cost: 1500, growth: 3, icon: 'moon', path: 'se*5',
+    id: 'offline', name: 'Night Watch', kind: 'fortune', group: 'squad', max: 5, cost: 1500, growth: 3, icon: 'moon', path: 'se*5',
     requires: { id: 'potionTime', tier: 2 },
     desc: 'The altar and the squad earn more while you are away.',
     text: () => '+40% rolls and gold while away',
   },
   // ---------------------------------------------------------------- the squad (south and south-west)
   {
-    id: 'vitality', name: 'Plate Mail', group: 'squad', max: 8, cost: 80, growth: 4.2, icon: 'heart', path: 's*8',
+    id: 'vitality', name: 'Plate Mail', kind: 'squad', group: 'squad', max: 8, cost: 80, growth: 4.2, icon: 'heart', path: 's*8',
     requires: { id: 'luck', tier: 1 },
     desc: 'More HP for the whole squad.',
     text: () => '+18% squad HP',
   },
   {
-    id: 'dragonscale', name: 'Dragonscale', group: 'squad', max: 1, cost: 1_500_000, growth: 1, icon: 'scale', path: 's', special: true,
+    id: 'dragonscale', name: 'Dragonscale', kind: 'squad', group: 'squad', max: 1, cost: 1_500_000, growth: 1, icon: 'scale', path: 's', special: true,
     requires: { id: 'vitality', tier: 8 },
     desc: 'A big HP bonus on top of Plate Mail.',
     text: () => '+30% squad HP',
   },
   {
-    id: 'swiftness', name: 'Swift Boots', group: 'squad', max: 5, cost: 400, growth: 3.2, icon: 'boot', path: 'se se s s s',
+    id: 'swiftness', name: 'Swift Boots', kind: 'squad', group: 'squad', max: 5, cost: 400, growth: 3.2, icon: 'boot', path: 'se se s s s',
     requires: { id: 'vitality', tier: 1 },
     desc: 'The squad moves and attacks faster.',
     text: () => '+6% move and attack speed',
   },
   {
-    id: 'might', name: 'Whetstone', group: 'squad', max: 8, cost: 80, growth: 4.2, icon: 'sword', path: 'sw*8',
+    id: 'might', name: 'Whetstone', kind: 'squad', group: 'squad', max: 8, cost: 80, growth: 4.2, icon: 'sword', path: 'sw*8',
     requires: { id: 'luck', tier: 1 },
     desc: 'The whole squad hits harder.',
     text: () => '+18% squad damage',
   },
   {
-    id: 'excalibur', name: 'Excalibur', group: 'squad', max: 1, cost: 1_500_000, growth: 1, icon: 'excalibur', path: 'sw', special: true,
+    id: 'excalibur', name: 'Excalibur', kind: 'squad', group: 'squad', max: 1, cost: 1_500_000, growth: 1, icon: 'excalibur', path: 'sw', special: true,
     requires: { id: 'might', tier: 8 },
     desc: 'A big damage bonus on top of Whetstone.',
     text: () => '+30% squad damage',
   },
   {
-    id: 'giantSlayer', name: 'Giant Slayer', group: 'squad', max: 6, cost: 1500, growth: 3, icon: 'skull', path: 'nw sw nw sw nw sw',
+    id: 'giantSlayer', name: 'Giant Slayer', kind: 'squad', group: 'squad', max: 6, cost: 1500, growth: 3, icon: 'skull', path: 'nw sw nw sw nw sw',
     requires: { id: 'might', tier: 5 },
     desc: 'More damage to elites and bosses.',
     text: () => '+15% damage to elites and bosses',
   },
   {
-    id: 'lifesteal', name: 'Leechblade', group: 'squad', max: 5, cost: 2000, growth: 3.5, icon: 'drop', path: 'nw sw nw sw nw',
+    id: 'lifesteal', name: 'Leechblade', kind: 'squad', group: 'squad', max: 5, cost: 2000, growth: 3.5, icon: 'drop', path: 'nw sw nw sw nw',
     requires: { id: 'might', tier: 7 },
     desc: 'Every hit heals the knight that landed it a little.',
     text: () => '+2% of damage dealt heals',
   },
   // ---------------------------------------------------------------- chance (west and south)
   {
-    id: 'luckyStrike', name: 'Lucky Strike', group: 'chance', max: 6, cost: 250, growth: 3.4, icon: 'luckyStrike', path: 'nw sw nw sw nw sw',
+    id: 'luckyStrike', name: 'Lucky Strike', kind: 'chance', group: 'squad', max: 6, cost: 250, growth: 3.4, icon: 'luckyStrike', path: 'nw sw nw sw nw sw', rolls: true,
     requires: { id: 'might', tier: 1 },
     desc: 'Any hit can be a LUCKY hit: x5 damage.',
     text: () => '+1.5% of hits are LUCKY (x5)',
   },
   {
-    id: 'doubleOrNothing', name: 'Double or Nothing', group: 'chance', max: 4, cost: 400, growth: 3, icon: 'coinFlip', path: 'nw*4',
+    id: 'doubleOrNothing', name: 'Double or Nothing', kind: 'chance', group: 'squad', max: 4, cost: 400, growth: 3, icon: 'coinFlip', path: 'nw*4', rolls: true,
     requires: { id: 'luckyStrike', tier: 3 },
     desc: 'Some hits flip a coin: double damage, or nothing at all.',
     text: () => '+10% of hits flip the coin',
   },
   {
-    id: 'twoHeaded', name: 'Two-Headed Coin', group: 'chance', max: 1, cost: 60_000, growth: 1, icon: 'twoHeaded', path: 'nw', special: true,
+    id: 'twoHeaded', name: 'Two-Headed Coin', kind: 'chance', group: 'squad', max: 1, cost: 60_000, growth: 1, icon: 'twoHeaded', path: 'nw', rolls: true, special: true,
     requires: { id: 'doubleOrNothing', tier: 4 },
     desc: "Double or Nothing's coin lands double two times in three.",
     text: () => 'The coin lands double 2 in 3',
   },
   {
-    id: 'ricochet', name: 'Ricochet', group: 'chance', max: 5, cost: 900, growth: 3.5, icon: 'ricochet', path: 'sw nw sw nw sw',
+    id: 'ricochet', name: 'Ricochet', kind: 'chance', group: 'squad', max: 5, cost: 900, growth: 3.5, icon: 'ricochet', path: 'sw nw sw nw sw', rolls: true,
     requires: { id: 'luckyStrike', tier: 6 },
     desc: 'Arrows and bolts sometimes bounce on to another foe nearby.',
     text: () => '+8% of arrows and bolts bounce',
   },
   {
-    id: 'wildMagic', name: 'Wild Magic', group: 'chance', max: 5, cost: 5000, growth: 3.5, icon: 'wildMagic', path: 'n*5',
+    id: 'wildMagic', name: 'Wild Magic', kind: 'chance', group: 'squad', max: 5, cost: 5000, growth: 3.5, icon: 'wildMagic', path: 'n*5', rolls: true,
     requires: { id: 'doubleOrNothing', tier: 4 },
     desc: "Any hit can cast a random spell from the knights' kits: Meteor, Arrow Rain, Whirlwind...",
     text: () => '+1% of hits cast a random spell',
   },
   {
-    id: 'ladyLuck', name: 'Lady Luck', group: 'chance', max: 1, cost: 2_500_000, growth: 1, icon: 'ladyLuck', path: 'n', special: true,
+    id: 'ladyLuck', name: 'Lady Luck', kind: 'chance', group: 'squad', max: 1, cost: 2_500_000, growth: 1, icon: 'ladyLuck', path: 'n', rolls: true, special: true,
     requires: { id: 'wildMagic', tier: 5 },
     desc: 'She smiles on the squad: every chance on this map comes up 25% more often.',
     text: () => 'Every chance x1.25',
   },
   {
-    id: 'secondWind', name: 'Second Wind', group: 'chance', max: 4, cost: 1200, growth: 4, icon: 'feather', path: 'sw*4',
+    id: 'secondWind', name: 'Second Wind', kind: 'chance', group: 'squad', max: 4, cost: 1200, growth: 4, icon: 'feather', path: 'sw*4', rolls: true,
     requires: { id: 'vitality', tier: 2 },
     desc: 'Once a floor, a knight may shrug off a killing blow and get back up.',
     text: () => '+15% chance to cheat death',
   },
   {
-    id: 'butterfingers', name: 'Butterfingers', group: 'chance', max: 5, cost: 700, growth: 3.3, icon: 'butterfingers', path: 'sw*5',
+    id: 'butterfingers', name: 'Butterfingers', kind: 'chance', group: 'squad', max: 5, cost: 700, growth: 3.3, icon: 'butterfingers', path: 'sw*5', rolls: true,
     requires: { id: 'vitality', tier: 4 },
     desc: "Foes sometimes fumble an attack: it does nothing, and they're dazed picking it up.",
     text: () => "+3% of foes' hits fumbled",
   },
   {
-    id: 'pratfall', name: 'Pratfall', group: 'chance', max: 5, cost: 2500, growth: 3.2, icon: 'banana', path: 'sw*5',
+    id: 'pratfall', name: 'Pratfall', kind: 'chance', group: 'squad', max: 5, cost: 2500, growth: 3.2, icon: 'banana', path: 'sw*5', rolls: true,
     requires: { id: 'vitality', tier: 6 },
     desc: 'Foes trip over their own feet now and then, and lie stunned for a moment.',
     text: () => '+2% a second that a foe trips',

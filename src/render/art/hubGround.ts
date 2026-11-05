@@ -14,6 +14,43 @@ import { h2, Layer, LEAF, PLANK, planks, rk, rkd, TIMBER, vnoise, type Ramp } fr
 export const FLAG: Ramp = ['#3a2f2a', '#54463a', '#6f5e4c', '#8b775e', '#a69071', '#bea783', '#d2bc94', '#e3cfa8'];
 const GROUT: Ramp = ['#1c1614', '#2a221e', '#3a302a'];
 const SOIL: Ramp = ['#140e0c', '#20160f', '#2e2016', '#3e2c1e', '#4e3a28'];
+/** Cobbles round the paving's edge, gray-brown, dark to light. */
+const COBBLE: Ramp = ['#221c1a', '#36302c', '#4c4440', '#645a52', '#7e7266', '#988a7c', '#b0a090'];
+
+/** Jittered-grid Voronoi: distance to the nearest and second-nearest point, the nearest's offset and id. */
+function voronoi(x: number, y: number, size: number, s: number): { d1: number; d2: number; dx: number; dy: number; id: number } {
+  const cx = Math.floor(x / size);
+  const cy = Math.floor(y / size);
+  let d1 = 1e9;
+  let d2 = 1e9;
+  let id = 0;
+  let ox = 0;
+  let oy = 0;
+  for (let gy = cy - 1; gy <= cy + 1; gy++) {
+    for (let gx = cx - 1; gx <= cx + 1; gx++) {
+      const px = (gx + 0.2 + h2(gx, gy, s) * 0.6) * size;
+      const py = (gy + 0.2 + h2(gx, gy, s + 1) * 0.6) * size;
+      const d = Math.hypot((x - px) * 0.85, y - py);
+      if (d < d1) {
+        d2 = d1;
+        d1 = d;
+        id = h2(gx, gy, s + 2);
+        ox = x - px;
+        oy = y - py;
+      } else if (d < d2) d2 = d;
+    }
+  }
+  return { d1, d2, dx: ox, dy: oy, id };
+}
+
+/** Rounded cobbles in dark mortar, each lit on its upper left (Firefly Garden's streets). */
+function cobblePixel(x: number, y: number, s: number, edge: number): string {
+  const v = voronoi(x + 0.5, y + 0.5, 7, s + 90);
+  if (v.d2 - v.d1 < 1.3) return h2(x, y, s + 91) < 0.25 ? rk(LEAF, 1.5 + h2(x, y, s + 92) * 2) : rk(GROUT, 1);
+  let k = 3 + (v.id - 0.5) * 1.8 - (v.dx + v.dy) * 0.22 - (v.d2 - v.d1 < 2.2 ? 0.6 : 0);
+  if (edge < 4) k -= 0.8;
+  return rk(COBBLE, k + (h2(x, y, s + 93) - 0.5) * 0.5);
+}
 
 export interface ShadowSpec {
   /** A contact shadow: an ellipse (cx, cy, rx, ry) or a band under a wall (x0..x1 at y, `depth` down). */
@@ -156,6 +193,9 @@ export function paintHubGround(g: GroundSpec): PixelBuf {
 }
 
 function flagPixel(flags: Flags, x: number, y: number, g: GroundSpec, s: number): string {
+  // A border of cobbles where the paving meets the grass.
+  const ed = g.edgeDist(x, y);
+  if (ed < 11 + (vnoise(x, y, 9, 9, s + 94) - 0.5) * 6) return cobblePixel(x, y, s, ed);
   const st = flags.at(x, y);
   const ix = x - st.x0;
   const iy = y - st.y0;

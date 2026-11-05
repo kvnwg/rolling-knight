@@ -22,6 +22,9 @@ function norm3(x: number, y: number, z: number): [number, number, number] {
 
 /** The sun: from the top left of the screen and a little toward the viewer. */
 export const SUN = norm3(-0.62, -0.74, 0.58);
+/** The sun's direction across the screen (a unit step), for marching shadows. */
+const SUN_SX = SUN[0] / Math.sqrt(SUN[0] * SUN[0] + SUN[1] * SUN[1]);
+const SUN_SY = SUN[1] / Math.sqrt(SUN[0] * SUN[0] + SUN[1] * SUN[1]);
 
 /** Deterministic 0..1 noise from integers. */
 export function h2(x: number, y: number, s: number): number {
@@ -62,35 +65,72 @@ export function vnoise(x: number, y: number, size: number, s: number): number {
 
 /**
  * Leaf cells: a jittered grid of leaf centers (Worley). For a pixel, the nearest leaf's center, its
- * offset from it (-1..1 of the cell), and the leaf's own random value.
+ * offset from it (-1..1 of the cell), and the leaf's own random value. `LeafGrid` is the fast form
+ * the painters use (cell points computed once, results in fields, nothing allocated per pixel).
  */
 export function leafCell(x: number, y: number, size: number, s: number, aspect = 1.12): { cx: number; cy: number; ox: number; oy: number; id: number; edge: number } {
-  const gx = Math.floor(x / size);
-  const gy = Math.floor(y / size);
-  let best = 1e9;
-  let second = 1e9;
-  let bx = 0;
-  let by = 0;
-  let id = 0;
-  for (let oy = -1; oy <= 1; oy++) {
-    for (let ox = -1; ox <= 1; ox++) {
-      const cx = gx + ox;
-      const cy = gy + oy;
-      const px = (cx + 0.05 + h2(cx, cy, s) * 0.9) * size;
-      const py = (cy + 0.05 + h2(cx, cy, s + 1) * 0.9) * size;
-      // Leaves come in a few sizes, and are a little wider than tall (seen from above at an angle).
-      const k = 0.8 + h2(cx, cy, s + 3) * 0.45;
-      const d = Math.hypot(x + 0.5 - px, (y + 0.5 - py) * aspect) / k;
-      if (d < best) {
-        second = best;
-        best = d;
-        bx = px;
-        by = py;
-        id = h2(cx, cy, s + 2);
-      } else if (d < second) second = d;
+  const g = new LeafGrid(size, s, aspect, x + 2, y + 2);
+  g.at(x, y);
+  return { cx: g.cx, cy: g.cy, ox: g.ox, oy: g.oy, id: g.id, edge: g.edge };
+}
+
+export class LeafGrid {
+  cx = 0;
+  cy = 0;
+  ox = 0;
+  oy = 0;
+  id = 0;
+  edge = 0;
+  private gw: number;
+  private gh: number;
+  /** Per cell: point x, point y, size factor, id (cells from -1 to the far edge + 1). */
+  private pts: Float64Array;
+
+  constructor(readonly size: number, readonly seed: number, readonly aspect: number, w: number, h: number) {
+    this.gw = Math.ceil(w / size) + 3;
+    this.gh = Math.ceil(h / size) + 3;
+    this.pts = new Float64Array(this.gw * this.gh * 4);
+    for (let j = 0; j < this.gh; j++) {
+      for (let i = 0; i < this.gw; i++) {
+        const cx = i - 1;
+        const cy = j - 1;
+        const o = (j * this.gw + i) * 4;
+        this.pts[o] = (cx + 0.05 + h2(cx, cy, seed) * 0.9) * size;
+        this.pts[o + 1] = (cy + 0.05 + h2(cx, cy, seed + 1) * 0.9) * size;
+        this.pts[o + 2] = 0.8 + h2(cx, cy, seed + 3) * 0.45;
+        this.pts[o + 3] = h2(cx, cy, seed + 2);
+      }
     }
   }
-  return { cx: bx, cy: by, ox: (x + 0.5 - bx) / size, oy: (y + 0.5 - by) / size, id, edge: second - best };
+
+  at(x: number, y: number): void {
+    const size = this.size;
+    const gx = Math.floor(x / size);
+    const gy = Math.floor(y / size);
+    let best = 1e9;
+    let second = 1e9;
+    const P = this.pts;
+    for (let oy = -1; oy <= 1; oy++) {
+      const j = Math.min(this.gh - 1, Math.max(0, gy + oy + 1));
+      for (let ox = -1; ox <= 1; ox++) {
+        const i = Math.min(this.gw - 1, Math.max(0, gx + ox + 1));
+        const o = (j * this.gw + i) * 4;
+        const dx = x + 0.5 - P[o];
+        const dy = (y + 0.5 - P[o + 1]) * this.aspect;
+        const d = Math.sqrt(dx * dx + dy * dy) / P[o + 2];
+        if (d < best) {
+          second = best;
+          best = d;
+          this.cx = P[o];
+          this.cy = P[o + 1];
+          this.id = P[o + 3];
+        } else if (d < second) second = d;
+      }
+    }
+    this.ox = (x + 0.5 - this.cx) / size;
+    this.oy = (y + 0.5 - this.cy) / size;
+    this.edge = second - best;
+  }
 }
 
 export interface Scallop {
@@ -130,7 +170,7 @@ export class Scene {
 
   private put(i: number, z: number, nx: number, ny: number, nz: number, mat: number, tag: number, tu: number, tv: number): void {
     if (z <= this.z[i]) return;
-    const l = Math.hypot(nx, ny, nz) || 1;
+    const l = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
     this.z[i] = z;
     this.nx[i] = nx / l;
     this.ny[i] = ny / l;
@@ -151,7 +191,9 @@ export class Scene {
       for (let x = x0; x <= x1; x++) {
         const dx = (x + 0.5 - cx) / rx;
         const dy = (y + 0.5 - cy) / ry;
-        const d = Math.hypot(dx, dy);
+        const d2 = dx * dx + dy * dy;
+        if (d2 >= 1.0001 && !sc) continue;
+        const d = Math.sqrt(d2);
         let f = 1;
         if (sc && d > 0.3) {
           const a = Math.atan2(dy, dx);
@@ -186,7 +228,7 @@ export class Scene {
         const t = Math.max(0, Math.min(1, (px * ax + py * ay) / len2));
         const ex = px - ax * t;
         const ey = py - ay * t;
-        const d = Math.hypot(ex, ey);
+        const d = Math.sqrt(ex * ex + ey * ey);
         const r = r0 + (r1 - r0) * t;
         if (d >= r || r <= 0.2) continue;
         const q = d / r;
@@ -220,13 +262,12 @@ export class Scene {
     const i = y * this.w + x;
     const z0 = this.z[i];
     if (z0 === EMPTY) return 0;
-    const sx = SUN[0] / Math.hypot(SUN[0], SUN[1]);
-    const sy = SUN[1] / Math.hypot(SUN[0], SUN[1]);
     let blocked = 0;
     for (let k = 1; k <= steps; k++) {
-      const qx = Math.round(x + 0.5 + sx * k - 0.5);
-      const qy = Math.round(y + 0.5 + sy * k - 0.5);
-      const zq = this.depth(qx, qy);
+      const qx = Math.round(x + SUN_SX * k);
+      const qy = Math.round(y + SUN_SY * k);
+      if (qx < 0 || qy < 0 || qx >= this.w || qy >= this.h) break;
+      const zq = this.z[qy * this.w + qx];
       if (zq === EMPTY) continue;
       const over = zq - (z0 + rise * k);
       if (over > 0.6) {
@@ -242,22 +283,38 @@ export class Scene {
     const i = y * this.w + x;
     const z0 = this.z[i];
     if (z0 === EMPTY) return 0;
+    const offs = ringOffsets(r);
     let acc = 0;
-    let n = 0;
-    for (let k = 0; k < 8; k++) {
-      const a = (k / 8) * Math.PI * 2;
-      const zq = this.depth(Math.round(x + Math.cos(a) * r), Math.round(y + Math.sin(a) * r));
-      n++;
+    for (let k = 0; k < 16; k += 2) {
+      const zq = this.depth(x + offs[k], y + offs[k + 1]);
       if (zq === EMPTY) continue;
-      acc += Math.max(0, Math.min(1, (zq - z0 - 0.5) / (r * 1.6)));
+      const v = (zq - z0 - 0.5) / (r * 1.6);
+      acc += v <= 0 ? 0 : v >= 1 ? 1 : v;
     }
-    return acc / n;
+    return acc / 8;
   }
 
   /** True where a pixel touches empty space (4-neighbors). */
+  // (see ringOffsets below)
   edge(x: number, y: number): boolean {
     return this.depth(x - 1, y) === EMPTY || this.depth(x + 1, y) === EMPTY || this.depth(x, y - 1) === EMPTY || this.depth(x, y + 1) === EMPTY;
   }
+}
+
+const rings = new Map<number, Int8Array>();
+/** Eight points round a circle of radius r, rounded to pixels (dx, dy pairs). */
+function ringOffsets(r: number): Int8Array {
+  let o = rings.get(r);
+  if (!o) {
+    o = new Int8Array(16);
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2;
+      o[k * 2] = Math.round(Math.cos(a) * r);
+      o[k * 2 + 1] = Math.round(Math.sin(a) * r);
+    }
+    rings.set(r, o);
+  }
+  return o;
 }
 
 /**
@@ -306,30 +363,56 @@ export class Paint {
    */
   cleanOrphans(pals: ReadonlySet<number>, keep: (pal: number, lev: number) => boolean = () => false): void {
     const src = this.lev.slice();
-    const at = (x: number, y: number) => (x < 0 || y < 0 || x >= this.w || y >= this.h ? -2 : src[y * this.w + x]);
-    for (let y = 0; y < this.h; y++) {
-      for (let x = 0; x < this.w; x++) {
-        const i = y * this.w + x;
+    const W = this.w;
+    const H = this.h;
+    for (let y = 1; y < H - 1; y++) {
+      for (let x = 1; x < W - 1; x++) {
+        const i = y * W + x;
         const v = src[i];
         if (v < 0 || !pals.has(this.pal[i]) || keep(this.pal[i], v)) continue;
-        const a = at(x - 1, y);
-        const b = at(x + 1, y);
-        const c = at(x, y - 1);
-        const d = at(x, y + 1);
-        if (a === b && b === c && c === d && a >= 0 && a !== v) this.lev[i] = a;
-        else {
-          // Three of four agree and the odd one out is the same as us: still a lone pixel; take the majority.
-          const n = [a, b, c, d].filter((q) => q >= 0);
-          if (n.length === 4) {
-            const same = n.filter((q) => q === v).length;
-            if (same === 0) {
-              // Take the closest tone among the neighbors.
-              let best = n[0];
-              for (const q of n) if (Math.abs(q - v) < Math.abs(best - v)) best = q;
-              this.lev[i] = best;
-            }
-          }
-        }
+        const a = src[i - 1];
+        const b = src[i + 1];
+        const c = src[i - W];
+        const d = src[i + W];
+        if (a < 0 || b < 0 || c < 0 || d < 0) continue;
+        if (a === v || b === v || c === v || d === v) continue;
+        // A lone pixel: it takes the neighbors' tone nearest its own.
+        let best = a;
+        if (Math.abs(b - v) < Math.abs(best - v)) best = b;
+        if (Math.abs(c - v) < Math.abs(best - v)) best = c;
+        if (Math.abs(d - v) < Math.abs(best - v)) best = d;
+        this.lev[i] = best;
+      }
+    }
+  }
+
+  /**
+   * A 1-pixel ring round everything opaque, in palette slot `pal`: tone `dark` where the ring is on
+   * the shadow side (right of or below the shape), `lit` on the sun's side, or what `pick` says for
+   * the neighbor it hugs (wood gets its own ink).
+   */
+  ring(pal: number, pick: (neighborPal: number, litSide: boolean) => number): void {
+    const before = this.lev.slice();
+    const W = this.w;
+    const H = this.h;
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const i = y * W + x;
+        if (before[i] >= 0) continue;
+        let n = -1;
+        let lit = false;
+        if (x + 1 < W && before[i + 1] >= 0) {
+          n = i + 1;
+          lit = true;
+        } else if (y + 1 < H && before[i + W] >= 0) {
+          n = i + W;
+          lit = true;
+        } else if (x > 0 && before[i - 1] >= 0) n = i - 1;
+        else if (y > 0 && before[i - W] >= 0) n = i - W;
+        if (n < 0) continue;
+        this.pal[i] = pal;
+        const r = this.ramps[pal];
+        this.lev[i] = Math.max(0, Math.min(r.length - 1, pick(this.pal[n], lit)));
       }
     }
   }

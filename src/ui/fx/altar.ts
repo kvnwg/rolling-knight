@@ -14,8 +14,9 @@
  * The reel drums are holes: light spills into them as a tint over the reels, with a shadow under the
  * frame's overhang.
  *
- * The lit wood is relit 30 times a second (and at once on a landing or a token); everything that moves
- * is drawn every frame.
+ * The lit wood is relit row by row, a third of its rows each frame (half on the mini), all at once on a
+ * landing or a token, and kept as finished pixels; each frame starts from those and only blends and
+ * converts the pixels that something moving touches.
  *
  * Golden, Lucky and Turbo spins change the light (gold, green, electric blue); a build-up turns the
  * runes, the orb and the circle to the glow's color and races them; a landing floods the frame with
@@ -103,6 +104,20 @@ const FLAME_RAMPS: Record<string, RGB[]> = {
   turbo: ['#f0fdff', '#b8ecff', '#6fd8ff', '#2a8cf0', '#1c4fb0'].map(rgbOf),
 };
 
+/** Premultiplied color (0..1, alpha 0..1) to an RGBA pixel (little-endian 32 bits). */
+function pack(r: number, g: number, b: number, a: number): number {
+  if (a <= 0.004) return 0;
+  if (a > 1) a = 1;
+  const inv = 255 / a;
+  r *= inv;
+  g *= inv;
+  b *= inv;
+  if (r > 255) r = 255;
+  if (g > 255) g = 255;
+  if (b > 255) b = 255;
+  return ((((a * 255) | 0) << 24) | ((b | 0) << 16) | ((g | 0) << 8) | (r | 0)) >>> 0;
+}
+
 const mix = (a: RGB, b: RGB, t: number): RGB => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 const css = (c: RGB, a: number) => `rgba(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)},${Math.max(0, Math.min(1, a)).toFixed(3)})`;
 
@@ -183,6 +198,11 @@ export class Altar {
   private oB = new Float32Array(0);
   private oA = new Float32Array(0);
   private levels = new Float32Array(0);
+  /** The lit base as finished pixels, and which pixels this frame's overlays touched. */
+  private base32 = new Uint32Array(0);
+  private touched = new Uint8Array(0);
+  private list = new Int32Array(0);
+  private listN = 0;
   /** The circle's rings: floor pixels and their weights (the far side dimmer). */
   private ringI = new Int32Array(0);
   private ringW = new Float32Array(0);
@@ -197,6 +217,8 @@ export class Altar {
   } = { flames: [], orb: null, sigil: null, emblem: null, gems: [], runes: [], reels: [] };
   private dirty = true;
   private tick = 0;
+  /** What relighting the whole altar costs on this device (ms, eased): it's spread over more frames if slow. */
+  private relightCost = 0;
   private last = 0;
   private activity = 0;
   private build = 0;
@@ -239,6 +261,10 @@ export class Altar {
     this.img = this.offCtx.createImageData(art.W, art.H);
     this.d32 = new Uint32Array(this.img.data.buffer);
     for (const k of ['LR', 'LG', 'LB', 'SR', 'SG', 'SB', 'bR', 'bG', 'bB', 'bA', 'oR', 'oG', 'oB', 'oA'] as const) this[k] = new Float32Array(n);
+    this.base32 = new Uint32Array(n);
+    this.touched = new Uint8Array(n);
+    this.list = new Int32Array(n);
+    this.listN = 0;
     this.levels = new Float32Array(art.runes.length);
     const L = art.lights;
     this.fields = {
@@ -326,8 +352,20 @@ export class Altar {
     return this.seed / 4294967296;
   }
 
+  /** Starts pixel `i` from the lit base, once a frame, before anything draws on it. */
+  private touch(i: number): void {
+    if (this.touched[i]) return;
+    this.touched[i] = 1;
+    this.list[this.listN++] = i;
+    this.oR[i] = this.bR[i];
+    this.oG[i] = this.bG[i];
+    this.oB[i] = this.bB[i];
+    this.oA[i] = this.bA[i];
+  }
+
   /** Adds light (premultiplied) to pixel `i`. */
   private add(i: number, r: number, g: number, b: number, al: number): void {
+    this.touch(i);
     this.oR[i] += r * al;
     this.oG[i] += g * al;
     this.oB[i] += b * al;
@@ -440,16 +478,16 @@ export class Altar {
       return true;
     });
 
-    // ---------------------------------------------------------------- the lit wood (30 times a second)
-    if (this.dirty || (this.tick++ & 1) === 0) {
-      this.dirty = false;
-      this.relight(a, flick, levels, runeCol, orbCol, sigilCol, gemCol, gemI, embI, burstI);
-    }
-    const { oR, oG, oB, oA } = this;
-    oR.set(this.bR);
-    oG.set(this.bG);
-    oB.set(this.bB);
-    oA.set(this.bA);
+    // ---------------------------------------------------------------- the lit wood (row by row)
+    // A share of the rows each frame, keeping it to about half a millisecond on slow devices.
+    const every = Math.max(big ? 3 : 2, Math.min(8, Math.ceil(this.relightCost / 0.5)));
+    const phase = this.dirty ? -1 : this.tick++ % every;
+    const r0 = performance.now();
+    this.relight(a, phase, every, flick, levels, runeCol, orbCol, sigilCol, gemCol, gemI, embI, burstI);
+    const spent = (performance.now() - r0) * (phase < 0 ? 1 : every);
+    this.relightCost = this.relightCost ? this.relightCost * 0.92 + spent * 0.08 : spent;
+    this.dirty = false;
+    const { oR, oG, oB } = this;
 
     // ---------------------------------------------------------------- what shines on its own
     // The magic circle on the floor (behind the plinth: only where nothing is painted).
@@ -536,6 +574,7 @@ export class Altar {
         if (!hex) return;
         const c = rgbOf(hex);
         for (const i of rim) {
+          this.touch(i);
           oR[i] = c[0] * 0.85 + oR[i] * 0.15;
           oG[i] = c[1] * 0.85 + oG[i] * 0.15;
           oB[i] = c[2] * 0.85 + oB[i] * 0.15;
@@ -595,23 +634,16 @@ export class Altar {
 
     // ---------------------------------------------------------------- to pixels
     const d32 = this.d32;
-    for (let i = 0; i < n; i++) {
-      let A = oA[i];
-      if (A <= 0.004) {
-        d32[i] = 0;
-        continue;
-      }
-      if (A > 1) A = 1;
-      const inv = 255 / A;
-      let r = oR[i] * inv;
-      let g = oG[i] * inv;
-      let b = oB[i] * inv;
-      if (r > 255) r = 255;
-      if (g > 255) g = 255;
-      if (b > 255) b = 255;
-      d32[i] = (((A * 255) | 0) << 24) | ((b | 0) << 16) | ((g | 0) << 8) | (r | 0);
+    d32.set(this.base32);
+    const { oA, list, touched } = this;
+    for (let k = 0; k < this.listN; k++) {
+      const i = list[k];
+      touched[i] = 0;
+      d32[i] = pack(oR[i], oG[i], oB[i], oA[i]);
     }
+    this.listN = 0;
     this.offCtx.putImageData(img, 0, 0);
+    void n;
 
     // ---------------------------------------------------------------- compose with the soft glows
     const g = this.ctx;
@@ -695,10 +727,16 @@ export class Altar {
     g.globalCompositeOperation = 'source-over';
   }
 
-  /** Lights the wood: every light's falloff scaled by its strength, banded and dithered, times the albedo. */
-  private relight(a: AltarArt, flick: number[], levels: Float32Array, runeCol: RGB, orbCol: RGB, sigilCol: RGB, gemCol: RGB, gemI: number, embI: number, burstI: number[]): void {
+  /**
+   * Lights the wood: every light's falloff scaled by its strength, banded and dithered, times the albedo.
+   * `phase` relights only the rows y % `every` === phase (-1: all of them).
+   */
+  private relight(a: AltarArt, phase: number, every: number, flick: number[], levels: Float32Array, runeCol: RGB, orbCol: RGB, sigilCol: RGB, gemCol: RGB, gemI: number, embI: number, burstI: number[]): void {
     const W = a.W;
     const H = a.H;
+    const step = phase < 0 ? 1 : every;
+    const first = phase < 0 ? 0 : phase;
+    const base32 = this.base32;
     const big = a.kind === 'big';
     const { LR, LG, LB, SR, SG, SB, bR, bG, bB, bA } = this;
     LR.fill(0);
@@ -713,9 +751,9 @@ export class Altar {
       const g = c[1] * I;
       const b = c[2] * I;
       const d = f.d;
-      let j = 0;
-      for (let y = 0; y < f.h; y++) {
+      for (let y = (((first - f.y0) % step) + step) % step; y < f.h; y += step) {
         let i = (f.y0 + y) * W + f.x0;
+        let j = y * f.w;
         for (let x = 0; x < f.w; x++, i++, j++) {
           const dv = d[j];
           LR[i] += r * dv;
@@ -727,6 +765,7 @@ export class Altar {
       const sv = f.sv;
       for (let k = 0; k < si.length; k++) {
         const i = si[k];
+        if (step > 1 && ((i / W) | 0) % step !== first) continue;
         const s = sv[k];
         SR[i] += r * s;
         SG[i] += g * s;
@@ -749,9 +788,9 @@ export class Altar {
     const ar = this.amb[0];
     const ag = this.amb[1];
     const ab = this.amb[2];
-    for (let y = 0, i = 0; y < H; y++) {
+    for (let y = first; y < H; y += step) {
       const brow = (y & 3) << 2;
-      for (let x = 0; x < W; x++, i++) {
+      for (let x = 0, i = y * W; x < W; x++, i++) {
         const k = px[i];
         if (k === EMPTY) continue;
         const dith = BAYER[brow + (x & 3)];
@@ -769,6 +808,7 @@ export class Altar {
           bG[i] = l1 * inv;
           bB[i] = l2 * inv;
           bA[i] = la + shade[i] * (1 - la);
+          base32[i] = pack(bR[i], bG[i], bB[i], bA[i]);
           continue;
         }
         // Light from above a little brighter (a sky-ish ambient), then the lights, banded.
@@ -802,6 +842,7 @@ export class Altar {
         bG[i] = g;
         bB[i] = b;
         bA[i] = 1;
+        base32[i] = pack(r, g, b, 1);
       }
     }
   }
@@ -866,6 +907,7 @@ export class Altar {
         const d = Math.hypot(x - o.x, y - o.y);
         if (d > R + 0.5) continue;
         const i = y * W + x;
+        this.touch(i);
         let r: number;
         let g: number;
         let b: number;

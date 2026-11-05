@@ -35,10 +35,10 @@ function edgeDark(P: Paint, pals: ReadonlySet<number>): void {
 // ------------------------------------------------------------------ dead trees
 
 const DEAD_SIZE: Record<Size, { W: number; H: number; w: number; depth: number }> = {
-  bush: { W: 18, H: 18, w: 3, depth: 1 },
-  small: { W: 30, H: 40, w: 4, depth: 2 },
-  medium: { W: 44, H: 60, w: 6, depth: 3 },
-  huge: { W: 64, H: 86, w: 9, depth: 3 },
+  bush: { W: 18, H: 18, w: 3, depth: 2 },
+  small: { W: 30, H: 40, w: 5, depth: 3 },
+  medium: { W: 46, H: 60, w: 7, depth: 4 },
+  huge: { W: 66, H: 86, w: 11, depth: 4 },
 };
 
 export function paintDead(o: { biome: string; seed: number; size: Size; bark: Ramp; moss?: Ramp }): OddBuilt {
@@ -51,39 +51,52 @@ export function paintDead(o: { biome: string; seed: number; size: Size; bark: Ra
   const bx = Math.round(SW / 2);
   const by = SH - 4;
   const sc = new Scene(SW, SH);
-  const forkY = by - H * (0.38 + R() * 0.14);
+  const forkY = by - H * (0.3 + R() * 0.14);
   const fx = bx + (R() - 0.5) * S.w;
   const limbs: Limb[] = [];
   const tips: Array<[number, number]> = [];
-  // Crooked limbs from the fork, each splitting into smaller and smaller crooked twigs.
+  // Crooked limbs from the fork, each splitting into smaller and smaller crooked twigs; three bends
+  // to a branch, and now and then one snapped off short.
   const grow = (x0: number, y0: number, ang: number, len: number, w: number, d: number, z: number) => {
-    const bend = (R() - 0.5) * 0.7;
-    const mx = x0 + Math.sin(ang) * len * 0.5;
-    const my = y0 - Math.cos(ang) * len * 0.5;
-    const a2 = ang + bend;
-    const ex = mx + Math.sin(a2) * len * 0.5;
-    const ey = my - Math.cos(a2) * len * 0.5;
-    sc.tube(x0, y0, z, w, mx, my, z, w * 0.82, WOOD, T_LIMB, 1, 0);
-    sc.tube(mx, my, z, w * 0.82, ex, ey, z, Math.max(0.5, w * 0.62), WOOD, T_LIMB, 1, len * 0.5);
-    if (d <= 0 || w < 0.9) {
-      tips.push([ex, ey]);
+    let x = x0;
+    let y = y0;
+    let a = ang;
+    let ww = w;
+    for (let seg = 0; seg < 3; seg++) {
+      a += (R() - 0.5) * 0.55;
+      const l = len / 3;
+      const nx = x + Math.sin(a) * l;
+      const ny = y - Math.cos(a) * l;
+      const nw = Math.max(0.5, ww * 0.84);
+      sc.tube(x, y, z, ww, nx, ny, z, nw, WOOD, T_LIMB, 1, seg * l);
+      x = nx;
+      y = ny;
+      ww = nw;
+    }
+    if (d <= 0 || ww < 0.7) {
+      tips.push([x, y]);
       return;
     }
-    const n = R() < 0.3 ? 3 : 2;
+    const n = R() < 0.35 ? 3 : 2;
     for (let k = 0; k < n; k++) {
-      const spread = 0.35 + R() * 0.45;
-      const na = a2 + (k === 0 ? -spread : k === 1 ? spread : (R() - 0.5) * 0.3) * (ang < 0 ? 1.1 : 1);
-      // Now and then a limb broke off: a short snapped stub.
-      const broken = d === 1 && R() < 0.18;
-      grow(ex, ey, na, len * (broken ? 0.3 : 0.62 + R() * 0.16), w * 0.62, broken ? 0 : d - 1, z + (R() - 0.5) * 3);
+      const spread = 0.3 + R() * 0.4;
+      const na = a + (k === 0 ? -spread : k === 1 ? spread : (R() - 0.5) * 0.3);
+      const broken = d <= 2 && R() < 0.15;
+      grow(x, y, na, len * (broken ? 0.3 : 0.64 + R() * 0.14), ww * 0.72, broken ? 0 : d - 1, z + (R() - 0.5) * 3);
     }
   };
-  const nL = R() < 0.4 ? 3 : 2;
+  const nL = R() < 0.45 ? 3 : 2;
   for (let k = 0; k < nL; k++) {
     const t = k / (nL - 1);
-    const ang = (t - 0.5) * 1.2 + (R() - 0.5) * 0.3;
+    const ang = (t - 0.5) * 1.1 + (R() - 0.5) * 0.3;
     limbs.push({ x: fx + Math.sin(ang) * 2, y: forkY - 2, w: 0.7 });
-    grow(fx, forkY, ang, H * (0.3 + R() * 0.1), S.w * 0.36, S.depth, (R() - 0.5) * 3);
+    grow(fx, forkY, ang, H * (0.26 + R() * 0.08), S.w * 0.5, S.depth, (R() - 0.5) * 3);
+  }
+  // Snags: stubs of lost limbs on the trunk.
+  for (let k = 0; k < (o.size === 'huge' ? 3 : 1); k++) {
+    const y = by - (by - forkY) * (0.35 + R() * 0.45);
+    const side = R() < 0.5 ? -1 : 1;
+    sc.tube(bx + side * S.w * 0.3, y, 1, Math.max(0.8, S.w * 0.22), bx + side * S.w * (0.8 + R() * 0.5), y - 2 - R() * 3, 1.5, 0.6, WOOD, T_LIMB, 1, 0);
   }
   buildTrunk(sc, R, { bx, by, w: S.w, fx, fy: forkY, limbs, roots: o.size === 'huge' ? 4 : o.size === 'bush' ? 1 : 3, rootLen: S.w * 1.1, flare: 0.8, bend: (R() - 0.5) * S.w });
   const ramps: Ramp[] = [o.bark];
@@ -124,13 +137,13 @@ export function paintMushroom(o: { seed: number; size: Size; glow: string }): Od
   const CAP = 7;
   const GILL = 8;
   // One big mushroom, and on the bigger sizes a smaller one or two at its foot.
-  const shrooms: Array<{ x: number; capW: number; h: number; lean: number; z: number }> = [{ x: bx, capW: base, h: base * 0.95, lean: (R() - 0.5) * base * 0.2, z: 0 }];
+  const shrooms: Array<{ x: number; capW: number; h: number; lean: number; z: number }> = [{ x: bx, capW: base, h: base * 0.7, lean: (R() - 0.5) * base * 0.25, z: 0 }];
   if (o.size === 'huge' || o.size === 'medium') {
-    shrooms.push({ x: bx + base * (0.45 + R() * 0.1), capW: base * 0.45, h: base * 0.45, lean: base * 0.08, z: 4 });
-    if (o.size === 'huge') shrooms.push({ x: bx - base * (0.42 + R() * 0.1), capW: base * 0.36, h: base * 0.32, lean: -base * 0.06, z: 6 });
+    shrooms.push({ x: bx + base * (0.48 + R() * 0.1), capW: base * 0.48, h: base * 0.36, lean: base * 0.1, z: 4 });
+    if (o.size === 'huge') shrooms.push({ x: bx - base * (0.45 + R() * 0.1), capW: base * 0.38, h: base * 0.26, lean: -base * 0.08, z: 6 });
   }
   shrooms.forEach((m, k) => {
-    const stalkW = Math.max(1.2, m.capW * 0.13);
+    const stalkW = Math.max(1.3, m.capW * 0.17);
     const capY = by - m.h;
     const midX = m.x + m.lean * 0.5 + (R() - 0.5) * 2;
     sc.tube(m.x, by, m.z, stalkW * 1.25, midX, by - m.h * 0.5, m.z, stalkW, STALK, k, 1, 0);
@@ -140,7 +153,7 @@ export function paintMushroom(o: { seed: number; size: Size; glow: string }): Od
     // The gills: a glowing band just under the cap's rim (only its front shows).
     sc.sphere(m.x + m.lean, capY + m.capW * 0.12, m.z - 1, m.capW * 0.46, m.capW * 0.17, m.capW * 0.1, GILL, 60 + k);
     // The cap: a wide dome.
-    sc.sphere(m.x + m.lean, capY - m.capW * 0.05, m.z + 2, m.capW * 0.5, m.capW * 0.32, m.capW * 0.3, CAP, 70 + k, { n: Math.round(m.capW / 3), amp: 0.04, ph: R() * 6 });
+    sc.sphere(m.x + m.lean, capY - m.capW * 0.08, m.z + 2, m.capW * 0.52, m.capW * 0.38, m.capW * 0.36, CAP, 70 + k, { n: Math.round(m.capW / 3), amp: 0.04, ph: R() * 6 });
   });
   const glow = o.glow;
   const capR: Ramp = [mixC(glow, '#0a0a18', 0.82), mixC(glow, '#0e0c22', 0.64), mixC(glow, '#141030', 0.42), mixC(glow, '#1a1438', 0.18), glow, mixC(glow, '#ffffff', 0.5)];
@@ -159,10 +172,10 @@ export function paintMushroom(o: { seed: number; size: Size; glow: string }): Od
       else {
         let lev = quant(0.42 + 0.42 * lam - 0.3 * sh - 0.5 * ao + (vnoise(x, y, 3, o.seed) - 0.5) * 0.12, 6);
         // Spots on the cap.
-        const cx = Math.floor(x / 4);
-        const cy = Math.floor(y / 3);
-        if (h2(cx, cy, o.seed + 3) < 0.22 && x % 4 === 1 && y % 3 === 1 && sc.ny[i] < 0.2) {
-          P.set(x, y, 3, lam > 0.4 ? 1 : 0);
+        const cx = Math.floor(x / 5);
+        const cy = Math.floor(y / 4);
+        if (h2(cx, cy, o.seed + 3) < 0.3 && x % 5 <= 1 && y % 4 <= 1 && sc.ny[i] < 0.3) {
+          P.set(x, y, 3, lam > 0.3 && x % 5 === 0 && y % 4 === 0 ? 1 : 0);
           continue;
         }
         if (lev >= 5 && lam < 0.6) lev = 4;

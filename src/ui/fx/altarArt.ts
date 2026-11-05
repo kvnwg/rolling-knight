@@ -698,7 +698,7 @@ export function paintBig(W: number, win: Rect, holes: Rect[], payY: number): Alt
     if (k === 15) blossoms.push({ i: p.idx(x, y - 1), x, y: y - 1, col: '#ffe27a', phase: 1.3 });
   }
   orderRunes(runes, cx, win.y + win.h / 2);
-  const reels = holes.map((r) => ({ x: r.x + r.w / 2, y: r.y + r.h / 2, z: 18, r: Math.max(70, W * 0.62) }));
+  const reels = holes.map((r) => ({ x: r.x + r.w / 2, y: r.y + r.h / 2, z: 18, r: Math.max(60, Math.round(W * 0.5)) }));
   return finish(
     p,
     'big',

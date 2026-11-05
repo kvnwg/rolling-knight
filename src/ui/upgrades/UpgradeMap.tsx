@@ -224,7 +224,7 @@ function BuyCard({ game, node, view, onBuy, onDetails }: { game: Game; node: Hex
         <span className={s.cardName} onClick={onDetails}>
           {nodeName(node)}
           {node.special && <em className={s.cardTag}>Special</em>}
-          {!node.special && def.group === 'chance' && (
+          {!node.special && def.rolls && (
             <em className={s.cardTag} data-kind="chance">
               Chance
             </em>

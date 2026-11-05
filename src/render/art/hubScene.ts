@@ -13,6 +13,14 @@ import { canopy, edgeGreens, frontLeaves } from './hubFoliage';
 import { cat, gate, lampPost, lightString, noticeBoard, sageCorner, scrapStall, shrine, smithy } from './hubStations';
 import { chair, chalkboard, flowerBench, outfitterShelves, planter, pottedBush, stool, stumpTable, tavernStall } from './hubStalls';
 
+/** Where a piece stands on the ground (blocks walking), hub pixels. */
+export interface Foot {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
 export interface HubArt {
   ground: PixelBuf;
   sprites: HubSprite[];
@@ -24,6 +32,7 @@ export interface HubArt {
   stations: HubStation[];
   extras: HubFigure[];
   grade: HubGrade;
+  feet: Foot[];
 }
 
 /** Collects pieces as they are painted. */
@@ -34,14 +43,32 @@ export class HubOut {
   lights: HubLight[] = [];
   shadows: ShadowSpec[] = [];
   motes: HubMotes[] = [];
+  feet: Foot[] = [];
 
-  /** A standing piece, sorted at `sort`; its glow (if any) and lights come with it. */
-  piece(L: Layer, id: string, sort: number): void {
+  /**
+   * A standing piece, sorted at `sort`; its glow (if any) and lights come with it. `foot` is the
+   * ground it covers (default: its opaque width over the bottom few rows, `depth` px deep); null for
+   * nothing (things hanging overhead, flat rugs).
+   */
+  piece(L: Layer, id: string, sort: number, foot?: Foot | null, depth = 8): void {
     const bb = bounds(L.buf);
     if (bb.w > 0) {
       const buf = crop(L.buf, bb.x, bb.y, bb.w, bb.h);
       const x = L.x0 + bb.x + Math.floor(bb.w / 2);
       this.sprites.push({ id, x, y: sort, buf, ax: x - (L.x0 + bb.x), ay: sort - (L.y0 + bb.y) });
+      if (foot) this.feet.push(foot);
+      else if (foot === undefined) {
+        let x0 = Infinity;
+        let x1 = -Infinity;
+        for (let y = Math.max(0, sort - L.y0 - 4); y <= Math.min(L.h - 1, sort - L.y0); y++) {
+          for (let xx = 0; xx < L.w; xx++) {
+            if (!L.buf.px[(y * L.w + xx) * 4 + 3]) continue;
+            x0 = Math.min(x0, xx + L.x0);
+            x1 = Math.max(x1, xx + L.x0);
+          }
+        }
+        if (x1 >= x0) this.feet.push({ x0: x0 + 1, y0: sort - depth, x1: x1 - 1, y1: sort });
+      }
     }
     this.glowOf(L, id, sort);
     for (const l of L.lights) this.lights.push({ ...l });
@@ -85,6 +112,16 @@ function paved(x: number, y: number): boolean {
   return x >= l && x <= r;
 }
 
+/** Ground you can walk on (before anything standing is taken out): the paving in front of the
+ * buildings, and the top of the steps down. */
+export function hubWalkable(x: number, y: number): boolean {
+  if (y >= 180 && paved(x, y)) {
+    const [l, r] = edgesAt(y);
+    return x >= l + 6 && x <= r - 6;
+  }
+  return y >= PAVE_BOTTOM - 8 && y < PAVE_BOTTOM + 24 && x > 204 && x < 276;
+}
+
 function edgeDist(x: number, y: number): number {
   const [l, r] = edgesAt(y);
   return Math.min(x - l, r - x, y - PAVE_TOP, (PAVE_BOTTOM - y) * (Math.abs(x - 240) < 44 ? 6 : 1));
@@ -113,7 +150,7 @@ const STATIONS: HubStation[] = [
   {
     id: 'smith', name: 'Brannoc the Smith', job: 'The smithy: level up and reforge knights',
     greeting: 'Shards and gold, and I\'ll beat any knight into something better. Mind the sparks.',
-    x: 120, y: 334, dir: 1, view: 'down', def: HUB_CAST.smith, pose: 'stand', tool: 'hammer', talk: { x: 124, y: 352 },
+    x: 122, y: 350, dir: 1, view: 'down', def: HUB_CAST.smith, pose: 'stand', tool: 'hammer', talk: { x: 124, y: 368 },
     sign: 'The forge glowing under the lean-to, the anvil, crossed hammers on the hanging sign.',
   },
   {
@@ -201,10 +238,11 @@ export function buildHub(): HubArt {
     emissive: out.emissive,
     fore: out.fore,
     lights,
-    ambient: '#4a4470',
+    ambient: '#4c4874',
     motes: out.motes,
     stations: STATIONS,
     extras: [{ def: HUB_CAST.traveller, x: 98, y: 254, dir: 1, view: 'up', pose: 'sit', tool: 'cup' }],
+    feet: out.feet,
     grade: {
       haze: [0.12, 0.1, 0.2],
       hazeAmount: 0.05,

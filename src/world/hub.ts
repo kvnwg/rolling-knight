@@ -15,7 +15,7 @@ import type { PixelBuf } from '../render/pixel/buf';
 import type { View } from './entities';
 import { BLOCKED, FLOOR, SOLID, TILE, type FloorMap } from './mapgen';
 import type { NpcDef } from './npcs';
-import { buildHub } from '../render/art/hubScene';
+import { buildHub, hubWalkable, type HubArt } from '../render/art/hubScene';
 import type { KeeperPose, KeeperTool } from '../render/art/hubNpcs';
 
 export const HUB_W = 480;
@@ -146,63 +146,36 @@ export interface HubScene {
 // ------------------------------------------------------------------ the layout
 
 /**
- * The collision grid, one character per tile: '#' wall or void, '.' floor, 'x' floor with something
- * standing on it. 30 x 40 tiles.
+ * The collision grid, worked out from the art: a tile is floor if its middle is on the paving (or the
+ * top of the steps) and nothing stands on it; blocked (floor with something on it) where a piece's
+ * footprint or a keeper covers it; wall everywhere else (buildings, foliage, the dark round the edge).
  */
-const GRID = [
-  '##############################', // 0
-  '##############################', // 1
-  '##############################', // 2
-  '##############################', // 3
-  '##############################', // 4
-  '##############################', // 5
-  '##############################', // 6
-  '##############################', // 7
-  '##############################', // 8
-  '##############################', // 9
-  '###.....xx##########xx......##', // 10
-  '###.....xx##########x.......##', // 11
-  '###.........................##', // 12
-  '###..xxx.................xx.##', // 13
-  '###..xxx..............xx.xx.##', // 14
-  '###...x...............xx....##', // 15
-  '###.........................##', // 16
-  '###.........................##', // 17
-  '###.........................##', // 18
-  '##xxxxx...x..........x..xxxx##', // 19
-  '##xxxxxx...............xxxxx##', // 20
-  '##..........................##', // 21
-  '##..........................##', // 22
-  '##..........................##', // 23
-  '##..........................##', // 24
-  '##..........................##', // 25
-  '##.xxxx...............xxxxx.##', // 26
-  '##.xxxx...............xxxxx.##', // 27
-  '##..........................##', // 28
-  '###.........................##', // 29
-  '###......xx........xx......###', // 30
-  '####.......................###', // 31
-  '#####.....................####', // 32
-  '#######..x...........x..######', // 33
-  '##########............########', // 34
-  '############......############', // 35
-  '##############################', // 36
-  '##############################', // 37
-  '##############################', // 38
-  '##############################', // 39
-];
-
-function buildMap(spawn: { x: number; y: number }): FloorMap {
+function buildMap(art: HubArt, spawn: { x: number; y: number }, keepers: Array<{ x: number; y: number }>): FloorMap {
   const w = HUB_COLS;
   const h = HUB_ROWS;
   const tiles = new Uint8Array(w * h);
   const pathMask = new Uint8Array(w * h);
-  for (let y = 0; y < h; y++) {
-    const row = GRID[y] ?? '';
-    for (let x = 0; x < w; x++) {
-      const ch = row[x] ?? '#';
-      tiles[y * w + x] = ch === '.' ? FLOOR : ch === 'x' ? BLOCKED : SOLID;
-      pathMask[y * w + x] = ch === '#' ? 0 : 1;
+  for (let ty = 0; ty < h; ty++) {
+    for (let tx = 0; tx < w; tx++) {
+      const cx = tx * TILE + TILE / 2;
+      const cy = ty * TILE + TILE / 2;
+      const i = ty * w + tx;
+      if (!hubWalkable(cx, cy)) {
+        tiles[i] = SOLID;
+        continue;
+      }
+      pathMask[i] = 1;
+      let blocked = false;
+      for (const f of art.feet) {
+        const ox = Math.min(f.x1, (tx + 1) * TILE) - Math.max(f.x0, tx * TILE);
+        const oy = Math.min(f.y1, (ty + 1) * TILE) - Math.max(f.y0, ty * TILE);
+        if ((ox > 0 && oy > 0 && ox * oy >= 48) || (cx >= f.x0 && cx <= f.x1 && cy >= f.y0 && cy <= f.y1)) {
+          blocked = true;
+          break;
+        }
+      }
+      if (!blocked) for (const k of keepers) if (Math.floor(k.x / TILE) === tx && Math.floor(k.y / TILE) === ty) blocked = true;
+      tiles[i] = blocked ? BLOCKED : FLOOR;
     }
   }
   const cx = Math.floor(spawn.x / TILE);
@@ -214,11 +187,25 @@ function buildMap(spawn: { x: number; y: number }): FloorMap {
     path: pathMask,
     rooms: [{ cx, cy, rx: 12, ry: 12, kind: 'start' }],
     start: { x: spawn.x, y: spawn.y },
-    exit: { x: HUB_W / 2, y: 36 * TILE },
+    exit: { x: HUB_W / 2, y: 35 * TILE },
     props: [],
     spawns: [],
     seed: 7171,
   };
+}
+
+/** The grid as text ('#' wall, '.' floor, 'x' blocked), for checking by eye. */
+export function hubGridText(map: FloorMap): string {
+  const rows: string[] = [];
+  for (let y = 0; y < map.h; y++) {
+    let r = '';
+    for (let x = 0; x < map.w; x++) {
+      const t = map.tiles[y * map.w + x];
+      r += t === FLOOR ? '.' : t === BLOCKED ? 'x' : '#';
+    }
+    rows.push(r);
+  }
+  return rows.join('\n');
 }
 
 let cached: HubScene | null = null;
@@ -227,12 +214,13 @@ let cached: HubScene | null = null;
 export function hubScene(): HubScene {
   if (cached) return cached;
   const art = buildHub();
-  const spawn = { x: 240, y: 536, view: 'up' as View, dir: 1 as const };
+  const spawn = { x: 240, y: 540, view: 'up' as View, dir: 1 as const };
+  const people = [...art.stations.filter((s) => s.def), ...art.extras];
   cached = {
     w: HUB_W,
     h: HUB_H,
     bg: '#07060a',
-    map: buildMap(spawn),
+    map: buildMap(art, spawn, people),
     spawn,
     ground: art.ground,
     sprites: art.sprites,

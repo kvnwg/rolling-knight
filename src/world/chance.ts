@@ -321,9 +321,10 @@ function cast(w: World, c: Ctx | null, hero: Unit, target: Unit, spell: WildSpel
       area(w, hero, { x: target.x, y: target.y, r: 22, delay: 0.35, dur: 0, tick: 1, tickT: 0, dmg: atk * 2, kind: 'bomb', color: '#ff7a2a' });
       break;
     case 'whirlwind':
-      for (const e of w.enemiesIn('hero', hero.x, hero.y - 4, 30)) w.damage(e, atk * 1.2, hero, { knock: 6 });
+      // (Every spell lands a beat later, as an area or a shot: this runs inside World.damage, and a hit
+      // dealt from here could kill the foe being hit a second time.)
+      area(w, hero, { x: hero.x, y: hero.y, r: 30, delay: 0.06, dur: 0, tick: 1, tickT: 0, dmg: atk * 1.2, kind: 'slam', color: '#e8f0ff' });
       w.fx.push({ kind: 'spark', x: hero.x, y: hero.y - 6, color: '#e8f0ff' });
-      w.fx.push({ kind: 'shock', x: hero.x, y: hero.y, color: '#e8f0ff', size: 2 });
       break;
     case 'light':
       for (const o of w.heroes) if (!o.downed) w.heal(o, o.maxHp * 0.15);
@@ -339,11 +340,8 @@ function cast(w: World, c: Ctx | null, hero: Unit, target: Unit, spell: WildSpel
       break;
     }
     case 'shockwave':
-      for (const e of w.livingMobs()) {
-        if (dist(e.x, e.y, hero.x, hero.y) > 64) continue;
-        if (!e.boss) e.stunT = Math.max(e.stunT, 0.8);
-        w.damage(e, atk * 0.8, hero, { knock: 16 });
-      }
+      for (const e of w.livingMobs()) if (!e.boss && dist(e.x, e.y, hero.x, hero.y) <= 64) e.stunT = Math.max(e.stunT, 0.8);
+      area(w, hero, { x: hero.x, y: hero.y, r: 64, delay: 0.06, dur: 0, tick: 1, tickT: 0, dmg: atk * 0.8, kind: 'slam', color: '#ffd84a' });
       w.fx.push({ kind: 'shock', x: hero.x, y: hero.y, color: '#ffd84a', size: 4, src: 'taunt' });
       w.shakeIt(2, 0.2);
       break;

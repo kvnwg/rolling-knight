@@ -40,11 +40,11 @@ export function UpgradePopup({ game, node, onBuy, onClose }: { game: Game; node:
         <div className={s.popTop}>
           <CardTile node={head} view={view} />
           <div className={s.popNames}>
-            <Chunky text={def.name.toUpperCase()} size={8} grad={def.special ? 'gold' : def.group === 'chance' ? 'green' : 'cream'} />
+            <Chunky text={def.name.toUpperCase()} size={8} grad={def.special ? 'gold' : def.rolls ? 'green' : 'cream'} />
             <span className={s.popFrom}>
               {def.special && def.max === 1 ? 'Special: a one-off' : `Tier ${level} of ${def.max}`}
               {def.special && def.max > 1 ? ' · Special' : ''}
-              {def.group === 'chance' ? ' · Chance' : ''}
+              {def.rolls ? ' · Chance' : ''}
             </span>
           </div>
         </div>

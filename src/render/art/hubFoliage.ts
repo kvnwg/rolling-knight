@@ -121,52 +121,121 @@ export function canopy(out: HubOut): void {
   ];
   near.sort((p, q) => p[1] - q[1]);
   near.forEach(([x, y, r, tone], i) => clump(L, x, y, r, r * 0.8, { seed: 520 + i, tone, ramp: DEEP, lobes: 8 }));
-  out.piece(L, 'canopy', 100);
+  out.piece(L, 'canopy', 100, null);
 }
 
-/** Greenery down the left and right edges and round the bottom: plants and bushes (y-sorted). */
+type Kind = 'leafy' | 'fern' | 'bush' | 'tree' | 'monstera' | 'banana' | 'elephant';
+
+/** One plant as its own y-sorted piece. `lean` tips its leaves toward the square (-1 left side, 1 right). */
+function plant(out: HubOut, id: string, x: number, y: number, kind: Kind, size: number, tone: number, seed: number, lean: number): void {
+  const tall = kind === 'tree' ? 2.6 : 1.7;
+  const pad = size * 1.9 + 10;
+  const L = new Layer(x - pad, y - pad * tall, pad * 2, pad * tall + 6);
+  // Leaves fan up and lean in over the square: -PI/2 is straight up.
+  const dir = -Math.PI / 2 + lean * 0.55;
+  switch (kind) {
+    case 'leafy':
+      bigLeafPlant(L, x, y, { seed, size, tone, n: 7, dir, spread: 2.6 });
+      break;
+    case 'elephant':
+      bigLeafPlant(L, x, y, { seed, size, tone, n: 5, dir, spread: 2.2, shape: 'round' });
+      break;
+    case 'banana':
+      bigLeafPlant(L, x, y, { seed, size, tone, n: 6, shape: 'lance', dir, spread: 2.3 });
+      break;
+    case 'monstera':
+      bigLeafPlant(L, x, y, { seed, size, tone, n: 6, notch: true, shape: 'round', dir, spread: 2.5 });
+      break;
+    case 'fern':
+      fern(L, x, y, { seed, size, tone, n: 7 });
+      break;
+    case 'bush':
+      clump(L, x, y - size * 0.7, size, size * 0.8, { seed, tone });
+      break;
+    case 'tree':
+      tree(L, x, y, { seed, r: size, tone, trunk: 16 });
+      break;
+  }
+  out.piece(L, id, y);
+  if (kind === 'tree' || kind === 'bush') out.shadows.push({ kind: 'oval', x: x + 4, y: y + 1, rx: size * 0.6, ry: 3, strength: 0.4 });
+}
+
+/**
+ * Greenery framing the square: a dense bank of big-leaved plants, ferns and bushes down the left and
+ * right edges (leaning in), trees with lanterns hung in them, thick planting in the top corners beside
+ * the stalls and round the bottom on either side of the steps. Everything is y-sorted.
+ */
 export function edgeGreens(out: HubOut): void {
-  // Each entry: x, y (base), kind, size, tone, seed.
-  type G = [number, number, 'leafy' | 'fern' | 'bush' | 'tree' | 'monstera' | 'banana', number, number];
-  const list: G[] = [
-    // Left edge, top to bottom.
-    [14, 196, 'banana', 26, 0.4], [30, 236, 'fern', 18, 0.45], [12, 280, 'tree', 30, 0.42], [34, 318, 'monstera', 18, 0.5],
-    [18, 366, 'leafy', 22, 0.45], [36, 402, 'fern', 16, 0.5], [14, 440, 'tree', 28, 0.4], [40, 470, 'bush', 13, 0.5],
-    // Right edge.
-    [466, 196, 'banana', 26, 0.4], [450, 240, 'fern', 18, 0.45], [468, 284, 'tree', 30, 0.42], [446, 322, 'monstera', 18, 0.5],
-    [462, 368, 'leafy', 22, 0.45], [444, 404, 'fern', 16, 0.5], [466, 442, 'tree', 28, 0.4], [440, 474, 'bush', 13, 0.5],
-    // Round the bottom, either side of the steps.
-    [70, 512, 'bush', 16, 0.45], [120, 530, 'leafy', 20, 0.55], [168, 552, 'fern', 15, 0.6],
-    [410, 512, 'bush', 16, 0.45], [360, 530, 'leafy', 20, 0.55], [312, 552, 'fern', 15, 0.6],
-  ];
-  list.forEach(([x, y, kind, size, tone], i) => {
-    const pad = size * 2 + 10;
-    const L = new Layer(x - pad, y - pad * (kind === 'tree' ? 2.4 : 1.6), pad * 2, pad * (kind === 'tree' ? 2.4 : 1.6) + 6);
-    const seed = 700 + i * 17;
-    switch (kind) {
-      case 'leafy':
-        bigLeafPlant(L, x, y, { seed, size, tone, n: 7 });
-        break;
-      case 'banana':
-        bigLeafPlant(L, x, y, { seed, size, tone, n: 6, shape: 'lance', spread: 2.2 });
-        break;
-      case 'monstera':
-        bigLeafPlant(L, x, y, { seed, size, tone, n: 6, notch: true, shape: 'round' });
-        break;
-      case 'fern':
-        fern(L, x, y, { seed, size, tone, n: 7 });
-        break;
-      case 'bush':
-        clump(L, x, y - size * 0.7, size, size * 0.8, { seed, tone });
-        tuft(L, x - size + 2, y, 3, 4, { seed, tone });
-        break;
-      case 'tree':
-        tree(L, x, y, { seed, r: size, tone, trunk: 14 });
-        break;
+  const kinds: Kind[] = ['leafy', 'fern', 'monstera', 'bush', 'banana', 'elephant', 'fern', 'leafy', 'bush'];
+  let n = 0;
+  const add = (x: number, y: number, kind: Kind, size: number, tone: number, lean: number) => plant(out, `green${n}`, x, y, kind, size, tone, 700 + n++ * 17, lean);
+  // The two edges, an outer row and a softer inner row along the paving.
+  for (const side of [-1, 1]) {
+    const X = (x: number) => (side < 0 ? x : 480 - x);
+    let i = 0;
+    for (let y = 96; y < 520; y += 15 + Math.floor(h2(i, 1, 33) * 8)) {
+      const k = kinds[(i * 4 + (side > 0 ? 3 : 0)) % kinds.length];
+      const x = 6 + h2(i, 2, side + 40) * 26;
+      const size = k === 'bush' ? 13 + h2(i, 3, 41) * 6 : k === 'fern' ? 16 + h2(i, 3, 42) * 6 : 20 + h2(i, 3, 43) * 9;
+      add(X(x), y, k, size, 0.45 + h2(i, 4, 44) * 0.35, -side);
+      i++;
     }
-    out.piece(L, `green${i}`, y);
-    out.shadows.push({ kind: 'oval', x: x + 4, y: y + 1, rx: size * (kind === 'tree' ? 0.5 : 0.7), ry: 3, strength: 0.4 });
-  });
+    // The inner row: low ferns and leaves spilling onto the paving's edge.
+    for (let y = 206; y < 500; y += 34 + Math.floor(h2(i, 5, 45) * 18)) {
+      add(X(40 + h2(i, 6, 46) * 8), y, i % 2 ? 'fern' : 'elephant', 12 + h2(i, 7, 47) * 5, 0.6 + h2(i, 8, 48) * 0.25, -side);
+      i++;
+    }
+  }
+  // Trees at the edges, a lantern hung from each.
+  for (const [x, y, r] of [[18, 300, 30], [462, 304, 30], [14, 470, 28], [468, 474, 28], [30, 176, 24], [452, 178, 24]] as const) {
+    add(x, y, 'tree', r, 0.42, 0);
+  }
+  for (const [x, y] of [[34, 266], [446, 270], [30, 436], [450, 440]] as const) hangingLantern(out, x, y, `treeLantern${x}`);
+  // The top corners beside the stalls: thick planting in front of the trees.
+  for (const [x, y, k, size] of [[8, 112, 'bush', 18], [34, 128, 'banana', 26], [16, 150, 'leafy', 24], [44, 170, 'fern', 16], [472, 112, 'bush', 18], [446, 128, 'banana', 26], [464, 150, 'leafy', 24], [436, 170, 'fern', 16]] as const) {
+    add(x, y, k, size, 0.5, x < 240 ? 1 : -1);
+  }
+  // Round the bottom, either side of the steps: banks of bushes and big leaves.
+  for (const side of [-1, 1]) {
+    const X = (x: number) => (side < 0 ? x : 480 - x);
+    let j = 0;
+    for (let y = 486; y < 650; y += 14) {
+      // The bank's inner edge follows the paving's curve toward the steps.
+      const t = Math.max(0, (y - 470) / 75);
+      const inner = Math.min(y > 540 ? 166 : 186, 40 + t * t * 150);
+      for (let x = 4 + (j % 2) * 12; x < inner - 6; x += 24 + Math.floor(h2(j, x, 49) * 10)) {
+        const k = kinds[(j * 3 + Math.floor(x / 24)) % kinds.length];
+        const near = x > inner - 40;
+        const size = (k === 'bush' ? 14 + h2(j, x, 50) * 7 : 18 + h2(j, x, 51) * 10) * (near ? 0.75 : 1);
+        // Plants by the steps lean away from them, so the steps stay clear.
+        add(X(x + h2(j, x, 52) * 6), y + Math.floor(h2(j, x, 53) * 6), k, size, 0.4 + h2(j, x, 54) * 0.35, near ? side * 0.5 : -side * 0.6);
+      }
+      j++;
+    }
+  }
+}
+
+/** A lantern hanging from a branch: a short chain, the glowing box. */
+function hangingLantern(out: HubOut, x: number, y: number, id: string): void {
+  const L = new Layer(x - 6, y - 8, 13, 22);
+  for (let yy = y - 6; yy < y; yy++) L.px(x, yy, yy % 2 ? '#3a3a44' : '#5a5a66');
+  lanternAt(L, x, y);
+  L.outlineTinted(0.7);
+  L.light(x, y + 6, 70, '#ffae4c', 0.55, 0.3);
+  out.piece(L, id, y + 40, null);
+}
+
+function lanternAt(L: Layer, x: number, y: number): void {
+  L.rect(x - 2, y, 5, 1, '#e0b040');
+  L.rect(x - 3, y + 1, 7, 1, '#8a5a1a');
+  for (let yy = y + 2; yy < y + 8; yy++) {
+    for (let xx = x - 2; xx <= x + 2; xx++) {
+      if (xx === x - 2 || xx === x + 2) L.px(xx, yy, '#363644');
+      else L.gl(xx, yy, yy < y + 4 ? '#fff2c0' : xx === x - 1 ? '#ffe090' : '#ffc860');
+    }
+  }
+  L.rect(x - 3, y + 8, 7, 1, '#8a5a1a');
+  for (const [dx, dy] of [[-3, 3], [3, 3], [-3, 5], [3, 5], [0, 9], [-4, 4], [4, 4]] as const) L.halo(x + dx, y + dy, '#ffb850', 0.3);
 }
 
 /** Huge glossy leaves over the bottom corners and the lowest edges: drawn over everything. */

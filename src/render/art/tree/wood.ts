@@ -99,12 +99,13 @@ export interface BarkLook {
 
 /** A raking light from the left for wood, so trunks read round. */
 const WL: readonly [number, number, number] = [-0.8, -0.34, 0.5];
+const WL_INV = 1 / Math.sqrt(WL[0] * WL[0] + WL[1] * WL[1] + WL[2] * WL[2]);
 
 /** Shades one wood pixel of the scene into the paint (5-tone bark ramps). */
 export function shadeBark(sc: Scene, P: Paint, x: number, y: number, b: BarkLook): void {
   const i = y * sc.w + x;
   const tag = sc.tag[i];
-  const lam = (sc.nx[i] * WL[0] + sc.ny[i] * WL[1] + sc.nz[i] * WL[2]) / Math.hypot(WL[0], WL[1], WL[2]);
+  const lam = (sc.nx[i] * WL[0] + sc.ny[i] * WL[1] + sc.nz[i] * WL[2]) * WL_INV;
   // The crown's shade, broken into dapples of sun near its edge.
   let sh = sc.shadow(x, y, 0.5, 34) * b.shade;
   if (sh > 0 && sh < 1) sh *= vnoise(x, y, 3, b.seed + 91) > 0.42 ? 1 : 0.35;

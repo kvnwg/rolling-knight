@@ -15,7 +15,18 @@ import { Altar } from './altar';
 const ms: number[] = [];
 (window as unknown as { __altarMs: number[] }).__altarMs = ms;
 const orig = Altar.prototype.frame;
+const live = new Map<Altar, Parameters<Altar['frame']>[1]>();
+(window as unknown as { __bench: (n: number) => Record<string, number> }).__bench = (n: number) => {
+  const out: Record<string, number> = {};
+  for (const [al, sig] of live) {
+    const t0 = performance.now();
+    for (let k = 0; k < n; k++) orig.call(al, t0 + k * 16.7, sig);
+    out[al.canvasEl.width > 100 ? 'big' : 'mini'] = +((performance.now() - t0) / n).toFixed(3);
+  }
+  return out;
+};
 Altar.prototype.frame = function (this: Altar, ...args: Parameters<Altar['frame']>) {
+  live.set(this, args[1]);
   const t0 = performance.now();
   orig.apply(this, args);
   ms.push((performance.now() - t0) * (this.canvasEl.width > 100 ? 1 : -1));

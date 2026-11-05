@@ -168,9 +168,9 @@ export function tavernStall(out: HubOut): void {
   // Kegs stacked beside the stall.
   barrel(L, x0 - 8, base, 51);
   L.outlineTinted(0.75);
-  L.light(92, 148, 46, '#ffc86a', 0.75);
-  L.light(x1 - 15, cy - 6, 28, '#ffb050', 0.5, 0.4);
-  out.piece(L, 'tavern', base);
+  L.light(92, 150, 50, '#ffb858', 0.55);
+  L.light(x1 - 15, cy - 6, 28, '#ffa040', 0.4, 0.4);
+  out.piece(L, 'tavern', base, { x0: x0 - 10, y0: 120, x1: x1 + 2, y1: base + 1 });
   out.shadows.push({ kind: 'band', x: (x0 + x1) / 2 + 4, y: base, rx: (x1 - x0) / 2 + 4, ry: 4, strength: 0.38 });
 }
 
@@ -386,12 +386,12 @@ export function outfitterShelves(out: HubOut): void {
   hline(L, x0 - 4, x0 + 1, by1 + 1, IRON[3]);
   L.px(x0 - 4, by1 + 2, IRON[2]);
   lanternBox(L, x0 - 4, by1 + 3);
-  L.light(x0 - 4, by1 + 9, 64, '#ffb860', 0.8, 0.25);
-  L.light((x0 + x1) / 2, 150, 40, '#ffc070', 0.4);
+  L.light(x0 - 4, by1 + 9, 64, '#ffae4c', 0.58, 0.25);
+  L.light((x0 + x1) / 2, 150, 44, '#ffb860', 0.3);
   // Crates by the shelves.
   box(L, x1 - 2, base - 11, 12, 3, 8, PLANK, 77);
   L.outlineTinted(0.75);
-  out.piece(L, 'outfitter', base);
+  out.piece(L, 'outfitter', base, { x0: x0 - 2, y0: 120, x1: x1 + 10, y1: base + 1 });
   out.shadows.push({ kind: 'band', x: (x0 + x1) / 2 + 4, y: base, rx: (x1 - x0) / 2 + 2, ry: 4, strength: 0.35 });
 }
 
@@ -565,12 +565,12 @@ export function stumpTable(out: HubOut, x: number, y: number): void {
     return rk(['#6a4a2a', '#8a6838', '#a8844c', '#c4a068', '#dcbc84'], 3.2 - ny * 0.8 - nx * 0.4 - ring * 0.7);
   });
   // A little potted plant and a mug.
-  pot(L, x - 7, top - 4, 5, 4);
-  for (let i = 0; i < 4; i++) leaf(L, x - 4.5, top - 4, -Math.PI / 2 + (i - 1.5) * 0.55, 5, 3, { tone: 0.6, seed: 400 + i, shape: 'lance' });
-  mug(L, x + 4, top + 1, 0);
-  candle(L, x - 1, top + 1, 3);
+  pot(L, x - 12, top - 2, 5, 4);
+  for (let i = 0; i < 4; i++) leaf(L, x - 9.5, top - 2, -Math.PI / 2 + (i - 1.5) * 0.6, 5, 3, { tone: 0.6, seed: 400 + i, shape: 'lance' });
+  mug(L, x + 5, top + 2, 0);
+  candle(L, x + 9, top + 1, 3);
   L.outlineTinted(0.75);
-  L.light(x - 1, top - 6, 34, '#ffb050', 0.55, 0.5);
+  L.light(x - 1, top - 6, 34, '#ffa040', 0.45, 0.5);
   out.piece(L, 'table', y);
   out.shadows.push({ kind: 'oval', x: x + 3, y: y + 1, rx: rx + 2, ry: 3, strength: 0.45 });
 }

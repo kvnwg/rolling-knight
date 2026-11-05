@@ -6,7 +6,7 @@
  * tier shows a lit top and a dark band under the hem above it. Old pines lose their lower boughs and
  * show a tall, reddish trunk with broken stubs; snow sits on the tops of the tiers.
  */
-import { EMPTY, Paint, Scene, h2, leafCell, quant, rand, vnoise, type Ramp } from './core';
+import { EMPTY, LeafGrid, Paint, Scene, h2, quant, rand, vnoise, type Ramp } from './core';
 import { WOOD, buildTrunk, shadeBark } from './wood';
 
 const NEEDLE = 4;
@@ -167,6 +167,7 @@ export function paintConifer(s: ConiferSpec): ConiferBuilt {
   const GRASS_P = s.grass ? ramps.push([s.grass[0], s.grass[1]]) - 1 : -1;
   const P = new Paint(SW, SH, ramps);
 
+  const lc = new LeafGrid(2.6, s.seed + 7, 0.8, SW, SH);
   for (let y = 0; y < SH; y++) {
     for (let x = 0; x < SW; x++) {
       const i = y * SW + x;
@@ -181,7 +182,7 @@ export function paintConifer(s: ConiferSpec): ConiferBuilt {
       const tt = tierT[i];
       const b = tierB[i];
       // Needle tufts: small clumps that hang (taller than wide), lit on top.
-      const lc = leafCell(x, y, 2.6, s.seed + 7, 0.8);
+      lc.at(x, y);
       const tuft = -lc.oy * 0.6 - lc.ox * 0.3;
       let v = 0.4 + 0.4 * lam - 0.34 * sh - 0.55 * ao + 0.06 * tuft + 0.08 * (1 - b * b) - 0.05;
       // The underside of each hem drops into shade, and so does the band of tier right under it.
@@ -217,25 +218,7 @@ export function paintConifer(s: ConiferSpec): ConiferBuilt {
     }
   }
   P.cleanOrphans(new Set([N_P]), (_p, lev) => lev === 5);
-  if (INK_P >= 0) {
-    const before = P.lev.slice();
-    const solid = (x: number, y: number) => x >= 0 && y >= 0 && x < SW && y < SH && before[y * SW + x] >= 0;
-    for (let y = 0; y < SH; y++) {
-      for (let x = 0; x < SW; x++) {
-        if (solid(x, y)) continue;
-        let n = -1;
-        let lit = false;
-        for (const [qx, qy, l] of [[x + 1, y, true], [x, y + 1, true], [x - 1, y, false], [x, y - 1, false]] as const) {
-          if (!solid(qx, qy)) continue;
-          n = qy * SW + qx;
-          lit = l;
-          break;
-        }
-        if (n < 0) continue;
-        P.set(x, y, INK_P, P.pal[n] === BARK_P ? 2 : lit ? 1 : 0);
-      }
-    }
-  }
+  if (INK_P >= 0) P.ring(INK_P, (np, lit) => (np === BARK_P ? 2 : lit ? 1 : 0));
   if (GRASS_P >= 0) {
     for (let x = bx - s.trunkW * 2; x <= bx + s.trunkW * 2; x++) {
       if (h2(x, 7, s.seed + 71) > 0.45) continue;

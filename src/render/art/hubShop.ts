@@ -193,7 +193,7 @@ export function paintShop(out: HubOut): void {
     }
     L.gl(wx - 4, wy - 4, '#fff6d6');
     L.gl(wx - 3, wy - 5, '#fff6d6');
-    L.light(wx, wy + 4, 40, '#ffb860', 0.45);
+    L.light(wx, wy + 4, 36, '#ffb050', 0.35);
   }
   // Barge boards along the gable's edges: thick dark timber with a lit upper edge, notched trim under.
   for (const side of [-1, 1]) {
@@ -294,7 +294,7 @@ export function paintShop(out: HubOut): void {
     L.px(px + dir, wy0 + 14, IRON[1]);
     L.px(px + dir * 2, wy0 + 15, IRON[1]);
     globeLantern(L, ex, wy0 + 14, 3);
-    L.light(ex, wy0 + 24, 64, '#ffb860', 0.85, 0.25);
+    L.light(ex, wy0 + 24, 56, '#ffb050', 0.5, 0.25);
   }
 
   // ---------------------------------------------------------------- string lights
@@ -311,19 +311,19 @@ export function paintShop(out: HubOut): void {
     }
     for (let i = 0; i + 1 < pts.length; i++) stringLights(L, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], 2, 4, i * 5 + (side > 0 ? 3 : 0));
   }
-  for (let x = roofL; x <= roofR; x += 20) L.light(x, eaveY + 6, 18, BULBS[(x / 20) % BULBS.length | 0], 0.35);
+  for (let x = roofL; x <= roofR; x += 20) L.light(x, eaveY + 6, 14, BULBS[(x / 20) % BULBS.length | 0], 0.25);
 
   // ---------------------------------------------------------------- the reel sign
   reelSign(L, S.sign.x, S.sign.y, S.sign.r);
 
   // ---------------------------------------------------------------- lights from the windows and door
-  L.light(S.winL.x0 + 23, 162, 92, '#ffae52', 0.95);
-  L.light(S.winR.x0 + 23, 162, 92, '#ffae52', 0.95);
-  L.light(S.cx, 178, 70, '#ff9a48', 0.7);
-  L.light(S.sign.x, S.sign.y + 6, 96, '#ffcf6a', 0.75);
-  L.light(S.cx, 214, 120, '#ffa850', 0.6);
+  L.light(S.winL.x0 + 23, 166, 84, '#ffa448', 0.55);
+  L.light(S.winR.x0 + 23, 166, 84, '#ffa448', 0.55);
+  L.light(S.cx, 180, 56, '#ff9040', 0.4);
+  L.light(S.sign.x, S.sign.y + 6, 92, '#ffc860', 0.45);
+  L.light(S.cx, 220, 124, '#ff9a48', 0.32);
 
-  out.piece(L, 'shop', by);
+  out.piece(L, 'shop', by, { x0: S.x0, y0: 120, x1: S.x1, y1: by + 2 });
   out.shadows.push({ kind: 'band', x: S.cx, y: by, rx: (S.x1 - S.x0) / 2 + 2, ry: 5, strength: 0.4 });
 }
 
@@ -655,9 +655,5 @@ function reelSign(L: Layer, cx: number, cy: number, R: number): void {
     const x = Math.round(cx + Math.cos(a) * R * 0.87 - 0.5);
     const y = Math.round(cy + Math.sin(a) * R * 0.87 - 0.5);
     L.gl(x, y, i % 2 ? '#fff8e0' : '#ffd860');
-  }
-  // A little leaf garland where the sign meets the gable (bottom).
-  for (let i = 0; i < 5; i++) {
-    leaf(L, cx - 10 + i * 5, cy + R + 1, Math.PI * (0.35 + i * 0.07), 5, 3, { tone: 0.55, seed: 300 + i, shape: 'lance', rim: true });
   }
 }
