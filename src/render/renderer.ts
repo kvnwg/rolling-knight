@@ -37,6 +37,7 @@ import { knightPaint, paintStep } from './pf/knightLook';
 import { deathPoofMs, deathPose, lastMoveOf, mobDirOf, mobPose, pruneMobs } from './pf/mobAnim';
 import { mobPaint, type MobPaint } from './pf/mobLook';
 import { facing, type Dir } from './pf/sheet';
+import { Vfx } from './vfx/vfx';
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -63,12 +64,8 @@ interface FxSprite {
   flip: boolean;
 }
 
-/** Effects that glow (drawn over the light, and lighting what's around them). */
+/** Bright effects: drawn crisp on the unlit top layer (they don't glow or light the scene). */
 const EMISSIVE: ReadonlySet<FxName> = new Set(['hit', 'crit', 'slash', 'boom', 'sparkle', 'levelUp', 'lightning', 'heal', 'electric', 'explosion']);
-const FX_LIGHT: Partial<Record<FxName, [string, number]>> = {
-  crit: ['#ffd84a', 26], boom: ['#ff8a3a', 40], explosion: ['#ff8a3a', 34], sparkle: ['#a8d8ff', 24], levelUp: ['#ffd84a', 50],
-  lightning: ['#d88aff', 36], heal: ['#fff0a0', 44], electric: ['#b08aff', 60], slash: ['#ffffff', 18],
-};
 
 /** Target art pixels on the screen's short side. */
 const SHORT_SIDE = 270;
@@ -139,6 +136,8 @@ export class Renderer {
   private corpses: Array<{ uid: number; x: number; y: number; paint: MobPaint; dir: Dir; at: number; world: World; poofed: boolean; boss: boolean }> = [];
   /** PixelForge FX playing in the world (death poofs, a skeleton's crumble), on the world's clock. */
   private pfFx: Array<{ name: SheetName; x: number; y: number; at: number; world: World }> = [];
+  /** The attack effects: swings, shots in flight, their impacts (src/render/vfx). */
+  private vfx = new Vfx();
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -466,32 +465,33 @@ export class Renderer {
     list.sort((a, b) => a.y - b.y);
     for (const d of list) d.draw();
     this.drawPfFx(st, w, sx, sy);
+    // --- swings: their own pass, over the units, on the unlit top layer like every attack effect
+    // (read before the Fx below are turned into effects: a stroke's own marks replace their sparks)
+    this.vfx.update(w);
+    this.vfx.drawSwings(w, ui, cx, cy);
     if (hub) {
       hub.drawFore(st, em, cx, cy, this.LW, this.LH);
       hub.updateMotes(dt);
       hub.drawMotes(em, cx, cy, this.LW, this.LH, this.time);
     } else this.ambient?.drawAir(em, cx, cy, this.LW, this.LH, this.time);
 
-    // --- shots, sparks, leaves and weather
-    for (const s of w.shots) {
-      if (pf && this.wardenShot(w, s)) this.drawRockShard(st, s, sx, sy);
-      else this.drawShot(s.kind === 'arrow' ? st : em, s, sx, sy);
-    }
+    // --- shots, sparks, leaves and weather. Attack effects (shots, spell and hit bursts) go on the
+    // unlit top layer: crisp, never bloomed or glowing (only the setting glows).
+    const warden = (s: Shot) => pf && this.wardenShot(w, s);
+    for (const s of w.shots) if (warden(s)) this.drawRockShard(st, s, sx, sy);
+    this.vfx.drawShots(w, ui, cx, cy, this.W, this.H, warden);
     this.spawnFx(w);
     if (!hub) this.weather(biome, dt, cx, cy);
     if (outdoors && !hub) this.dropLeaves(biome, cx, cy, dt);
     this.updateParticles(st, em, dt, sx, sy);
+    this.vfx.drawImpacts(w, ui, cx, cy, this.W, this.H);
     if (w.sky.rain > 0) this.rain.drawAir(st, cx, cy);
     this.advanceFx(dt);
     this.drawFx(st, sx, sy, false);
-    this.drawFx(em, sx, sy, true);
+    this.drawFx(ui, sx, sy, true);
 
-    // --- light
+    // --- light (the setting's: effects light nothing)
     const lights = this.collectLights(w, biome, cx, cy, sx, sy);
-    for (const f of this.fxs) {
-      const l = FX_LIGHT[f.name];
-      if (l) out_push(lights, { x: sx(f.x), y: sy(f.y), r: l[1], color: l[0], intensity: 0.9, bloom: true });
-    }
     if (outdoors && w.sky.kind === 'clear') this.sunFlecks(lights, w, cx, cy);
     this.flashT = Math.max(0, this.flashT - dt);
 
@@ -1063,36 +1063,6 @@ export class Renderer {
     ctx.drawImage(frameCanvas('fx_rock_shard', f[i][0], NO_PAINT), sx(s.x) - px, sy(s.y) - py);
   }
 
-  private drawShot(ctx: Ctx, s: Shot, sx: (x: number) => number, sy: (y: number) => number): void {
-    const x = sx(s.x);
-    const y = sy(s.y);
-    if (s.kind === 'arrow') {
-      const l = Math.hypot(s.vx, s.vy) || 1;
-      const dx = s.vx / l;
-      const dy = s.vy / l;
-      ctx.fillStyle = '#5a3a20';
-      for (let k = 0; k < 6; k++) ctx.fillRect(x - Math.round(dx * k), y - Math.round(dy * k), 1, 1);
-      ctx.fillStyle = '#e8e8f0';
-      ctx.fillRect(x, y, 1, 1);
-      ctx.fillStyle = '#f0f0f0';
-      ctx.fillRect(x - Math.round(dx * 6), y - Math.round(dy * 6), 1, 1);
-      return;
-    }
-    const r = s.kind === 'bullet' ? 2 : 2;
-    ctx.fillStyle = shade(s.color, -0.5);
-    ctx.fillRect(x - r - 1, y - r, r * 2 + 3, r * 2 + 1);
-    ctx.fillRect(x - r, y - r - 1, r * 2 + 1, r * 2 + 3);
-    ctx.fillStyle = s.color;
-    ctx.fillRect(x - r, y - r, r * 2 + 1, r * 2 + 1);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(x - 1, y - 1, 2, 2);
-    // A short trail.
-    ctx.globalAlpha = 0.5;
-    ctx.fillStyle = s.color;
-    ctx.fillRect(x - Math.round(s.vx * 0.03), y - Math.round(s.vy * 0.03), 2, 2);
-    ctx.globalAlpha = 1;
-  }
-
   private drawArea(ctx: Ctx, em: Ctx, a: Area, sx: (x: number) => number, sy: (y: number) => number): void {
     const x = sx(a.x);
     const y = sy(a.y);
@@ -1268,12 +1238,6 @@ export class Renderer {
       if (h.cls === 'arcanist') out.push({ x: sx(h.x) + h.dir * 4, y: sy(h.y) - 16, r: 10, color: orb, intensity: 0.35, bloom: true });
     }
     if (this.ambient) for (const l of this.ambient.lights(cx, cy, this.W, this.H, this.time)) out.push(l);
-    for (const s of w.shots) {
-      if (s.kind === 'arrow') continue;
-      // A Stone Warden's thrown stones only catch a little light (they don't glow like spells).
-      if (pfReady() && this.wardenShot(w, s)) out.push({ x: sx(s.x), y: sy(s.y), r: 12, color: '#fff2d8', intensity: 0.35 });
-      else out.push({ x: sx(s.x), y: sy(s.y), r: s.team === 'hero' ? 20 : 16, color: s.color, intensity: 0.9, bloom: true });
-    }
     for (const a of w.areas) {
       if (a.kind === 'fire' || (a.kind === 'meteor' && a.delay < 0.4)) out.push({ x: sx(a.x), y: sy(a.y), r: a.r * 1.6, color: '#ff7a2a', intensity: 0.9, bloom: true });
       else if (a.kind === 'sanctuary') out.push({ x: sx(a.x), y: sy(a.y), r: a.r * 1.4, color: '#fff0a0', intensity: 0.7, bloom: true });
@@ -1608,10 +1572,6 @@ function gradeOf(b: Biome, sky: Sky | null): Grade {
     vignette: day || grey ? Math.min(0.32, b.light.vignette * 0.7) : Math.min(0.75, b.light.vignette + 0.1),
     bloom: indoor ? 0.9 : wet ? 0.65 : 0.5,
   };
-}
-
-function out_push(list: Light[], l: Light): void {
-  list.push(l);
 }
 
 export { BIOMES, RARITY_COLOR };

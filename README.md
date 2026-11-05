@@ -27,6 +27,14 @@ How every system works, with its numbers: [`DESIGN.md`](DESIGN.md). Art sources 
   wolves, goblins, goblin archers and chiefs, orcs, skeletons, ogres; the Stone Warden is the boss)
   and wear their floor's colors. The farm's animals, ghosts, pumpkins, bugs, plants, casters and the
   demon keep the game's own sprites (built on Snoblin's prototype mannequin or painted from shapes).
+- Attacks are drawn by code on the pixel grid (`src/render/vfx/`). The melee knights swing solid
+  white smears in the classic pixel-art way: on the hit, one wedge sweeps from behind the head far
+  out in front to a crisp point, then a thin streak, then it's gone (the Guardian's a heavy chop, the
+  Lancer's a spike to its reach). Arrows are hand-drawn in 16 directions; the arcane bolt twinkles
+  with sparks orbiting it, the holy orb turns in a halo, foes' bullets are big glossy danger balls
+  with an ink outline; each shot ends in an impact sized to the hit. Commons stay white; each tier
+  tints, edges and layers the smears in its color, up to Primordial's rainbow and Absolute's black
+  and white. Like every attack effect they're crisp and flat: nothing glows or lights the scene.
 - The look follows Firefly Garden turned into pixels: bright, readable places edge to edge. The
   hamlet is a town of half-timbered houses, fenced lots, hedges, a market square with striped stalls,
   a fountain and string lights, and a canal with a bridge; trees stand in clumps on the lawns
@@ -106,6 +114,13 @@ npx tsx tools/preview.ts knights shots/knights.png
 ```bash
 npx tsx tools/preview.ts mobs shots/mobs.png
 ```
+
+```bash
+npx tsx tools/vfxPreview.ts shots
+```
+
+Every attack effect by tier and frame on grass, stone, a crypt, sand and snow (`shots/vfx_*.png`);
+`tools/vfxSmearCheck.ts` draws the melee smears in eight directions.
 
 ## Build
 
