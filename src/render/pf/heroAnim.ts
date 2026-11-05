@@ -27,7 +27,7 @@ import type { Unit, View } from '../../world/entities';
 import type { World } from '../../world/world';
 import { SHEETS } from './assets';
 import { KNIGHT_SHEET } from './knightLook';
-import { eventFrame, facing, type Dir, type FrameRef, type PFSheet } from './sheet';
+import { eventFrame, facing, walkPace, type Dir, type FrameRef, type PFSheet } from './sheet';
 
 export interface HeroPose {
   anim: string;
@@ -230,7 +230,11 @@ export function heroPose(w: World, h: Unit): HeroPose {
     m.vx += (dx / dt - m.vx) * k;
     m.vy += (dy / dt - m.vy) * k;
   }
-  if (!jump && !h.rolling) m.walk += moved;
+  if (!jump && !h.rolling) {
+    const a = sheet.meta.anims.walk;
+    const n = a.dirs.s?.length ?? 4;
+    m.walk += moved * walkPace(a.stride ? a.stride.reduce((s, v) => s + v, 0) : n * 2.5, n, m.speed);
+  }
   const prevX = m.x;
   const prevY = m.y;
   m.x = h.x;

@@ -8,7 +8,7 @@
  *  - CharacterSelect: who you play as, when the game opens.
  * In the dungeon none of this is reachable: to change your squad or spend anything you leave, or fall.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { sfx } from '../audio/sfx';
 import { knightDef } from '../core/knights';
 import { CHALLENGE, floorDifficulty, knightRating, squadPower } from '../core/power';
@@ -20,11 +20,12 @@ import { npcFrame } from '../render/art/npcs';
 import { toCanvas } from '../render/art/draw';
 import { biomeForFloor } from '../world/biomes';
 import type { HubStation, StationId } from '../world/hubWorld';
-import { Chunky, HeroArt } from './common';
+import { Chunky, HeroArt, HeroLive } from './common';
 import { AltarReels } from './fx/AltarReels';
 import { fmt } from './format';
 import { DupeBar, HeroCard, HeroesPanel, PerksPanel, RebirthPanel, Section, SummonPanel, UpgradesPanel } from './panels';
 import { Px, type IconName } from './px';
+import { KNIGHT_PIC_H, KNIGHT_PIC_W } from './sprites';
 import { uiSound } from './sound';
 import { TopBar } from './TopBar';
 
@@ -285,6 +286,17 @@ function GatePanel({ game, onClose }: { game: Game; onClose: () => void }) {
 
 // ------------------------------------------------------------------ who you play as
 
+/**
+ * A knight picture about `s` UI pixels per art pixel, rounded to whole screen pixels per art pixel:
+ * blown up big, a fractional scale draws some art pixels a screen pixel wider than others.
+ */
+function crispKnight(s: number): CSSProperties {
+  const px = parseFloat(document.documentElement.style.getPropertyValue('--px')) || 3;
+  const dpr = window.devicePixelRatio || 1;
+  const k = Math.max(1, Math.round(s * px * dpr)) / dpr;
+  return { width: `${KNIGHT_PIC_W * k}px`, height: `${KNIGHT_PIC_H * k}px` };
+}
+
 export function CharacterSelect({ game, onPick, onSelect }: { game: Game; onPick: () => void; onSelect?: (id: string) => void }) {
   const s = game.state;
   const ids = rankedKnights(s).slice(0, 12);
@@ -312,7 +324,7 @@ export function CharacterSelect({ game, onPick, onSelect }: { game: Game; onPick
       </div>
       <div className="cs-stage">
         <div className="cs-light" style={{ ['--rc' as string]: RARITY_COLOR[def.rarity] }} />
-        <HeroArt id={sel} mutation={s.roster[sel]?.mutation ?? null} s={3} />
+        <HeroLive id={sel} mutation={s.roster[sel]?.mutation ?? null} s={2} style={crispKnight(2.2)} />
       </div>
       <div className="cs-name outlined">
         <Chunky text={def.name.toUpperCase()} size={9} grad="white" />

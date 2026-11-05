@@ -269,10 +269,11 @@ describe('knight animations from the sim', () => {
     expect(p.anim).toBe('backflip');
     expect(p.dir).toBe('w');
     h.rolling = undefined;
-    // Walking steps by distance: 10 px is one whole cycle of the stride.
+    // Walking steps by distance (10 px of stride is a cycle), but at the game's speeds no faster than
+    // a frame every 90 ms or so: at 50 px/s the feet slide a little instead of flicking.
     h.moving = true;
     const frames: number[] = [];
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 40; i++) {
       (w as { time: number }).time += 0.02;
       h.x += 1;
       p = heroPose(w, h);
@@ -280,6 +281,11 @@ describe('knight animations from the sim', () => {
       frames.push(p.k);
     }
     expect(new Set(frames).size).toBe(4);
+    let changes = 0;
+    for (let i = 12; i < frames.length; i++) if (frames[i] !== frames[i - 1]) changes++;
+    // 28 ticks of 20 ms once the pace has settled: about six frames, never the fourteen of a frame per 40 ms.
+    expect(changes).toBeLessThanOrEqual(7);
+    expect(changes).toBeGreaterThanOrEqual(4);
     // Downed: the death, held; stunned: stun.
     h.moving = false;
     h.downed = true;

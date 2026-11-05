@@ -45,6 +45,18 @@ export interface PFMeta {
   anchors?: Array<number[] | null>;
 }
 
+/**
+ * The fastest a walk's frames may change (s). PixelForge draws a walk at its own pace (a knight's
+ * 10 px stride every 520 ms is about 19 px/s) and the game moves knights at 50 to 64 px/s: stepped by
+ * distance alone, the legs would flick every 40 ms. Past this pace the feet slide a little instead.
+ */
+export const WALK_MIN_FRAME = 0.09;
+
+/** The share of the distance walked to step a cycle of `cyclePx` drawn px over `frames` frames by, at `speed` px/s. */
+export function walkPace(cyclePx: number, frames: number, speed: number): number {
+  return Math.min(1, cyclePx / Math.max(1e-3, speed * frames * WALK_MIN_FRAME));
+}
+
 /** Material name -> ramp (dark to light) to paint it with instead of its own. */
 export type Recolor = Partial<Record<string, readonly string[]>>;
 

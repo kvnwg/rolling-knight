@@ -12,7 +12,7 @@ import type { World } from '../../world/world';
 import { SHEETS, type SheetName } from './assets';
 import { travelDir } from './heroAnim';
 import type { MonsterId } from './mobLook';
-import { clipMs, eventFrame, facing, type Dir, type FrameRef, type PFSheet } from './sheet';
+import { clipMs, eventFrame, facing, walkPace, type Dir, type FrameRef, type PFSheet } from './sheet';
 
 /** Each monster's animations for the game's moves, and how far its walk cycle carries it (px). */
 interface Kit {
@@ -41,6 +41,11 @@ const KITS: Record<MonsterId, Kit> = {
   ogre: { walk: 'walk', cycle: 15, melee: 'attack_heavy', death: 'death' },
   stone_warden: { walk: 'walk', cycle: 16, melee: 'attack_slam', death: 'death' },
 };
+
+/** The gait a mob moves in at `speed` px/s: its walk, or its run once it's quick. */
+function gait(sheet: PFSheet, kit: Kit, speed: number): { anim: string; cyc: number } {
+  return kit.run && kit.runCycle && speed > 40 && sheet.has(kit.run) ? { anim: kit.run, cyc: kit.runCycle } : { anim: kit.walk, cyc: kit.cycle };
+}
 
 /** The boss moves (mobgen's BossMove) as Stone Warden animations. */
 export const BOSS_ANIM: Record<string, string> = {
@@ -177,7 +182,8 @@ export function mobPose(w: World, m: Unit, monster: MonsterId, sheetName: SheetN
     s.speed += (moved / dt - s.speed) * k;
     s.vx += (dx / dt - s.vx) * k;
     s.vy += (dy / dt - s.vy) * k;
-    s.walk += moved;
+    const g = gait(sheet, kit, s.speed);
+    if (g.cyc) s.walk += moved * walkPace(g.cyc, sheet.clip(g.anim, 's').length, s.speed);
   }
   s.x = m.x;
   s.y = m.y;
@@ -280,10 +286,8 @@ export function mobPose(w: World, m: Unit, monster: MonsterId, sheetName: SheetN
   const moving = (m.moving || s.speed > 6) && s.speed > 3;
   if (moving) {
     const dir = travelDir(s.vx, s.vy, s.dir);
-    const fast = kit.run && kit.runCycle && s.speed > 40 && sheet.has(kit.run);
-    const anim = fast ? kit.run! : kit.walk;
+    const { anim, cyc } = gait(sheet, kit, s.speed);
     const f = clip(anim, dir);
-    const cyc = fast ? kit.runCycle! : kit.cycle;
     if (!cyc) return out(anim, dir, loop(anim, dir, now * 1000));
     const p = ((s.walk % cyc) + cyc) % cyc;
     return out(anim, dir, f[Math.min(f.length - 1, Math.floor((p / cyc) * f.length))][0]);

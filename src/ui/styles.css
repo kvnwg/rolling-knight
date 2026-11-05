@@ -1175,6 +1175,15 @@ select.select {
 .toast .who {
   color: var(--tc, var(--text));
 }
+/* With a boss on the floor, news drops in under its bar instead of over its name. */
+:root:has(.dhud.has-boss) .toasts {
+  top: calc(52 * var(--px) + env(safe-area-inset-top, 0px));
+}
+@media (max-aspect-ratio: 1/1) {
+  :root:has(.dhud.has-boss) .toasts {
+    top: calc(92 * var(--px) + env(safe-area-inset-top, 0px));
+  }
+}
 @keyframes toastIn {
   from {
     transform: translateY(calc(-6 * var(--px)));
