@@ -19,7 +19,7 @@ import { AltarReels } from './fx/AltarReels';
 import daggerUrl from '../assets/ui/dagger.png';
 import { uiSound } from './sound';
 import { knightFaceUrl } from './sprites';
-import { CLASS_ICON } from './keeper/KnightShops';
+import { CLASS_ICON } from './classIcons';
 import { Glyph } from './keeper/KeeperScreen';
 import { goalName, questIcon } from './keeper/Shops';
 import { TopBar } from './TopBar';

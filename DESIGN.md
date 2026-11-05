@@ -72,10 +72,11 @@ and Mythic or better.
   better mutation upgrades the knight you have.
 - **"1 in X"** on a knight: its tier at luck 1 times its mutation's odds.
 - **Stats**: class base × rarity (Common 1 … Primordial 30) × level × mutation × rebirths × upgrades.
-- **Duplicates**: every copy after the first piles up; break it into **shards** (1 each; 2 for
-  Commons and Uncommons with Peasant Levy) or **sell** it for gold. Rules per rarity can do it as
-  they land. **Levels** cost L shards and gold; each adds 10% of base stats (30% for Commons and
-  Uncommons with Humble Beginnings).
+- **Duplicates**: every copy after the first turns straight into gold as it lands (kills' worth by
+  rarity; 3x for Commons and Uncommons with Peasant Levy); a better mutation it rolled sticks to the
+  knight. **Levels** cost gold only: 40 x 1.32^(L-1), times 1 + 0.5 per rarity tier (half for Commons
+  and Uncommons with Hand-Me-Downs); each adds 10% of base stats (30% for Commons and Uncommons with
+  Humble Beginnings). Old saves' spare copies and shards were cashed in as gold.
 - **Classes** (the kit is the same for every knight of a class):
 
 | Class | Role | Auto attack | Dodge |
@@ -89,10 +90,9 @@ and Mythic or better.
 
 - **Skill rolls** (`src/core/skillbook.ts`, `src/world/skills.ts`). There is no fixed special: the
   skill button spins a 0.7 s reel over the class's list and fires whatever it lands on (the result is
-  fixed when the spin starts, as at the altar); then the cooldown starts. Quick Roll (the tinker's
-  Combat tab, 5 tiers off Swift Boots I) makes each tier's spin 12% shorter and the cooldown 6%
-  shorter (at 5 tiers: a 0.28 s spin, cooldowns 30% shorter). Allies roll on their own
-  when the moment suits their role. Each class has six skills; at luck 1 they weigh 30, 26, 20, 13, 8
+  fixed when the spin starts, as at the altar). There are no cooldowns: in a fight every knight rolls,
+  fires, and rolls again at once. Quick Roll (the tinker's Combat tab) makes each tier's spin 12%
+  shorter (at 5 tiers: a 0.28 s spin). Each class has six skills; at luck 1 they weigh 30, 26, 20, 13, 8
   and 3 in 100 (two commons, an uncommon, a rare, an epic, a legendary), and luck tilts them rarer
   (weight × luck^(0.1 × tier step), luck capped at 1000; Loaded Dice adds to it). Epic and up chain
   several beats and announce their tier; legendary and up flash the screen and stop time for a beat.
@@ -117,7 +117,7 @@ taunt when the squad is pressed, fighters chase, archers and mages kite, healers
 hurt and save Sanctuary for when it counts. Everyone dodges what they see coming, most of the time
 (shots, blasts and boulders about to land, a lunge's lane or landing ring once its aim has locked).
 Auto hands your knight to the AI too (and it is on while a menu is open). Empty slots fill with your
-strongest free knight; anything else is your call (or Best squad), at the quartermaster in the hub.
+strongest free knight; anything else is your call (or Best squad), at the Warden's by the steps down.
 The squad is locked in the dungeon: knights rolled during a dive wait at the hub, and to change who
 fights (or spend anything) you head back up, or fall.
 
@@ -241,10 +241,10 @@ Perks open after the first rebirth. **Sigils** (one per rebirth at the start of 
 beaten for the first time in a run) buy perks from four trees; a rebirth clears them all:
 
 - **Underdogs**: Humble Beginnings (Common and Uncommon level-ups ×3), Peasant Levy (every 4th spin at
-  luck 1; 2 shards per low dupe), Rags to Riches (+25% stats per tier below Legendary), Peasant Revolt
-  (a low-rarity squad deals double damage and dodges twice as often), Hand-Me-Downs (shards spread to
-  the whole class).
-- **Command**: Tag Team (switching rolls a free skill), Lone Wolf (solo: ×3 HP, ×2.5 damage), Hive Mind
+  luck 1; low duplicates pay 3x), Rags to Riches (+25% stats per tier below Legendary), Peasant Revolt
+  (a low-rarity squad deals double damage and dodges twice as often), Hand-Me-Downs (Common and
+  Uncommon level-ups cost half).
+- **Command**: Tag Team (switching lands the incoming knight's roll at once), Lone Wolf (solo: ×3 HP, ×2.5 damage), Hive Mind
   (the squad dodges with you; allies' skill rolls 2× faster), War Banner (your hits speed up the squad),
   Heirloom (keep your knight through the next rebirth).
 - **Rigged Reels**: Four-Leaf Litter, Bootleg Reel, Greased Gears, Pawn Shop, Rigged Jackpot.
@@ -264,6 +264,5 @@ Build-ups use 30-second and 2-minute windows, and nothing is judged in a new gam
 Offline rolling uses the same rules at 1/10 speed and 75% efficiency (Night Watch +40% a tier), up to
 1,000 rolls or 8 hours, keeping only Epic or better; the squad's gold income runs on too.
 
-The tutorial: three quick spins (a Common Guardian, an Uncommon Ranger, a Rare Cleric) make the
-squad; then a Legendary Blade; about 45 seconds into floor 1, beginner's luck: a ×3 then ×5 chain into
-an Exalted Ranger, clearly labeled. Both join the squad.
+The start: ordinary rolls, no scripted finds and no gift to hook you; the first spins are just quick
+(1.6 s) until you have three knights for a squad.

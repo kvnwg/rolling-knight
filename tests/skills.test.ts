@@ -182,7 +182,7 @@ describe('signatures', () => {
 // ------------------------------------------------------------------ the roll
 
 describe('a skill roll', () => {
-  it('spins while the knight keeps moving, then fires exactly one skill and starts the cooldown', () => {
+  it('spins while the knight keeps moving, fires exactly that skill, and rolls the next straight away', () => {
     const w = world([knightId('rare', 'blade')]);
     const h = w.heroes[0];
     fightAt(w, 3);
@@ -207,41 +207,39 @@ describe('a skill roll', () => {
     expect(h.lastSkill).toBeUndefined();
     expect(h.specialT).toBeLessThanOrEqual(0);
     run(w, 0.2);
-    expect(h.skillRoll).toBeUndefined();
     const lands = got.filter((e) => e.phase === 'land');
     expect(lands.length).toBe(1);
     expect(lands[0].skill.id).toBe(decided);
     expect(h.lastSkill).toMatchObject({ skill: decided, n: 1, free: false });
-    expect(h.specialT).toBeGreaterThan(h.specialCd! - 0.3);
-    run(w, 3);
-    expect(got.filter((e) => e.phase === 'land').length).toBe(1);
+    // No cooldown: in the fight the next roll is already spinning (roll, fire, roll, fire).
+    expect(h.specialT).toBe(0);
+    expect(h.skillRoll).toBeDefined();
+    expect(got.filter((e) => e.phase === 'start').length).toBe(2);
+    run(w, ROLL_TIME * 2 + 0.3);
+    expect(got.filter((e) => e.phase === 'land').length).toBeGreaterThanOrEqual(3);
   });
 
-  it('waits for its cooldown; a free roll (Tag Team) does not, and starts none', () => {
+  it('leaves no cooldown: one roll at a time, the next as soon as it lands; stunned, none', () => {
     const w = world([knightId('rare', 'ranger')]);
     const h = w.heroes[0];
-    fightAt(w, 2, 60);
-    h.specialT = 0;
+    expect(heroSpecial(w, h, false)).toBe(true);
+    // One at a time: no second roll while one spins.
+    expect(heroSpecial(w, h, false)).toBe(false);
+    run(w, ROLL_TIME + 0.1);
+    expect(h.lastSkill?.n).toBe(1);
+    expect(h.specialT).toBe(0);
+    // Straight away again (out of a fight it waits for the button; here, the call).
     expect(heroSpecial(w, h, false)).toBe(true);
     run(w, ROLL_TIME + 0.1);
-    const cd = h.specialT!;
-    expect(cd).toBeGreaterThan(0);
-    expect(heroSpecial(w, h, false)).toBe(false);
-    // A free roll lands without touching the cooldown.
+    expect(h.lastSkill?.n).toBe(2);
+    // A free roll (Tag Team) works the same.
     expect(heroSpecial(w, h, true)).toBe(true);
     run(w, ROLL_TIME + 0.1);
-    expect(h.lastSkill?.n).toBe(2);
     expect(h.lastSkill?.free).toBe(true);
-    expect(h.specialT!).toBeLessThan(cd);
     // Stunned: no roll (unless free).
-    h.specialT = 0;
     h.stunT = 1;
     expect(heroSpecial(w, h, false)).toBe(false);
     h.stunT = 0;
-    // Once the cooldown is up it rolls again.
-    h.specialT = 0.2;
-    expect(heroSpecial(w, h, false)).toBe(false);
-    run(w, 0.25);
     expect(heroSpecial(w, h, false)).toBe(true);
   });
 
@@ -316,7 +314,8 @@ describe('a skill roll', () => {
           w.rewind !== null;
       }
       expect(marked, id).toBe(true);
-      expect(h.skillQueue, id).toBeUndefined();
+      // Its beats have all played (a later roll, chained on with no cooldown, may have queued its own).
+      if ((h.lastSkill?.n ?? 0) === 1) expect(h.skillQueue, id).toBeUndefined();
     }
   });
 
@@ -421,7 +420,7 @@ describe('allies', () => {
     expect(got.filter((e) => e.phase === 'land' && e.hero === me).length).toBeGreaterThanOrEqual(1);
   });
 
-  it('includes your knight on Auto, and Tag Team rolls for free on switching', () => {
+  it('includes your knight on Auto, and Tag Team lands the incoming roll at once', () => {
     const w = world([knightId('rare', 'arcanist'), knightId('rare', 'cleric')], ['tagTeam']);
     const [mage, cleric] = w.heroes;
     w.auto = true;
@@ -430,25 +429,19 @@ describe('allies', () => {
     run(w, 6);
     expect(mage.lastSkill?.n ?? 0).toBeGreaterThanOrEqual(1);
     w.auto = false;
-    cleric.specialT = 5;
     const n = cleric.lastSkill?.n ?? 0;
     expect(w.switchControl(1)).toBe(true);
-    expect(cleric.skillRoll?.free).toBe(true);
-    run(w, ROLL_TIME + 0.1);
+    // It lands on the next tick, not after a whole roll.
+    run(w, 0.05);
     expect(cleric.lastSkill?.n).toBe(n + 1);
   });
 
-  it('pick the moment by role: a healer waits for someone to be hurt', () => {
+  it('keep rolling through a fight, every knight: roll, fire, roll, fire', () => {
     const w = world([knightId('rare', 'guardian'), knightId('rare', 'cleric')]);
-    const cleric = w.heroes[1];
-    cleric.specialT = 0;
     fightAt(w, 2, 80);
     for (const h of w.heroes) h.invuln = 99;
-    run(w, 3);
-    expect(cleric.lastSkill).toBeUndefined();
-    w.heroes[0].hp = w.heroes[0].maxHp * 0.3;
-    run(w, 1.5);
-    expect(cleric.lastSkill?.n ?? (cleric.skillRoll ? 0.5 : 0)).toBeGreaterThan(0);
+    run(w, ROLL_TIME * 3 + 0.5);
+    for (const h of w.heroes) expect(h.lastSkill?.n ?? 0, h.knightId).toBeGreaterThanOrEqual(2);
   });
 });
 

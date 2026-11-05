@@ -379,7 +379,8 @@ function land(w: World, h: Unit, r: NonNullable<Unit['skillRoll']>): void {
   h.skillRoll = undefined;
   const skill = SKILLS[r.skill];
   castSkill(w, h, skill.id);
-  if (!r.free) h.specialT = h.specialCd!;
+  // No cooldown: in a fight the next roll starts as soon as this one fires (roll, fire, roll, fire).
+  h.specialT = 0;
   h.lastSkill = { skill: skill.id, at: w.time, n: (h.lastSkill?.n ?? 0) + 1, free: r.free };
   for (const fn of listeners) fn({ phase: 'land', world: w, hero: h, skill, free: r.free, luck: r.luck });
 }

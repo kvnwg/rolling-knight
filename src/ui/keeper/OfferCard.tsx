@@ -58,6 +58,8 @@ export interface OfferCardProps {
   tall?: boolean;
   /** Under the button: what opens it, or how much is missing. */
   note?: ReactNode;
+  /** A second, smaller button under the main one (the Warden's "ADD TO SQUAD"); `on` shows it pressed in. */
+  second?: { label: ReactNode; onPress?: () => void; on?: boolean; title?: string };
   state?: 'open' | 'locked' | 'done';
   special?: boolean;
   /** Words on the padlock ribbon (locked cards; just the padlock when left out). */
@@ -168,6 +170,11 @@ export function OfferCard(p: OfferCardProps) {
         <button className={`btn ${s.buy}`} data-kind={btn.kind} disabled={!p.onArt} onClick={p.onArt}>
           {btn.kind === 'locked' ? <Px icon="lock" size="sm" /> : <Px icon="check" size="sm" />}
           {btn.label && <span>{btn.label}</span>}
+        </button>
+      )}
+      {p.second && (
+        <button className={`btn ${s.second}`} data-on={p.second.on || undefined} title={p.second.title} onClick={p.second.onPress} disabled={!p.second.onPress}>
+          {p.second.label}
         </button>
       )}
       {p.note && <div className={s.need}>{p.note}</div>}

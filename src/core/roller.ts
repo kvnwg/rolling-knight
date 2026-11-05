@@ -117,8 +117,9 @@ export function startSpin(state: GameState, rng: Rng, nowMs: number, emit: Event
   if (hasPerk(state, 'peasantLevy') && r.spinCount % 4 === 3) luck = 1;
   let lucky = false;
   let golden = false;
+  // The start: quick spins (ordinary rolls, no luck tricks) until there's a squad.
   const warm = tut === 'warmup' || tut === 'rewarm';
-  const scriptedSpin = warm || tut === 'first' || (tut === 'beginner' && r.beginnerAt !== null && state.playTimeMs >= r.beginnerAt);
+  const scriptedSpin = warm;
   if (!scriptedSpin && tut === 'done') {
     r.sinceLucky += 1;
     if (r.sinceLucky >= luckyEvery(state)) {
@@ -140,37 +141,28 @@ export function startSpin(state: GameState, rng: Rng, nowMs: number, emit: Event
   // Every reel's tokens first: tokens landing together multiply (combos).
   const first = tokenChance(state);
   const tokens: number[][] = Array.from({ length: n }, () => (tut === 'done' ? rollTokens(rng, first) : []));
-  if (tut === 'beginner' && scriptedSpin) tokens[0] = [...BAL.tutorial.beginnerTokens];
   const combos = comboSteps(tokens);
   const picks: Pick[] = [];
   let dry = r.dry;
   for (let i = 0; i < n; i++) {
     const mult = tokenMult(tokens, i, combos);
     let pick: Pick;
-    if (warm && i === 0) {
-      const w = BAL.tutorial.warmup[Math.min(BAL.tutorial.warmup.length - 1, r.spinCount)];
-      pick = { rarity: w.rarity, cls: w.cls, mutation: null, scripted: 'warmup' };
-    } else if (tut === 'first' && i === 0) {
-      pick = { ...BAL.tutorial.firstFind, mutation: null, scripted: 'first' };
-    } else if (tut === 'beginner' && scriptedSpin && i === 0) {
-      pick = { ...BAL.tutorial.beginnerFind, mutation: null, scripted: 'beginner' };
-    } else {
+    {
       const pity = tut === 'done' && dry >= drySpell(state) ? BAL.roll.pity.rarity : null;
       const floor = higherRarity(higherRarity(chainFloor(mult), pity), rigged ? 'legendary' : null) ?? 'common';
       const rarity = scriptedSpin || tut !== 'done' ? rollRarity(Math.min(luck, 2), rng) : rollRarity(luck * mult, rng, floor);
       // (The Absolute tier has one knight, whatever classes are unlocked: Kevin.)
-      pick = { rarity, cls: rarity === 'absolute' ? 'blade' : rng.pick(classes), mutation: rollMutation(rng, fx.mutationMult) };
+      pick = { rarity, cls: rarity === 'absolute' ? 'blade' : rng.pick(classes), mutation: rollMutation(rng, fx.mutationMult), ...(warm ? { scripted: 'warmup' as const } : {}) };
     }
     dry = rarityAtLeast(pick.rarity, BAL.roll.pity.rarity) ? 0 : dry + 1;
     picks.push(pick);
   }
   const judged = judgeFinds(state, picks, luck);
-  if (scriptedSpin && !warm) judged.drama[0] ??= 'big';
   const buildsUp = scriptedSpin || judged.tease > 0 || judged.drama.some((d) => d !== null);
   const turbo = state.hourglasses >= 1 && !buildsUp && tut === 'done';
   if (turbo) state.hourglasses -= 1;
   // The warm-up spins are quick, so the squad is ready within a few seconds.
-  const cycle = warm ? 1.6 : spinCycle(state, turbo);
+  const cycle = warm ? BAL.tutorial.cycle : spinCycle(state, turbo);
   const baseSpinSeconds = cycle * spinShare();
   const stepSeconds = tokenStepSeconds(baseSpinSeconds);
   // Reels land one by one: each later reel waits a little longer.
@@ -207,9 +199,8 @@ export function startSpin(state: GameState, rng: Rng, nowMs: number, emit: Event
   r.current = spin;
   r.timer = 0;
   r.spinCount += 1;
-  if (warm && r.spinCount >= BAL.tutorial.warmup.length) r.tutorial = tut === 'warmup' ? 'first' : 'done';
-  else if (tut === 'first') r.tutorial = 'beginner';
-  else if (tut === 'beginner' && scriptedSpin) r.tutorial = 'done';
+  // (The start ends when the squad can be filled: checked as the knights land, in rollTick.)
+  if (warm && r.spinCount >= BAL.tutorial.maxSpins) r.tutorial = 'done';
   emit({ type: 'spinStart', spin: structuredClone(spin) });
   return spin;
 }
@@ -260,7 +251,8 @@ export function rollTick(state: GameState, rng: Rng, nowMs: number, dt: number, 
   let t = dt;
   for (let guard = 0; guard < 40; guard++) {
     if (!state.roll.current) {
-      // Beginner's luck waits for its moment; until then the tutorial rolls ordinary spins.
+      // The start's quick spins end once there are knights enough for a squad.
+      if (state.roll.tutorial !== 'done' && Object.keys(state.roster).length >= BAL.tutorial.knights) state.roll.tutorial = 'done';
       startSpin(state, rng, nowMs, emit);
     }
     const cur = state.roll.current!;

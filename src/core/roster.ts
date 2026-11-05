@@ -1,9 +1,8 @@
 /**
- * Your knights: you own each knight once (its first pull); every later pull of it is a spare copy
- * you either break down into that knight's shards or sell for gold, and shards (plus gold) level
- * that knight up. Neither ever touches the knight itself: only its spares go.
+ * Your knights: you own each knight once (its first pull); every later pull of it turns straight
+ * into gold (and a better mutation it rolled with sticks to the knight). Gold levels knights up.
  * Also the squad: three slots, one of them yours to control. Empty slots fill themselves with your
- * strongest free knight; anything else is your choice (or Best squad).
+ * strongest free knight; anything else is your choice at the Warden's (or Best squad).
  */
 import { BAL } from './balance';
 import { CLASSES, knightDef, type ClassId } from './knights';
@@ -81,15 +80,9 @@ export function knightStats(state: GameState, id: string): KnightStats {
   if (hasPerk(state, 'rollDancer')) atkCd *= 1.2;
   let dodgeCd = cls.dodgeCd;
   if (hasPerk(state, 'rollDancer')) dodgeCd *= 0.5;
-  const specialCd = skillRollCd(id) * (1 - up.skillCdPct / 100);
+  // (Skills have no cooldown: the next roll starts as one fires. This is only the skill table's "every".)
+  const specialCd = skillRollCd(id);
   return { hp, atk, armor: cls.armor, speed: cls.speed * speedMult, atkCd, range: cls.range, dodgeCd, specialCd, rollTimeMult: 1 - up.rollSpinPct / 100 };
-}
-
-// ------------------------------------------------------------------ spare copies (duplicates)
-
-/** Shards one spare copy breaks down into. */
-export function shardsPerDupe(state: Pick<GameState, 'perks'>, rarity: Rarity): number {
-  return hasPerk(state, 'peasantLevy') && isUnderdog(rarity) ? 2 : 1;
 }
 
 /** Gold for one kill on `floor` before multipliers. */
@@ -144,105 +137,42 @@ export function goldMult(state: GameState): number {
   return (1 + upgradeFx(state).goldPct / 100) * (1 + BAL.rebirth.goldMultPer * state.rebirths);
 }
 
-export function sellValue(state: GameState, id: string): number {
+/** The gold a duplicate of this knight turns into when it's rolled. */
+export function dupeGold(state: GameState, id: string): number {
   const def = knightDef(id);
   let v = BAL.roster.sellKills[def.rarity] * killGold(Math.max(1, state.run.bestFloor)) * goldMult(state);
   if (hasPerk(state, 'pawnShop')) v *= 4;
   if (hasPerk(state, 'fourLeafLitter')) v *= 0.5;
+  if (hasPerk(state, 'peasantLevy') && isUnderdog(def.rarity)) v *= 3;
   return Math.max(1, Math.round(v));
-}
-
-/** How many spare copies a request for `n` of them takes: a whole number, never more than the knight has. */
-function spareCount(rec: KnightRec | undefined, n: number): number {
-  if (!rec) return 0;
-  const k = Math.floor(Math.min(n, rec.dupes));
-  return Number.isFinite(k) && k > 0 ? k : 0;
-}
-
-/**
- * What `n` of a knight's spare copies (all of them by default) would give: the shards breaking them
- * down adds to this knight, or the gold selling them pays. `copies` is how many that really is.
- */
-export function spareYield(state: GameState, id: string, n = Infinity): { copies: number; shards: number; gold: number } {
-  const copies = spareCount(state.roster[id], n);
-  if (copies === 0) return { copies, shards: 0, gold: 0 };
-  return { copies, shards: copies * shardsPerDupe(state, knightDef(id).rarity), gold: sellValue(state, id) * copies };
-}
-
-/**
- * Breaks `n` of a knight's spare copies (all by default) down into its shards. Returns the shards
- * this knight got. The knight itself always stays; with no spares nothing happens.
- */
-export function shardDupes(state: GameState, id: string, n = Infinity): number {
-  const rec = state.roster[id];
-  const k = spareCount(rec, n);
-  if (k <= 0) return 0;
-  const def = knightDef(id);
-  rec.dupes -= k;
-  const per = shardsPerDupe(state, def.rarity);
-  rec.shards += k * per;
-  if (hasPerk(state, 'handMeDowns')) {
-    for (const other of Object.values(state.roster)) if (other.id !== id && knightDef(other.id).cls === def.cls) other.shards += k;
-  }
-  return k * per;
-}
-
-/** Sells `n` of a knight's spare copies (all by default). Returns the gold. The knight itself always stays. */
-export function sellDupes(state: GameState, id: string, n = Infinity): number {
-  const rec = state.roster[id];
-  const k = spareCount(rec, n);
-  if (k <= 0) return 0;
-  rec.dupes -= k;
-  const g = sellValue(state, id) * k;
-  state.gold += g;
-  return g;
-}
-
-export function totalDupes(state: GameState): number {
-  return Object.values(state.roster).reduce((s, r) => s + r.dupes, 0);
-}
-
-/** Every knight that has spare copies (most spares first), with what all of them would give. */
-export function spareList(state: GameState): Array<{ id: string; copies: number; shards: number; gold: number }> {
-  return Object.keys(state.roster)
-    .map((id) => ({ id, ...spareYield(state, id) }))
-    .filter((x) => x.copies > 0)
-    .sort((a, b) => b.copies - a.copies || rarityIndex(knightDef(b.id).rarity) - rarityIndex(knightDef(a.id).rarity));
-}
-
-/** Breaks down every knight's spare copies (the scrap dealer's "all at once", after you confirm). Returns the shards. */
-export function shardAll(state: GameState): number {
-  let n = 0;
-  for (const id of Object.keys(state.roster)) n += shardDupes(state, id);
-  return n;
-}
-
-/** Sells every knight's spare copies (the scrap dealer's "all at once", after you confirm). Returns the gold. */
-export function sellAll(state: GameState): number {
-  let g = 0;
-  for (const id of Object.keys(state.roster)) g += sellDupes(state, id);
-  return g;
 }
 
 // ------------------------------------------------------------------ levels
 
-export function levelCost(level: number): { shards: number; gold: number } {
-  return { shards: level, gold: Math.round(BAL.roster.goldBase * Math.pow(BAL.roster.goldGrowth, level - 1)) };
+/** Gold to take this knight from its level to the next: more each level, more for rarer knights (Hand-Me-Downs: half for Common and Uncommon). */
+export function levelCost(state: GameState, id: string): number {
+  const R = BAL.roster;
+  const rec = state.roster[id];
+  const rarity = knightDef(id).rarity;
+  let g = R.goldBase * Math.pow(R.goldGrowth, (rec?.level ?? 1) - 1) * (1 + R.rarityStep * rarityIndex(rarity));
+  if (hasPerk(state, 'handMeDowns') && isUnderdog(rarity)) g *= 0.5;
+  return Math.max(1, Math.round(g));
+}
+
+export function maxedLevel(state: GameState, id: string): boolean {
+  return (state.roster[id]?.level ?? 0) >= BAL.roster.maxLevel;
 }
 
 export function canLevel(state: GameState, id: string): boolean {
   const rec = state.roster[id];
   if (!rec || rec.level >= BAL.roster.maxLevel) return false;
-  const c = levelCost(rec.level);
-  return rec.shards >= c.shards && state.gold >= c.gold;
+  return state.gold >= levelCost(state, id);
 }
 
 export function levelUp(state: GameState, id: string): boolean {
   if (!canLevel(state, id)) return false;
   const rec = state.roster[id];
-  const c = levelCost(rec.level);
-  rec.shards -= c.shards;
-  state.gold -= c.gold;
+  state.gold -= levelCost(state, id);
   rec.level += 1;
   return true;
 }
@@ -260,7 +190,7 @@ export function isNewKnight(rec: Pick<KnightRec, 'gotAt'> | null | undefined, no
   return age >= 0 && age < NEW_FOR_MS;
 }
 
-export type AddResult = { kind: 'new' } | { kind: 'dupe'; auto: 'keep' | 'shard' | 'sell'; gold: number; shards: number; mutationUp: boolean };
+export type AddResult = { kind: 'new' } | { kind: 'dupe'; gold: number; mutationUp: boolean };
 
 function betterMutation(a: MutationId | null, b: MutationId | null): boolean {
   if (!a) return false;
@@ -269,30 +199,25 @@ function betterMutation(a: MutationId | null, b: MutationId | null): boolean {
 }
 
 /**
- * A rolled knight arrives: a new knight joins (stamped with the wall clock `now`, for its NEW tag),
- * a repeat becomes a spare copy (or goes by its rarity's rule straight away).
+ * A rolled knight arrives: a new knight joins (stamped with the wall clock `now`, for its NEW tag);
+ * a repeat turns straight into gold (a better mutation it rolled with sticks to the knight).
  */
 export function addKnight(state: GameState, id: string, mutation: MutationId | null, now = Date.now()): AddResult {
-  const def = knightDef(id);
   const codex = (state.codex[id] ??= { count: 0, best: null, firstAt: state.playTimeMs });
   codex.count += 1;
   if (betterMutation(mutation, codex.best)) codex.best = mutation;
   const rec = state.roster[id];
   if (!rec) {
-    state.roster[id] = { id, level: 1, shards: 0, dupes: 0, mutation, copies: 1, firstAt: state.playTimeMs, gotAt: now };
+    state.roster[id] = { id, level: 1, mutation, copies: 1, firstAt: state.playTimeMs, gotAt: now };
     fillSquad(state);
     return { kind: 'new' };
   }
   rec.copies += 1;
   const mutationUp = betterMutation(mutation, rec.mutation);
   if (mutationUp) rec.mutation = mutation;
-  rec.dupes += 1;
-  const rule = state.dupeRules[def.rarity];
-  let gold = 0;
-  let shards = 0;
-  if (rule === 'shard') shards = shardDupes(state, id, 1);
-  else if (rule === 'sell') gold = sellDupes(state, id, 1);
-  return { kind: 'dupe', auto: rule, gold, shards, mutationUp };
+  const gold = dupeGold(state, id);
+  state.gold += gold;
+  return { kind: 'dupe', gold, mutationUp };
 }
 
 // ------------------------------------------------------------------ squad

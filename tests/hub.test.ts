@@ -48,10 +48,11 @@ describe('hub', () => {
     for (const l of s.lights) expect(l.intensity).toBeLessThanOrEqual(1);
   });
 
-  it('has every station, with a keeper (or a board), a sign and a greeting', () => {
+  it('has one keeper per job (or a board), each with a sign and a greeting', () => {
     const s = hubScene();
     const ids = s.stations.map((st) => st.id).sort();
-    expect(ids).toEqual(['altar', 'gate', 'perks', 'quests', 'rebirth', 'scrap', 'smith', 'squad', 'upgrades']);
+    // (No quartermaster, smith or scrap dealer: the warden picks and levels the squad, duplicates turn into gold.)
+    expect(ids).toEqual(['altar', 'gate', 'perks', 'quests', 'rebirth', 'upgrades']);
     for (const st of s.stations) {
       expect(st.name.length).toBeGreaterThan(0);
       expect(st.job.length).toBeGreaterThan(0);

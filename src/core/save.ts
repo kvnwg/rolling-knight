@@ -5,7 +5,9 @@
 import { cleanDeck, isDesign, shuffleDeck } from './deck';
 import { newGame } from './newGame';
 import { Rng } from './rng';
-import { SAVE_VERSION, type GameState } from './state';
+import { KNIGHTS_BY_ID } from './knights';
+import { dupeGold } from './roster';
+import { SAVE_VERSION, type GameState, type KnightRec } from './state';
 import { sanitizeUpgrades } from './upgrades';
 
 export const SAVE_KEY = 'rolling-knight-save';
@@ -31,7 +33,6 @@ export function mend(raw: unknown): GameState {
   out.stats = { ...fresh.stats, ...(s.stats ?? {}) };
   out.settings = { ...fresh.settings, ...(s.settings ?? {}) };
   out.seen = { ...fresh.seen, ...(s.seen ?? {}) };
-  out.dupeRules = { ...fresh.dupeRules, ...(s.dupeRules ?? {}) };
   if (!out.roster || typeof out.roster !== 'object') out.roster = {};
   // Older saves flagged knights NEW until you opened each one; NEW now lasts 30 s from `gotAt`
   // (which those knights don't have), so the old flag goes and nothing from them shows NEW.
@@ -52,6 +53,7 @@ export function mend(raw: unknown): GameState {
   out.version = SAVE_VERSION;
   // Upgrade tiers within each line's range (the map was rebuilt: some lines have fewer tiers now).
   sanitizeUpgrades(out);
+  cashInSpares(out);
   return out;
 }
 
@@ -96,4 +98,25 @@ export function saveGame(state: GameState): void {
 
 export function clearSave(): void {
   storage()?.removeItem(SAVE_KEY);
+}
+
+/**
+ * Shards and spare copies are gone (duplicates turn into gold as they're rolled): an older save's
+ * spare copies pay what a duplicate pays now, and its shards half that each, into the purse.
+ */
+function cashInSpares(out: GameState): void {
+  const raw = out as GameState & { dupeRules?: unknown };
+  delete raw.dupeRules;
+  for (const rec of Object.values(out.roster)) {
+    if (!rec || typeof rec !== 'object') continue;
+    const r = rec as KnightRec & { dupes?: unknown; shards?: unknown };
+    const dupes = Math.max(0, Math.floor(Number(r.dupes) || 0));
+    const shards = Math.max(0, Math.floor(Number(r.shards) || 0));
+    if ((dupes || shards) && KNIGHTS_BY_ID.has(r.id)) {
+      const each = dupeGold(out, r.id);
+      out.gold += dupes * each + Math.round(shards * each * 0.5);
+    }
+    delete r.dupes;
+    delete r.shards;
+  }
 }

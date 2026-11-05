@@ -20,7 +20,7 @@ export interface RevealItem {
   drama: RollDrama;
   isNew: boolean;
   mult: number;
-  scripted?: 'warmup' | 'first' | 'beginner';
+  scripted?: 'warmup';
 }
 
 const DARK_MS: Record<RollDrama, number> = { big: 700, huge: 1300, insane: 2000, hyper: 2400 };
@@ -68,7 +68,7 @@ export function Reveal({ item, onDone }: { item: RevealItem; onDone: () => void 
       {phase !== 'dark' && <div className="rays" />}
       {phase !== 'dark' && (
         <>
-          <div className="kick">{item.scripted === 'beginner' ? "BEGINNER'S LUCK!" : item.scripted === 'first' ? 'YOUR FIRST LEGEND!' : KICK[item.drama]}</div>
+          <div className="kick">{KICK[item.drama]}</div>
           <div className="hero">
             <KnightSprite id={item.knightId} mutation={item.mutation} scale={7} />
           </div>
@@ -80,7 +80,6 @@ export function Reveal({ item, onDone }: { item: RevealItem; onDone: () => void 
           <div className="name">{def.name}</div>
           <div className="odds">{oneIn(count)}</div>
           {item.mult > 1 && <div className="kick" style={{ color: '#8af07a' }}>luck tokens ×{item.mult}</div>}
-          {item.scripted === 'beginner' && <div className="muted" style={{ position: 'relative', fontSize: 'calc(4.5 * var(--u))' }}>A scripted roll to start you off: real ones are this rare.</div>}
         </>
       )}
       {phase === 'done' && <div className="tapnote">Tap to continue</div>}

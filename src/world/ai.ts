@@ -208,16 +208,15 @@ function fightFoes(w: World, h: Unit): Unit[] {
 }
 
 /**
- * Skill rolls: once the cooldown is up and a fight is on, roll at a good moment for the role (what
- * lands is up to the dice; when to roll isn't). The longer it waits, the less it takes. A roll fires
- * its skill as it lands.
+ * Skill rolls: no cooldown, so while a fight is on a knight is always rolling. The moment a roll
+ * lands and its skill fires, the next one starts (roll, fire, roll, fire).
  */
-function autoRoll(w: World, h: Unit, target: Unit | null, foes: readonly Unit[], dt: number): void {
+function autoRoll(w: World, h: Unit, _target: Unit | null, foes: readonly Unit[], dt: number): void {
   const ai = h.ai!;
-  if (h.specialT! > 0 || h.skillRoll || !foes.length) ai.rollWait = 0;
+  if (h.skillRoll || !foes.length) ai.rollWait = 0;
   else {
     ai.rollWait = (ai.rollWait ?? 0) + dt;
-    if (goodMomentToRoll(w, h, target, foes, ai.rollWait) && heroSpecial(w, h, false)) ai.rollWait = 0;
+    if (heroSpecial(w, h, false)) ai.rollWait = 0;
   }
 }
 

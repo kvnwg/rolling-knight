@@ -174,8 +174,12 @@ function edgeDist(x: number, y: number): number {
 
 // ------------------------------------------------------------------ the keepers
 
-/** The keepers: where each stands (or sits), where you stand to talk, and what says what they do. */
-/** The keepers: where each stands (or sits), where you stand to talk, and what says what they do. */
+/**
+ * The keepers: where each stands (or sits), where you stand to talk, and what says what they do.
+ * One job each: the Oracle summons, the board has jobs, the tinker sells upgrades, the sage perks,
+ * the sister rebirth, and the warden picks who goes down and makes them stronger. (The junk dealer's
+ * cabinet, the quartermaster's table and the smith's anvil stay as the court's furniture.)
+ */
 const STATIONS: HubStation[] = [
   {
     id: 'altar', name: 'Oracle Vesper', job: 'The Gilded Reel: summon knights',
@@ -190,22 +194,10 @@ const STATIONS: HubStation[] = [
     sign: 'The board by the door: chalked jobs, pinned notes, a gold exclamation mark over it.',
   },
   {
-    id: 'scrap', name: 'Rusty Mags', job: 'Scrap: break down or sell duplicates',
-    greeting: 'Doubles? Spares? Bring them here. I\'ll break them into shards or pay you gold.',
-    x: 70, y: FRONT + 9, dir: 1, view: 'down', def: HUB_CAST.scrap, pose: 'stand', tool: 'tongs', talk: { x: 73, y: FRONT + 26 },
-    sign: 'The lit curio cabinet of junk in the shop\'s left wing.',
-  },
-  {
     id: 'upgrades', name: 'Tinker Pell', job: 'Upgrades: spend gold on better everything',
     greeting: 'Faster reels, luckier spins, deeper pockets. All for a little gold. Have a look at the board.',
     x: 186, y: FRONT + 9, dir: 1, view: 'down', def: HUB_CAST.upgrades, pose: 'stand', tool: 'wrench', talk: { x: 184, y: FRONT + 26 },
     sign: 'The slate of painted upgrades over his shelves of bottles and gadgets in the right wing.',
-  },
-  {
-    id: 'squad', name: 'Quartermaster Hilde', job: 'Your squad: pick three and who leads',
-    greeting: 'Three to a squad, dear. Pick who fights and who leads, and I\'ll see them fed and shod.',
-    x: 81, y: 189, dir: 1, view: 'down', def: HUB_CAST.squad, pose: 'sit', talk: { x: 105, y: 194 },
-    sign: 'Her round table, the ledger open on it by a candle, the traveller across from her.',
   },
   {
     id: 'perks', name: 'Sage Orrin', job: 'Sigils: perks for the reborn',
@@ -220,14 +212,8 @@ const STATIONS: HubStation[] = [
     sign: 'The little candle shrine with the rose-gold rising sun, potted flowers round it.',
   },
   {
-    id: 'smith', name: 'Brannoc the Smith', job: 'The smithy: level up and reforge knights',
-    greeting: 'Shards and gold, and I\'ll beat any knight into something better. Mind the sparks.',
-    x: 182, y: 228, dir: -1, view: 'side', def: HUB_CAST.smith, pose: 'stand', tool: 'hammer', talk: { x: 162, y: 216 },
-    sign: 'The anvil on its stump and the brazier of glowing coals in the nook, crossed hammers over them.',
-  },
-  {
-    id: 'gate', name: 'Warden Tobb', job: 'The stairs down: into the dungeon',
-    greeting: 'Stairs go down, monsters come up. Ready when you are.',
+    id: 'gate', name: 'Warden Tobb', job: 'Your squad: who goes down, and making them stronger',
+    greeting: 'Stairs go down, monsters come up. Pick your three, toughen them up, and down you go.',
     x: 165, y: 251, dir: -1, view: 'side', def: HUB_CAST.gate, pose: 'stand', talk: { x: 141, y: 250 },
     sign: 'The dark stone steps at the foot of the court, lanterns on their posts, the violet glow below.',
   },

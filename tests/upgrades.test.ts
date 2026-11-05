@@ -386,18 +386,14 @@ describe('Quick Roll', () => {
     expect(tier(s, 'quickRoll')).toBe(5);
   });
 
-  it('per tier: the roll spins 12% shorter and the cooldown is 6% shorter', () => {
-    expect(QUICK_ROLL).toEqual({ spinPct: 12, cdPct: 6 });
-    for (let t = 0; t <= 5; t++) {
-      const fx = upgradeFx(game({ quickRoll: t }));
-      expect(fx.rollSpinPct).toBe(12 * t);
-      expect(fx.skillCdPct).toBe(6 * t);
-    }
-    expect(effectAt(game(), 'quickRoll', 0)).toBe('-0% spin, -0% cooldown');
-    expect(effectAt(game(), 'quickRoll', 3)).toBe('-36% spin, -18% cooldown');
+  it('per tier: the roll spins 12% shorter (there is no cooldown to shorten)', () => {
+    expect(QUICK_ROLL).toEqual({ spinPct: 12 });
+    for (let t = 0; t <= 5; t++) expect(upgradeFx(game({ quickRoll: t })).rollSpinPct).toBe(12 * t);
+    expect(effectAt(game(), 'quickRoll', 0)).toBe('-0% roll time');
+    expect(effectAt(game(), 'quickRoll', 3)).toBe('-36% roll time');
   });
 
-  it("shortens every knight's skill cooldown and roll spin in its stats, and nothing else", () => {
+  it("shortens every knight's roll spin in its stats, and nothing else", () => {
     for (const cls of ['guardian', 'blade', 'ranger', 'cleric', 'arcanist', 'lancer'] as const) {
       const id = knightId('epic', cls);
       const plain = game();
@@ -408,7 +404,7 @@ describe('Quick Roll', () => {
       const b = knightStats(quick, id);
       expect(a.specialCd).toBeCloseTo(CLASSES[cls].specialCd, 9);
       expect(a.rollTimeMult).toBe(1);
-      expect(b.specialCd).toBeCloseTo(CLASSES[cls].specialCd * 0.7, 9);
+      expect(b.specialCd).toBeCloseTo(a.specialCd, 9);
       expect(b.rollTimeMult).toBeCloseTo(0.4, 9);
       expect(b.atk).toBeCloseTo(a.atk, 9);
       expect(b.hp).toBeCloseTo(a.hp, 9);
@@ -416,7 +412,7 @@ describe('Quick Roll', () => {
     }
   });
 
-  it('lands a skill roll sooner in the fight, and starts the shorter cooldown', () => {
+  it('lands a skill roll sooner in the fight, and leaves no cooldown behind it', () => {
     const id = knightId('rare', 'blade');
     const spin = (ups: Partial<Record<UpgradeId, number>>) => {
       const w = world([id], 7, ups);
@@ -441,10 +437,9 @@ describe('Quick Roll', () => {
     expect(quick.dur).toBeCloseTo(ROLL_TIME * 0.4, 9);
     expect(quick.took).toBeLessThan(ROLL_TIME * 0.4 + 0.02);
     expect(quick.took).toBeLessThan(plain.took - 0.3);
-    expect(quick.cd).toBeCloseTo(plain.cd * 0.7, 9);
-    // The cooldown that starts as it lands is the shorter one.
-    expect(quick.left).toBeLessThanOrEqual(quick.cd + 1e-9);
-    expect(quick.left).toBeGreaterThan(quick.cd - 0.05);
+    // No cooldown starts as it lands: the next roll can start straight away.
+    expect(plain.left).toBe(0);
+    expect(quick.left).toBe(0);
     // A unit without the field spins for ROLL_TIME.
     expect(rollTime({})).toBe(ROLL_TIME);
     expect(rollTime({ rollTimeMult: 0.76 })).toBeCloseTo(ROLL_TIME * 0.76, 9);
@@ -465,7 +460,7 @@ describe('Quick Roll', () => {
     g.syncSquad();
     w.heroes.forEach((h, i) => {
       expect(h.rollTimeMult).toBeCloseTo(0.76, 9);
-      expect(h.specialCd!).toBeCloseTo(before[i] * 0.88, 6);
+      expect(h.specialCd!).toBeCloseTo(before[i], 6);
     });
   });
 });

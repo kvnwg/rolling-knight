@@ -238,7 +238,7 @@ export const UPGRADES: UpgradeDef[] = [
   {
     id: 'quickRoll', name: 'Quick Roll', kind: 'squad', group: 'squad', max: 5, cost: 900, growth: 3.4, icon: 'quickRoll', path: 'ne se ne se ne',
     requires: { id: 'swiftness', tier: 1 },
-    desc: "Your knights' skill rolls spin faster and come round again sooner.",
+    desc: "Your knights' skill rolls spin faster, so skills come out quicker.",
     text: () => 'Skill rolls spin 12% faster, cooldown 6% shorter',
   },
   // ---------------------------------------------------------------- chance (west and south-west of Whetstone I)
@@ -381,7 +381,7 @@ export function sanitizeUpgrades(state: Pick<GameState, 'upgrades'>): void {
 }
 
 /** Quick Roll, per tier: a skill roll spins this much shorter, and its cooldown this much shorter (percent). */
-export const QUICK_ROLL = { spinPct: 12, cdPct: 6 } as const;
+export const QUICK_ROLL = { spinPct: 12 } as const;
 
 /** Everything the altar, fortune and squad lines do, as numbers (the chance lines: chance.ts). */
 export function upgradeFx(state: Pick<GameState, 'upgrades'>) {
@@ -403,7 +403,6 @@ export function upgradeFx(state: Pick<GameState, 'upgrades'>) {
     speedPct: 6 * t('swiftness'),
     /** Quick Roll: how much shorter a skill roll spins, and how much shorter its cooldown, in percent. */
     rollSpinPct: QUICK_ROLL.spinPct * t('quickRoll'),
-    skillCdPct: QUICK_ROLL.cdPct * t('quickRoll'),
     offlineEff: 0.4 * t('offline'),
   };
 }

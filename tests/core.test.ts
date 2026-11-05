@@ -7,7 +7,8 @@ import { buyPerk } from '../src/core/perks';
 import { RARITIES, RARITY_ODDS, RARITY_STAT, rarityAtLeast, rarityChances, rollRarity } from '../src/core/rarity';
 import { Rng } from '../src/core/rng';
 import { chainFloor, comboSteps, performSpin, reelCount, rollTokens, spinCycle, tokenMult } from '../src/core/roller';
-import { addKnight, knightPower, levelMult, levelUp, sellDupes, shardDupes } from '../src/core/roster';
+import { addKnight, dupeGold, knightPower, levelCost, levelMult, levelUp } from '../src/core/roster';
+import { mend } from '../src/core/save';
 import type { GameState } from '../src/core/state';
 
 function done(seed = 1): GameState {
@@ -95,20 +96,19 @@ describe('reels', () => {
     expect(chained / any).toBeLessThan(0.55);
   });
 
-  it('runs the tutorial: Common, Uncommon, Rare, then a Legendary', () => {
+  it('starts on ordinary rolls: quick spins until there is a squad, no scripted finds', () => {
     const s = newGame(5);
     const rng = new Rng(5);
-    const got = [0, 1, 2, 3].map(() => performSpin(s, rng, Date.now())[0]);
-    expect(got.map((r) => r.rarity)).toEqual(['common', 'uncommon', 'rare', 'legendary']);
+    const got: string[] = [];
+    for (let i = 0; i < 12 && s.roll.tutorial !== 'done'; i++) {
+      got.push(...performSpin(s, rng, Date.now()).map((r) => r.rarity));
+      // (The start ends as the knights land: rollTick checks the roster.)
+      if (Object.keys(s.roster).length >= BAL.tutorial.knights) s.roll.tutorial = 'done';
+    }
+    expect(Object.keys(s.roster).length).toBeGreaterThanOrEqual(BAL.tutorial.knights);
     expect(s.squad.filter(Boolean).length).toBe(3);
-    expect(s.roll.tutorial).toBe('beginner');
-    // Beginner's luck: a x3 then x5 chain into an Exalted, when its moment comes.
-    s.roll.beginnerAt = 0;
-    const b = performSpin(s, rng, Date.now())[0];
-    expect(b.tokens).toEqual([3, 5]);
-    expect(b.rarity).toBe('exalted');
-    expect(b.scripted).toBe('beginner');
-    expect(s.roll.tutorial).toBe('done');
+    // Ordinary low rolls: nothing above Rare at the start's luck.
+    for (const r of got) expect(rarityAtLeast(r as never, 'epic'), r).toBe(false);
   });
 
   it('guarantees an Epic after 40 dry rolls', () => {
@@ -140,31 +140,47 @@ describe('roster', () => {
     expect(RARITY_STAT.absolute).toBeGreaterThan(RARITY_STAT.primordial * 3);
   });
 
-  it('turns repeats into duplicates you can shard or sell', () => {
+  it('turns a repeat straight into gold (a better mutation it rolled with sticks)', () => {
     const s = done();
     const id = knightId('common', 'blade');
     expect(addKnight(s, id, null).kind).toBe('new');
-    addKnight(s, id, null);
-    addKnight(s, id, null);
-    expect(s.roster[id].dupes).toBe(2);
-    expect(shardDupes(s, id, 1)).toBe(1);
-    expect(s.roster[id].shards).toBe(1);
-    const g = sellDupes(s, id);
-    expect(g).toBeGreaterThan(0);
-    expect(s.gold).toBe(g);
-    expect(s.roster[id].dupes).toBe(0);
+    const each = dupeGold(s, id);
+    const r = addKnight(s, id, 'gilded');
+    expect(r).toEqual({ kind: 'dupe', gold: each, mutationUp: true });
+    expect(s.gold).toBe(each);
+    expect(s.roster[id].mutation).toBe('gilded');
+    expect(s.roster[id].copies).toBe(2);
   });
 
-  it('levels up with shards and gold', () => {
+  it('levels up with gold alone, more for rarer knights', () => {
     const s = done();
     const id = knightId('rare', 'ranger');
     addKnight(s, id, null);
-    s.roster[id].shards = 10;
     s.gold = 1e6;
     const p = knightPower(s, s.roster[id]);
     expect(levelUp(s, id)).toBe(true);
     expect(s.roster[id].level).toBe(2);
     expect(knightPower(s, s.roster[id])).toBeGreaterThan(p);
+    addKnight(s, knightId('common', 'ranger'), null);
+    addKnight(s, knightId('legendary', 'ranger'), null);
+    expect(levelCost(s, knightId('legendary', 'ranger'))).toBeGreaterThan(levelCost(s, knightId('common', 'ranger')));
+    s.gold = 0;
+    expect(levelUp(s, id)).toBe(false);
+  });
+
+  it("cashes an old save's spare copies and shards in as gold", () => {
+    const old = done();
+    const id = knightId('epic', 'cleric');
+    addKnight(old, id, null);
+    const raw = JSON.parse(JSON.stringify(old));
+    raw.roster[id].dupes = 3;
+    raw.roster[id].shards = 4;
+    raw.dupeRules = { common: 'sell' };
+    const s = mend(raw);
+    expect(s.gold).toBe(3 * dupeGold(s, id) + Math.round(4 * dupeGold(s, id) * 0.5));
+    expect('dupes' in s.roster[id]).toBe(false);
+    expect('shards' in s.roster[id]).toBe(false);
+    expect('dupeRules' in s).toBe(false);
   });
 
   it('Humble Beginnings makes Common level-ups 3x as effective', () => {

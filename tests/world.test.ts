@@ -227,6 +227,8 @@ describe('the squad in a fight', () => {
   it('your knight attacks only while you hold the attack, toward your aim', () => {
     const w = world([knightId('rare', 'ranger')]);
     const h = w.heroes[0];
+    // (Its skill rolls kept out of it: this is about the attack.)
+    h.specialT = 99;
     const m = w.mobs.find((x) => !x.dead)!;
     // The mob steps up close in the open start room.
     m.x = h.x + 30;

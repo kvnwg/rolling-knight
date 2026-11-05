@@ -4,17 +4,17 @@ A top-down (3/4 view) pixel action roguelite with a rolling game on top, in the 
 Legend. A free Summoning Altar rolls knights forever; you field a squad of three in endless,
 procedurally generated dungeons (hamlets, a farm, dark forests, tundra, a dungeon keep, crypts, bogs, desert ruins,
 graveyards, lava caves, crystal grottoes, moonlit shrines), control one knight and let the other two
-fight by their class; when its cooldown is up in a fight, each knight rolls a random skill from its
-class's list and fires it. Between dives
+fight by their class; in a fight each knight keeps rolling a random skill from its class's list,
+firing it and rolling the next at once (no cooldowns). Between dives
 you walk round the hub, a lamplit square before the Gilded Reel, where each keeper runs one counter:
-the Oracle's altar, the smith, the junk dealer, the quartermaster, the tinker's upgrades on two tabs,
-Luck and Combat (with chance upgrades like Ricochet and Double or Nothing, and Quick Roll for faster
-skill rolls), the sage, the rebirth shrine, the notice board, and the warden by the steps down: walk
-down them to dive. Talk to a keeper and their screen opens with them big at their counter, lamplit
+the Oracle's altar (summons, the odds and the Codex), the tinker's upgrades on two tabs, Luck and
+Combat (with chance upgrades like Ricochet and Double or Nothing, and Quick Roll for faster skill
+rolls), the sage's perks, the rebirth shrine, the notice board, and Warden Tobb by the steps down,
+who picks the three you send down, levels them up and reforges them: one job each, nothing twice. Talk to a keeper and their screen opens with them big at their counter, lamplit
 among the things of their trade, and their wares below as cards on beige paper: a picture, a level,
 a number or two and a price, the details a tap away. Above all of them, at 1 in 2.5 billion, sits the Absolute tier and its one knight: Kevin, a
-black-haired normal guy and the strongest in the game by far. Duplicates become shards or gold;
-shards level your knights. Rebirth
+black-haired normal guy and the strongest in the game by far. A knight you already have turns
+straight into gold; gold levels your knights. You start on ordinary rolls: no scripted finds. Rebirth
 for permanent luck and power; perks from the first rebirth change how a run plays. Folk on the floors
 keep a set-up of their own off the fighting (a market stall, a tent by a campfire, a candlelit shrine)
 and hand out jobs, and one of them may be a demon in disguise.
@@ -84,7 +84,7 @@ recording: [`docs/SOUNDS.md`](docs/SOUNDS.md).
   seals for difficulty. The keepers' screens (`src/ui/keeper/`) are lighter: beige paper in a dark
   brown border with torn corners, green tabs and buttons, slots pressed into the paper and dark brown
   pixel text. Each counter says in a line what it's for, every number says what it is ("Luck x1.20",
-  "Shards 4/10"), every button says what it does ("LEVEL UP 1.2K", "SELL 3 +57"), and an offer's
+  "Shards 4/10"), every button says what it does ("LEVEL UP 1.2K", "ADD TO SQUAD"), and an offer's
   whole story is a tap away. On a phone the text is bigger (about 130 art pixels across the screen
   for the UI) and the categories run across the top so the cards get two columns. Each keeper's scene across the top is
   painted and lit in code (`src/render/art/keepers/`: the keeper's bust from their hub look, their
@@ -142,9 +142,10 @@ as usual). `?fresh` starts a new game. The game is on
 npm test
 ```
 
-291 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
-timing, extra reels, the tutorial's scripted rolls, bad-luck protection, Lucky Spins, duplicates,
-shards, selling, levels and reforging, Humble Beginnings' 3x, rebirth; every biome's floors fully
+275 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
+timing, extra reels, the start's ordinary quick spins, bad-luck protection, Lucky Spins, duplicates
+turning into gold, gold-only levels and reforging, old saves' spares cashed in, Humble Beginnings' 3x,
+rebirth; every biome's floors fully
 connected with spawns reachable and deterministic by seed, mob and boss design, a squad clearing a
 floor on Auto, auto attacks, dodge invulnerability, skill rolls and their odds, Rewind, the balance
 curve and the first floors' edge; how monsters fight: every kind with a lunge or a gun, their
@@ -174,7 +175,7 @@ Checks the music files too: each one's length and loudness (with ffmpeg installe
 npm run sim -- --minutes 40
 ```
 
-The real game logic on Auto with a bot that shards, levels, buys upgrades and perks and rebirths.
+The real game logic on Auto with a bot that levels, buys upgrades and perks and rebirths.
 Current result over seeds 1 to 8 (`--seed N`): floor 5 at about 4 minutes (3 to 5), floor 10 at about
 13 (10 to 19), the first rebirth at about 24 (15 to 31; one seed of the eight not yet by 40 minutes),
 with three or so wipes (none on floors 1 to 5) and about 160 perfect rolls in 40 minutes.

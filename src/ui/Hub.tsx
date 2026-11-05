@@ -14,7 +14,7 @@ import { sfx } from '../audio/sfx';
 import { knightDef } from '../core/knights';
 import { CHALLENGE, floorDifficulty, knightRating, squadPower } from '../core/power';
 import { RARITY_COLOR, RARITY_NAME } from '../core/rarity';
-import { bestSquad, rankedKnights } from '../core/roster';
+import { rankedKnights } from '../core/roster';
 import type { Game } from '../game';
 import { npcFrame } from '../render/art/npcs';
 import { toCanvas } from '../render/art/draw';
@@ -23,9 +23,7 @@ import { type HubStation, type StationId } from '../world/hubWorld';
 import { Chunky, HeroArt, HeroLive } from './common';
 import { AltarReels } from './fx/AltarReels';
 import { fmt } from './format';
-import { HeroCard, HeroesPanel } from './panels';
-import { SmithShop, ScrapShop } from './keeper/KnightShops';
-import { BoardShop, GateShop, OracleShop, QuartermasterShop, SageShop, ShrineShop } from './keeper/Shops';
+import { BoardShop, OracleShop, SageShop, ShrineShop, WardenShop } from './keeper/Shops';
 import { TinkerShop } from './keeper/TinkerShop';
 import { Px, type IconName } from './px';
 import { KNIGHT_PIC_H, KNIGHT_PIC_W } from './sprites';
@@ -142,10 +140,6 @@ export function StationSheet({ game, station, onOpen, onClose }: { game: Game; s
       return <OracleShop {...p} onOpen={onOpen} />;
     case 'upgrades':
       return <TinkerShop {...p} />;
-    case 'smith':
-      return <SmithShop {...p} onOpen={onOpen} />;
-    case 'scrap':
-      return <ScrapShop {...p} onOpen={onOpen} />;
     case 'perks':
       return <SageShop {...p} />;
     case 'rebirth':
@@ -153,33 +147,12 @@ export function StationSheet({ game, station, onOpen, onClose }: { game: Game; s
     case 'quests':
       return <BoardShop {...p} />;
     case 'gate':
-      return <GateShop {...p} />;
-    case 'squad':
-      return (
-        <QuartermasterShop {...p}>
-          <SquadPanel game={game} onOpen={onOpen} />
-        </QuartermasterShop>
-      );
+      return <WardenShop {...p} onOpen={onOpen} />;
+    // (The quartermaster, the smith and the scrap dealer are gone: the Warden does their jobs, and
+    // duplicates turn into gold as they're rolled.)
+    default:
+      return null;
   }
-}
-
-/** The quartermaster's roster: who's in the squad and who leads, then every knight (panels.tsx). */
-function SquadPanel({ game, onOpen }: { game: Game; onOpen: (id: string) => void }) {
-  const s = game.state;
-  return (
-    <>
-      <div className="spread">
-        <span className="section-title outlined">Your squad</span>
-        <button className="btn small" onClick={() => (bestSquad(s), game.syncHub(true), uiSound('equip', 3))} title="Put your 3 strongest knights in the squad">
-          <Px icon="star" size="sm" />
-          Best squad
-        </button>
-      </div>
-      <div className="squad-row">{s.squad.map((id, slot) => (id ? <HeroCard key={slot} game={game} id={id} onOpen={onOpen} /> : null))}</div>
-      <span className="section-title outlined">All your knights</span>
-      <HeroesPanel game={game} onOpen={onOpen} />
-    </>
-  );
 }
 
 // ------------------------------------------------------------------ who you play as

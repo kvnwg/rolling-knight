@@ -52,9 +52,6 @@ export function teasePlan(spin: Spin): Tease | null {
       reel = i;
     }
   }
-  const scripted = spin.reels[0]?.scripted;
-  const tutorialFind = scripted === 'first' || scripted === 'beginner';
-  if (tutorialFind) reel = 0;
   const r = spin.reels[reel];
   const tier = rarityIndex(r.rarity);
   if (tier < 1) return null;
@@ -62,7 +59,7 @@ export function teasePlan(spin: Spin): Tease | null {
   const u = hash(spin.id * 31 + reel * 7 + 7);
   const u2 = hash(spin.id * 53 + reel * 5 + 11);
   let level: TeaseLevel;
-  if (r.drama || tutorialFind) level = 3;
+  if (r.drama) level = 3;
   else if (spin.tease >= 2) level = 2;
   else if (spin.tease >= 1) level = 1;
   else if (odds >= 6 && u < HOPE_CHANCE) level = 0;

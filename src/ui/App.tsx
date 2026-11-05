@@ -20,7 +20,7 @@ import { Chunky, HeroArt, type Grad } from './common';
 import { DungeonHud } from './DungeonHud';
 import { fmt, secs } from './format';
 import { CharacterSelect, HubHud, StationSheet } from './Hub';
-import { KnightTile, SpareTag } from './KnightCard';
+import { KnightTile } from './KnightCard';
 import { HeroDetail, LuckSheet, SettingsSheet } from './panels';
 import { hubLayout, type HubStation } from '../world/hubWorld';
 import type { Npc } from '../world/npcs';
@@ -143,7 +143,7 @@ export function App() {
       switch (e.type) {
         case 'land': {
           const def = knightDef(e.knightId);
-          if (e.drama || e.scripted === 'first' || e.scripted === 'beginner') {
+          if (e.drama) {
             setReveals((r) => [...r, { knightId: e.knightId, rarity: e.rarity, mutation: e.mutation, oneIn: e.oneIn, drama: e.drama ?? 'big', isNew: e.result.kind === 'new', mult: e.mult, scripted: e.scripted }]);
           } else if (e.result.kind === 'new') {
             toast({ text: def.name, color: RARITY_COLOR[e.rarity], knightId: e.knightId });
@@ -385,7 +385,7 @@ export function App() {
                     rarity={k.rarity}
                     name={knightDef(k.knightId).name}
                     top={k.isNew ? <span className="ktag new">NEW</span> : undefined}
-                    tl={k.isNew ? undefined : <SpareTag />}
+                    tl={k.isNew ? undefined : <span className="ktag spare num" title="Already yours: it turned into gold">GOLD</span>}
                   />
                 ))}
               </div>

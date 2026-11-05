@@ -13,7 +13,7 @@ import { perksOpen } from './core/perks';
 import { floorDifficulty, squadPower, type Difficulty } from './core/power';
 import { Rng } from './core/rng';
 import { rollTick } from './core/roller';
-import { bestSquad, fillSquad, goldMult, killGold, knightStats } from './core/roster';
+import { fillSquad, goldMult, killGold, knightStats } from './core/roster';
 import { clearSave, loadGame, saveGame } from './core/save';
 import type { GameState } from './core/state';
 import { CAMP_BIOME, biomeForFloor, isBossFloor, type Biome } from './world/biomes';
@@ -95,14 +95,6 @@ export class Game {
       this.version++;
       this.recent.unshift({ knightId: e.knightId, mutation: e.mutation, oneIn: e.oneIn, isNew: e.result.kind === 'new', mult: e.mult, at: Date.now() });
       if (this.recent.length > 30) this.recent.length = 30;
-      // The tutorial's two big finds go straight into the squad, unless you're mid-fight: the squad
-      // only changes at the hub (leave the dungeon, or fall, to bring new knights along).
-      if ((e.scripted === 'first' || e.scripted === 'beginner') && !this.inDungeon) {
-        bestSquad(this.state);
-        this.hubKey = '';
-      } else if (e.scripted === 'beginner' && this.inDungeon) {
-        this.emit({ type: 'toast', text: 'A new knight waits at the hub. Head back to bring them along!', tone: 'gold' });
-      }
     }
     for (const fn of this.listeners) fn(e);
   };
@@ -170,8 +162,6 @@ export class Game {
     s.controlled = this.world.controlled;
     this.fade = 1;
     this.fadeDir = -1;
-    // The tutorial's beginner's luck comes about 45 s after the first floor opens.
-    if (s.roll.tutorial === 'beginner' && s.roll.beginnerAt === null) s.roll.beginnerAt = s.playTimeMs + BAL.tutorial.beginnerAfterSeconds * 1000;
     // Saved now, so the card just dealt stays dealt even if the game closes straight away.
     saveGame(s);
     this.emit({ type: 'floorStart', floor, biome: biome.name, boss });

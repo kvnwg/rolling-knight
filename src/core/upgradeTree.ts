@@ -258,7 +258,7 @@ export function effectAt(state: GameState, id: UpgradeId, level: number): string
     case 'swiftness':
       return `+${fx.speedPct}% speed`;
     case 'quickRoll':
-      return `-${fx.rollSpinPct}% spin, -${fx.skillCdPct}% cooldown`;
+      return `-${fx.rollSpinPct}% roll time`;
     case 'giantSlayer':
       return `+${pctText(ch.giantSlayer)} vs elites and bosses`;
     case 'lifesteal':

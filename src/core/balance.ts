@@ -60,22 +60,23 @@ export const BAL = {
     reels: { nearMissChance: 0.65, cellsPerSecond: 13 },
   },
   offline: { capHours: 8, efficiency: 0.75, perTier: 0.4, rollSlowdown: 10, maxRolls: 1000, keepRarity: 'epic' as const, minAwaySeconds: 60 },
+  /**
+   * The start: ordinary rolls (no scripted finds), just quick ones (`cycle` seconds) until you have
+   * `knights` knights for a squad, at most `maxSpins` of them.
+   */
   tutorial: {
-    warmup: [
-      { rarity: 'common', cls: 'guardian' },
-      { rarity: 'uncommon', cls: 'ranger' },
-      { rarity: 'rare', cls: 'cleric' },
-    ] as const,
-    firstFind: { rarity: 'legendary', cls: 'blade' } as const,
-    /** Beginner's luck: about 45 s after the first floor starts, a x3 then x5 chain into an Exalted Ranger. */
-    beginnerAfterSeconds: 45,
-    beginnerTokens: [3, 5],
-    beginnerFind: { rarity: 'exalted', cls: 'ranger' } as const,
+    cycle: 1.6,
+    knights: 3,
+    maxSpins: 10,
   },
   roster: {
-    /** Shards needed for level L -> L+1: L shards. Gold: goldBase * goldGrowth^(L-1). */
-    goldBase: 20,
+    /**
+     * Gold for level L -> L+1: goldBase * goldGrowth^(L-1), times (1 + rarityStep * the rarity's
+     * index) so a rare knight costs more to raise than a common one. Gold is all it takes.
+     */
+    goldBase: 40,
     goldGrowth: 1.32,
+    rarityStep: 0.5,
     maxLevel: 60,
     /** Each level adds this share of the knight's base stats (additive). */
     levelPct: 0.1,
@@ -85,7 +86,7 @@ export const BAL = {
      * knights, and `growth` times more every time that knight is reforged.
      */
     reforge: { kills: 40, rarityStep: 0.6, growth: 1.35, oddsMult: 6 },
-    /** Gold for selling a duplicate, in kills' worth of gold at your best floor. */
+    /** Gold a duplicate turns into when it's rolled, in kills' worth of gold at your best floor. */
     sellKills: {
       common: 1, uncommon: 2, rare: 5, epic: 15, legendary: 80, mythic: 600, ancient: 900, exalted: 1400,
       celestial: 2200, astral: 3500, divine: 6000, eternal: 10000, primordial: 20000, absolute: 100000,

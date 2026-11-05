@@ -9,17 +9,9 @@ import type { Rarity } from './rarity';
 export type MutationId = 'gilded' | 'shadow' | 'radiant' | 'void';
 export const MUTATIONS: MutationId[] = ['gilded', 'shadow', 'radiant', 'void'];
 
-export type DupeRule = 'keep' | 'shard' | 'sell';
-
 export interface KnightRec {
   id: string;
   level: number;
-  shards: number;
-  /**
-   * Spare copies: later pulls of a knight you already own, waiting to be broken down (into this
-   * knight's shards) or sold (for gold). The knight itself is never one of them.
-   */
-  dupes: number;
   /** The best mutation this knight has rolled with. */
   mutation: MutationId | null;
   /** Copies rolled in total (this run). */
@@ -49,8 +41,8 @@ export interface ReelResult {
   /** "1 in X" at luck 1 for its tier and mutation. */
   oneIn: number;
   drama: RollDrama | null;
-  /** Beginner's luck and the tutorial's scripted finds are labeled. */
-  scripted?: 'warmup' | 'first' | 'beginner';
+  /** A quick spin of the start (an ordinary roll, rolled faster). */
+  scripted?: 'warmup';
 }
 
 export type RollDrama = 'big' | 'huge' | 'insane' | 'hyper';
@@ -94,7 +86,6 @@ export interface GameState {
   /** Three squad slots (knight ids) and which one you control. */
   squad: Array<string | null>;
   controlled: number;
-  dupeRules: Record<Rarity, DupeRule>;
 
   upgrades: Record<string, number>;
   perks: string[];
@@ -115,9 +106,8 @@ export interface GameState {
     hist: Array<[number, number]>;
     best: number;
     since: number | null;
-    /** The tutorial: warm-up spins, the first Legendary, then beginner's luck. */
-    tutorial: 'warmup' | 'first' | 'beginner' | 'done' | 'rewarm';
-    beginnerAt: number | null;
+    /** The start (and after a rebirth): quick ordinary spins until the squad is full, then ordinary play. */
+    tutorial: 'warmup' | 'done' | 'rewarm';
     nextSpinId: number;
   };
 

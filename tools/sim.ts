@@ -1,12 +1,12 @@
 /**
  * Headless balance run: the real game logic on Auto (every knight played by its class AI), with a
- * simple bot that buys upgrades, shards duplicates, levels the squad and rebirths when it can.
+ * simple bot that buys upgrades, levels the squad and rebirths when it can (duplicates turn into gold by themselves).
  *   npm run sim -- --minutes 60 --seed 3
  */
 import { Game } from '../src/game';
 import { RARITIES } from '../src/core/rarity';
 import { UPGRADES, buyUpgrade, canBuy, upgradeCost } from '../src/core/upgrades';
-import { bestSquad, canLevel, levelUp, shardAll } from '../src/core/roster';
+import { bestSquad, canLevel, levelUp } from '../src/core/roster';
 import { canRebirth } from '../src/core/newGame';
 import { PERKS, buyPerk, canBuyPerk } from '../src/core/perks';
 import { squadPower } from '../src/core/power';
@@ -60,7 +60,6 @@ for (let t = 0; t < minutes * 60; t += dt) {
   if (botT > 5) {
     botT = 0;
     const s = g.state;
-    shardAll(s);
     // Level the squad, then buy the cheapest upgrade.
     for (const id of s.squad) while (id && canLevel(s, id)) levelUp(s, id);
     const ups = UPGRADES.filter((u) => canBuy(s, u.id)).sort((a, b) => upgradeCost(s, a.id) - upgradeCost(s, b.id));

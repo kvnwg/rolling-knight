@@ -35,7 +35,7 @@ describe("the tinker's counter", () => {
         expect(text.length, `${u.id} ${t}: ${text}`).toBeLessThanOrEqual(40);
       }
     }
-    expect(effectAt(s, 'quickRoll', 5)).toBe('-60% spin, -30% cooldown');
+    expect(effectAt(s, 'quickRoll', 5)).toBe('-60% roll time');
   });
 
   it('gives every perk a few words for its card', () => {

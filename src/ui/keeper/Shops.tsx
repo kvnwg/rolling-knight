@@ -6,19 +6,18 @@
  *  - Sister Maren: rebirth, what it gives and what it takes, and the button (core/newGame.ts);
  *  - the notice board: your jobs, their progress and rewards (core/quests.ts);
  *  - Oracle Vesper: the altar's reels, your latest summons and the odds;
- *  - Warden Tobb: the next floor, your squad and the way down;
- *  - Quartermaster Hilde: the roster, as its own screen draws it (kept whole, on dark wood).
+ *  - Warden Tobb: who goes down (your squad and who leads), levelling and reforging them, the way down.
  */
 import { useState, type CSSProperties, type ReactNode } from 'react';
 import { BAL } from '../../core/balance';
-import { CLASSES, knightDef, knightId, unlockedClasses } from '../../core/knights';
+import { CLASSES, KNIGHTS, knightDef, knightId, unlockedClasses } from '../../core/knights';
 import { canRebirth, rebirthFloor } from '../../core/newGame';
 import { PERKS, PERK_TREES, buyPerk, canBuyPerk, hasPerk, perksOpen, type PerkDef, type PerkTree } from '../../core/perks';
 import { CHALLENGE, floorDifficulty, knightRating, squadPower } from '../../core/power';
 import { activeQuests, MAX_ACTIVE_QUESTS, mobNoun, plural, questGoal, rewardText, type Quest } from '../../core/quests';
 import { RARITIES, RARITY_COLOR, RARITY_NAME, RARITY_ODDS, rarityChances } from '../../core/rarity';
 import { drySpell, reelCount, spinCycle, tokenChance } from '../../core/roller';
-import { rebirthStatMult } from '../../core/roster';
+import { bestSquad, canLevel, levelCost, levelUp, maxedLevel, rankedKnights, rebirthStatMult, reforge, reforgeCost, setSquadSlot } from '../../core/roster';
 import type { Game } from '../../game';
 import { biomeForFloor } from '../../world/biomes';
 import type { HubStation } from '../../world/hubWorld';
@@ -31,6 +30,8 @@ import { InfoPopup } from './InfoPopup';
 import { Delta, Glyph, KeeperScreen, Purse, ShopBody, ShopFoot, ShopGrid, ShopHeading, ShopHint, ShopTop, Stat, keeperStyles as s, useGameTick, type KeeperCat } from './KeeperScreen';
 import { OfferCard } from './OfferCard';
 import { Icon } from './TinkerShop';
+import { CLASS_ICON } from '../classIcons';
+import { Codex } from '../panels';
 
 /** A rarity's color made dark enough to read on paper. */
 function inkOf(c: string): string {
@@ -390,6 +391,7 @@ export function OracleShop({ game, station, onClose, onOpen }: { game: Game; sta
         { id: 'summon', label: 'SUMMON', icon: 'reelGold' },
         { id: 'latest', label: 'LATEST', icon: 'helm10' },
         { id: 'odds', label: 'ODDS', icon: 'dice' },
+        { id: 'codex', label: 'CODEX', icon: 'book' },
       ]}
       tab={tab}
       onTab={setTab}
@@ -422,6 +424,11 @@ export function OracleShop({ game, station, onClose, onOpen }: { game: Game; sta
         {tab === 'odds' && (
           <>
             How likely each rarity is: the <b>base</b> odds, and <b>your</b> chance with your luck (x{luck < 10 ? luck.toFixed(2) : fmt(luck)}).
+          </>
+        )}
+        {tab === 'codex' && (
+          <>
+            Every knight there is: {Object.keys(st.codex).length} of {KNIGHTS.length} found. Rolling one you already have turns it into gold.
           </>
         )}
       </ShopHint>
@@ -490,6 +497,11 @@ export function OracleShop({ game, station, onClose, onOpen }: { game: Game; sta
               })}
             </ShopGrid>
           ))}
+        {tab === 'codex' && (
+          <div className={s.legacy}>
+            <Codex game={game} />
+          </div>
+        )}
         {tab === 'odds' && (
           <div className={s.note} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 'calc(1 * var(--px)) calc(4 * var(--px))', fontVariantNumeric: 'tabular-nums' }}>
             <span className={s.colhead}>RARITY</span>
@@ -525,26 +537,83 @@ function Row({ name, color, odds, chance }: { name: string; color: string; odds:
 
 // ------------------------------------------------------------------ the warden
 
-export function GateShop({ game, station, onClose }: { game: Game; station: HubStation; onClose: () => void }) {
+const wardenMemory = { tab: 'squad', slot: -1 };
+
+/** A rarity's little square, for a card's corner (its name in the title). */
+function rarityTag(id: string) {
+  const r = knightDef(id).rarity;
+  return { color: RARITY_COLOR[r], title: RARITY_NAME[r] };
+}
+
+/**
+ * Warden Tobb at the head of the stairs: who goes down. Your three slots across the top (tap one to
+ * pick it, LEAD to play that knight), every knight you have below with its level, power and LEVEL UP
+ * for gold, and ADD TO SQUAD to put it in the slot you picked; REFORGE (a roll for a better
+ * mutation) on its own tab; DESCEND at the foot. Everything to do with your knights happens here.
+ */
+export function WardenShop({ game, station, onClose, onOpen }: { game: Game; station: HubStation; onClose: () => void; onOpen: (id: string) => void }) {
   useGameTick(game);
   const st = game.state;
+  const [tab, setTabState] = useState(wardenMemory.tab);
+  const [pick, setPickState] = useState(wardenMemory.slot);
+  const [msg, setMsg] = useState<Record<string, string>>({});
+  const [, bump] = useState(0);
+  const setTab = (t: string) => ((wardenMemory.tab = t), setTabState(t));
+  const setPick = (i: number) => ((wardenMemory.slot = i), setPickState(i));
   const floor = st.run.floor;
   const biome = biomeForFloor(floor, st.run.biomeSeed);
   const power = squadPower(st);
   const diff = floorDifficulty(floor, power);
   const ch = CHALLENGE[diff.challenge];
+  const all = rankedKnights(st);
+  // The slot ADD fills: the one you picked, else the first empty one, else the weakest.
+  const empty = st.squad.findIndex((x) => !x);
+  const weakest = st.squad.reduce((w, id, i) => (id && (w < 0 || knightRating(st, id) < knightRating(st, st.squad[w]!)) ? i : w), -1);
+  const target = pick >= 0 ? pick : empty >= 0 ? empty : weakest;
+  const refresh = () => {
+    game.syncSquad();
+    game.syncHub(true);
+    game.touch();
+    bump((x) => x + 1);
+  };
+  const put = (id: string) => {
+    if (target < 0) return;
+    setSquadSlot(st, target, id);
+    if (!st.squad[st.controlled]) st.controlled = target;
+    uiSound('equip', 2);
+    setPick(-1);
+    refresh();
+  };
+  const lead = (slot: number) => {
+    st.controlled = slot;
+    uiSound('equip', 4);
+    refresh();
+  };
+  const levelUpKnight = (id: string): boolean => {
+    const before = st.roster[id]?.level ?? 0;
+    if (!levelUp(st, id)) return false;
+    uiSound('levelUp', Math.min(6, Math.floor(before / 3)));
+    refresh();
+    return true;
+  };
   return (
-    <KeeperScreen game={game} station={station} tabs={[{ id: 'down', label: 'DESCEND', icon: 'swords' }]} tab="down" onTab={() => {}} onClose={onClose}>
+    <KeeperScreen
+      game={game}
+      station={station}
+      tabs={[
+        { id: 'squad', label: 'SQUAD', icon: 'helm10', badge: st.squad.filter((id) => id && canLevel(st, id)).length },
+        { id: 'reforge', label: 'REFORGE', icon: 'gem' },
+      ]}
+      tab={tab}
+      onTab={setTab}
+      onClose={onClose}
+    >
       <ShopTop
-        purse={
-          <Stat icon="stairs" label="Floor" title="Floor">
-            {floor}
-          </Stat>
-        }
+        purse={<Purse amount={st.gold} />}
         title={
           <span className={s.chips} style={{ justifyContent: 'flex-end' }}>
-            <Stat icon="sword" label="Power" title="Your squad's power / what this floor expects">
-              {fmt(power)}/{fmt(diff.par)}
+            <Stat icon="stairs" label="Floor" title={`Floor ${floor}, ${biome.name}`}>
+              {floor}
             </Stat>
             <span className="dchip" style={{ ['--cc' as string]: ch.color, ['--seal' as string]: `var(--sk-seal-${diff.challenge})`, color: '#2b170c', textShadow: 'none' } as CSSProperties} title={ch.text}>
               {ch.name.toUpperCase()}
@@ -553,65 +622,160 @@ export function GateShop({ game, station, onClose }: { game: Game; station: HubS
         }
       />
       <ShopHint>
-        Next: <b>floor {floor}</b>, {biome.name}
-        {floor % 5 === 0 ? ', with a boss' : ''}. {ch.text}
+        {tab === 'squad' ? (
+          <>
+            Who goes down? Tap a slot, then <b>ADD</b> a knight to it; <b>LEAD</b> is the one you play. <b>LEVEL UP</b> makes a knight stronger for gold.
+          </>
+        ) : (
+          <>
+            <b>Reforge</b> rolls for a <b>mutation</b> (a big power boost) for gold. A better one replaces the old; a worse one changes nothing.
+          </>
+        )}
       </ShopHint>
-      <ShopBody>
-        <ShopGrid>
-          <OfferCard
-            level={floor % 5 === 0 ? <Px icon="skull" size="sm" /> : undefined}
-            art={<Px icon={floor % 5 === 0 ? 'skull' : 'swords'} size="lg" s={1} />}
-            name={biome.name}
-            lines={[{ text: floor % 5 === 0 ? `Floor ${floor} · BOSS` : `Floor ${floor}` }]}
-          />
-          {st.squad.map((id, slot) =>
-            id ? (
-              <OfferCard
-                key={slot}
-                level={`Lv.${st.roster[id]?.level ?? 1}`}
-                levelRight={slot === st.controlled ? 'YOU' : undefined}
-                art={<HeroArt id={id} mutation={st.roster[id]?.mutation ?? null} s={1} />}
-                tall
-                tag={{ color: RARITY_COLOR[knightDef(id).rarity], title: RARITY_NAME[knightDef(id).rarity] }}
-                name={knightDef(id).name}
-                lines={[{ icon: 'sword', text: `Power ${fmt(knightRating(st, id))}` }]}
-              />
-            ) : null,
-          )}
-        </ShopGrid>
+      {tab === 'squad' && (
+        <div className={s.squadRow}>
+          {st.squad.map((id, slot) => (
+            <div key={slot} className={s.slot} data-on={slot === target || undefined} onClick={() => (uiSound('tap'), setPick(slot === pick ? -1 : slot))} role="button">
+              {id ? (
+                <>
+                  <div className={s.slotArt}>
+                    <HeroArt id={id} mutation={st.roster[id]?.mutation ?? null} s={1} />
+                    {slot === st.controlled && (
+                      <span className={s.slotCrown} title="The knight you play">
+                        <Px icon="crown" size="sm" />
+                      </span>
+                    )}
+                  </div>
+                  <b>{knightDef(id).name}</b>
+                  <small>
+                    Lv {st.roster[id]?.level ?? 1} · <Px icon="sword" size="xs" /> {fmt(knightRating(st, id))}
+                  </small>
+                  {slot !== st.controlled ? (
+                    <button className={`btn ${s.second}`} onClick={(e) => (e.stopPropagation(), lead(slot))}>
+                      <Px icon="crown" size="xs" /> LEAD
+                    </button>
+                  ) : (
+                    <span className={s.youTag}>YOU PLAY</span>
+                  )}
+                </>
+              ) : (
+                <div className={s.slotEmpty}>
+                  <Px icon="helm" size="lg" s={1} />
+                  <small>Empty: ADD a knight</small>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      <ShopBody scrollKey={tab}>
+        {all.length === 0 ? (
+          <div className={s.empty}>
+            <Px icon="helm" size="lg" s={1} />
+            <div>No knights yet. The Oracle's altar summons them for free.</div>
+          </div>
+        ) : (
+          <ShopGrid>
+            {all.map((id) => {
+              const rec = st.roster[id];
+              const def = knightDef(id);
+              const inSquad = st.squad.includes(id);
+              if (tab === 'squad') {
+                const maxed = maxedLevel(st, id);
+                const cost = levelCost(st, id);
+                return (
+                  <OfferCard
+                    key={id}
+                    level={`Lv ${rec.level}`}
+                    levelRight={<Px icon={CLASS_ICON[def.cls]} size="xs" />}
+                    art={<HeroArt id={id} mutation={rec.mutation} s={1} />}
+                    tall
+                    tag={rarityTag(id)}
+                    name={def.name}
+                    onArt={() => (uiSound('tap'), onOpen(id))}
+                    lines={[{ icon: 'sword', text: `Power ${fmt(knightRating(st, id))}` }]}
+                    button={
+                      maxed
+                        ? { kind: 'done', label: 'MAX LEVEL' }
+                        : {
+                            kind: 'buy',
+                            verb: 'LEVEL UP',
+                            label: fmt(cost),
+                            icon: 'coin',
+                            ready: st.gold >= cost,
+                            hold: true,
+                            onPress: () => levelUpKnight(id),
+                            paid: `Lv ${rec.level + 1}!`,
+                            short: `need ${fmt(cost - st.gold)} more`,
+                          }
+                    }
+                    second={
+                      inSquad
+                        ? { label: <><Px icon="check" size="xs" /> IN SQUAD</>, on: true, title: 'In your squad' }
+                        : { label: target >= 0 && st.squad[target] ? `SWAP IN (slot ${target + 1})` : 'ADD TO SQUAD', onPress: () => put(id) }
+                    }
+                  />
+                );
+              }
+              const voided = rec.mutation === 'void';
+              const cost = reforgeCost(st, id);
+              return (
+                <OfferCard
+                  key={id}
+                  level={rec.mutation ? rec.mutation.toUpperCase() : 'No mutation'}
+                  levelRight={<Px icon={CLASS_ICON[def.cls]} size="xs" />}
+                  art={<HeroArt id={id} mutation={rec.mutation} s={1} />}
+                  tall
+                  tag={rarityTag(id)}
+                  name={def.name}
+                  onArt={() => (uiSound('tap'), onOpen(id))}
+                  lines={[
+                    { icon: 'sword', text: `Power ${fmt(knightRating(st, id))}` },
+                    ...(msg[id] ? [{ icon: 'sparkle' as IconName, text: msg[id], tone: msg[id].endsWith('!') ? ('good' as const) : ('muted' as const) }] : []),
+                  ]}
+                  button={
+                    voided
+                      ? { kind: 'done', label: 'VOID: BEST' }
+                      : {
+                          kind: 'buy',
+                          verb: 'REFORGE',
+                          label: fmt(cost),
+                          icon: 'coin',
+                          ready: st.gold >= cost,
+                          onPress: () => {
+                            const r = reforge(st, id, () => game.rng.next());
+                            if (!r) return false;
+                            const text = r.improved ? `${r.rolled!.toUpperCase()}!` : r.rolled ? `Rolled ${r.rolled}: no better` : 'Rolled nothing';
+                            uiSound(r.improved ? 'mutation' : 'dupe', r.improved ? 6 : 0);
+                            setMsg((m) => ({ ...m, [id]: text }));
+                            refresh();
+                            return true;
+                          },
+                          paid: () => `-${fmt(cost)}`,
+                          short: `need ${fmt(cost - st.gold)} more`,
+                        }
+                  }
+                />
+              );
+            })}
+          </ShopGrid>
+        )}
       </ShopBody>
       <ShopFoot>
-        <button className={`btn ${s.bigBtn}`} style={{ flex: 1 }} onClick={() => (uiSound('embark'), onClose(), game.enterDungeon())}>
+        <button className={`btn ${s.smallBtn}`} onClick={() => (bestSquad(st), uiSound('equip', 3), refresh())} title="Put your 3 strongest knights in the squad">
+          <Px icon="star" size="sm" />
+          BEST
+        </button>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          Power <b>{fmt(power)}</b>
+          <br />
+          floor {floor} wants {fmt(diff.par)}
+        </span>
+        <button className={`btn ${s.bigBtn}`} style={{ flex: 'none' }} disabled={!st.squad.some(Boolean)} onClick={() => (uiSound('embark'), onClose(), game.enterDungeon())}>
           <Px icon="swords" size="md" />
           {game.world ? 'CONTINUE' : 'DESCEND'}
         </button>
       </ShopFoot>
-    </KeeperScreen>
-  );
-}
-
-// ------------------------------------------------------------------ the quartermaster
-
-/** The quartermaster's counter: the roster screen as it draws itself, on dark wood inside the paper. */
-export function QuartermasterShop({ game, station, onClose, children }: { game: Game; station: HubStation; onClose: () => void; children: ReactNode }) {
-  useGameTick(game);
-  const st = game.state;
-  return (
-    <KeeperScreen game={game} station={station} tabs={[{ id: 'squad', label: 'SQUAD', icon: 'helm10' }]} tab="squad" onTab={() => {}} onClose={onClose}>
-      <ShopTop
-        purse={<Purse amount={st.gold} />}
-        title={
-          <Stat icon="sword" label="Squad power" title="Squad power">
-            {fmt(squadPower(st))}
-          </Stat>
-        }
-      />
-      <ShopHint>
-        Your <b>squad</b> is the 3 knights who fight; the one with the crown is you. Tap any knight to see it, level it or put it in the squad.
-      </ShopHint>
-      <ShopBody>
-        <div className={s.legacy}>{children}</div>
-      </ShopBody>
     </KeeperScreen>
   );
 }

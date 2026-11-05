@@ -856,7 +856,7 @@ class Sfx {
     const list = this.lands;
     this.lands = [];
     if (!engine.live) return;
-    const rest = list.filter((e) => !(e.drama || e.scripted === 'first' || e.scripted === 'beginner'));
+    const rest = list.filter((e) => !e.drama);
     if (!rest.length) return;
     const best = rest.reduce((a, b) => {
       const ta = rarityIndex(a.rarity);

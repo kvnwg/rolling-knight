@@ -537,6 +537,27 @@
     transform: translateX(var(--px));
   }
 }
+/* A card's second button: paper, and pressed in (brown, with a check) when it's on. */
+.second {
+  --sk: var(--sk-btn-paper);
+  --skd: var(--sk-btn-paper-down);
+  width: 100%;
+  min-height: calc(11 * var(--px)) !important;
+  padding: 0 calc(1.5 * var(--px)) calc(2 * var(--px)) !important;
+  font-size: calc(4.2 * var(--px)) !important;
+  gap: calc(1 * var(--px)) !important;
+  color: var(--dark) !important;
+  text-shadow: none !important;
+  filter: drop-shadow(0 var(--px) 0 rgba(60, 30, 10, 0.35)) !important;
+}
+.second[data-on] {
+  --sk: var(--sk-btn-amber);
+  --skd: var(--sk-btn-amber);
+  color: #2a1204 !important;
+}
+.second:disabled {
+  cursor: default;
+}
 .need {
   margin-top: calc(-0.5 * var(--px));
   text-align: center;
@@ -714,6 +735,97 @@
   background: #24150e;
   box-shadow: inset 0 0 0 var(--px) #120a06, inset 0 0 0 calc(2 * var(--px)) #5a3324;
   font-size: calc(4.6 * var(--px));
+}
+
+/* ------------------------------------------------------------ the warden's squad */
+/* Three slots across the top of the paper: the knight, its name, its level and power, LEAD (or YOU
+   PLAY); the slot ADD fills next is lit amber. */
+.squadRow {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: calc(2 * var(--px));
+  padding: 0 calc(1 * var(--px));
+}
+.slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(1 * var(--px));
+  min-width: 0;
+  padding: calc(1.5 * var(--px)) calc(1.5 * var(--px)) calc(2 * var(--px));
+  border: 0 solid transparent;
+  border-image: var(--sk-pa-card) 4 fill / calc(4 * var(--px)) stretch;
+  image-rendering: pixelated;
+  cursor: pointer;
+  text-align: center;
+  font-size: calc(4 * var(--px));
+  color: var(--dark);
+  filter: drop-shadow(0 var(--px) 0 rgba(90, 56, 28, 0.45));
+}
+.slot[data-on] {
+  border-image-source: var(--sk-pa-card-gold);
+  outline: var(--px) solid #e8a92a;
+}
+.slot b {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: calc(4.4 * var(--px));
+}
+.slot small {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(0.5 * var(--px));
+  color: var(--mid);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.slotArt {
+  position: relative;
+  display: grid;
+  place-items: end center;
+  width: 100%;
+  height: calc(30 * var(--px));
+  border: 0 solid transparent;
+  border-image: var(--sk-pa-inset) 3 fill / calc(3 * var(--px)) stretch;
+  image-rendering: pixelated;
+  padding-bottom: calc(1 * var(--px));
+}
+.slotCrown {
+  position: absolute;
+  left: calc(1 * var(--px));
+  top: calc(1 * var(--px));
+  line-height: 0;
+  filter: drop-shadow(0 var(--px) 0 var(--ink));
+}
+.youTag {
+  display: block;
+  width: 100%;
+  padding: calc(1 * var(--px)) 0;
+  font-size: calc(3.8 * var(--px));
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #fffbe8;
+  background: var(--good);
+  box-shadow: 0 0 0 calc(0.5 * var(--px)) var(--ink);
+}
+.slotEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(1.5 * var(--px));
+  width: 100%;
+  min-height: calc(46 * var(--px));
+  color: var(--mid);
+  opacity: 0.8;
+}
+.slot .second {
+  min-height: calc(10 * var(--px)) !important;
+  font-size: calc(3.8 * var(--px)) !important;
 }
 
 /* ------------------------------------------------------------ the details popup */
@@ -894,7 +1006,9 @@
   .tab {
     min-width: 0;
     flex: 1 1 auto;
-    padding: calc(1 * var(--px)) calc(2.5 * var(--px)) 0;
+    gap: calc(1 * var(--px));
+    padding: calc(1 * var(--px)) calc(1.5 * var(--px)) 0;
+    font-size: calc(4.4 * var(--px));
   }
 }
 

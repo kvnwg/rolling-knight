@@ -3,7 +3,7 @@
  * controller (game.ts) builds a World per floor and feeds it input; the renderer draws it.
  */
 import { BAL } from '../core/balance';
-import { CLASSES, type ClassId } from '../core/knights';
+import { type ClassId } from '../core/knights';
 import type { Rarity } from '../core/rarity';
 import { Rng } from '../core/rng';
 import type { KnightStats } from '../core/roster';
@@ -243,7 +243,6 @@ export class World {
   makeHero(h: HeroSpec, x: number, y: number): Unit {
     const lone = this.perks.has('loneWolf') ? 3 : 1;
     const maxHp = h.stats.hp * lone;
-    const cls = CLASSES[h.cls];
     return {
       uid: uid(),
       team: 'hero',
@@ -286,7 +285,7 @@ export class World {
       dodgeCd: h.stats.dodgeCd * (this.perks.has('peasantRevolt') && this.underdogSquad() ? 0.5 : 1),
       dodgeT: 0,
       specialCd: h.stats.specialCd * (this.perks.has('loneWolf') ? 0.7 : 1),
-      specialT: cls.specialCd * 0.35,
+      specialT: 0,
       rollTimeMult: h.stats.rollTimeMult,
       downed: h.hpShare <= 0,
       ai: { target: null, think: 0, dodgeThink: 0, wanderX: 0, wanderY: 0, stuck: 0 },
@@ -606,10 +605,11 @@ export class World {
     this.controlled = slot;
     this.events.push({ type: 'switch', slot });
     this.fx.push({ kind: 'spark', x: h.x, y: h.y - 10, color: '#ffe27a' });
-    // Tag Team: the incoming knight's special goes off for free.
+    // Tag Team: the incoming knight's skill roll lands at once (one starts if none is spinning).
     if (!forced && this.perks.has('tagTeam') && this.tagTeamT <= 0) {
       this.tagTeamT = 8;
-      heroSpecial(this, h, true);
+      if (!h.skillRoll) heroSpecial(this, h, true);
+      if (h.skillRoll) h.skillRoll.t = h.skillRoll.dur;
     }
     return true;
   }
@@ -880,7 +880,9 @@ export class World {
       this.refreshFlows();
     }
     // Down you go after standing in the open portal a moment (so passing over it mid-fight doesn't).
-    if (this.portalOpen && !this.exited && lead && dist(lead.x, lead.y, this.map.exit.x, this.map.exit.y) < 14) {
+    // A squad playing itself clears the floor (or its boss) first.
+    const mayLeave = !this.auto || this.cleared || (this.boss && this.portalOpen);
+    if (this.portalOpen && mayLeave && !this.exited && lead && dist(lead.x, lead.y, this.map.exit.x, this.map.exit.y) < 14) {
       this.exitHold += dt;
       if (this.exitHold >= EXIT_HOLD) {
         this.exited = true;

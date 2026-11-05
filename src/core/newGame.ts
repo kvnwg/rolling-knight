@@ -1,13 +1,8 @@
 /** A fresh save, and the state a rebirth starts from. */
 import { BAL } from './balance';
 import { shuffleDeck } from './deck';
-import { RARITIES, type Rarity } from './rarity';
 import { Rng } from './rng';
-import { SAVE_VERSION, type DupeRule, type GameState } from './state';
-
-export function defaultDupeRules(): Record<Rarity, DupeRule> {
-  return Object.fromEntries(RARITIES.map((r) => [r, 'keep'])) as Record<Rarity, DupeRule>;
-}
+import { SAVE_VERSION, type GameState } from './state';
 
 export function newGame(seed = Date.now()): GameState {
   const s = Rng.hashSeed(seed);
@@ -26,7 +21,6 @@ export function newGame(seed = Date.now()): GameState {
     roster: {},
     squad: [null, null, null],
     controlled: 0,
-    dupeRules: defaultDupeRules(),
     upgrades: {},
     perks: [],
     rebirths: 0,
@@ -42,7 +36,6 @@ export function newGame(seed = Date.now()): GameState {
       best: 0,
       since: null,
       tutorial: 'warmup',
-      beginnerAt: null,
       nextSpinId: 1,
     },
     // The first floor ever is the plain chain of rooms; after that the deck takes over.
@@ -67,7 +60,7 @@ export function canRebirth(state: GameState): boolean {
 
 /**
  * Rebirth: start over from Floor 1 with permanently more luck, gold and stats, and new classes to
- * roll. Gold, upgrades, knights (with their levels, shards and duplicates), perks and sigils go.
+ * roll. Gold, upgrades, knights (with their levels), perks and sigils go.
  * The Codex, records and settings stay. Heirloom (a perk) keeps one knight.
  */
 export function rebirth(state: GameState): boolean {
@@ -84,7 +77,7 @@ export function rebirth(state: GameState): boolean {
   state.squad = [null, null, null];
   state.controlled = 0;
   if (kept) {
-    state.roster[kept.id] = { ...kept, dupes: 0 };
+    state.roster[kept.id] = { ...kept };
     state.squad[0] = kept.id;
   }
   state.heirloom = kept?.id ?? null;

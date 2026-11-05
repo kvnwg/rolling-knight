@@ -17,7 +17,7 @@ export type CoreEvent =
       drama: RollDrama | null;
       result: AddResult;
       newRecord: boolean;
-      scripted?: 'warmup' | 'first' | 'beginner';
+      scripted?: 'warmup';
     }
   | { type: 'token'; spinId: number; reel: number; value: number; total: number; combo: boolean }
   | { type: 'potion'; seconds: number }

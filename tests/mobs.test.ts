@@ -66,6 +66,8 @@ function duel(type: MobType, dx: number, cls: 'guardian' | 'blade' = 'guardian')
   const h = w.heroes[0];
   h.x = tx * TILE + TILE / 2;
   h.y = ty * TILE + TILE / 2;
+  // (The knight's skill rolls kept out of it: these are about the mob.)
+  h.specialT = 99;
   const m = w.makeMob(type, h.x + dx, h.y, false, false);
   m.awake = true;
   m.hp = m.maxHp = 1e9;

@@ -444,7 +444,7 @@ export function SkillTable({ knightId, luck = 1, cd, highlight }: { knightId: st
     <div className={s.table}>
       <div className={s.head}>
         <b>Skill roll</b>
-        {cd ? <span>every {Math.round(cd * 10) / 10}s</span> : null}
+        {cd ? <span>rolls again as it fires</span> : null}
       </div>
       {odds.map(({ skill, chance }) => (
         <div key={skill.id} className={s.row} data-on={highlight === skill.id ? '' : undefined} style={{ ['--tc' as string]: tierColor(skill.tier) } as CSSProperties}>

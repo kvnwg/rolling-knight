@@ -28,7 +28,6 @@ describe('power', () => {
     const legend = knightRating(s, s.squad[0]!);
     expect(legend).toBeCloseTo(480, 0);
     const before = squadPower(s);
-    s.roster[s.squad[1]!].shards = 999;
     s.gold = 1e9;
     levelUp(s, s.squad[1]!);
     expect(squadPower(s)).toBeGreaterThan(before);

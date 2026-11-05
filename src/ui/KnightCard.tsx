@@ -10,7 +10,6 @@ import { RARITY_NAME, RARITY_ODDS, type Rarity } from '../core/rarity';
 import type { MutationId } from '../core/state';
 import { HeroArt, rarityStyle } from './common';
 import { oneInShort } from './format';
-import { Px } from './px';
 import { KNIGHT_PIC_H, KNIGHT_PIC_W } from './sprites';
 
 /** The box a card's knight is fitted into, in art pixels (var(--px)). */
@@ -37,26 +36,6 @@ export function knightFit(w: number, h: number): CSSProperties {
 /** A rarity's odds as the altar's odds table has them, short ("1 in 1K", "1 in 2.5B"); Common is just Common. */
 export function rarityOdds(r: Rarity): string {
   return RARITY_ODDS[r] <= 1 ? RARITY_NAME[r] : oneInShort(RARITY_ODDS[r]);
-}
-
-/** The spare copies chip (two cards, "×4"): the same on every card and in the knight's sheet. */
-export function SpareChip({ n }: { n: number }) {
-  return (
-    <span className="kspare num" title={`${n} spare ${n === 1 ? 'copy' : 'copies'}`}>
-      <Px icon="copies" size="sm" />
-      <b>×{n}</b>
-    </span>
-  );
-}
-
-/** A pull that came in as a spare copy (the summon log, the welcome-back report): two cards, "+1". */
-export function SpareTag() {
-  return (
-    <span className="ktag spare num" title="A spare copy">
-      <Px icon="copies" size="sm" />
-      +1
-    </span>
-  );
 }
 
 /** A value that pops (a quick bump) whenever it changes; not when it first shows. */
