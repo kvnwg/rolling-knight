@@ -12,8 +12,8 @@
  * the skill it landed on, in the dark; once it's ready again the icons tick round now and then.
  * Reduce motion: no spin (a die while it rolls), no sparks, rays or shakes, a plain fade for the name.
  *
- * <SkillTable knightId luck /> is the hero sheet's list: every skill the knight can roll, its tier,
- * its line and its chance at that luck.
+ * <SkillTable knightId luck /> is the hero sheet's list: every skill the knight can roll, one short
+ * line each (its icon, name, tier and chance at that luck).
  */
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { RARITY_COLOR, rarityIndex } from '../core/rarity';
@@ -438,14 +438,11 @@ function SkillPop({ skill, onDone }: { skill: SkillId; onDone: () => void }) {
  */
 export function SkillTable({ knightId, luck = 1, cd, highlight }: { knightId: string; luck?: number; cd?: number; highlight?: SkillId }) {
   const odds = skillOdds(knightId, luck);
-  const l = Math.max(1, luck);
   return (
     <div className={s.table}>
       <div className={s.head}>
         <b>Skill roll</b>
-        <span>
-          {cd ? `every ${Math.round(cd * 10) / 10}s · ` : ''}luck ×{l >= 100 ? Math.round(l) : Math.round(l * 100) / 100}
-        </span>
+        {cd ? <span>every {Math.round(cd * 10) / 10}s</span> : null}
       </div>
       {odds.map(({ skill, chance }) => (
         <div key={skill.id} className={s.row} data-on={highlight === skill.id ? '' : undefined} style={{ ['--tc' as string]: tierColor(skill.tier) } as CSSProperties}>
@@ -457,7 +454,6 @@ export function SkillTable({ knightId, luck = 1, cd, highlight }: { knightId: st
             <span className={s.tier}>{skill.tier === 'jackpot' ? 'JACKPOT' : TIER_NAME[skill.tier].toUpperCase()}</span>
           </span>
           <span className={s.odds}>{fmtChance(chance)}</span>
-          <span className={s.text}>{skill.text}</span>
         </div>
       ))}
     </div>

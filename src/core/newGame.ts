@@ -84,7 +84,7 @@ export function rebirth(state: GameState): boolean {
   state.squad = [null, null, null];
   state.controlled = 0;
   if (kept) {
-    state.roster[kept.id] = { ...kept, dupes: 0, isNew: false };
+    state.roster[kept.id] = { ...kept, dupes: 0 };
     state.squad[0] = kept.id;
   }
   state.heirloom = kept?.id ?? null;

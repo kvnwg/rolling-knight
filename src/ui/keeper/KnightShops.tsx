@@ -6,7 +6,7 @@
  *    a time or all of them at once.
  * Tap a knight's picture for its whole sheet (HeroDetail).
  */
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { CLASSES, CLASS_IDS, knightDef, type ClassId } from '../../core/knights';
 import { knightRating } from '../../core/power';
 import { RARITY_COLOR, RARITY_NAME } from '../../core/rarity';
@@ -217,6 +217,13 @@ export function ScrapShop({ game, station, onClose, onOpen }: { game: Game; stat
   const n = totalDupes(st);
   const gold = all.reduce((a, id) => a + st.roster[id].dupes * sellValue(st, id), 0);
   const shards = all.reduce((a, id) => a + st.roster[id].dupes * shardsPerDupe(st, knightDef(id).rarity), 0);
+  // Everything at once takes two taps: the first arms it (red, with a check), the second does it.
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const t = window.setTimeout(() => setArmed(false), 4000);
+    return () => window.clearTimeout(t);
+  }, [armed]);
   const done = () => {
     game.touch();
     bump((x) => x + 1);
@@ -231,10 +238,16 @@ export function ScrapShop({ game, station, onClose, onOpen }: { game: Game; stat
           <b>x{n}</b>
         </span>
         <button
-          className={`btn ${s.buy}`}
+          className={`btn ${armed ? 'red' : s.buy}`}
           style={{ width: 'auto', flex: 'none' }}
           data-kind="buy"
           onClick={() => {
+            if (!armed) {
+              setArmed(true);
+              uiSound('tap');
+              return;
+            }
+            setArmed(false);
             if (selling) {
               const g = sellAll(st);
               if (g > 0) uiSound('sell');
@@ -242,6 +255,7 @@ export function ScrapShop({ game, station, onClose, onOpen }: { game: Game; stat
             done();
           }}
         >
+          {armed && <Px icon="check" size="xs" />}
           <Px icon={selling ? 'coin' : 'shard'} size="xs" />
           <span>{selling ? `ALL +${fmt(gold)}` : `ALL +${fmt(shards)}`}</span>
         </button>

@@ -168,7 +168,7 @@ function SquadPanel({ game, onOpen }: { game: Game; onOpen: (id: string) => void
     <>
       <div className="spread">
         <div className="squad-row">
-          {s.squad.map((id, slot) => (id ? <HeroCard key={slot} game={game} id={id} onOpen={onOpen} slot={slot === s.controlled ? 0 : undefined} /> : null))}
+          {s.squad.map((id, slot) => (id ? <HeroCard key={slot} game={game} id={id} onOpen={onOpen} /> : null))}
         </div>
         <button className="btn small" onClick={() => (bestSquad(s), game.syncHub(true), uiSound('equip', 3))} title="Best squad">
           <Px icon="star" size="sm" />

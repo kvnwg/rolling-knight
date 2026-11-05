@@ -46,6 +46,11 @@ const EXTRA: Record<string, Rows> = {
     '................',
   ],
   hourglass: ['kkkkkkk', 'knNNNnk', '.kYYYk.', '..kyk..', '..kCk..', '.kCYCk.', 'kCYYYCk', 'knNNNnk', 'kkkkkkk'],
+  // The roster's own: spare copies (two cards, one behind the other), the leader's crown, power
+  // (crossed swords, small enough to sit beside a number).
+  copies: ['..kkkkkk', '..k5554k', 'kkkkkk4k', 'kWWWTk4k', 'kWWWTk4k', 'kWWWTkkk', 'kTTTTk..', 'kkkkkk..'],
+  crown: ['k...k...k', 'ky.kyk.yk', 'kykyYykyk', 'kyyyYyyyk', 'kyRyCyRyk', 'kyyyyyyOk', 'kOOOOOOOk', 'kkkkkkkkk'],
+  might: ['kk....kk', 'k5k..k5k', '.k5kk5k.', '..k55k..', '..k55k..', '.kykkyk.', 'kyk..kyk', 'kk....kk'],
   boot: ['....kkk...', '...kNtNk..', '...kNtNk..', '...kNtNk..', '..kNNtNk..', '.kNNNNtkk.', 'knNNNNNttk', 'knnnnnnnnk', 'kkkkkkkkkk'],
   shard: ['...k...', '..kCk..', '.kCwck.', '.kCcck.', 'kCCcUck', '.kCcUk.', '..kUk..', '...k...'],
   sigil: ['...kkk...', '..kMmVk..', '.kMmmmVk.', 'kMmkkkmVk', 'kmmkMkmvk', 'kVmkkkmvk', '.kVmmmvk.', '..kVvvk..', '...kkk...'],

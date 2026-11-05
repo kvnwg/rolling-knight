@@ -15,7 +15,10 @@ export interface KnightRec {
   id: string;
   level: number;
   shards: number;
-  /** Duplicate copies waiting to be sold or broken into shards. */
+  /**
+   * Spare copies: later pulls of a knight you already own, waiting to be broken down (into this
+   * knight's shards) or sold (for gold). The knight itself is never one of them.
+   */
   dupes: number;
   /** The best mutation this knight has rolled with. */
   mutation: MutationId | null;
@@ -23,8 +26,11 @@ export interface KnightRec {
   copies: number;
   /** When it was first rolled (play time, ms). */
   firstAt: number;
-  /** Not yet looked at in the Knights tab. */
-  isNew: boolean;
+  /**
+   * When it was first rolled by the wall clock (Date.now(), ms): the roster tags it NEW for 30
+   * seconds after. Knights from saves older than this field have none, so they're never NEW.
+   */
+  gotAt?: number;
   /** Times the smith has reforged it (each costs more). */
   reforges?: number;
 }

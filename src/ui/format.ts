@@ -18,6 +18,30 @@ export function oneIn(n: number): string {
   return `1 in ${n < 1e7 ? Math.round(n).toLocaleString('en-US') : fmt(n)}`;
 }
 
+/** A count, short: 80, 2.5K, 25K, 150K, 1M, 2.5B (three figures at most, no trailing ".0"). */
+export function short(n: number): string {
+  if (!Number.isFinite(n)) return '∞';
+  const sign = n < 0 ? '-' : '';
+  let v = Math.abs(n);
+  if (v < 1000) return `${sign}${Math.round(v)}`;
+  const units = ['K', 'M', 'B', 'T', 'Qa', 'Qi'];
+  v /= 1000;
+  for (let i = 0; ; i++) {
+    const r = v >= 100 ? Math.round(v) : Math.round(v * 10) / 10;
+    // Rounding can reach the next unit (999,960 is 1M, not 1000K).
+    if (r >= 1000 && i < units.length - 1) {
+      v /= 1000;
+      continue;
+    }
+    return `${sign}${r}${units[i]}`;
+  }
+}
+
+/** Odds, short: "1 in 80", "1 in 25K", "1 in 1M", "1 in 2.5B". */
+export function oneInShort(n: number): string {
+  return `1 in ${short(n)}`;
+}
+
 export function secs(s: number): string {
   if (s < 60) return `${Math.ceil(s)}s`;
   const m = Math.floor(s / 60);
