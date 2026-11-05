@@ -13,8 +13,15 @@ pixelforge checkout, after `pf build --all`) and writes, for each sheet the game
 Pixels are copied 1:1: nothing is scaled, rotated or flipped. West frames are PixelForge's own
 (mirrored at its build time), never made here. Color ownership comes from style/style.json and each
 recipe's `colors`; a hex two materials share goes to the one listed first in OWNER_ORDER that the
-recipe sets (the Guardian's helmet hides the eyes that share its cloth color, say). Humanoid
-knights also get the rig's anchors (head, chin, back, hip) per frame, for the game's capes.
+recipe sets (the Guardian's helmet hides the eyes that share its cloth color, say). A part the
+recipe dyes apart (`slot_colors`: the Blade's scarf, the Lancer's gold helm) is a second material of
+its own, `<material>2` (cloth2, metal2), so a recolor can dye it apart too. The white swing trails
+PixelForge paints on every strike (style fx_ramps.swing: rim, mid, core) are the material `trail`:
+the monsters keep theirs (the game draws no swing of its own for them), while the knights come from
+PixelForge's out/bare/ (tools/packs/pixelforge_bare.py: the same build with no trails), because the
+game draws every knight's swing itself, aimed and dressed in its rarity; a trail of PixelForge's on
+top would double it.
+Humanoid knights also get the rig's anchors (head, chin, back, hip) per frame, for the game's capes.
 Only PNG, JSON and YAML files are read from the checkout, as data; nothing in it is executed.
 """
 import json
@@ -26,39 +33,45 @@ from PIL import Image
 
 # Sheet -> the animations the game plays (aliases the game never asks for are left out).
 SHEETS = {
-    'rk_guardian': ['idle', 'blink', 'walk', 'combat_idle', 'attack_slash', 'attack_heavy', 'block_enter', 'block_hold', 'roll', 'hurt', 'stun', 'death', 'victory'],
-    'rk_blade': ['idle', 'blink', 'walk', 'combat_idle', 'attack_slash', 'attack_heavy', 'roll', 'hurt', 'stun', 'death', 'victory'],
-    'rk_ranger': ['idle', 'blink', 'walk', 'combat_idle', 'shoot_bow', 'backflip', 'hurt', 'stun', 'death', 'victory'],
-    'rk_cleric': ['idle', 'blink', 'walk', 'combat_idle', 'cast', 'roll', 'hurt', 'stun', 'death', 'victory'],
-    'rk_arcanist': ['idle', 'blink', 'walk', 'combat_idle', 'cast', 'dodge', 'hurt', 'stun', 'death', 'victory'],
-    'rk_lancer': ['idle', 'blink', 'walk', 'combat_idle', 'attack_slash', 'vault', 'hurt', 'stun', 'death', 'victory'],
+    'rk_guardian': ['idle', 'blink', 'walk', 'run', 'combat_idle', 'attack_slash', 'attack_heavy', 'block_enter', 'block_hold', 'roll', 'hurt', 'stun', 'death', 'victory'],
+    'rk_blade': ['idle', 'blink', 'walk', 'run', 'combat_idle', 'attack_slash', 'attack_heavy', 'roll', 'hurt', 'stun', 'death', 'victory'],
+    'rk_ranger': ['idle', 'blink', 'walk', 'run', 'combat_idle', 'shoot_bow', 'backflip', 'hurt', 'stun', 'death', 'victory'],
+    'rk_cleric': ['idle', 'blink', 'walk', 'run', 'combat_idle', 'cast', 'roll', 'hurt', 'stun', 'death', 'victory'],
+    'rk_arcanist': ['idle', 'blink', 'walk', 'run', 'combat_idle', 'cast', 'dodge', 'hurt', 'stun', 'death', 'victory'],
+    'rk_lancer': ['idle', 'blink', 'walk', 'run', 'combat_idle', 'attack_slash', 'vault', 'hurt', 'stun', 'death', 'victory'],
     'slime': ['idle', 'move', 'attack_slam', 'attack_spit', 'hurt', 'death'],
     'bat': ['idle', 'attack_swoop', 'hurt', 'death'],
-    'wolf': ['idle', 'walk', 'run', 'attack_bite', 'hurt', 'death'],
-    'goblin': ['idle', 'walk', 'attack_slash', 'hurt', 'death'],
-    'goblin_archer': ['idle', 'walk', 'shoot_bow', 'hurt', 'death'],
-    'goblin_chief': ['idle', 'walk', 'attack_slash', 'hurt', 'death'],
-    'orc': ['idle', 'walk', 'combat_idle', 'attack_slash', 'attack_heavy', 'hurt', 'stun', 'death'],
-    'skeleton': ['idle', 'walk', 'combat_idle', 'attack_slash', 'hurt', 'stun', 'death_crumble'],
-    'ogre': ['idle', 'walk', 'attack_heavy', 'hurt', 'death'],
-    'stone_warden': ['idle', 'walk', 'attack_slam', 'cast_ring', 'attack_fan', 'charge', 'summon', 'stomp', 'enrage', 'hurt', 'death'],
+    'wolf': ['idle', 'combat_idle', 'walk', 'run', 'attack_bite', 'howl', 'hurt', 'death'],
+    'goblin': ['idle', 'walk', 'combat_idle', 'attack_slash', 'hurt', 'death'],
+    'goblin_archer': ['idle', 'walk', 'combat_idle', 'shoot_bow', 'hurt', 'death'],
+    'goblin_chief': ['idle', 'walk', 'combat_idle', 'attack_slash', 'hurt', 'death'],
+    'orc': ['idle', 'walk', 'run', 'combat_idle', 'attack_slash', 'attack_heavy', 'hurt', 'stun', 'death'],
+    'skeleton': ['idle', 'walk', 'run', 'combat_idle', 'attack_slash', 'hurt', 'stun', 'death_crumble'],
+    'ogre': ['idle', 'walk', 'combat_idle', 'attack_heavy', 'roar', 'hurt', 'death'],
+    'stone_warden': ['idle', 'walk', 'combat_idle', 'attack_slam', 'cast_ring', 'attack_fan', 'charge', 'summon', 'stomp', 'enrage', 'hurt', 'death'],
+    'cinderwyrm': ['idle', 'walk', 'combat_idle', 'attack_bite', 'attack_tail', 'breath', 'roar', 'hurt', 'death'],
+    'ashen_duelist': ['idle', 'walk', 'combat_idle', 'attack_slash', 'attack_lunge', 'hurt', 'death'],
 }
 
 # Recipes that are pure palette swaps of a sheet above are made in the game (frost_wolf from wolf,
-# stone_warden_enraged from stone_warden), so they ship no pixels of their own.
+# stone_warden_enraged from stone_warden, cinderwyrm_obsidian from cinderwyrm), so they ship no
+# pixels of their own.
 
 # FX (out/fx/<name>/, after `pf fx build --all`), written as fx_<name>: the mobs' death poofs, the
-# skeleton's crumble, the stun stars, the Stone Warden's thrown shards.
+# skeleton's crumble, the stun stars, the Stone Warden's thrown shards, the Cinderwyrm's fireballs,
+# the rings of a wolf's howl.
 FX = {
     'poof_smoke': ['play'],
     'bone_crumble': ['play'],
     'status_stun': ['loop'],
     'rock_shard': ['travel'],
+    'fireball': ['travel'],
+    'howl_rings': ['play'],
 }
 
 KNIGHT_ANCHORS = ('chin', 'back', 'hip')
 OWNER_ORDER = ['metal', 'cloth', 'leather', 'accent', 'skin', 'hair', 'hide', 'fur', 'slime', 'slime_highlight', 'stone', 'bone',
-               'membrane', 'horn', 'scales', 'chitin', 'eyes']
+               'membrane', 'horn', 'scales', 'leaf', 'fruit', 'chitin', 'eyes']
 DIRS = ('s', 'e', 'n', 'w')
 COLS = 16
 
@@ -79,7 +92,13 @@ def recipe_path(repo, name):
     raise SystemExit(f'no recipe for {name}')
 
 
-def owners_for(style, recipe):
+def part_material(repo, slot, variant):
+    """The material a part is drawn in (parts/<slot>/<variant>/part.yaml)."""
+    path = os.path.join(repo, 'parts', slot, variant, 'part.yaml')
+    return (yaml.safe_load(open(path)) or {}).get('material') if os.path.isfile(path) else None
+
+
+def owners_for(repo, style, recipe):
     """hex -> (material, shade) for the colors this recipe can paint."""
     colors = recipe.get('colors', {}) or {}
     found = {}
@@ -90,12 +109,52 @@ def owners_for(style, recipe):
         ramp = spec['presets'][preset] if preset else spec['base']
         for shade, h in enumerate(ramp):
             found.setdefault(h.lower(), []).append((mat, shade, preset is not None))
+    # A part dyed apart (slot_colors) is a second material of its kind, ahead of the rest: cloth2
+    # for a scarf or a cloak in another dye, metal2 for a helm in another metal (a third, cloth3...).
+    seconds = {}
+    for slot, preset in sorted((recipe.get('slot_colors') or {}).items()):
+        mat = part_material(repo, slot, (recipe.get('parts') or {}).get(slot, ''))
+        if not mat or preset == colors.get(mat):
+            continue
+        key = (mat, preset)
+        if key not in seconds:
+            seconds[key] = f'{mat}{2 + sum(1 for m, _p in seconds if m == mat)}'
+        for shade, h in enumerate(style['materials'][mat]['presets'][preset]):
+            found.setdefault(h.lower(), []).insert(0, (seconds[key], shade, True))
     out = {}
     rank = {m: i for i, m in enumerate(OWNER_ORDER)}
     for h, cands in found.items():
-        cands.sort(key=lambda c: (not c[2], rank.get(c[0], 99)))
+        # Set by the recipe first, a part dyed apart before its material, then OWNER_ORDER.
+        cands.sort(key=lambda c: (not c[2], not c[0][-1:].isdigit(), rank.get(c[0], 99)))
         out[h] = (cands[0][0], cands[0][1])
+    # The swing trails: rim, mid and the white core.
+    for shade, h in enumerate(style['fx_ramps']['swing']):
+        out.setdefault(h.lower(), ('trail', shade))
     return out
+
+
+def check_bare(repo, style, name):
+    """The knight's trail-free build is there and is the full build's frames, timing and pixels but
+    for its swing trails (else it's stale: run tools/packs/pixelforge_bare.py again)."""
+    full_dir = os.path.join(repo, 'out', name)
+    bare_dir = os.path.join(repo, 'out', 'bare', name)
+    if not os.path.isfile(os.path.join(bare_dir, f'{name}.json')):
+        raise SystemExit(f'{name}: no {bare_dir}; run tools/packs/pixelforge_bare.py with PixelForge\'s Python first')
+    full = json.load(open(os.path.join(full_dir, f'{name}.json')))
+    bare = json.load(open(os.path.join(bare_dir, f'{name}.json')))
+    same = full['meta']['frameTags'] == bare['meta']['frameTags'] and [f['duration'] for f in full['frames']] == [f['duration'] for f in bare['frames']]
+    if same:
+        swing = {tuple(int(h[i:i + 2], 16) for i in (1, 3, 5)) for h in style['fx_ramps']['swing']}
+        a = Image.open(os.path.join(full_dir, f'{name}.png')).convert('RGBA')
+        b = Image.open(os.path.join(bare_dir, f'{name}.png')).convert('RGBA')
+        for ff, bf in zip(full['frames'], bare['frames']):
+            fa = pixels(a.crop((ff['frame']['x'], ff['frame']['y'], ff['frame']['x'] + ff['frame']['w'], ff['frame']['y'] + ff['frame']['h'])))
+            fb = pixels(b.crop((bf['frame']['x'], bf['frame']['y'], bf['frame']['x'] + bf['frame']['w'], bf['frame']['y'] + bf['frame']['h'])))
+            if any(p != q and not (p[3] == 255 and p[:3] in swing) for p, q in zip(fa, fb)):
+                same = False
+                break
+    if not same:
+        raise SystemExit(f'{name}: {bare_dir} is not this build without its trails; run tools/packs/pixelforge_bare.py again')
 
 
 def main():
@@ -108,12 +167,15 @@ def main():
     outline = style['outline']['color'].lower()
     rig_anchors = json.load(open(os.path.join(repo, 'parts', 'body', 'humanoid', 'anchors.json')))
     total = 0
-    jobs = [(n, a, os.path.join(repo, 'out', n), n, False) for n, a in SHEETS.items()]
+    jobs = [(n, a, os.path.join(repo, 'out', 'bare' if n.startswith('rk_') else '', n), n, False) for n, a in SHEETS.items()]
     jobs += [(n, a, os.path.join(repo, 'out', 'fx', n), f'fx_{n}', True) for n, a in FX.items()]
     for name, anims, src, out_name, is_fx in jobs:
+        if name.startswith('rk_'):
+            check_bare(repo, style, name)
         meta = json.load(open(os.path.join(src, f'{name}.json')))
         sheet = Image.open(os.path.join(src, f'{name}.png')).convert('RGBA')
-        owner = {} if is_fx else owners_for(style, yaml.safe_load(open(recipe_path(repo, name))))
+        recipe = {} if is_fx else yaml.safe_load(open(recipe_path(repo, name)))
+        owner = {} if is_fx else owners_for(repo, style, recipe)
         pf = meta['meta']['pixelforge']
         tags = {t['name']: t for t in meta['meta']['frameTags']}
         cell = meta['frames'][0]['sourceSize']['w']
@@ -184,6 +246,7 @@ def main():
 
         # The palette: transparent first, then each color with its material and shade.
         table = []
+        stray = []
         for (h, a) in colors:
             if is_fx:
                 mat, shade = 'fx', 0
@@ -195,7 +258,11 @@ def main():
                 mat, shade = owner[h]
             else:
                 mat, shade = 'flash', 0
+                if h != style['effects']['flash'].lower():
+                    stray.append(h)
             table.append([h, a, mat, shade])
+        if stray:
+            print(f'{name}: colors no material owns (kept as drawn): {" ".join(stray)}')
         rank = {m: i for i, m in enumerate(['outline', 'shadow', 'flash'] + OWNER_ORDER)}
         table.sort(key=lambda c: (rank.get(c[2], 99), c[2], c[3]))
         index = {(c[0], c[1]): i + 1 for i, c in enumerate(table)}
@@ -238,6 +305,9 @@ def main():
         }
         if anchors:
             doc['anchors'] = [anchors.get(k) for k in range(len(cells))]
+        if is_knight and (recipe.get('parts') or {}).get('cape', 'none') != 'none':
+            # A knight in a cloak of its own design: the game hangs no cape of its own on it.
+            doc['cloak'] = True
         with open(os.path.join(out_dir, f'{out_name}.json'), 'w') as f:
             json.dump(doc, f, separators=(',', ':'))
         size = os.path.getsize(png_path)

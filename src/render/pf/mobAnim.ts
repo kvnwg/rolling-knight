@@ -8,8 +8,11 @@
  * stride, the Stone Warden's rush frames), a leap holds a frame in the air (an ogre's club overhead, a
  * slime stretched tall, a wolf crouched then biting) and lands on the strike frame. The renderer moves
  * the whole body on top (mobMotion.ts: the crouch, the arc, the squash). Bosses play the move they
- * wind up (ring, fan, charge, slam, summon, rain, leap) and roar when they enrage. Deaths play out
- * after the sim has let go of the mob (see the renderer's corpses).
+ * wind up (ring, fan, charge, slam, summon, rain, leap; the Stone Warden's own moves, the Cinderwyrm's
+ * roar, breath, bite and tail) and roar when they enrage. Waking, a wolf howls (its rings rising off
+ * its muzzle) and an ogre roars, over the moment it takes to rise into the fight. Quick movers run
+ * (a wolf, an orc or a skeleton at a sprint). Deaths play out after the sim has let go of the mob
+ * (see the renderer's corpses).
  *
  * The supplied packs' monsters (the dark biomes' skeletons and vampire, the slime) are side views:
  * their sheets draw east and west only, so a mob going up or down keeps facing the way the sim says
@@ -21,8 +24,11 @@ import type { Unit } from '../../world/entities';
 import type { World } from '../../world/world';
 import { SHEETS, type SheetName } from './assets';
 import { travelDir } from './heroAnim';
-import type { MonsterId } from './mobLook';
-import { clipMs, eventFrame, facing, walkPace, type Dir, type FrameRef, type PFSheet } from './sheet';
+import { MONSTER_SHEET, type MonsterId } from './mobLook';
+import { clipMs, eventFrame, facing, RUN_MIN_FRAME, WALK_MIN_FRAME, walkPace, type Dir, type FrameRef, type PFSheet } from './sheet';
+
+/** Seconds a foe takes to rise into a fight (world.ts SPAWN_IN). */
+const RISE = 0.6;
 
 /** Each monster's animations for the game's moves, and how far its walk cycle carries it (px). */
 interface Kit {
@@ -38,8 +44,12 @@ interface Kit {
   stun?: string;
   /** A lunge's anim (its crouch, its flight and its landing); the melee's when left out. */
   lunge?: string;
-  /** What a dash shows: the lunge's strike frame held (the default), or its gait run fast ('run'). */
+  /** What a dash shows: the lunge's strike frame held, or its gait run fast ('run'); by default a charge runs and a dash holds. */
   dash?: 'hold' | 'run';
+  /** What it plays as it wakes and rises into the fight (a wolf's howl, an ogre's roar). */
+  wake?: string;
+  /** A boss's roar at half HP (the Stone Warden's 'enrage' by default). */
+  enrage?: string;
   /** The lunge anim's frame a leap holds in the air; by default its last windup frame going up and its strike frame coming down. */
   air?: number;
   /** A throw's anim (its raise over the wind-up, its release). */
@@ -53,24 +63,31 @@ interface Kit {
 const KITS: Record<MonsterId, Kit> = {
   slime: { walk: 'move', cycle: 14, melee: 'attack_slam', ranged: 'attack_spit', bomb: 'attack_spit', death: 'death', lunge: 'attack_slam', air: 2 },
   bat: { walk: 'idle', cycle: 0, melee: 'attack_swoop', death: 'death', lunge: 'attack_swoop' },
-  wolf: { walk: 'walk', cycle: 11, run: 'run', runCycle: 22, melee: 'attack_bite', death: 'death', lunge: 'attack_bite' },
-  frost_wolf: { walk: 'walk', cycle: 11, run: 'run', runCycle: 22, melee: 'attack_bite', death: 'death', lunge: 'attack_bite' },
+  wolf: { walk: 'walk', cycle: 11, run: 'run', runCycle: 22, melee: 'attack_bite', death: 'death', lunge: 'attack_bite', wake: 'howl' },
+  frost_wolf: { walk: 'walk', cycle: 11, run: 'run', runCycle: 22, melee: 'attack_bite', death: 'death', lunge: 'attack_bite', wake: 'howl' },
   goblin: { walk: 'walk', cycle: 7, melee: 'attack_slash', death: 'death', lunge: 'attack_slash' },
   goblin_chief: { walk: 'walk', cycle: 7, melee: 'attack_slash', death: 'death', lunge: 'attack_slash' },
   goblin_archer: { walk: 'walk', cycle: 7, melee: 'shoot_bow', ranged: 'shoot_bow', death: 'death' },
-  orc: { walk: 'walk', cycle: 10, melee: 'attack_slash', death: 'death', stun: 'stun', lunge: 'attack_heavy', dash: 'run' },
-  skeleton: { walk: 'walk', cycle: 10, melee: 'attack_slash', death: 'death_crumble', stun: 'stun', lunge: 'attack_slash' },
-  ogre: { walk: 'walk', cycle: 15, melee: 'attack_heavy', death: 'death', lunge: 'attack_heavy', throw: 'attack_heavy' },
+  // (PixelForge's humanoids walk 12 px a cycle and run 30.)
+  orc: { walk: 'walk', cycle: 12, run: 'run', runCycle: 30, melee: 'attack_slash', death: 'death', stun: 'stun', lunge: 'attack_heavy', dash: 'run' },
+  skeleton: { walk: 'walk', cycle: 12, run: 'run', runCycle: 30, melee: 'attack_slash', death: 'death_crumble', stun: 'stun', lunge: 'attack_slash' },
+  ogre: { walk: 'walk', cycle: 15, melee: 'attack_heavy', death: 'death', lunge: 'attack_heavy', throw: 'attack_heavy', wake: 'roar' },
   stone_warden: { walk: 'walk', cycle: 16, melee: 'attack_slam', death: 'death' },
+  // The Ember Depths' boss: a slow dragon that bites, sweeps its tail, breathes fire and roars.
+  cinderwyrm: { walk: 'walk', cycle: 30, melee: 'attack_bite', ranged: 'breath', death: 'death', lunge: 'attack_bite', dash: 'hold', enrage: 'roar', linger: 300 },
+  // A quick elite of the later floors: its glaive sweeps, it lunges with the glaive out in front.
+  ashen_duelist: { walk: 'walk', cycle: 24, melee: 'attack_slash', ranged: 'attack_slash', death: 'death', lunge: 'attack_lunge' },
   pk_skeleton: { walk: 'walk', cycle: 22, melee: 'attack', death: 'death', linger: 1100, poof: null },
   pk_reaper: { walk: 'walk', cycle: 22, melee: 'attack', death: 'death', linger: 1100, poof: null },
   pk_vampire: { walk: 'walk', cycle: 18, melee: 'attack', death: 'death', linger: 500, poof: null },
   pk_slime: { walk: 'move', cycle: 18, melee: 'attack', ranged: 'attack', bomb: 'attack', death: 'death', poof: null },
 };
 
-/** The gait a mob moves in at `speed` px/s: its walk, or its run once it's quick. */
-function gait(sheet: PFSheet, kit: Kit, speed: number): { anim: string; cyc: number } {
-  return kit.run && kit.runCycle && speed > 40 && sheet.has(kit.run) ? { anim: kit.run, cyc: kit.runCycle } : { anim: kit.walk, cyc: kit.cycle };
+/** The gait a mob moves in at `speed` px/s: its walk, or its run once it's quick (its frames may turn quicker). */
+function gait(sheet: PFSheet, kit: Kit, speed: number): { anim: string; cyc: number; minFrame: number } {
+  return kit.run && kit.runCycle && speed > 40 && sheet.has(kit.run)
+    ? { anim: kit.run, cyc: kit.runCycle, minFrame: RUN_MIN_FRAME }
+    : { anim: kit.walk, cyc: kit.cycle, minFrame: WALK_MIN_FRAME };
 }
 
 /** The boss moves (mobgen's BossMove) as Stone Warden animations. */
@@ -84,13 +101,31 @@ export const BOSS_ANIM: Record<string, string> = {
   leap: 'attack_slam',
 };
 
+/**
+ * The boss moves as the Cinderwyrm's: its fire ring and its summons are the roar (wings spread), its
+ * fan the breath, its charge a lunging bite, its slam the tail swept round, the fire it calls down a
+ * roar at the sky, and its leap a beat of the wings (aloft on the roar's spread wings).
+ */
+export const WYRM_ANIM: Record<string, string> = {
+  ring: 'roar',
+  fan: 'breath',
+  charge: 'attack_bite',
+  slam: 'attack_tail',
+  summon: 'roar',
+  rain: 'roar',
+  leap: 'roar',
+};
+
+const BOSS_ANIMS: Partial<Record<MonsterId, Record<string, string>>> = { stone_warden: BOSS_ANIM, cinderwyrm: WYRM_ANIM };
+
 /** Moves whose aim follows the target through the first half of the wind-up (the sprite turns with it). */
 const AIMED: ReadonlySet<string> = new Set(['dash', 'charge', 'leap']);
 
 /** The animation a mob plays for one of the game's moves. */
 export function moveAnim(monster: MonsterId, move: string | undefined, boss: boolean): string {
   const kit = KITS[monster];
-  if (boss && move && BOSS_ANIM[move]) return BOSS_ANIM[move];
+  const bossAnim = boss && move ? (BOSS_ANIMS[monster] ?? BOSS_ANIM)[move] : undefined;
+  if (bossAnim && SHEETS[MONSTER_SHEET[monster]].has(bossAnim)) return bossAnim;
   if (move === 'shoot' || move === 'cast') return kit.ranged ?? kit.melee;
   if (move === 'bomb') return kit.bomb ?? kit.melee;
   if (move === 'dash' || move === 'charge' || move === 'leap') return kit.lunge ?? kit.melee;
@@ -106,6 +141,10 @@ export interface MobPose {
   flash: boolean;
   alpha: number;
   stunned: boolean;
+  /** A PixelForge FX its frame calls for, once (a howl's rings), and where: px from the mob's feet. */
+  fx?: { name: SheetName; dx: number; dy: number };
+  /** Its frames carry the motion themselves (a howl as it wakes): drawn whole, not squashed or faded in. */
+  steady?: boolean;
 }
 
 interface Mem {
@@ -130,6 +169,8 @@ interface Mem {
   charging: boolean;
   chargeEnd: number;
   flashAt: number;
+  /** The frame (anim and index) whose FX last went out, so each goes out once. */
+  fxAt: string;
 }
 
 const mems = new Map<number, Mem>();
@@ -201,7 +242,7 @@ export function mobPose(w: World, m: Unit, monster: MonsterId, sheetName: SheetN
     s = {
       world: w, t: now, x: m.x, y: m.y, vx: 0, vy: 0, speed: 0, dir: m.dir < 0 ? 'w' : 'e', walk: 0,
       hurtT: m.hurtT, hurtAt: -9, windT: m.windT ?? 0, wind: null, swingT: m.swingT, strike: null,
-      phase: m.bossPhase ?? 0, enrageAt: -9, lastMove: m.move, charging: false, chargeEnd: -9, flashAt: -9,
+      phase: m.bossPhase ?? 0, enrageAt: -9, lastMove: m.move, charging: false, chargeEnd: -9, flashAt: -9, fxAt: '',
     };
     mems.set(m.uid, s);
   }
@@ -215,8 +256,9 @@ export function mobPose(w: World, m: Unit, monster: MonsterId, sheetName: SheetN
     s.speed += (moved / dt - s.speed) * k;
     s.vx += (dx / dt - s.vx) * k;
     s.vy += (dy / dt - s.vy) * k;
+    // (Cycles walked: the phase carries over between the walk and the run.)
     const g = gait(sheet, kit, s.speed);
-    if (g.cyc) s.walk += moved * walkPace(g.cyc, sheet.clip(g.anim, 's').length, s.speed);
+    if (g.cyc) s.walk += (moved * walkPace(g.cyc, sheet.clip(g.anim, 's').length, s.speed, g.minFrame)) / g.cyc;
   }
   s.x = m.x;
   s.y = m.y;
@@ -275,6 +317,23 @@ export function mobPose(w: World, m: Unit, monster: MonsterId, sheetName: SheetN
     const f = clip('hurt', s.dir);
     return out('hurt', s.dir, f[Math.min(1, f.length - 1)][0], { stunned: true });
   }
+  // --- waking: rising into the fight, a wolf howls and an ogre roars (over the moment it takes)
+  const rise = m.spawnT ?? 0;
+  if (rise > 0 && kit.wake && sheet.has(kit.wake)) {
+    const dir = towardHero(w, m, s.dir);
+    const f = clip(kit.wake, dir);
+    const i = at(f, Math.min(0.999, Math.max(0, 1 - rise / RISE)) * clipMs(f));
+    // Its FX (the rings off a howling muzzle) go out once, as the frame that calls for them shows.
+    const ev = sheet.meta.anims[kit.wake].events?.find((e) => e[0] === i && e[1] === 'vfx' && e[2] && `fx_${e[2]}` in SHEETS);
+    const at_ = `${kit.wake}${i}`;
+    if (ev && s.fxAt !== at_) {
+      s.fxAt = at_;
+      const [top, mid] = sheet.meta.tops[f[i][0]];
+      const [px, py] = sheet.meta.pivot;
+      return out(kit.wake, dir, f[i][0], { steady: true, fx: { name: `fx_${ev[2]}` as SheetName, dx: mid - px, dy: top - py + 3 } });
+    }
+    return out(kit.wake, dir, f[i][0], { steady: true });
+  }
   // --- a wind-up: the windup frames over the game's telegraph (a lunge turns with its aim while it tracks)
   if (windT > 0 && s.wind) {
     if (s.wind.move && AIMED.has(s.wind.move)) s.wind.dir = moveDir(w, m, s.wind.dir);
@@ -302,8 +361,9 @@ export function mobPose(w: World, m: Unit, monster: MonsterId, sheetName: SheetN
     const f = clip(anim, dir);
     const st = Math.min(f.length - 1, strikeOf(sheet, anim));
     if (r.kind === 'dash') {
-      // A charge runs (its run, or its walk at a sprint); a dash holds its strike (a stab, a thrust, a dive).
-      if (r.move === 'charge' || kit.dash === 'run') {
+      // A charge runs (its run, or its walk at a sprint); a dash holds its strike (a stab, a thrust, a
+      // dive), and so does a kit that lunges into a charge (the Cinderwyrm's bite).
+      if (kit.dash ? kit.dash === 'run' : r.move === 'charge') {
         const run = kit.run && sheet.has(kit.run) ? kit.run : kit.walk;
         return out(run, dir, loop(run, dir, now * 1000 * 1.8));
       }
@@ -326,9 +386,10 @@ export function mobPose(w: World, m: Unit, monster: MonsterId, sheetName: SheetN
     s.strike = null;
   }
   // --- a boss's roar at half HP
-  if (m.boss && now - s.enrageAt < 1.2 && sheet.has('enrage') && !busy) {
-    const f = clip('enrage', s.dir);
-    return out('enrage', s.dir, f[at(f, (now - s.enrageAt) * 1000, 1.2 / (clipMs(f) / 1000))][0]);
+  const roar = kit.enrage ?? 'enrage';
+  if (m.boss && now - s.enrageAt < 1.2 && sheet.has(roar) && !busy) {
+    const f = clip(roar, s.dir);
+    return out(roar, s.dir, f[at(f, (now - s.enrageAt) * 1000, 1.2 / (clipMs(f) / 1000))][0]);
   }
   // --- hurt (bosses only flash)
   if (hit < 0.34 && !m.boss && s.speed < 8) {
@@ -342,8 +403,8 @@ export function mobPose(w: World, m: Unit, monster: MonsterId, sheetName: SheetN
     const { anim, cyc } = gait(sheet, kit, s.speed);
     const f = clip(anim, dir);
     if (!cyc) return out(anim, dir, loop(anim, dir, now * 1000));
-    const p = ((s.walk % cyc) + cyc) % cyc;
-    return out(anim, dir, f[Math.min(f.length - 1, Math.floor((p / cyc) * f.length))][0]);
+    const p = ((s.walk % 1) + 1) % 1;
+    return out(anim, dir, f[Math.min(f.length - 1, Math.floor(p * f.length))][0]);
   }
   // --- standing: facing the nearest knight once awake
   const dir = m.awake ? towardHero(w, m, s.dir) : s.dir;

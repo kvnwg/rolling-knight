@@ -18,6 +18,8 @@
 import { KNIGHTS_BY_ID } from '../core/knights';
 import type { MutationId } from '../core/state';
 import type { View } from './art/knights';
+import { pfReady } from './pf/assets';
+import { idleFrameAt } from './pf/frames';
 import { FIRE_H, FIRE_W, fireFrames, fireFront, knightSprite, paintCamp, type KnightSprite } from './vista/camp';
 import { ground, makeLayout, mistStrip, paintFar, paintFront, paintLake, paintMid, paintNear, riverPath, type Glow, type Layout } from './vista/land';
 import { blurRGBA, blurred, canvas, clamp, crop, ctx2d, firstRow, glowSprite, hex, luma, padPix, Pix, rng, type Canvas } from './vista/pix';
@@ -486,7 +488,8 @@ export class Vista {
     const rimSide = 1;
     const drawKnight = (i: number) => {
       const { hero, slot } = placed[i];
-      const frame = Math.floor(t * 1.9 + slot.phase * 2) % 2;
+      // PixelForge's knights breathe through their idle at its own timing; the old art bobs on two frames.
+      const frame = pfReady() ? idleFrameAt(hero.id, (t + slot.phase) * 1000) : Math.floor(t * 1.9 + slot.phase * 2) % 2;
       const k = this.knight(hero.id, hero.mutation, slot, frame, t, rimSide);
       if (!k) return;
       const x = L.fx + slot.dx - k.ax;

@@ -7,8 +7,8 @@
 import { toCanvas } from '../art/draw';
 import { blank, blit, type PixelBuf } from '../pixel/buf';
 import { SHEETS, type SheetName } from './assets';
-import { knightPaint, PRIMORDIAL_STILL, type KnightPaint } from './knightLook';
-import type { Dir, Recolor } from './sheet';
+import { knightPaint, knightSheet, PRIMORDIAL_STILL, type KnightPaint } from './knightLook';
+import { frameAt, type Dir, type Recolor } from './sheet';
 
 export const OUTLINE = '#3a263a';
 export const FLASH = '#efe2c8';
@@ -245,6 +245,12 @@ export function knightBounds(names: readonly SheetName[]): [number, number, numb
     }
   }
   return box;
+}
+
+/** The idle frame (its place in the clip) a knight shows `ms` into its breath, at the idle's own timing. */
+export function idleFrameAt(id: string, ms: number): number {
+  const f = SHEETS[knightSheet(id)].clip('idle', 's');
+  return f.length ? frameAt(f, ms, true) : 0;
 }
 
 /**

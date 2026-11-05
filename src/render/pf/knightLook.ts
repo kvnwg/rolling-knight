@@ -3,14 +3,21 @@
  * rarity and mutation paint over the sheet's own (metal, cloth, accent, leather; skin and hair per
  * knight). Commons wear iron and undyed cloth; each tier up wears a better metal and cloth dyed in
  * its rarity's color, all at PixelForge's lightness steps and muted chroma so the shading and the
- * style hold. Epic and up add a cape, Celestial and up a halo, Primordial cycles its colors; the
- * mutations repaint on top (Gilded gold, Shadow dark, Radiant light, Void purple-black with cyan).
+ * style hold. Epic and up add a cape (unless the class wears a cloak of its own), Celestial and up a
+ * halo, Primordial cycles its colors; the mutations repaint on top (Gilded gold, Shadow dark, Radiant
+ * light, Void purple-black with cyan).
+ *
+ * Each class is drawn with a silhouette and a two-tone outfit of its own (the Blade's dark tunic and
+ * bright scarf, the Cleric's white robe under a gold cloak and mitre): the tier's dye goes on through
+ * the class's own values (dressed), so a light robe stays light and a vivid scarf stays the vivid
+ * part, and a part dyed apart (cloth2: a scarf, a cloak; metal2: the Lancer's helm and spearhead)
+ * takes a second tone of the tier.
  */
 import { KEVIN_ID, knightDef, type ClassId } from '../../core/knights';
 import { RARITY_COLOR, rarityIndex, type Rarity } from '../../core/rarity';
 import type { MutationId } from '../../core/state';
-import type { SheetName } from './assets';
-import { hexToOklch, mixHexes, oklchToHex, ramp, rampLike } from './color';
+import { SHEETS, type SheetName } from './assets';
+import { hexToOklch, mixHexes, oklchToHex, ramp, rampLike, warmer } from './color';
 import type { Recolor } from './sheet';
 
 /** The sheet each class is drawn from (recolored per rarity and mutation). */
@@ -70,6 +77,10 @@ interface Tier {
   cloth: readonly string[];
   accent: readonly string[];
   leather: readonly string[];
+  /** A part dyed apart: a scarf, a cloak, a mitre (dressed: the class's own values in the tier's dye). */
+  cloth2?: readonly string[];
+  /** A part in another metal: the Lancer's helm and spearhead (the tier's trim metal). */
+  metal2?: readonly string[];
 }
 
 /** One look per rarity (the order is RARITIES'). */
@@ -125,40 +136,125 @@ function primordialTier(step: number): Tier {
 /** The step a still Primordial (menus, portraits) shows: violet to gold armor over royal blue. */
 export const PRIMORDIAL_STILL = 18;
 
+/** How a class's sheet paints a material: its lightness per shade, and its chroma and hue. */
+interface Design {
+  L: number[];
+  C: number;
+  h: number;
+}
+
+const designs = new Map<string, Design | null>();
+
+/** The sheet's own colors of `mat` (null when it has none): lightness by shade, a missing shade a step from its neighbour. */
+function designOf(sheet: SheetName, mat: string, shades: number): Design | null {
+  const key = `${sheet}|${mat}`;
+  if (designs.has(key)) return designs.get(key)!;
+  const L: Array<number | undefined> = Array.from({ length: shades });
+  let C = 0;
+  let h = 0;
+  let n = 0;
+  for (const [hex, a, m, shade] of SHEETS[sheet].meta.colors) {
+    if (m !== mat || a !== 255 || shade >= shades) continue;
+    const o = hexToOklch(hex);
+    L[shade] = o[0];
+    C += o[1];
+    h = o[2];
+    n++;
+  }
+  let d: Design | null = null;
+  if (n) {
+    const step = 0.065;
+    for (let i = 0; i < shades; i++) if (L[i] === undefined) for (let j = 1; j < shades; j++) {
+      if (L[i - j] !== undefined) { L[i] = L[i - j]! + step * j; break; }
+      if (L[i + j] !== undefined) { L[i] = L[i + j]! - step * j; break; }
+    }
+    d = { L: L as number[], C: C / n, h };
+  }
+  designs.set(key, d);
+  return d;
+}
+
+/**
+ * The tier's dye (`tier`, a ramp) put on through a class's own values (`d`): the class's lightness
+ * steps, a little lighter or darker as the dye is, at the dye's hue (turned by `dh`), and the dye's
+ * chroma scaled by how vivid the class's own color is against `refC` (a near-white robe stays
+ * nearly white, a vivid scarf takes the dye at full strength). Without a design, the tier's ramp.
+ */
+function dress(tier: readonly string[], d: Design | null, refL: number, refC: number, dh = 0): string[] {
+  if (!d) return [...tier];
+  const [Lt, Ct] = hexToOklch(tier[Math.min(1, tier.length - 1)]);
+  const h0 = hexToOklch(tier[0])[2];
+  const lo = Math.min(...d.L);
+  const hi = Math.max(...d.L);
+  const dL = Math.max(0.31 - lo, Math.min(0.83 - hi, (Lt - refL) * 0.5));
+  const C = Ct * Math.max(0.3, Math.min(1.2, d.C / refC));
+  return d.L.map((L, i) => oklchToHex(L + dL, C, warmer((h0 + dh + 360) % 360, 5 * i)));
+}
+
+/** A tier dressed for a class's sheet: its cloth, its second cloth and its leather through the class's values, its trim metal from its accent. */
+function dressFor(t: Tier, sheet: SheetName): Tier {
+  const cloth = designOf(sheet, 'cloth', 2);
+  const cloth2 = designOf(sheet, 'cloth2', 2);
+  // A second dye a little round the wheel from the first, as the class's own two are (both vivid).
+  const dh = cloth && cloth2 && cloth.C > 0.06 && cloth2.C > 0.06 ? Math.max(-25, Math.min(25, ((cloth2.h - cloth.h + 540) % 360) - 180)) : 0;
+  const [, aC, aH] = hexToOklch(t.accent[t.accent.length - 1]);
+  return {
+    ...t,
+    cloth: dress(t.cloth, cloth, 0.49, 0.09),
+    cloth2: dress(t.cloth, cloth2, 0.49, 0.09, dh),
+    leather: dress(t.leather, designOf(sheet, 'leather', 3), 0.45, 0.03),
+    metal2: t.metal.map((x, i) => oklchToHex(Math.min(0.83, hexToOklch(x)[0] + 0.03), Math.max(0.02, Math.min(0.1, aC)), warmer(aH, 4 * i))),
+  };
+}
+
 /** The mutations' paint over a tier: Gilded gold, Shadow dark, Radiant light, Void purple-black with a cyan glint. */
 function mutate(t: Tier, m: MutationId | null, cls: ClassId): Tier {
+  // Halfway to white in lightness, softer in color (the order of the shades holds).
+  const whiten = (r: readonly string[]) =>
+    r.map((c) => {
+      const [L, C, h] = hexToOklch(c);
+      return oklchToHex(L + (0.84 - L) * 0.5, C * 0.75, h);
+    });
   switch (m) {
     case 'gilded': {
       const gold = ramp([0.58, 0.67, 0.75, 0.81], 0.095, 70, 4);
       // Classes without armor gild their wood: the Ranger's bow, the casters' staves.
       const unarmored = cls === 'ranger' || cls === 'cleric' || cls === 'arcanist';
-      return { ...t, metal: gold, accent: ramp([0.76, 0.82], 0.1, 85), leather: unarmored ? ramp([0.5, 0.58, 0.66], 0.085, 72, 4) : t.leather };
+      return { ...t, metal: gold, metal2: gold, accent: ramp([0.76, 0.82], 0.1, 85), leather: unarmored ? ramp([0.5, 0.58, 0.66], 0.085, 72, 4) : t.leather };
     }
-    case 'shadow':
+    case 'shadow': {
+      const metal = ramp([0.31, 0.36, 0.43, 0.51], 0.035, 300, 3);
       return {
-        metal: ramp([0.31, 0.36, 0.43, 0.51], 0.035, 300, 3),
+        metal,
+        metal2: metal,
         cloth: ramp([0.31, 0.37], 0.05, 305),
+        cloth2: ramp([0.36, 0.43], 0.085, 300),
         accent: ramp([0.5, 0.6], 0.09, 305),
         leather: ramp([0.3, 0.33, 0.37], 0.02, 300),
       };
-    case 'radiant':
+    }
+    case 'radiant': {
+      const metal = ramp([0.66, 0.72, 0.78, 0.82], 0.035, 90, 2);
       return {
-        metal: ramp([0.66, 0.72, 0.78, 0.82], 0.035, 90, 2),
-        // Halfway to white in lightness, softer in color (the order of the shades holds).
-        cloth: t.cloth.map((c) => {
-          const [L, C, h] = hexToOklch(c);
-          return oklchToHex(L + (0.84 - L) * 0.5, C * 0.75, h);
-        }),
+        metal,
+        metal2: metal,
+        cloth: whiten(t.cloth),
+        ...(t.cloth2 ? { cloth2: whiten(t.cloth2) } : {}),
         accent: ramp([0.76, 0.82], 0.09, 85),
         leather: PF.leatherTan,
       };
-    case 'void':
+    }
+    case 'void': {
+      const metal = [oklchToHex(0.3, 0.02, 290), oklchToHex(0.33, 0.035, 288), oklchToHex(0.38, 0.05, 284), oklchToHex(0.72, 0.11, 205)];
       return {
-        metal: [oklchToHex(0.3, 0.02, 290), oklchToHex(0.33, 0.035, 288), oklchToHex(0.38, 0.05, 284), oklchToHex(0.72, 0.11, 205)],
+        metal,
+        metal2: metal,
         cloth: ramp([0.3, 0.34], 0.04, 290),
+        cloth2: ramp([0.33, 0.39], 0.06, 212),
         accent: ramp([0.64, 0.78], 0.11, 205, 0),
         leather: ramp([0.3, 0.32, 0.35], 0.02, 290),
       };
+    }
     default:
       return t;
   }
@@ -200,7 +296,11 @@ export function knightPaint(id: string, mutation: MutationId | null, step = 0): 
   let p = paintCache.get(key);
   if (p) return p;
   const r = def.rarity;
-  const tier = mutate(r === 'primordial' ? primordialTier(step) : TIERS[r], mutation, def.cls);
+  const sheet = knightSheet(id);
+  const base = r === 'primordial' ? primordialTier(step) : TIERS[r];
+  // The tier as it is (the cape), and dressed for the class's outfit (the knight).
+  const plain = mutate(base, mutation, def.cls);
+  const tier = mutate(dressFor(base, sheet), mutation, def.cls);
   const h = hashStr(def.name);
   const recolor: Recolor = {
     metal: tier.metal,
@@ -210,6 +310,8 @@ export function knightPaint(id: string, mutation: MutationId | null, step = 0): 
     skin: PF.skins[h % PF.skins.length],
     hair: PF.hairs[(h >>> 8) % PF.hairs.length],
   };
+  if (tier.cloth2) recolor.cloth2 = tier.cloth2;
+  if (tier.metal2) recolor.metal2 = tier.metal2;
   if (mutation === 'void') recolor.eyes = ['#6ae8ff'];
   if (mutation === 'shadow') recolor.skin = rampLike(PF.skins[h % PF.skins.length], 0.035, 30, 2, -0.1);
   const ri = rarityIndex(r);
@@ -228,10 +330,11 @@ export function knightPaint(id: string, mutation: MutationId | null, step = 0): 
     cls: def.cls,
     rarity: r,
     mutation,
-    sheet: knightSheet(id),
+    sheet,
     recolor: own ? {} : recolor,
     key,
-    cape: !own && ri >= rarityIndex('epic') ? tier.cloth.map((c) => mixHexes(c, '#20101e', 0.12)) : null,
+    // (A class that wears a cloak of its own has it dyed in the tier's color instead.)
+    cape: !own && !SHEETS[sheet].meta.cloak && ri >= rarityIndex('epic') ? plain.cloth.map((c) => mixHexes(c, '#20101e', 0.12)) : null,
     halo,
     glow,
   };

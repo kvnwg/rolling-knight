@@ -26,14 +26,29 @@ recording: [`docs/SOUNDS.md`](docs/SOUNDS.md).
 ## The look
 
 - The knights and most mobs come from PixelForge, the game's character pipeline: chibi sprites in
-  one muted palette with a 1 px plum outline, drawn in four directions with real attacks, dodges,
-  hurts, deaths and victories (`src/render/pf/`). Each knight's class sheet is recolored at runtime
+  one palette with a 1 px plum outline, drawn in four directions with real attacks, dodges, hurts,
+  deaths and victories (`src/render/pf/`). Each class has a silhouette of its own: the Guardian in a
+  great helm, pauldrons and a cloak, the Blade with spiky hair and a scarf streaming behind, the
+  Ranger an elf in a wide feathered hat and cloak, the Cleric in a mitre and cloak over a white robe,
+  the Arcanist a bearded wizard in a pointed hat, the Lancer in a winged helm with twin tails. They
+  breathe standing (a six-frame idle, a blink on its rest frame), walk on eight frames when slow and
+  run at a knight's pace (the run is drawn for it, so the feet stay planted); the Blade and the
+  Guardian cleave (a coil, a blur and a wide arc across the body), and the Whirlwind is a real spin
+  through every view, looped while it lasts. Each knight's class sheet is recolored at runtime
   for its rarity (iron and undyed cloth at Common, then bronze, steel, violet silver, gold, rose
   steel, verdigris, crimson steel, star-silver, aurora steel, white gold, obsidian, and cycling
-  colors at Primordial, with cloth dyed in the rarity's color), with capes from Epic, halos from
-  Celestial and the mutations (Gilded, Shadow, Radiant, Void). Mobs map by body plan (bats,
-  wolves, goblins, goblin archers and chiefs, orcs, skeletons, ogres; the Stone Warden is the boss)
-  and wear their floor's colors. The slimes (a green blob with a face) and the undead of the dark
+  colors at Primordial, with cloth dyed in the rarity's color through the class's own values: the
+  Cleric's robe stays white under a dyed cloak, the Blade's scarf is the vivid part over a dark
+  tunic, the Lancer's helm a second metal), with capes from Epic (the cloaked classes wear their
+  cloak dyed instead), halos from Celestial and the mutations (Gilded, Shadow, Radiant, Void). Mobs
+  map by body plan (bats, wolves that howl as they wake, goblins, goblin archers and chiefs, orcs,
+  skeletons, ogres that roar as they wake; from floor 36 a chaser's elite is the Ashen Duelist, a tall
+  quick glaive fighter) and wear their floor's colors. The bosses are the Stone Warden, a forest
+  guardian of boulders with an antlered skull and a leafy mane in each place's stone and leaves (its
+  leaves autumn red at half HP), and in the Ember Depths the Cinderwyrm, a big slow dragon in
+  obsidian scales (dark against the lava; its embers show at half HP) that breathes a fan of
+  fireballs, roars up rings of them, lunges to bite and sweeps its tail. Monsters
+  swing with PixelForge's white trails. The slimes (a green blob with a face) and the undead of the dark
   biomes (a skeleton with a sword, one with a scythe and a robed vampire, their attacks with their
   own slash smears) come from supplied packs, side views turned to face their targets, played by the
   same sim-driven animator. The farm's animals, ghosts, pumpkins, bugs, plants, casters and the
@@ -46,6 +61,9 @@ recording: [`docs/SOUNDS.md`](docs/SOUNDS.md).
   with an ink outline; each shot ends in an impact sized to the hit. Commons stay white; each tier
   tints, edges and layers the smears in its color, up to Primordial's rainbow and Absolute's black
   and white. Like every attack effect they're crisp and flat: nothing glows or lights the scene.
+  (PixelForge paints a white trail on every swing too; the knights' sheets are imported without it,
+  so a knight's stroke is the game's alone: aimed at its target, as long as its reach, and dressed in
+  its rarity.)
 - The Grimstone Dungeon (floors 21 to 25, before the crypt) is built tile by tile from supplied packs:
   each floor is purple-brown stone (thin walls, a brick face to the north) or blue stone (thick mauve
   caps, a cobbled rim round the floor), dressed with torches that light it, banners, cell doors,
@@ -142,7 +160,7 @@ as usual). `?fresh` starts a new game. The game is on
 npm test
 ```
 
-279 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
+282 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
 timing, extra reels, the start's ordinary quick spins, bad-luck protection, Lucky Spins, duplicates
 turning into gold, gold-only levels and reforging, old saves' spares cashed in, Humble Beginnings' 3x,
 rebirth; every biome's floors fully
@@ -157,9 +175,12 @@ the squad's AI seeing a lunge's lane or landing ring, the lunges' crouch, arc an
 wind-up warning; the camera, the weather, the hub's map and keepers, folk and quests, the two upgrade
 maps, Quick Roll and every chance upgrade in a fight, the keepers' scenes and cards, a full game
 starting up; and the PixelForge art: every sheet holding what the game plays in four directions, the
-body plan to monster mapping, the material recolors, every rarity's and mutation's ramps, and the
-animations the sim's state picks (attacks on the hit's tick, windups over the mobs' telegraphs,
-dodges, walks stepped by distance, deaths and revives); and the music: a track for every scene and
+body plan to monster mapping (the Cinderwyrm in the Ember Depths, the Ashen Duelist's elites), the
+material recolors, every rarity's and mutation's ramps (each class's outfit dressed in them, its
+second tones too), the knights drawn without PixelForge's swing trails, and the animations the
+sim's state picks (attacks on the hit's tick, the Cleave and the Whirlwind's spin, windups over the
+mobs' telegraphs, the bosses' moves, a wolf's howl as it wakes, dodges, walks and runs stepped by
+distance, the idle's blink, deaths and revives); and the music: a track for every scene and
 floor, each one's file, credit and loop points, the 5 MB budget; the Dungeon: its floors valid in
 both stones, every prop drawn from the packs, its traps warning before they strike, rolled through
 untouched, hurting mobs; the packs' monsters having every animation the sim asks for, striking on
@@ -244,11 +265,28 @@ python3 -I tools/packs/enemies.py "<Enemy_Animations_Set>" "<DungeonAssets>/Pack
 ```
 
 The PixelForge sheets (`src/assets/pf/`), from a PixelForge checkout after `pf build --all` and
-`pf fx build --all` (it keeps the animations the game plays, each distinct frame once, as indexed
-PNGs with every color's material and shade, for the runtime recolors):
+`pf fx build --all`. First the knights again without PixelForge's swing trails (the game draws its
+knights' swings itself), with PixelForge's own Python; it writes `<pixelforge>/out/bare/`:
+
+```bash
+"<pixelforge>/.venv/bin/python" -I tools/packs/pixelforge_bare.py "<pixelforge>"
+```
+
+Then the import (it keeps the animations the game plays, each distinct frame once, as indexed PNGs
+with every color's material and shade, for the runtime recolors; it checks the knights' trail-free
+build matches the full one):
 
 ```bash
 python3 -I tools/packs/pixelforge.py "<pixelforge>" src/assets/pf
+```
+
+Contact sheets of the result as the game paints it (every class in every rarity and mutation, each
+class's moves frame by frame, the monsters and bosses in each biome's colors):
+
+```bash
+npx tsx tools/pfPreview.ts knights shots/pf_knights.png
+npx tsx tools/pfPreview.ts moves shots/pf_moves.png legendary blade
+npx tsx tools/pfPreview.ts mobs shots/pf_mobs.png
 ```
 
 The music loops (`src/assets/music/`), from a folder of the original MP3s, named as downloaded from
