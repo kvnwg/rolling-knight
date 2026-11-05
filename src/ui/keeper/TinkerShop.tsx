@@ -27,7 +27,7 @@ import { upgradeStats } from './stats';
 import { TINKER_CATS } from './tinkerCats';
 
 /** Where the tinker's screen was left (kept while the app runs). */
-const memory: { tab: UpgradeTab; cat: Record<UpgradeTab, string> } = { tab: 'luck', cat: { luck: 'luck', combat: 'attack' } };
+const memory: { tab: UpgradeTab; cat: Record<UpgradeTab, string>; map?: boolean } = { tab: 'luck', cat: { luck: 'luck', combat: 'attack' } };
 
 /** An upgrade (or keeper) icon: the hex size, or the card's bigger one. */
 export function Icon({ icon, big }: { icon: string; big?: boolean }) {
@@ -41,7 +41,12 @@ export function TinkerShop({ game, station, onClose }: { game: Game; station: Hu
   const st = game.state;
   const [tab, setTabState] = useState<UpgradeTab>(memory.tab);
   const [cat, setCatState] = useState(memory.cat[tab]);
-  const [map, setMap] = useState(false);
+  // The tinker opens straight onto the map (the cards are a tap away).
+  const [map, setMap] = useState(memory.map ?? true);
+  const showMap = (on: boolean) => {
+    memory.map = on;
+    setMap(on);
+  };
   const [info, setInfo] = useState<UpgradeId | null>(null);
   const [, bump] = useState(0);
   const setTab = (t: string) => {
@@ -96,7 +101,7 @@ export function TinkerShop({ game, station, onClose }: { game: Game; station: Hu
             )
           }
           right={
-            <button className={`btn ${s.smallBtn}`} onClick={() => (uiSound('open'), setMap(true))} title="The upgrade map">
+            <button className={`btn ${s.smallBtn}`} onClick={() => (uiSound('open'), showMap(true))} title="The upgrade map">
               <Px icon="target" size="sm" />
               MAP
             </button>
@@ -112,7 +117,7 @@ export function TinkerShop({ game, station, onClose }: { game: Game; station: Hu
       </KeeperScreen>
       {map && (
         <div style={{ ['--upgrade-map-z' as string]: 32 } as CSSProperties}>
-          <UpgradeMap key={tab} game={game} tab={tab} onClose={() => setMap(false)} closeText="BACK" />
+          <UpgradeMap key={tab} game={game} tab={tab} onClose={onClose} closeText="CLOSE" onTab={(t) => setTab(t)} onCards={() => showMap(false)} />
         </div>
       )}
       {info && <UpgradeInfo game={game} id={info} onBuy={(r) => buy(info, r)} onClose={() => setInfo(null)} />}

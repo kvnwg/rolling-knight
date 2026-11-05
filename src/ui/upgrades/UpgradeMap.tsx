@@ -242,7 +242,16 @@ function MapGold({ gold }: { gold: number }) {
 
 /* ---------------------------------------------------------------- the screen */
 
-export function UpgradeMap({ game, tab = 'luck', onClose, closeText = 'CLOSE' }: { game: Game; tab?: UpgradeTab; onClose?: () => void; closeText?: string }) {
+export function UpgradeMap({ game, tab = 'luck', onClose, closeText = 'CLOSE', onTab, onCards }: {
+  game: Game;
+  tab?: UpgradeTab;
+  onClose?: () => void;
+  closeText?: string;
+  /** Switch between the Luck and Combat maps from the map itself (the tinker opens straight onto it). */
+  onTab?: (t: UpgradeTab) => void;
+  /** Show the same upgrades as a list of cards instead. */
+  onCards?: () => void;
+}) {
   useFollow(game);
   const st = game.state;
   const memory = memories[tab];
@@ -755,7 +764,23 @@ export function UpgradeMap({ game, tab = 'luck', onClose, closeText = 'CLOSE' }:
 
       <div className={s.head}>
         <div className={s.titles} ref={titlesRef}>
-          <Chunky text={tab === 'luck' ? 'LUCK MAP' : 'COMBAT MAP'} size={11} grad={tab === 'luck' ? 'green' : 'red'} />
+          {onTab ? (
+            <span className="row" data-ui style={{ gap: 'calc(2 * var(--px))', pointerEvents: 'auto' }}>
+              {(['luck', 'combat'] as const).map((t) => (
+                <button key={t} className={`btn small ${t === tab ? (t === 'luck' ? 'green' : 'red') : ''}`} onClick={() => t !== tab && (uiSound('tap'), onTab(t))}>
+                  <Px icon={t === 'luck' ? 'clover' : 'swords'} size="sm" />
+                  {t === 'luck' ? 'LUCK' : 'COMBAT'}
+                </button>
+              ))}
+              {onCards && (
+                <button className="btn small" onClick={() => (uiSound('tap'), onCards())} title="As cards">
+                  <Px icon="bag" size="sm" />
+                </button>
+              )}
+            </span>
+          ) : (
+            <Chunky text={tab === 'luck' ? 'LUCK MAP' : 'COMBAT MAP'} size={11} grad={tab === 'luck' ? 'green' : 'red'} />
+          )}
         </div>
         <button className={`btn blue square ${s.centerBtn}`} data-ui onClick={center} aria-label="Center the map" title="Center the map">
           <Px icon="target" size="md" />
