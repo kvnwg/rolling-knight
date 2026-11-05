@@ -88,6 +88,19 @@ export const LEAF = {
   sakura: ['#3a1a2e', '#62284a', '#97456b', '#c96f92', '#eba1ba', '#ffd8e4'],
   /** Shrine maples: deep crimson to coral. */
   crimson: ['#240c16', '#48121f', '#781c25', '#a82c2c', '#d4523a', '#f2905e'],
+  /** The garden look (Firefly Garden): olive to lime, chunky. */
+  garden: ['#20361a', '#2f4e1e', '#436a26', '#5a882e', '#7ca83a', '#a6c956'],
+  /** A garden tree gone golden. */
+  goldleaf: ['#38270f', '#5c4315', '#856322', '#ab872e', '#d0ac40', '#f2d468'],
+} as const;
+
+/** Outlines for the garden look: dark tones tinted from the foliage (never black). */
+export const INK = {
+  garden: { dark: '#11200f', lit: '#1b3016', wood: '#1a100c' },
+  goldleaf: { dark: '#21190b', lit: '#2e2410', wood: '#1a100c' },
+  sakura: { dark: '#2a1020', lit: '#3a1a2c', wood: '#1a0e12' },
+  crimson: { dark: '#1c080e', lit: '#2c0e16', wood: '#1a0e12' },
+  conifer: { dark: '#040a07', lit: '#08140d', wood: '#140a08' },
 } as const;
 
 /** Needles: six tones, cooler and darker than broad leaves. */
@@ -97,6 +110,8 @@ export const NEEDLE = {
   frost: ['#0a1b24', '#112e37', '#1a4246', '#255853', '#346e62', '#538a78'],
   grave: ['#08090f', '#0f131b', '#161f28', '#202d33', '#2c3c3e', '#42554f'],
   shrine: ['#0b1915', '#122a21', '#1b3e2b', '#265633', '#376e3b', '#5a8e48'],
+  /** The garden's near-black conifers. */
+  garden: ['#050d09', '#0a1810', '#112619', '#1a3721', '#264c2a', '#3a6636'],
 } as const;
 
 export const SNOW: Ramp = ['#5d7398', '#8aa2c4', '#b8cce2', '#e2edf7', '#ffffff'];
@@ -123,6 +138,8 @@ export const MOSS_DARK: Ramp = ['#0b1a14', '#12281d', '#1b3a25', '#28512d', '#3c
 /** Apples: shadow, body, lit, glint. */
 export const APPLE: Ramp = ['#4a0f14', '#8e1d1c', '#c4382a', '#f0805a'];
 export const BLOSSOM: Ramp = ['#a86a86', '#e0a6bc', '#fff0f4'];
+/** Garden blossom dots: shade pink, pink, white. */
+export const PETALS: Ramp = ['#a8708a', '#e2aabc', '#fbeef2'];
 
 /** A tree's own small shift, so neighbors differ: hue +-`dh`, value and saturation a few percent. */
 export function jitter(r: Ramp, seed: number, dh = 7, dv = 0.06): string[] {

@@ -8,7 +8,10 @@ import type { Biome, PropKind, TreeKind } from '../../world/biomes';
 import { blank, type PixelBuf } from '../pixel/buf';
 import { BODY_ANIMS, BODY_FRAMES } from '../packs/mannequin';
 import { ball, hash, inkOutline, line, mixHex, rect, setRGB, shade } from './draw';
+import { outlineTinted } from './ink';
+import { townArt } from './town';
 import { villageArt } from './village';
+import { wildArt } from './wild';
 
 export interface PropArt {
   buf: PixelBuf;
@@ -242,7 +245,7 @@ export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {
       ball(b, 6, 6, w, 3.6, [stone[0], stone[1], stone[2], stone[3]]);
       if (biome.ground.kind === 'grass' || biome.ground.kind === 'moss') for (let x = 3; x < 9; x++) if (hash(seed, x) < 0.6) setRGB(b, x, 3, biome.ground.ramp[3]);
       if (biome.ground.kind === 'snow') for (let x = 3; x < 10; x++) setRGB(b, x, 3, '#f0f6fc');
-      return { buf: inkOutline(b, ink(stone)), ax: 7, ay: 10 };
+      return { buf: outlineTinted(b), ax: 7, ay: 10 };
     }
     case 'bush': {
       const t = clumpTree(biome.treeRamp, seed, 12, 9, false);
@@ -270,7 +273,7 @@ export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {
       rect(b, 1, 0, 7, 2, WOOD[3]);
       rect(b, 2, 0, 5, 1, WOOD[4]);
       for (const y of [3, 8]) rect(b, 0, y, 9, 1, IRON[2]);
-      return { buf: inkOutline(b, '#140c0a'), ax: 5, ay: 12 };
+      return { buf: outlineTinted(b), ax: 5, ay: 12 };
     }
     case 'crate': {
       const b = blank(11, 11);
@@ -280,7 +283,7 @@ export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {
       line(b, 1, 4, 9, 10, WOOD[1]);
       rect(b, 0, 10, 11, 1, WOOD[0]);
       rect(b, 1, 0, 9, 1, WOOD[4]);
-      return { buf: inkOutline(b, '#140c0a'), ax: 6, ay: 12 };
+      return { buf: outlineTinted(b), ax: 6, ay: 12 };
     }
     case 'bones':
     case 'skull': {
@@ -303,7 +306,7 @@ export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {
       rect(b, 2, 3, 1, 6, WOOD[1]);
       rect(b, 1, 3, 3, 1, IRON[2]);
       rect(b, 1, 5, 3, 1, IRON[1]);
-      return { buf: inkOutline(b, '#140c0a'), ax: 3, ay: 10, light: { dx: 0, dy: -11, color: fire, r: 58, flicker: true }, flame: { dx: 0, dy: -9, size: 1 } };
+      return { buf: outlineTinted(b), ax: 3, ay: 10, light: { dx: 0, dy: -11, color: fire, r: 58, flicker: true }, flame: { dx: 0, dy: -9, size: 1 } };
     }
     case 'lantern': {
       const b = blank(7, 18);
@@ -313,7 +316,7 @@ export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {
       rect(b, 2, 5, 1, 2, '#fff4d0');
       rect(b, 1, 4, 1, 4, IRON[1]);
       rect(b, 0, 2, 6, 1, IRON[2]);
-      return { buf: inkOutline(b, '#140c0a'), ax: 4, ay: 19, light: { dx: -1, dy: -13, color: fire, r: 52, flicker: true } };
+      return { buf: outlineTinted(b), ax: 4, ay: 19, light: { dx: -1, dy: -13, color: fire, r: 52, flicker: true } };
     }
     case 'brazier': {
       const b = blank(11, 11);
@@ -322,7 +325,7 @@ export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {
       line(b, 2, 7, 1, 10, IRON[1]);
       line(b, 8, 7, 9, 10, IRON[1]);
       line(b, 5, 7, 5, 10, IRON[2]);
-      return { buf: inkOutline(b, '#100c10'), ax: 6, ay: 12, light: { dx: 0, dy: -10, color: fire, r: 72, flicker: true }, flame: { dx: 0, dy: -9, size: 2 } };
+      return { buf: outlineTinted(b), ax: 6, ay: 12, light: { dx: 0, dy: -10, color: fire, r: 72, flicker: true }, flame: { dx: 0, dy: -9, size: 2 } };
     }
     case 'gravestone': {
       const b = blank(9, 12);
@@ -334,7 +337,7 @@ export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {
       rect(b, 4, 4, 1, 4, g[0]);
       rect(b, 3, 5, 3, 1, g[0]);
       if (hash(seed, 2) < 0.5) for (let x = 1; x < 8; x++) if (hash(seed, x) < 0.5) setRGB(b, x, 11, '#3e5a3a');
-      return { buf: inkOutline(b, '#0e0c14'), ax: 5, ay: 13 };
+      return { buf: outlineTinted(b), ax: 5, ay: 13 };
     }
     case 'crystalSmall': {
       const t = crystalTree(biome.id === 'crystal' ? biome.treeRamp : ['#1a2a5a', '#2a4a9a', '#4a8ad8', '#8ac8ff', '#e0f8ff'], seed);
@@ -358,7 +361,7 @@ export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {
         rect(b, x - 1 - s, 2 + (1 - s), 3 + s * 2, 2, glow);
         setRGB(b, x - 1 - s, 2 + (1 - s), mixHex(glow, '#ffffff', 0.5));
       }
-      return { buf: inkOutline(b, '#0e0c14'), ax: 5, ay: 8, light: { dx: 0, dy: -4, color: glow, r: 22, flicker: false } };
+      return { buf: outlineTinted(b), ax: 5, ay: 8, light: { dx: 0, dy: -4, color: glow, r: 22, flicker: false } };
     }
     case 'pumpkin': {
       const b = blank(10, 8);
@@ -373,7 +376,7 @@ export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {
         setRGB(b, 7, 4, '#ffe06a');
         rect(b, 4, 6, 3, 1, '#ffe06a');
       }
-      return { buf: inkOutline(b, '#140c0a'), ax: 6, ay: 9, ...(carved ? { light: { dx: 0, dy: -4, color: '#ffb84a', r: 30, flicker: true } } : {}) };
+      return { buf: outlineTinted(b), ax: 6, ay: 9, ...(carved ? { light: { dx: 0, dy: -4, color: '#ffb84a', r: 30, flicker: true } } : {}) };
     }
     case 'stump': {
       const b = blank(11, 8);
@@ -382,7 +385,7 @@ export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {
       rect(b, 1, 3, 2, 4, BARK[3]);
       rect(b, 8, 3, 2, 4, BARK[1]);
       setRGB(b, 5, 2, '#8a6a44');
-      return { buf: inkOutline(b, '#140c0a'), ax: 6, ay: 9 };
+      return { buf: outlineTinted(b), ax: 6, ay: 9 };
     }
     case 'pillar': {
       const b = blank(10, 26);
@@ -392,7 +395,7 @@ export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {
       rect(b, 6, 3, 2, 20, stone[1]);
       rect(b, 1, 23, 8, 3, stone[2]);
       if (hash(seed, 1) < 0.5) line(b, 4, 8, 6, 13, stone[0]);
-      return { buf: inkOutline(b, ink(stone)), ax: 5, ay: 27 };
+      return { buf: outlineTinted(b), ax: 5, ay: 27 };
     }
     case 'statue': {
       // A knight statue: the mannequin in stone on a plinth.
@@ -402,7 +405,7 @@ export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {
       f.rows.forEach((row, y) => [...row].forEach((ch, x) => ch !== '.' && setRGB(b, x + 1, y + 1, ch === 'k' || ch === 'e' ? stone[0] : st['hijtuvabclmnfg'.indexOf(ch) % 3 === 2 ? 2 : 'hijtuvabclmnfg'.indexOf(ch) % 3 === 1 ? 1 : 0])));
       rect(b, 3, f.rows.length + 1, b.w - 6, 6, stone[2]);
       rect(b, 3, f.rows.length + 1, b.w - 6, 1, stone[3]);
-      return { buf: inkOutline(b, ink(stone)), ax: Math.round(b.w / 2) + 1, ay: b.h + 1 };
+      return { buf: outlineTinted(b), ax: Math.round(b.w / 2) + 1, ay: b.h + 1 };
     }
     case 'well': {
       const b = blank(15, 18);
@@ -414,14 +417,14 @@ export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {
       rect(b, 12, 2, 1, 9, WOOD[1]);
       rect(b, 0, 1, 15, 2, WOOD[3]);
       rect(b, 0, 0, 15, 1, WOOD[4]);
-      return { buf: inkOutline(b, '#140c0a'), ax: 8, ay: 18 };
+      return { buf: outlineTinted(b), ax: 8, ay: 18 };
     }
     case 'fence': {
       const b = blank(15, 9);
       for (const x of [1, 7, 13]) rect(b, x, 0, 2, 9, WOOD[2]);
       rect(b, 0, 2, 15, 1, WOOD[3]);
       rect(b, 0, 5, 15, 1, WOOD[2]);
-      return { buf: inkOutline(b, '#140c0a'), ax: 8, ay: 10 };
+      return { buf: outlineTinted(b), ax: 8, ay: 10 };
     }
     case 'cart': {
       const b = blank(17, 12);
@@ -435,7 +438,7 @@ export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {
         ball(b, 8, 1, 6, 2.4, [HAY[1], HAY[2], HAY[3], HAY[4]]);
         for (const [x, y] of [[2, 0], [13, 1], [6, -1], [10, -1]] as const) setRGB(b, x, y + 1, HAY[3]);
       } else ball(b, 8, 1, 4, 2, ['#6e2a12', '#a6451f', '#e0702a', '#ffa046']);
-      return { buf: inkOutline(b, '#140c0a'), ax: 9, ay: 12 };
+      return { buf: outlineTinted(b), ax: 9, ay: 12 };
     }
     case 'stoneLantern': {
       const b = blank(11, 18);
@@ -447,7 +450,7 @@ export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {
       rect(b, 3, 7, 5, 1, st[3]);
       rect(b, 4, 8, 3, 7, st[2]);
       rect(b, 2, 15, 7, 3, st[1]);
-      return { buf: inkOutline(b, '#0e1412'), ax: 6, ay: 19, light: { dx: 0, dy: -13, color: fire, r: 50, flicker: true } };
+      return { buf: outlineTinted(b), ax: 6, ay: 19, light: { dx: 0, dy: -13, color: fire, r: 50, flicker: true } };
     }
     case 'campfire': {
       // A ring of stones round crossed logs; the flame is animated on top.
@@ -463,7 +466,7 @@ export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {
       line(b, 4, 4, 12, 8, WOOD[3]);
       rect(b, 6, 5, 5, 2, '#ff8a3a');
       setRGB(b, 8, 5, '#ffe08a');
-      return { buf: inkOutline(b, '#100c10'), ax: 9, ay: 10, light: { dx: 0, dy: -8, color: fire, r: 110, flicker: true }, flame: { dx: 0, dy: -5, size: 3 } };
+      return { buf: outlineTinted(b), ax: 9, ay: 10, light: { dx: 0, dy: -8, color: fire, r: 110, flicker: true }, flame: { dx: 0, dy: -5, size: 3 } };
     }
     case 'tent': {
       // A canvas tent in 3/4 view, the flap open.
@@ -482,7 +485,7 @@ export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {
       }
       line(b, 13, 0, 13, 18, cloth[0]);
       rect(b, 12, 0, 3, 1, WOOD[2]);
-      return { buf: inkOutline(b, '#140c0a'), ax: 14, ay: 20 };
+      return { buf: outlineTinted(b), ax: 14, ay: 20 };
     }
     case 'house':
     case 'pot':
@@ -496,6 +499,25 @@ export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {
     case 'stall':
     case 'wellStone':
       return villageArt(kind, biome, seed);
+    case 'lanternPost':
+    case 'stringLights':
+    case 'roughFence':
+    case 'fern':
+    case 'mossRock':
+    case 'log':
+    case 'brokenPillar':
+    case 'stoneBlock':
+    case 'ruinWall':
+    case 'stairs':
+      return wildArt(kind, biome, seed);
+    case 'picket':
+    case 'picketSide':
+    case 'hedge':
+    case 'fountain':
+    case 'cafeTable':
+    case 'stringPost':
+    case 'bridgeRail':
+      return townArt(kind, biome, seed);
     case 'hayBale':
     case 'cabbage':
     case 'wheat':
@@ -510,7 +532,7 @@ export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {
       rect(b, 2, 1, 6, 1, biome.mobs.palettes[0][2]);
       setRGB(b, 4, 10, biome.mobs.palettes[0][1]);
       setRGB(b, 7, 10, biome.mobs.palettes[0][1]);
-      return { buf: inkOutline(b, '#140c0a'), ax: 2, ay: 21 };
+      return { buf: outlineTinted(b), ax: 2, ay: 21 };
     }
   }
 }
@@ -550,11 +572,11 @@ function farmProp(kind: 'hayBale' | 'cabbage' | 'wheat' | 'scarecrow' | 'trough'
         bale(b, 0, 6, 11, 3, 6, seed);
         bale(b, 10, 6, 11, 3, 6, seed + 1);
         bale(b, 5, 0, 11, 3, 6, seed + 2);
-        return { buf: inkOutline(b, '#1a1006'), ax: 11, ay: 16 };
+        return { buf: outlineTinted(b), ax: 11, ay: 16 };
       }
       const b = blank(15, 11);
       bale(b, 0, 0, 15, 4, 7, seed);
-      return { buf: inkOutline(b, '#1a1006'), ax: 8, ay: 12 };
+      return { buf: outlineTinted(b), ax: 8, ay: 12 };
     }
     case 'cabbage': {
       const b = blank(12, 9);
@@ -570,7 +592,7 @@ function farmProp(kind: 'hayBale' | 'cabbage' | 'wheat' | 'scarecrow' | 'trough'
       setRGB(b, 8, 4, head[0]);
       setRGB(b, 7, 5, head[0]);
       setRGB(b, 4, 2, '#eef8c8');
-      return { buf: inkOutline(b, '#0e1c0c'), ax: 7, ay: 10 };
+      return { buf: outlineTinted(b), ax: 7, ay: 10 };
     }
     case 'wheat': {
       const b = blank(12, 14);
@@ -638,7 +660,7 @@ function farmProp(kind: 'hayBale' | 'cabbage' | 'wheat' | 'scarecrow' | 'trough'
         setRGB(b, 14, 7, '#c8a050');
         setRGB(b, 10, 9, '#1c1c28');
       }
-      return { buf: inkOutline(b, '#160e0a'), ax: 8, ay: 25 };
+      return { buf: outlineTinted(b), ax: 8, ay: 25 };
     }
     case 'trough': {
       const b = blank(16, 8);
@@ -653,7 +675,7 @@ function farmProp(kind: 'hayBale' | 'cabbage' | 'wheat' | 'scarecrow' | 'trough'
       rect(b, 1, 5, 14, 1, WOOD[1]);
       rect(b, 0, 7, 2, 1, WOOD[0]);
       rect(b, 14, 7, 2, 1, WOOD[0]);
-      return { buf: inkOutline(b, '#140c0a'), ax: 9, ay: 9 };
+      return { buf: outlineTinted(b), ax: 9, ay: 9 };
     }
     case 'sunflower': {
       const b = blank(9, 18);
@@ -667,7 +689,7 @@ function farmProp(kind: 'hayBale' | 'cabbage' | 'wheat' | 'scarecrow' | 'trough'
       // The head, turned to the afternoon sun.
       ball(b, 4.4, 4.2 - tall, 4, 3.8, ['#b8741a', '#e0a02a', '#f8cc3a', '#fff07a']);
       ball(b, 4.2, 4.4 - tall, 2, 1.9, ['#3a2210', '#5a3618', '#7a4e22', '#9a6a30']);
-      return { buf: inkOutline(b, '#16100a'), ax: 5, ay: 19 };
+      return { buf: outlineTinted(b), ax: 5, ay: 19 };
     }
   }
 }

@@ -1,12 +1,13 @@
 /**
  * Simple AIs. The two knights you don't control (and yours, on Auto) play by their class's role:
- * a tank wades in and taunts when the squad is pressed; fighters chase the nearest foe; archers and
- * mages keep their distance and kite; a healer stays by whoever is hurt and saves Sanctuary for
- * when it counts. Everyone dodges what they see coming, most of the time.
+ * a tank wades in; fighters chase the nearest foe; archers and mages keep their distance and kite;
+ * a healer stays by whoever is hurt. Each rolls its skill when the fight gives its role a good
+ * moment (goodMomentToRoll). Everyone dodges what they see coming, most of the time.
  * Mobs: chasers, archers, chargers (wind up, then dash), bombers, casters (circles on the ground),
  * tanks (ground slams), swarms, and bosses with patterns of their own.
  */
-import { CLASSES, SIGNATURES } from '../core/knights';
+import { CLASSES } from '../core/knights';
+import { signatureSkill } from '../core/skillbook';
 import { dist, lineOfSight, moveUnit, norm, type Unit } from './entities';
 import { flowDist, flowStep, type Flow } from './flow';
 import { heroDodge, heroSpecial } from './skills';
@@ -49,7 +50,39 @@ function threatened(w: World, u: Unit): [number, number] | null {
   return null;
 }
 
-/** One knight's decision for this frame: where to move (and maybe a dodge or special). */
+/**
+ * Is now a good moment for this knight to roll its skill? By role, since most of a class's skills
+ * want the same thing: a tank rolls when foes crowd it or a friend is pressed, a fighter when foes are
+ * in reach, an archer or a mage when it has a target (best a group or a boss), a healer when someone
+ * is hurt or down. After `waited` seconds of a fight without that moment, less will do. A knight
+ * whose list holds a signature (a jackpot like Rewind) also rolls when a knight falls.
+ */
+export function goodMomentToRoll(w: World, h: Unit, target: Unit | null, foes: readonly Unit[], waited: number): boolean {
+  const near = (r: number) => w.enemiesIn('hero', h.x, h.y, r).length;
+  const boss = foes.some((m) => m.boss && dist(m.x, m.y, h.x, h.y) < 140);
+  const down = w.heroes.some((o) => o.downed);
+  const patient = waited > 3;
+  if (down && signatureSkill(h.knightId!)) return true;
+  switch (CLASSES[h.cls!].role) {
+    case 'tank': {
+      const pressed = w.heroes.some((o) => o !== h && !o.downed && o.hp / o.maxHp < 0.5 && w.enemiesIn('hero', o.x, o.y, 30).length > 0);
+      return near(70) >= 2 || (boss && near(60) >= 1) || pressed || (patient && near(70) >= 1);
+    }
+    case 'melee':
+      if (h.cls === 'lancer') return near(60) >= 1 || (!!target && dist(target.x, target.y, h.x, h.y) < 130 && waited > 1.5);
+      return near(34) >= 2 || (boss && near(50) >= 1) || (patient && near(34) >= 1);
+    case 'ranged':
+    case 'caster':
+      return !!target && ((w.densest(h, 150, 34)?.n ?? 0) >= 2 || boss || patient);
+    case 'healer': {
+      const hurt = w.heroes.filter((o) => !o.downed && o.hp / o.maxHp < 0.75).length;
+      return down || hurt >= 2 || w.heroes.some((o) => !o.downed && o.hp / o.maxHp < 0.5) || (!!target && waited > 5);
+    }
+  }
+  return false;
+}
+
+/** One knight's decision for this frame: where to move (and maybe a dodge or a skill roll). */
 export function heroAi(w: World, h: Unit, lead: Unit | undefined, dt: number): [number, number] {
   const ai = h.ai!;
   const cls = CLASSES[h.cls!];
@@ -63,34 +96,12 @@ export function heroAi(w: World, h: Unit, lead: Unit | undefined, dt: number): [
   }
   const foes = w.livingMobs().filter((m) => m.awake || dist(m.x, m.y, h.x, h.y) < 100);
   let target = foes.length ? w.nearestEnemy(h, 160, true) : null;
-  // --- specials, by role
-  if (h.specialT! <= 0 && foes.length) {
-    const near = (r: number) => w.enemiesIn('hero', h.x, h.y, r).length;
-    const hurt = w.heroes.filter((o) => !o.downed && o.hp / o.maxHp < 0.45).length;
-    const down = w.heroes.some((o) => o.downed);
-    const boss = foes.some((m) => m.boss && dist(m.x, m.y, h.x, h.y) < 140);
-    let go = false;
-    const rewinder = SIGNATURES[h.knightId!]?.id === 'rewind';
-    switch (rewinder ? 'rewind' : cls.role) {
-      case 'rewind':
-        // Rewind when the last few seconds went badly: someone fell, or the squad lost a lot.
-        go = down || hurt >= 2;
-        break;
-      case 'tank':
-        go = near(70) >= 3 || (boss && near(60) >= 1) || w.heroes.some((o) => o !== h && !o.downed && o.hp / o.maxHp < 0.4 && w.enemiesIn('hero', o.x, o.y, 30).length > 0);
-        break;
-      case 'melee':
-        go = h.cls === 'lancer' ? !!target && dist(target.x, target.y, h.x, h.y) > 30 && dist(target.x, target.y, h.x, h.y) < 120 : near(28) >= 2 || boss;
-        break;
-      case 'ranged':
-      case 'caster':
-        go = (w.densest(h, 150, 34)?.n ?? 0) >= 3 || boss;
-        break;
-      case 'healer':
-        go = hurt >= 2 || down || w.heroes.some((o) => !o.downed && o.hp / o.maxHp < 0.3);
-        break;
-    }
-    if (go) heroSpecial(w, h, false);
+  // --- skill rolls: once the cooldown is up and a fight is on, roll at a good moment for the role
+  // (what lands is up to the dice; when to roll isn't). The longer it waits, the less it takes.
+  if (h.specialT! > 0 || h.skillRoll || !foes.length) ai.rollWait = 0;
+  else {
+    ai.rollWait = (ai.rollWait ?? 0) + dt;
+    if (goodMomentToRoll(w, h, target, foes, ai.rollWait) && heroSpecial(w, h, false)) ai.rollWait = 0;
   }
   // --- movement
   if (target && target.uid !== ai.target) {

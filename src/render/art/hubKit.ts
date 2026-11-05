@@ -77,9 +77,17 @@ export class Layer {
   readonly buf: PixelBuf;
   readonly glow: PixelBuf;
   readonly lights: LightSpec[] = [];
-  constructor(readonly x0: number, readonly y0: number, readonly w: number, readonly h: number) {
-    this.buf = blank(w, h);
-    this.glow = blank(w, h);
+  readonly x0: number;
+  readonly y0: number;
+  readonly w: number;
+  readonly h: number;
+  constructor(x0: number, y0: number, w: number, h: number) {
+    this.x0 = Math.floor(x0);
+    this.y0 = Math.floor(y0);
+    this.w = Math.ceil(w + (x0 - this.x0));
+    this.h = Math.ceil(h + (y0 - this.y0));
+    this.buf = blank(this.w, this.h);
+    this.glow = blank(this.w, this.h);
   }
   inside(x: number, y: number): boolean {
     const lx = (x | 0) - this.x0;
@@ -95,6 +103,19 @@ export class Layer {
     if (!c) return;
     setRGB(this.glow, Math.floor(x) - this.x0, Math.floor(y) - this.y0, c);
     setRGB(this.buf, Math.floor(x) - this.x0, Math.floor(y) - this.y0, base ?? c);
+  }
+  /**
+   * A soft glow pixel: emissive at partial strength (0..1) over whatever is there, never weakening
+   * a stronger glow already on that pixel. The albedo is left alone.
+   */
+  halo(x: number, y: number, c: string, a: number): void {
+    const lx = Math.floor(x) - this.x0;
+    const ly = Math.floor(y) - this.y0;
+    if (lx < 0 || ly < 0 || lx >= this.w || ly >= this.h) return;
+    const i = (ly * this.w + lx) * 4;
+    const A = Math.round(Math.max(0, Math.min(1, a)) * 255);
+    if (this.glow.px[i + 3] >= A) return;
+    setRGB(this.glow, lx, ly, c, A);
   }
   /** Removes a pixel's glow (something in front of a window). */
   unglow(x: number, y: number): void {
@@ -176,6 +197,43 @@ export class Layer {
       }
     }
     this.lights.push(...o.lights);
+  }
+  /**
+   * A crisp outline tinted from each object's own colour: every transparent pixel next to the shape
+   * takes the darkest neighbour's colour pushed far toward a deep shade (wood gets a dark brown line,
+   * leaves a dark green one). `diag` closes the corners too.
+   */
+  outlineTinted(dark = 0.72, diag = false): void {
+    const src = this.buf.px.slice();
+    const W = this.w;
+    const H = this.h;
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        if (src[(y * W + x) * 4 + 3]) continue;
+        let best = -1;
+        let bl = 1e9;
+        const nb = diag ? [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]] : [[1, 0], [-1, 0], [0, 1], [0, -1]];
+        for (const [dx, dy] of nb) {
+          const X = x + dx;
+          const Y = y + dy;
+          if (X < 0 || Y < 0 || X >= W || Y >= H) continue;
+          const i = (Y * W + X) * 4;
+          if (!src[i + 3]) continue;
+          const l = src[i] * 0.3 + src[i + 1] * 0.59 + src[i + 2] * 0.11;
+          if (l < bl) {
+            bl = l;
+            best = i;
+          }
+        }
+        if (best < 0) continue;
+        const o = (y * W + x) * 4;
+        // Darken toward a deep warm purple-black, keeping some of the hue.
+        this.buf.px[o] = Math.round(src[best] * (1 - dark) + 16 * dark);
+        this.buf.px[o + 1] = Math.round(src[best + 1] * (1 - dark) + 10 * dark);
+        this.buf.px[o + 2] = Math.round(src[best + 2] * (1 - dark) + 18 * dark);
+        this.buf.px[o + 3] = 255;
+      }
+    }
   }
   /**
    * A 1-pixel ink line round everything opaque, drawn on the transparent pixels next to it (the
@@ -434,6 +492,50 @@ export function shingles(L: Layer, x0: number, y0: number, x1: number, y1: numbe
   }
 }
 
+/**
+ * Fish-scale shingles: each one's rounded lower edge lies over the row below, a dark line under it,
+ * the light catching its upper middle; the row below shows dark in the notches between the scales.
+ */
+export function scales(L: Layer, x0: number, y0: number, x1: number, y1: number, inside: (x: number, y: number) => boolean, o: { w: number; h: number; ramp: Ramp; seed: number; base?: number; moss?: Ramp; rowShade?: (y: number) => number }): void {
+  const r = o.ramp;
+  const base = o.base ?? (r.length - 1) * 0.55;
+  const w = o.w;
+  const h = o.h;
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      if (!inside(x, y)) continue;
+      const row = Math.floor((y - y0) / h);
+      const iy = y - y0 - row * h;
+      const off = row % 2 ? Math.floor(w / 2) : 0;
+      const col = Math.floor((x - x0 + off) / w);
+      const ix = x - x0 + off - col * w;
+      const id = h2(col, row, o.seed);
+      const shadeRow = o.rowShade ? o.rowShade(y) : 0;
+      const notch = (iy === h - 1 && (ix <= 1 || ix >= w - 2)) || (iy === h - 2 && (ix === 0 || ix === w - 1));
+      let k: number;
+      if (notch) {
+        // The row below, deep in the shadow of this one.
+        k = 0.8 + shadeRow * 0.5;
+      } else {
+        k = base + (id - 0.5) * 1.3 + shadeRow;
+        const rim = (iy === h - 1 && ix >= 2 && ix <= w - 3) || (iy === h - 2 && (ix === 1 || ix === w - 2));
+        if (rim) k = 0.6 + shadeRow * 0.4;
+        else {
+          if (iy === 0) k -= 0.9;
+          if (iy === 1 && ix >= 1 && ix < w / 2 + 1) k += 0.9;
+          if (iy === 2 && ix === 1) k += 0.5;
+          if (ix === w - 1 || (ix === w - 2 && iy >= h - 3)) k -= 0.6;
+        }
+        if (id > 0.94) k -= 0.8;
+        if (id < 0.05) k += 0.7;
+      }
+      let c = rk(r, k);
+      if (o.moss && !notch && iy >= h - 3 && h2(x, y, o.seed + 9) < 0.3 && vnoise(x, y, 16, 11, o.seed + 5) > 0.62) c = rk(o.moss, 1 + h2(x, y, o.seed + 3) * 2);
+      L.px(x, y, c);
+    }
+  }
+}
+
 /** Dressed stone blocks in courses with mortar between, each block lit on its top-left edge. */
 export function blocks(L: Layer, x0: number, y0: number, w: number, h: number, o: { bw: number; bh: number; seed: number; ramp?: Ramp; mortar?: string; base?: number; moss?: Ramp; inside?: (x: number, y: number) => boolean }): void {
   const r = o.ramp ?? STONE;
@@ -470,24 +572,26 @@ export function blocks(L: Layer, x0: number, y0: number, w: number, h: number, o
 // ------------------------------------------------------------------ leaves
 
 export interface LeafOpts {
-  /** Ramp indexes for the leaf: shadow side, lit side (LEAF ramp by default). */
   ramp?: Ramp;
   /** Overall tone: 0 deep in the back, 1 bright in front. */
   tone: number;
   seed: number;
-  /** Width profile: 'broad' (banana, monstera), 'lance' (narrow, pointed), 'round'. */
+  /** Width profile: 'broad' (banana, elephant ear), 'lance' (narrow, pointed), 'round'. */
   shape?: 'broad' | 'lance' | 'round';
   ink?: string;
-  /** Draws a lime rim on the side facing the light. */
+  /** A lime rim on the edge facing the light (default on). */
   rim?: boolean;
-  /** Notches cut into the edge (monstera). */
+  /** Slits cut into the edge (monstera). */
   notch?: boolean;
+  /** How much the tip droops (0..1, default by angle). */
+  droop?: number;
 }
 
 /**
  * One leaf from its stem point along `ang` (radians, 0 = right, y down), `len` long, `wid` at its
- * widest. Split along the midrib: the half facing the light (up and left) is lighter. Veins run off
- * the rib, the edge gets an ink line, the lit edge a lime rim. The leaf curls: its far end droops.
+ * widest. Crisp two-tone halves split along the midrib (the half facing the light, up and left, is
+ * the light one), a pale midrib, a few veins, a lime rim along the lit edge, a dark line round the
+ * shadow edge, and an outline in the leaf's own darkest green. The tip droops under its weight.
  */
 export function leaf(L: Layer, x0: number, y0: number, ang: number, len: number, wid: number, o: LeafOpts): void {
   const r = o.ramp ?? LEAF;
@@ -495,27 +599,33 @@ export function leaf(L: Layer, x0: number, y0: number, ang: number, len: number,
   const ca = Math.cos(ang);
   const sa = Math.sin(ang);
   const shape = o.shape ?? 'broad';
-  // The leaf droops under its weight: the midrib bends down a little toward the tip.
-  const droop = len * 0.12 * Math.abs(ca);
+  const droop = len * (o.droop ?? 0.14 * Math.abs(ca) + 0.04);
   const ribAt = (t: number): [number, number] => [x0 + ca * len * t, y0 + sa * len * t + droop * t * t];
   const halfW = (t: number) => {
     if (t <= 0 || t >= 1) return 0;
-    if (shape === 'lance') return wid * Math.pow(Math.sin(Math.PI * Math.pow(t, 0.8)), 1.1) * 0.5;
-    if (shape === 'round') return wid * Math.sqrt(Math.sin(Math.PI * t)) * 0.5;
-    return wid * Math.pow(Math.sin(Math.PI * Math.pow(t, 0.7)), 0.75) * 0.5;
+    if (shape === 'lance') return wid * 0.5 * Math.pow(Math.sin(Math.PI * Math.pow(t, 0.85)), 1.2);
+    if (shape === 'round') return wid * 0.5 * Math.pow(Math.sin(Math.PI * t), 0.55);
+    return wid * 0.5 * Math.pow(Math.sin(Math.PI * Math.pow(t, 0.72)), 0.7);
   };
-  // Bounding box.
-  const pad = wid + 2;
-  const xs = [x0, x0 + ca * len];
-  const ys = [y0, y0 + sa * len + droop];
-  const bx0 = Math.floor(Math.min(...xs) - pad);
-  const bx1 = Math.ceil(Math.max(...xs) + pad);
-  const by0 = Math.floor(Math.min(...ys) - pad);
-  const by1 = Math.ceil(Math.max(...ys) + pad);
-  // Sample the rib finely, map each pixel to (t, v): t along, v across (+ to the leaf's left).
-  const N = Math.max(8, Math.ceil(len * 2));
+  const N = Math.max(10, Math.ceil(len * 2));
   const rib: Array<[number, number]> = [];
   for (let i = 0; i <= N; i++) rib.push(ribAt(i / N));
+  let bx0 = Infinity;
+  let by0 = Infinity;
+  let bx1 = -Infinity;
+  let by1 = -Infinity;
+  for (const [x, y] of rib) {
+    bx0 = Math.min(bx0, x);
+    by0 = Math.min(by0, y);
+    bx1 = Math.max(bx1, x);
+    by1 = Math.max(by1, y);
+  }
+  const pad = wid * 0.6 + 2;
+  bx0 = Math.floor(bx0 - pad);
+  by0 = Math.floor(by0 - pad);
+  bx1 = Math.ceil(bx1 + pad);
+  by1 = Math.ceil(by1 + pad);
+  // Map each pixel to (t along, v across, + on the leaf's left of its direction).
   const mask = new Map<number, [number, number]>();
   for (let y = by0; y <= by1; y++) {
     for (let x = bx0; x <= bx1; x++) {
@@ -538,51 +648,50 @@ export function leaf(L: Layer, x0: number, y0: number, ang: number, len: number,
         if (d < best) {
           best = d;
           bt = (i + u) / N;
-          // Which side: the cross product's sign.
           bv = Math.sign(dx * (py - ay) - dy * (px - ax)) * d;
         }
       }
       let hw = halfW(bt);
-      if (o.notch && bt > 0.2 && bt < 0.85) {
-        const slot = Math.floor(bt * 7 + (bv > 0 ? 0.5 : 0));
-        const fr = bt * 7 + (bv > 0 ? 0.5 : 0) - slot;
-        if (fr > 0.42 && fr < 0.58 && Math.abs(bv) > hw * 0.45) hw = 0;
+      if (o.notch && bt > 0.22 && bt < 0.86) {
+        const f = bt * 6 + (bv > 0 ? 0.5 : 0);
+        const fr = f - Math.floor(f);
+        if (fr > 0.4 && fr < 0.6 && Math.abs(bv) > hw * 0.4) hw = 0;
       }
-      if (Math.abs(bv) <= hw) mask.set(y * 4096 + x, [bt, bv / Math.max(0.5, hw)]);
+      if (Math.abs(bv) <= hw + 0.15 && hw > 0.3) mask.set(y * 8192 + x, [bt, bv / Math.max(0.6, hw)]);
     }
   }
-  // Which side faces the light (up-left): the normal on the +v side.
+  const has = (x: number, y: number) => mask.has(y * 8192 + x);
+  // The lit half: the side whose outward normal points up-left.
   const nx = -sa;
   const ny = ca;
-  const plusLit = nx * -0.6 + ny * -0.8 > 0;
-  const has = (x: number, y: number) => mask.has(y * 4096 + x);
+  const plusLit = nx * -0.55 + ny * -0.85 > 0;
+  const base = 1.6 + o.tone * 4;
   for (const [key, [t, v]] of mask) {
-    const y = Math.floor(key / 4096);
-    const x = key - y * 4096;
+    const y = Math.floor(key / 8192);
+    const x = key - y * 8192;
     const lit = (v > 0) === plusLit;
-    let k = 1.2 + o.tone * 4.4 + (lit ? 1.3 : -0.4);
-    // Shade toward the tip and the base, lighter in the middle of each half.
-    k -= Math.abs(t - 0.45) * 1.2;
-    k += (1 - Math.abs(v)) * 0.4 * (lit ? 1 : 0.4);
-    // Veins: slanted lines off the rib, a step darker.
-    const vein = Math.abs(((t * len * 0.55 + Math.abs(v) * wid * 0.22) % 3) - 1.5) < 0.38 && Math.abs(v) > 0.18 && Math.abs(v) < 0.85;
-    if (vein) k -= 0.9;
-    // The midrib: a pale line on the lit side of the leaf.
-    if (Math.abs(v) < 0.14 && t > 0.06 && t < 0.92) k = Math.max(k, 1.6 + o.tone * 4.4 + (lit ? 0.6 : 0.2));
-    if (h2(x, y, o.seed) < 0.06) k += 0.6;
-    let c = rkd(r, k, x, y);
-    // Edges: ink outside the shape on the shadow side, a lime rim on the lit edge.
+    const av = Math.abs(v);
+    let k = base + (lit ? 2 : -0.3) - (t > 0.8 ? (t - 0.8) * 3 : 0);
+    // A crease by the rib on the lit half; the shadow half darkens toward its edge.
+    if (lit && av < 0.3) k -= 0.6;
+    if (!lit && av > 0.6) k -= 0.7;
+    // Veins: a darker line every few px, slanting out from the rib toward the tip.
+    const vein = ((t * len - av * wid * 0.32) % 4 + 4) % 4;
+    if (vein < 0.7 && av > 0.2 && av < 0.8 && t > 0.12 && t < 0.86) k -= 0.8;
+    // The midrib.
+    if (av < 0.12 && t > 0.04 && t < 0.88) k = base + (lit ? 2.2 : 1.4);
+    let c = rk(r, k);
     const edge = !has(x - 1, y) || !has(x + 1, y) || !has(x, y - 1) || !has(x, y + 1);
     if (edge) {
-      if (lit && o.rim !== false && (!has(x, y - 1) || !has(x - 1, y))) c = rk(r, Math.min(r.length - 1, 2.5 + o.tone * 6.5));
-      else if (!lit) c = rk(r, Math.max(0, k - 1.4));
+      if (lit && o.rim !== false && (!has(x, y - 1) || !has(x - 1, y) || !has(x + 1, y))) c = rk(r, Math.min(r.length - 1, base + 3.2));
+      else if (!lit) c = rk(r, Math.max(0, base - 1.2));
     }
     L.px(x, y, c);
   }
-  // Ink round the leaf (only where nothing is drawn yet: leaves behind keep their pixels).
+  // The outline, in the leaf's own darkest green (only on pixels not already painted, except under it).
   for (const key of mask.keys()) {
-    const y = Math.floor(key / 4096);
-    const x = key - y * 4096;
+    const y = Math.floor(key / 8192);
+    const x = key - y * 8192;
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
       if (has(x + dx, y + dy)) continue;
       if (!L.a(x + dx, y + dy) || dy === 1) L.px(x + dx, y + dy, ink);
@@ -590,38 +699,64 @@ export function leaf(L: Layer, x0: number, y0: number, ang: number, len: number,
   }
 }
 
-/** A round clump of small leaves (bushes, the tops of potted plants), lit from the top left. */
-export function clump(L: Layer, cx: number, cy: number, rx: number, ry: number, o: { seed: number; tone: number; ramp?: Ramp; ink?: string; leaf?: number }): void {
+/**
+ * A rounded mass of foliage (a bush, a tree's crown) built from lobes like Firefly Garden's trees:
+ * each lobe lit on its upper left with a clear top, darker underneath, textured with little leaf
+ * strokes, the lobes in front casting a dark line on the ones behind; outlined in deep green.
+ */
+export function clump(L: Layer, cx: number, cy: number, rx: number, ry: number, o: { seed: number; tone: number; ramp?: Ramp; ink?: string; leaf?: number; lobes?: number }): void {
   const r = o.ramp ?? LEAF;
-  const lw = o.leaf ?? 3;
-  // Little leaves scattered over the dome, back (top) ones first.
-  const items: Array<[number, number, number]> = [];
-  const n = Math.round((rx * ry) / (lw * 1.4));
+  const n = o.lobes ?? Math.max(3, Math.round((rx * ry) / 40));
+  // Lobes: one big middle, the rest round its rim, back (top) ones first.
+  const lobes: Array<[number, number, number]> = [];
   for (let i = 0; i < n; i++) {
-    const a = h2(i, 1, o.seed) * Math.PI * 2;
-    const d = Math.sqrt(h2(i, 2, o.seed));
-    items.push([cx + Math.cos(a) * rx * d, cy + Math.sin(a) * ry * d, h2(i, 3, o.seed)]);
+    const a = (i / n) * Math.PI * 2 + h2(i, 1, o.seed) * 0.9;
+    const d = 0.45 + h2(i, 2, o.seed) * 0.3;
+    const lr = Math.min(rx, ry) * (0.42 + h2(i, 3, o.seed) * 0.22);
+    lobes.push([cx + Math.cos(a) * rx * d, cy + Math.sin(a) * ry * d * 0.9, lr]);
   }
-  items.sort((p, q) => p[1] - q[1]);
-  // A dark mass first so gaps read as depth.
-  oval(L, cx, cy + 0.5, rx, ry, (x, y, nx, ny) => rkd(r, 0.6 + o.tone * 1.6 - ny * 0.6 - nx * 0.2 + h2(x, y, o.seed) * 0.5, x, y));
-  for (const [x, y, id] of items) {
-    const nx = (x - cx) / rx;
-    const ny = (y - cy) / ry;
-    const lit = -nx * 0.55 - ny * 0.8;
-    const k = 1.6 + o.tone * 3.6 + lit * 1.8 + (id - 0.5) * 0.8;
-    // A leaf: a small lens shape pointing outward from the center, lighter on its upper edge.
-    const ang = Math.atan2(y - cy, x - cx) + (id - 0.5) * 0.8;
-    const ca = Math.cos(ang);
-    const sa = Math.sin(ang);
-    for (let t = -lw; t <= lw; t++) {
-      const half = Math.round((lw - Math.abs(t)) * 0.55);
-      for (let v = -half; v <= half; v++) {
-        const px = Math.round(x + ca * t * 0.8 - sa * v);
-        const py = Math.round(y + sa * t * 0.8 + ca * v * 0.7);
-        const top = v === -half && half > 0;
-        L.px(px, py, rkd(r, k + (top ? 0.9 : 0) - (v === half && half > 0 ? 0.8 : 0), px, py));
+  lobes.push([cx - rx * 0.1, cy - ry * 0.15, Math.min(rx, ry) * 0.62]);
+  lobes.sort((p, q) => p[1] + p[2] * 0.3 - (q[1] + q[2] * 0.3));
+  const owner = new Map<number, number>();
+  lobes.forEach(([lx, ly, lr], li) => {
+    for (let y = Math.floor(ly - lr * 0.9); y <= Math.ceil(ly + lr * 0.9); y++) {
+      for (let x = Math.floor(lx - lr); x <= Math.ceil(lx + lr); x++) {
+        const nx = (x + 0.5 - lx) / lr;
+        const ny = (y + 0.5 - ly) / (lr * 0.9);
+        const d = nx * nx + ny * ny;
+        // A ragged edge: leaves poking out.
+        if (d > 1 + (h2(x, y, o.seed + li) - 0.5) * 0.35) continue;
+        owner.set(y * 8192 + x, li);
+        const lit = -nx * 0.5 - ny * 0.85;
+        let k = 1.2 + o.tone * 3.6 + lit * 2.1;
+        // Leaf strokes: little 2-3 px dashes a step lighter or darker.
+        const sx = Math.floor((x + (y % 2) * 2) / 3);
+        const s = h2(sx, y, o.seed + 7);
+        if (s < 0.22) k += 0.9;
+        else if (s > 0.8) k -= 0.8;
+        if (d > 0.72 && ny > 0.1) k -= 0.9;
+        L.px(x, y, rk(r, k));
       }
+    }
+  });
+  // Dark lines where a front lobe overlaps one behind it, and bright tips on the lit tops.
+  for (const [key, li] of owner) {
+    const y = Math.floor(key / 8192);
+    const x = key - y * 8192;
+    const up = owner.get((y - 1) * 8192 + x);
+    if (up !== undefined && up !== li && lobes[up][1] < lobes[li][1]) L.px(x, y - 1, rk(r, 0.6 + o.tone));
+    if (up === undefined && h2(x, y, o.seed + 3) < 0.55) {
+      const [lx, ly, lr] = lobes[li];
+      if (x < lx + lr * 0.3 && y < ly) L.px(x, y, rk(r, 3.4 + o.tone * 4.4));
+    }
+  }
+  const ink = o.ink ?? r[0];
+  for (const key of owner.keys()) {
+    const y = Math.floor(key / 8192);
+    const x = key - y * 8192;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+      if (owner.has((y + dy) * 8192 + x + dx)) continue;
+      if (!L.a(x + dx, y + dy) || dy === 1) L.px(x + dx, y + dy, ink);
     }
   }
 }

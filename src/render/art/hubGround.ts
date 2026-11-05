@@ -53,43 +53,49 @@ interface Stone {
   y0: number;
   y1: number;
   id: number;
+  /** Row and index, for per-stone choices. */
+  r: number;
+  i: number;
 }
 
-/** The flagstone layout: rows of uneven height, each cut into stones of uneven width. */
+/**
+ * The flagstone layout: rows of uneven height, each cut into slabs of a few sizes (big ones mostly, a
+ * narrow filler now and then). Joints snap to a coarse 6 px grid, so they line up across rows often
+ * enough to read as a loose grid rather than brickwork; edges wander a pixel.
+ */
 class Flags {
   private rowY: number[] = [];
   private cuts: number[][] = [];
   constructor(private s: number, w: number, h: number) {
-    let y = -4;
+    let y = -6;
     let r = 0;
-    while (y < h + 20) {
+    while (y < h + 24) {
       this.rowY.push(y);
       const cut: number[] = [];
-      let x = -Math.floor(h2(r, 0, s) * 20) - 2;
+      let x = -6 * Math.floor(h2(r, 0, s) * 5) - 3;
       let i = 0;
-      while (x < w + 30) {
+      while (x < w + 40) {
         cut.push(x);
-        // Mostly big slabs, now and then a narrow filler stone.
-        const narrow = h2(r, i, s + 5) < 0.14;
-        x += narrow ? 11 + Math.floor(h2(r, i, s + 6) * 5) : 19 + Math.floor(h2(r, i, s + 7) * 12);
+        const pick = h2(r, i, s + 5);
+        x += pick < 0.12 ? 12 : pick < 0.45 ? 24 : pick < 0.8 ? 30 : 36;
         i++;
       }
       this.cuts.push(cut);
-      y += 13 + Math.floor(h2(r, 1, s) * 5);
+      y += 15 + Math.floor(h2(r, 1, s) * 7);
       r++;
     }
   }
   /** A row's top edge at x: it wanders a pixel up or down every few pixels. */
   private top(r: number, x: number): number {
-    const seg = Math.floor((x + r * 7) / 7);
+    const seg = Math.floor((x + r * 7) / 9);
     const w = h2(r, seg, this.s + 11);
-    return this.rowY[r] + (w < 0.22 ? 1 : w > 0.88 ? -1 : 0);
+    return this.rowY[r] + (w < 0.2 ? 1 : w > 0.9 ? -1 : 0);
   }
   /** A stone's left edge in row r at y: it leans a pixel now and then. */
   private left(r: number, i: number, y: number): number {
     const lean = h2(r, i, this.s + 12);
     const dy = y - this.rowY[r];
-    return this.cuts[r][i] + (lean < 0.25 && dy > 7 ? 1 : lean > 0.8 && dy < 6 ? -1 : 0);
+    return this.cuts[r][i] + (lean < 0.25 && dy > 8 ? 1 : lean > 0.8 && dy < 7 ? -1 : 0);
   }
   at(x: number, y: number): Stone {
     let r = 0;
@@ -105,11 +111,7 @@ class Flags {
     const y1 = r + 1 < this.rowY.length ? this.top(r + 1, x) : y0 + 16;
     const x0 = this.left(r, i, y);
     const x1 = i + 1 < cut.length ? this.left(r, i + 1, y) : x0 + 24;
-    return { x0, x1, y0, y1, id: h2(r, i, this.s + 3) * 0.999 + 0.0005 + (r * 1000 + i) * 0 };
-  }
-  key(x: number, y: number): number {
-    const st = this.at(x, y);
-    return st.x0 * 7919 + st.y0 * 104729;
+    return { x0, x1, y0, y1, id: h2(r, i, this.s + 3), r, i };
   }
 }
 
@@ -161,56 +163,62 @@ function flagPixel(flags: Flags, x: number, y: number, g: GroundSpec, s: number)
   const h = st.y1 - st.y0;
   const id = st.id;
   const edge = g.edgeDist(x, y);
-  // Grout: a pixel at each stone's left and top, two where the stone is laid loose.
-  const loose = id > 0.7;
-  const gapL = ix <= 0 || (loose && ix === 1 && h2(st.x0, st.y0, s + 21) < 0.5);
+  // Joints: a pixel at each slab's left and top; wider (and mossier) where a slab sits loose.
+  const loose = h2(st.r, st.i, s + 20) < 0.22;
+  const wideL = loose && h2(st.r, st.i, s + 21) < 0.6;
+  const gapL = ix <= 0 || (wideL && ix === 1);
   const gapT = iy <= 0 || (loose && iy === 1);
-  // Chamfered corners.
-  const cornerTL = ix + iy < 3;
-  const cornerTR = w - 1 - ix + iy < 2;
-  const cornerBL = ix + (h - 1 - iy) < 2;
-  const cornerBR = w - 1 - ix + (h - 1 - iy) < 1;
-  if (gapL || gapT || cornerTL || cornerTR || cornerBL || cornerBR) {
-    // Moss and grass in the joints, more toward the edges of the paving.
-    const mossy = vnoise(x, y, 11, 9, s + 30) + (edge < 40 ? (40 - edge) / 60 : 0);
-    if (mossy > 0.78 && h2(x, y, s + 31) < 0.6) return rk(LEAF, 1 + h2(x, y, s + 32) * 2.5 + (mossy > 0.95 ? 1 : 0));
-    return rk(GROUT, h2(x, y, s + 33) < 0.25 ? 2 : iy <= 0 && ix > 1 ? 0 : 1);
+  // Rounded corners.
+  const cTL = ix + iy < 2 + (loose ? 1 : 0);
+  const cTR = w - 1 - ix + iy < 2;
+  const cBL = ix + (h - 1 - iy) < 2;
+  const cBR = w - 1 - ix + (h - 1 - iy) < 1;
+  if (gapL || gapT || cTL || cTR || cBL || cBR) {
+    // Moss and grass in the joints, more in wide ones and toward the edges of the paving.
+    const mossy = vnoise(x, y, 13, 9, s + 30) + (edge < 46 ? (46 - edge) / 70 : 0) + (loose ? 0.12 : 0);
+    if (mossy > 0.74 && h2(x, y, s + 31) < 0.7) return rk(LEAF, 1.2 + h2(x, y, s + 32) * 2.4 + (mossy > 0.92 ? 1 : 0));
+    if (h2(x, y, s + 34) < 0.06) return rk(FLAG, 2);
+    return rk(GROUT, h2(x, y, s + 33) < 0.3 ? 2 : 1);
   }
-  // The slab: its own tone (some warmer, some grayer), mottled, lit on its top edge.
-  let k = 3.1 + (id - 0.5) * 2.1;
-  k += (vnoise(x, y, 6, 5, s + 1) - 0.5) * 1.1 + (vnoise(x, y, 17, 13, s + 2) - 0.5) * 0.7;
-  const top = iy === 1 || (gapT && iy === 2);
-  if (iy === 1 || (loose && iy === 2)) k += 1.3;
-  else if (iy === 2) k += 0.35;
-  if (ix === 1 || (loose && ix === 2)) k += 0.6;
-  if (iy === h - 1) k -= 1.5;
-  else if (iy === h - 2) k -= 0.5;
-  if (ix === w - 1) k -= 0.8;
-  // Pits and speckles.
+  // The slab: its own tone, mottled softly, a faint lit lip along the top and a soft shade underneath.
+  let k = 3.4 + (id - 0.5) * 1.8;
+  k += (vnoise(x, y, 7, 5, s + 1) - 0.5) * 0.9 + (vnoise(x, y, 19, 14, s + 2) - 0.5) * 0.6;
+  const firstRow = gapT ? (loose ? 2 : 1) : 1;
+  if (iy === firstRow) k += 0.8;
+  if (ix === (wideL ? 2 : 1)) k += 0.35;
+  if (iy === h - 1) k -= 1.1;
+  if (ix === w - 1) k -= 0.45;
+  // Pits, speckles and lichen spots.
   const sp = h2(x, y, s + 4);
-  if (sp < 0.035) k -= 1.3;
-  else if (sp > 0.975) k += 0.9;
-  // Worn smooth along the walk: a touch lighter, less mottled.
+  if (sp < 0.03) k -= 1.2;
+  else if (sp > 0.982) k += 0.9;
+  if (vnoise(x, y, 3, 3, s + 5 + st.i) > 0.86 && id > 0.5) k -= 0.7;
+  // Worn smooth along the walk: a touch lighter.
   const wr = g.wear;
   if (y > wr.y0 && y < wr.y1) {
     const d = Math.abs(x - wr.x) / wr.half;
-    if (d < 1) k += (1 - d * d) * 0.55;
+    if (d < 1) k += (1 - d * d) * 0.5;
   }
   // Darker and dirtier toward the edges.
-  if (edge < 50) k -= ((50 - edge) / 50) * 1.1;
-  // A crack across some slabs: a jagged dark line with a lit lip.
-  if (id > 0.84 && !top) {
-    const cx = Math.round(w * (0.3 + (id - 0.84) * 2.5) + (iy - h / 2) * 0.7 + (h2(st.x0, iy, s + 8) < 0.3 ? 1 : 0));
-    if (ix === cx) return rk(GROUT, 1);
-    if (ix === cx + 1) k += 0.7;
+  if (edge < 56) k -= ((56 - edge) / 56) * 1.3;
+  // Now and then a crack: a jagged line from the top edge down into the slab, with a lit lip.
+  if (h2(st.r, st.i, s + 22) < 0.07) {
+    const cx0 = Math.floor(w * (0.25 + h2(st.r, st.i, s + 23) * 0.5));
+    let cx = cx0;
+    for (let yy = 1; yy <= iy; yy++) cx += h2(st.x0 + st.y0, yy, s + 24) < 0.33 ? -1 : h2(st.x0 + st.y0, yy, s + 24) > 0.7 ? 1 : 0;
+    const len = Math.floor(h * (0.5 + h2(st.r, st.i, s + 25) * 0.5));
+    if (iy <= len) {
+      if (ix === cx) return rk(GROUT, 1);
+      if (ix === cx + 1) k += 0.6;
+    }
   }
-  // A stain or two of old moss on the stone itself near the edges.
-  if (edge < 26 && vnoise(x, y, 5, 4, s + 9) > 0.7 && h2(x, y, s + 10) < 0.5) return mixHex(rk(FLAG, k), LEAF[3], 0.45);
-  const c = rkd(FLAG, k, x, y);
+  // Old moss stains on the stone near the edges.
+  if (edge < 30 && vnoise(x, y, 5, 4, s + 9) > 0.68 && h2(x, y, s + 10) < 0.55) return mixHex(rk(FLAG, k), LEAF[3], 0.45);
+  const c = rk(FLAG, k + (h2(x, y, s + 7) - 0.5) * 0.5);
   // Some slabs lean warm, some cool.
-  const hue = h2(st.x0, st.y0, s + 6);
-  if (hue < 0.18) return mixHex(c, '#b88a64', 0.18);
-  if (hue > 0.86) return mixHex(c, '#8a8a8a', 0.2);
+  const hue = h2(st.r, st.i, s + 6);
+  if (hue < 0.2) return mixHex(c, '#b88a64', 0.2);
+  if (hue > 0.85) return mixHex(c, '#8e8a86', 0.22);
   return c;
 }
 

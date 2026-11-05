@@ -109,6 +109,46 @@
 .chip[data-tier='3'] { color: #ffd23f; }
 .chip[data-tier='4'] { color: #ff8a8a; }
 .chip[data-gold] { color: #ffd84a; }
+/*
+ * Inside the shrine (altarArt.ts paints it on the canvas over the windows, with holes where they are):
+ * the windows sit where the shrine puts them, the knight centered in each; the canvas draws the frame,
+ * the rims and the light.
+ */
+.mini[data-altar] {
+  display: block;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+.mini[data-altar][data-glow] {
+  box-shadow: none;
+  animation: none;
+}
+.mini[data-altar] .win {
+  position: absolute;
+}
+.mini[data-altar] .win::after {
+  display: none;
+}
+.mini[data-altar] .pic {
+  left: var(--kx);
+  top: var(--ky);
+}
+.mini[data-altar] .win[data-state='token'] .pic {
+  left: var(--tx);
+  top: var(--ty);
+}
+.mini[data-altar] .chip {
+  z-index: 3;
+}
+.altar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 2;
+  pointer-events: none;
+  image-rendering: pixelated;
+}
 @media (prefers-reduced-motion: reduce) {
   .mini[data-glow='3'] {
     animation: none;

@@ -37,6 +37,8 @@ import type { Game } from '../../game';
 import { knightUrl } from '../sprites';
 import { Chunky } from './Chunky';
 import { fxSound } from './fxSound';
+import { Altar, type AltarSignals } from './altar';
+import { bigHeight, bigWindow, miniLayout, paintBig, paintMini, type Rect } from './altarArt';
 import { paylinePic, sparklePic, tokenPic } from './pixelArt';
 import { RAINBOW, raysUrl } from './rays';
 import { Rays } from './Rays';
@@ -48,8 +50,18 @@ import { CONFETTI_COLORS, fmtNum, rarityBands, RAINBOW_TIERS, readU, tierColor }
 import s from './reels.module.css';
 import m from './mini.module.css';
 
-export function AltarReels({ game, variant }: { game: Game; variant: 'big' | 'mini' }) {
-  return variant === 'mini' ? <MiniReels game={game} /> : <BigReels game={game} />;
+/**
+ * `housing`: 'altar' (default) sets the reels in the Summoning Altar (altarArt.ts, lit by altar.ts):
+ * a carved, candle- and rune-lit shrine for 'big', a small rune-rimmed shrine for 'mini'. 'plain' is
+ * Dumpster Legend's slot machine frame with marquee bulbs.
+ */
+export function AltarReels({ game, variant, housing = 'altar' }: { game: Game; variant: 'big' | 'mini'; housing?: 'altar' | 'plain' }) {
+  return variant === 'mini' ? <MiniReels game={game} altarOn={housing === 'altar'} /> : <BigReels game={game} altarOn={housing === 'altar'} />;
+}
+
+/** How full the altar's orb is for `luck` (the spin's, times its best luck token stack): 1 is a tenth, ×1000 is full. */
+function orbFill(luck: number): number {
+  return Math.max(0.1, Math.min(1, 0.1 + (0.9 * Math.log(Math.max(1, luck))) / Math.log(1000)));
 }
 
 // ------------------------------------------------------------------ shared
@@ -100,6 +112,8 @@ interface Layout {
   artCx: number;
   /** Where the reels start inside the window. */
   left: number;
+  /** The bank's own frame round the window (0 inside the altar). */
+  frame: number;
   win: number;
   bankW: number;
   bankH: number;
@@ -119,10 +133,10 @@ function tierSize(name: string, L: Layout): number {
 }
 
 /** Sizes (art pixels) for `count` reels across `widthPx`. Every size is whole art pixels. */
-function layoutFor(count: number, widthPx: number, u: number): Layout {
+function layoutFor(count: number, widthPx: number, u: number, frame: number = FRAME): Layout {
   const n = Math.min(5, Math.max(1, count));
   const bankW = Math.max(48, Math.floor(widthPx / u));
-  const inner = bankW - 2 * FRAME;
+  const inner = bankW - 2 * frame;
   const gap = n === 1 ? 0 : n === 2 ? 4 : 2;
   const reelW = Math.max(12, Math.floor((inner - (n - 1) * gap) / n));
   const side = n <= 2;
@@ -137,7 +151,7 @@ function layoutFor(count: number, widthPx: number, u: number): Layout {
   const artX = n === 2 ? Math.max(0, Math.min(4, cellW - artW)) : Math.floor((cellW - artW) / 2);
   const total = n * reelW + (n - 1) * gap;
   return {
-    n, u, k, side, cell, lab, reelW, gap, artW, artH, artX, artCx: 1 + artX + artW / 2, left: Math.max(0, Math.floor((inner - total) / 2)), win, bankW, bankH: win + 2 * FRAME,
+    n, u, k, side, cell, lab, reelW, gap, artW, artH, artX, artCx: 1 + artX + artW / 2, left: Math.max(0, Math.floor((inner - total) / 2)), frame, win, bankW, bankH: win + 2 * frame,
     big: k === 2 ? (n === 1 ? 11 : 9) : n === 1 ? 9 : 7,
     small: k === 2 ? 5 : 4,
     tierf: n === 1 ? (k === 2 ? 8 : 6) : k === 2 ? 6 : 5,
@@ -463,7 +477,7 @@ function Landing({ f, x, y, L, calm }: { f: Fx; x: number; y: number; L: Layout;
           />
         ))}
       {look.stamp && (
-        <div className={s.stamp} data-calm={calm || undefined} style={{ left: stampX, top: (FRAME - 1) * u }}>
+        <div className={s.stamp} data-calm={calm || undefined} style={{ left: stampX, top: (L.frame - 1) * u }}>
           <Chunky text={stamp} size={L.n <= 2 ? 9 : L.n === 3 ? 7 : 6} grad={bands} />
         </div>
       )}
@@ -533,10 +547,10 @@ const COMBO = { fly: FLIGHT_MS, hold: 820, minHold: 380, back: 260, calmHold: 14
 function ComboFx({ f, L, calm }: { f: Fx; L: Layout; calm: boolean }) {
   const c = f.combo!;
   const u = L.u;
-  const xs = c.reels.map((i) => (FRAME + L.left + i * (L.reelW + L.gap) + L.reelW / 2) * u);
+  const xs = c.reels.map((i) => (L.frame + L.left + i * (L.reelW + L.gap) + L.reelW / 2) * u);
   const cx = Math.round((Math.min(...xs) + Math.max(...xs)) / 2 / u) * u;
-  const cy = (FRAME + L.win / 2) * u;
-  const chipY = (FRAME + 1 + 4) * u;
+  const cy = (L.frame + L.win / 2) * u;
+  const chipY = (L.frame + 1 + 4) * u;
   const sizes = L.n <= 2 ? { title: 11, x: 21, sum: 7, part: 15 } : L.n === 3 ? { title: 9, x: 19, sum: 6, part: 13 } : { title: 8, x: 15, sum: 5, part: 11 };
   const product = `×${fmtNum(c.product)}`;
   const style = { ['--fly' as string]: `${calm ? 0 : COMBO.fly}ms`, ['--hold' as string]: `${c.hold}ms`, ['--back' as string]: `${COMBO.back}ms` } as CSSProperties;
@@ -645,7 +659,7 @@ function TokenFly({ value, from, to, L }: { value: number; from: { x: number; y:
 
 // ------------------------------------------------------------------ the big reels
 
-function BigReels({ game }: { game: Game }) {
+function BigReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState<{ w: number; u: number } | null>(null);
   const [calm, setCalm] = useState(game.state.settings.reduceMotion);
@@ -669,8 +683,28 @@ function BigReels({ game }: { game: Game }) {
   const cellRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  const L = useMemo(() => (box ? layoutFor(run.strips.length, box.w, box.u) : null), [box, run.strips.length]);
+  // The reels' layout, and (inside the altar) where the window and the drums go in the altar's canvas.
+  const geo = useMemo(() => {
+    if (!box) return null;
+    const n = run.strips.length;
+    if (!altarOn) return { L: layoutFor(n, box.w, box.u), altar: null };
+    const W = Math.max(120, Math.floor(box.w / box.u));
+    const aw = bigWindow(W);
+    const L = layoutFor(n, aw.w * box.u, box.u, 0);
+    const win: Rect = { x: aw.x, y: aw.y, w: aw.w, h: L.win };
+    const holes: Rect[] = Array.from({ length: n }, (_, i) => ({ x: win.x + L.left + i * (L.reelW + L.gap) + 1, y: win.y + 1, w: L.reelW - 2, h: L.win - 2 }));
+    return { L, altar: { W, H: bigHeight(L.win, W), win, holes, payY: win.y + Math.floor(L.win / 2) } };
+  }, [box, run.strips.length, altarOn]);
+  const L = geo?.L ?? null;
   layoutRef.current = L;
+  const altarArt = useMemo(() => (geo?.altar ? paintBig(geo.altar.W, geo.altar.win, geo.altar.holes, geo.altar.payY) : null), [geo]);
+  const altarRef = useRef<Altar | null>(null);
+  const canvasRef = (el: HTMLCanvasElement | null) => {
+    if (el && altarRef.current?.canvasEl !== el) altarRef.current = new Altar(el);
+  };
+  useLayoutEffect(() => {
+    if (altarArt && altarRef.current) altarRef.current.setArt(altarArt);
+  }, [altarArt]);
 
   // The container's width and the UI pixel unit.
   useLayoutEffect(() => {
@@ -800,7 +834,11 @@ function BigReels({ game }: { game: Game }) {
       const bank = bankRef.current;
       const lay = layoutRef.current;
       const cur = r.spin;
-      if (!cur || !bank || !lay || committed.current !== r.seq) return;
+      const altar = altarRef.current;
+      if (!cur || !bank || !lay || committed.current !== r.seq) {
+        if (altar && !cur) altar.frame(performance.now(), { calm: calmNow, spinning: false, glow: null, glowStrength: 0, win: null, mode: null, fill: orbFill(game.luck) });
+        return;
+      }
       const calm = calmNow;
       const u = lay.u;
       // The spin's own clock (it stops while the game is paused); between spins the last one rests.
@@ -847,6 +885,7 @@ function BigReels({ game }: { game: Game }) {
             // which counts it as it lands. The last token of a combo sets off its animation.
             const match = combosDone(r.matched, r.mults, r.reached).includes(k);
             tokenSound(cur, i, k);
+            altar?.token(i, calm);
             addFx({ kind: 'token', reel: i, tier: 0, x: stop.token }, 900);
             const count = () => {
               if (runRef.current !== r) return;
@@ -859,6 +898,7 @@ function BigReels({ game }: { game: Game }) {
           } else {
             const tier = rarityIndex(strip.cells[stop.idx].rarity);
             fxSound('reelLand', tier);
+            altar?.land(tier, i, tierColor(tier), calm);
             if (!calm) {
               bank.animate(
                 tier >= 3
@@ -934,6 +974,21 @@ function BigReels({ game }: { game: Game }) {
         bank.dataset.bulbs = bulbs;
         if (bulbs === 'win') bank.style.setProperty('--prize', tierColor(r.best));
       }
+      if (altar) {
+        // The altar's light: the build-up's glow, the find's color after an Epic or better, the spin's
+        // kind, and the orb filling with the spin's luck times its best token stack so far.
+        const stack = Math.max(1, ...chainsOf(r));
+        const sig: AltarSignals = {
+          calm,
+          spinning: !allLanded,
+          glow: building ? color : null,
+          glowStrength: building ? strength : 0,
+          win: allLanded && r.best >= 3 ? tierColor(r.best) : null,
+          mode: cur.golden ? 'golden' : cur.lucky ? 'lucky' : cur.turbo ? 'turbo' : null,
+          fill: orbFill(cur.luck * stack),
+        };
+        altar.frame(performance.now(), sig);
+      }
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
@@ -944,11 +999,12 @@ function BigReels({ game }: { game: Game }) {
   const spin = run.spin;
   const n = run.strips.length;
   const idle = !spin;
-  const fxX = (reel: number) => (L ? (FRAME + L.left + reel * (L.reelW + L.gap) + L.artCx) * L.u : 0);
-  const fxY = L ? (FRAME + L.win / 2 + (L.side ? 0 : L.lab / 2)) * L.u : 0;
-  const chipY = L ? (FRAME + 1 + 4) * L.u : 0;
-  const reelCx = (reel: number) => (L ? (FRAME + L.left + reel * (L.reelW + L.gap) + L.reelW / 2) * L.u : 0);
+  const fxX = (reel: number) => (L ? (L.frame + L.left + reel * (L.reelW + L.gap) + L.artCx) * L.u : 0);
+  const fxY = L ? (L.frame + L.win / 2 + (L.side ? 0 : L.lab / 2)) * L.u : 0;
+  const chipY = L ? (L.frame + 1 + 4) * L.u : 0;
+  const reelCx = (reel: number) => (L ? (L.frame + L.left + reel * (L.reelW + L.gap) + L.reelW / 2) * L.u : 0);
   let style: CSSProperties | undefined;
+  const A = geo?.altar ?? null;
   if (L) {
     const u = L.u;
     const px = (v: number) => `${v * u}px`;
@@ -957,7 +1013,7 @@ function BigReels({ game }: { game: Game }) {
       ['--cell' as string]: px(L.cell),
       ['--lab' as string]: px(L.lab),
       ['--win' as string]: px(L.win),
-      ['--frame' as string]: px(FRAME),
+      ['--frame' as string]: px(L.frame),
       ['--artw' as string]: px(L.artW),
       ['--arth' as string]: px(L.artH),
       ['--tokw' as string]: px(16 * L.k),
@@ -972,8 +1028,8 @@ function BigReels({ game }: { game: Game }) {
       ['--small' as string]: px(L.small),
       ['--tierf' as string]: px(L.tierf),
       ['--trail' as string]: px(3 * L.k),
-      width: px(L.bankW),
-      height: px(L.bankH),
+      width: px(A ? A.W : L.bankW),
+      height: px(A ? A.H : L.bankH),
     } as CSSProperties;
   }
   const arrow = paylinePic();
@@ -990,14 +1046,18 @@ function BigReels({ game }: { game: Game }) {
             data-golden={spin?.golden || undefined}
             data-lucky={spin?.lucky || undefined}
             data-calm={calm || undefined}
+            data-altar={A ? '' : undefined}
             data-bulbs="idle"
+            style={A ? { position: 'absolute', left: A.win.x * L.u, top: A.win.y * L.u, width: A.win.w * L.u, height: A.win.h * L.u } : undefined}
           >
-            <div className={s.bulbs} aria-hidden>
-              <i />
-              <i />
-              <i />
-              <i />
-            </div>
+            {!A && (
+              <div className={s.bulbs} aria-hidden>
+                <i />
+                <i />
+                <i />
+                <i />
+              </div>
+            )}
             <div className={s.reels} style={{ gap: L.gap * L.u, paddingLeft: L.left * L.u }}>
               {run.strips.map((st, i) => {
                 const x = spin ? chain[i] ?? 1 : 1;
@@ -1035,10 +1095,18 @@ function BigReels({ game }: { game: Game }) {
                 );
               })}
             </div>
+            {A && (
+              <canvas
+                ref={canvasRef}
+                className={s.altar}
+                aria-hidden
+                style={{ left: -A.win.x * L.u, top: -A.win.y * L.u, width: A.W * L.u, height: A.H * L.u }}
+              />
+            )}
             <div className={s.payline}>
               <div ref={payFlashRef} className={s.payFlash} />
-              <img className={s.arrowL} src={arrow.url} alt="" draggable={false} />
-              <img className={s.arrowR} src={arrowR.url} alt="" draggable={false} />
+              {!A && <img className={s.arrowL} src={arrow.url} alt="" draggable={false} />}
+              {!A && <img className={s.arrowR} src={arrowR.url} alt="" draggable={false} />}
             </div>
             <div className={s.fx}>
               {fx.map((f) =>
@@ -1111,7 +1179,7 @@ interface MiniPlan {
 /** What the windows last showed, kept while the mini roller is away (so it comes back as it was). */
 const miniShown: Array<{ url: string; rim: string | null; state: string; chip: string; tier: number; gold: boolean }> = [];
 
-function MiniReels({ game }: { game: Game }) {
+function MiniReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
   const countNow = () => Math.max(1, game.state.roll.current?.reels.length ?? reelCount(game.state));
   const [n, setN] = useState(countNow);
   const [u, setU] = useState(() => readU());
@@ -1121,6 +1189,15 @@ function MiniReels({ game }: { game: Game }) {
   const wins = useRef<(HTMLDivElement | null)[]>([]);
   const imgs = useRef<(HTMLImageElement | null)[]>([]);
   const chips = useRef<(HTMLSpanElement | null)[]>([]);
+  // The shrine round the windows (altarArt.ts paints it, altar.ts lights it).
+  const shrine = useMemo(() => (altarOn ? { lay: miniLayout(n), art: paintMini(n) } : null), [n, altarOn]);
+  const altarRef = useRef<Altar | null>(null);
+  const canvasRef = (el: HTMLCanvasElement | null) => {
+    if (el && altarRef.current?.canvasEl !== el) altarRef.current = new Altar(el);
+  };
+  useLayoutEffect(() => {
+    if (shrine && altarRef.current) altarRef.current.setArt(shrine.art);
+  }, [shrine]);
 
   useEffect(() => {
     // (Read where it's mounted: the roller sets its own --u from this.)
@@ -1214,7 +1291,11 @@ function MiniReels({ game }: { game: Game }) {
         });
       }
       const active = spinRef;
-      if (!active) return;
+      const altar = altarRef.current;
+      if (!active) {
+        altar?.frame(now, { calm, spinning: false, glow: null, glowStrength: 0, win: null, mode: null, fill: orbFill(game.luck), rims: miniShown.map((x) => x?.rim ?? null) });
+        return;
+      }
       const el = spin === active ? g.roll.timer * 1000 : lastEl;
       lastEl = el;
       const reached = () => plan.map((p) => p.reached);
@@ -1229,6 +1310,7 @@ function MiniReels({ game }: { game: Game }) {
             setWin(i, tokenPic(stop.token).url, 'token', '#7ef08f');
             bump(i, -uu, false);
             tokenSound(active, i, step);
+            altar?.token(i, calm);
             const done = combosDone(matched, mults, reached());
             if (done.includes(step) && !shown.includes(step)) {
               shown = [...shown, step];
@@ -1240,6 +1322,7 @@ function MiniReels({ game }: { game: Game }) {
           } else {
             setWin(i, p.url, 'landed', p.rim);
             bump(i, uu, p.tier >= 3);
+            altar?.land(p.tier, i, p.rim, calm);
           }
         }
         if (p.reached >= p.stops.length) return;
@@ -1264,9 +1347,13 @@ function MiniReels({ game }: { game: Game }) {
       // The build-up's glow round the roller, climbing the tiers like the big reels'.
       let key = '';
       let color = '';
+      let building = false;
+      let bStrength = 0;
       if (tease) {
         const gl = glowAt(tease, el);
         if (gl.tier !== null) {
+          building = el < tease.land && gl.strength > 0;
+          bStrength = gl.strength;
           let shownTier = gl.tier;
           const since = el - tease.times[gl.step];
           if (gl.step > 0 && !calm && since < flickerMs(tease)) shownTier = Math.floor(since / 45) % 2 === 0 ? gl.tier : tease.tiers[gl.step - 1];
@@ -1290,6 +1377,21 @@ function MiniReels({ game }: { game: Game }) {
         if (active.golden) root.dataset.golden = '';
         else delete root.dataset.golden;
       }
+      if (altar) {
+        const allIn = plan.every((p) => p.reached >= p.stops.length);
+        const best = allIn ? Math.max(...plan.map((p) => p.tier)) : -1;
+        const stack = Math.max(1, ...plan.map((p, i) => chainMult(mults, i, shown, p.reached)));
+        altar.frame(now, {
+          calm,
+          spinning: !allIn,
+          glow: building ? color : null,
+          glowStrength: building ? bStrength : 0,
+          win: best >= 3 ? tierColor(best) : null,
+          mode: active.golden ? 'golden' : active.lucky ? 'lucky' : active.turbo ? 'turbo' : null,
+          fill: orbFill(active.luck * stack),
+          rims: plan.map((_, i) => miniShown[i]?.rim ?? null),
+        });
+      }
     };
     raf = requestAnimationFrame(frame);
     return () => {
@@ -1300,15 +1402,36 @@ function MiniReels({ game }: { game: Game }) {
 
   const cols = miniCols(n);
   const rows = Math.ceil(n / cols);
+  const lay = shrine?.lay ?? null;
   return (
     <div
       ref={rootRef}
       className={m.mini}
-      style={{ ['--u' as string]: `${u}px`, width: miniSpan(cols, MINI.winW) * u, height: miniSpan(rows, MINI.winH) * u } as CSSProperties}
+      data-altar={lay ? '' : undefined}
+      style={
+        {
+          ['--u' as string]: `${u}px`,
+          width: (lay ? lay.W : miniSpan(cols, MINI.winW)) * u,
+          height: (lay ? lay.H : miniSpan(rows, MINI.winH)) * u,
+        } as CSSProperties
+      }
       data-mini-roller
     >
       {Array.from({ length: n }, (_, i) => {
         const was = miniShown[i];
+        const c = lay?.cells[i];
+        const place: CSSProperties = c
+          ? ({
+              left: c.x * u,
+              top: c.y * u,
+              width: c.w * u,
+              height: c.h * u,
+              ['--kx' as string]: `${Math.floor((c.w - KW) / 2) * u}px`,
+              ['--ky' as string]: `${Math.floor((c.h - KH) / 2) * u}px`,
+              ['--tx' as string]: `${Math.floor((c.w - 16) / 2) * u}px`,
+              ['--ty' as string]: `${Math.floor((c.h - 16) / 2) * u}px`,
+            } as CSSProperties)
+          : {};
         return (
           <div
             key={i}
@@ -1318,7 +1441,7 @@ function MiniReels({ game }: { game: Game }) {
             className={m.win}
             data-mini-reel={i}
             data-state={was?.state ?? 'spin'}
-            style={was?.rim ? ({ ['--rim' as string]: was.rim } as CSSProperties) : undefined}
+            style={{ ...place, ...(was?.rim ? ({ ['--rim' as string]: was.rim } as CSSProperties) : {}) }}
           >
             <img
               ref={(el) => {
@@ -1342,6 +1465,7 @@ function MiniReels({ game }: { game: Game }) {
           </div>
         );
       })}
+      {lay && <canvas ref={canvasRef} className={m.altar} aria-hidden style={{ width: lay.W * u, height: lay.H * u }} />}
     </div>
   );
 }

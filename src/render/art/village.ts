@@ -12,7 +12,9 @@ import { houseLayout } from '../../world/decor';
 import type { Prop } from '../../world/mapgen';
 import { blank, type PixelBuf } from '../pixel/buf';
 import type { DecalKind } from './decals';
-import { ball, hash, inkOutline, line, mixHex, rect, setRGB, shade } from './draw';
+import { ball, hash, line, mixHex, rect, setRGB, shade } from './draw';
+import { outlineTinted } from './ink';
+import { stallArt } from './town';
 
 /** What propArt returns (declared here too, so this module doesn't import props.ts). */
 interface Art {
@@ -42,7 +44,6 @@ const SHUTTERS = [
 ];
 const FLOWERS = ['#e04848', '#f088b0', '#f4d050', '#f4f0e8', '#c060d0', '#f08a3a'];
 const LEAF = ['#163018', '#244a22', '#386a2e', '#5a8a3c'];
-const INK = '#1c120c';
 
 /** Darkens a pixel toward a cool shadow color (eaves, the chimney's shadow). */
 function darken(b: PixelBuf, x: number, y: number, f: number): void {
@@ -294,7 +295,7 @@ export function houseArt(variant: number): Art {
   }
   rect(b, cx - 1, cy0 - 1, 9, 2, STONE[4]);
   rect(b, cx + 1, cy0 - 1, 5, 1, '#141414');
-  return { buf: inkOutline(b, INK), ax: Math.round(W / 2) + 1, ay: H + 1 };
+  return { buf: outlineTinted(b), ax: Math.round(W / 2) + 1, ay: H + 1 };
 }
 
 // ------------------------------------------------------------------ small things
@@ -326,7 +327,7 @@ function pot(seed: number): Art {
     for (let i = 0; i < 5; i++) line(b, 5, 8, 1 + i * 2, 1 + (i % 2) * 2, LEAF[1 + (i % 3)]);
     setRGB(b, 5, 1, LEAF[3]);
   }
-  return { buf: inkOutline(b, INK), ax: 6, ay: 14 };
+  return { buf: outlineTinted(b), ax: 6, ay: 14 };
 }
 
 function bench(): Art {
@@ -342,7 +343,7 @@ function bench(): Art {
   rect(b, 1, 7, 2, 3, WOOD[1]);
   rect(b, 15, 7, 2, 3, WOOD[1]);
   rect(b, 8, 7, 2, 2, WOOD[0]);
-  return { buf: inkOutline(b, INK), ax: 10, ay: 11 };
+  return { buf: outlineTinted(b), ax: 10, ay: 11 };
 }
 
 function lampPost(biome: Biome): Art {
@@ -362,7 +363,7 @@ function lampPost(biome: Biome): Art {
   rect(b, 3, 3, 1, 3, '#fff6d8');
   setRGB(b, 4, 6, '#ffb84a');
   rect(b, 2, 9, 5, 1, IRON[2]);
-  return { buf: inkOutline(b, '#100c10'), ax: 5, ay: 31, light: { dx: 0, dy: -25, color: biome.light.fire, r: 70, flicker: true } };
+  return { buf: outlineTinted(b), ax: 5, ay: 31, light: { dx: 0, dy: -25, color: biome.light.fire, r: 70, flicker: true } };
 }
 
 function signpost(seed: number): Art {
@@ -381,7 +382,7 @@ function signpost(seed: number): Art {
     setRGB(b, tip, y + 2, WOOD[2]);
     rect(b, x + 2, y + 2, 5, 1, WOOD[1]);
   }
-  return { buf: inkOutline(b, INK), ax: 9, ay: 23 };
+  return { buf: outlineTinted(b), ax: 9, ay: 23 };
 }
 
 function sacks(seed: number): Art {
@@ -395,7 +396,7 @@ function sacks(seed: number): Art {
     rect(b, x - 1, y - 4, 3, 1, '#6a4a2a');
     setRGB(b, x, y - 5, burlap[2]);
   }
-  return { buf: inkOutline(b, INK), ax: 8, ay: 12 };
+  return { buf: outlineTinted(b), ax: 8, ay: 12 };
 }
 
 function woodpile(): Art {
@@ -409,7 +410,7 @@ function woodpile(): Art {
     setRGB(b, x + 1, y + 2, '#c8a070');
     setRGB(b, x + 2, y + 2, '#a88050');
   }
-  return { buf: inkOutline(b, INK), ax: 9, ay: 13 };
+  return { buf: outlineTinted(b), ax: 9, ay: 13 };
 }
 
 function noticeBoard(seed: number): Art {
@@ -430,7 +431,7 @@ function noticeBoard(seed: number): Art {
     for (let k = y + 1; k < y + h - 1; k += 2) rect(b, x + 1, k, w - 2, 1, '#9a8e7a');
     setRGB(b, x + 1, y, hash(seed, x) < 0.5 ? '#c83a2a' : '#3a6ac8');
   }
-  return { buf: inkOutline(b, INK), ax: 9, ay: 21 };
+  return { buf: outlineTinted(b), ax: 9, ay: 21 };
 }
 
 function flowerBed(seed: number): Art {
@@ -450,39 +451,7 @@ function flowerBed(seed: number): Art {
     setRGB(b, x + 1, y, c);
     setRGB(b, x, y + 1, shade(c, -0.3));
   }
-  return { buf: inkOutline(b, INK), ax: 10, ay: 10 };
-}
-
-function stall(seed: number): Art {
-  const b = blank(32, 26);
-  const cloth = hash(seed, 1) < 0.5 ? ['#8a1e1e', '#c83a32', '#f0eadc'] : ['#1e3e7a', '#3a64b0', '#f0eadc'];
-  // Posts, a striped awning with a scalloped hem, a counter of goods.
-  rect(b, 2, 8, 2, 18, WOOD[2]);
-  rect(b, 28, 8, 2, 18, WOOD[1]);
-  for (let y = 0; y < 9; y++) {
-    const inset = Math.max(0, 3 - Math.floor(y / 2));
-    for (let x = inset; x < 32 - inset; x++) {
-      const stripe = Math.floor(x / 4) % 2;
-      let col = stripe ? cloth[2] : cloth[1];
-      if (y < 2) col = stripe ? '#ffffff' : mixHex(cloth[1], '#ffffff', 0.25);
-      if (y === 8 && x % 4 === 3) continue;
-      if (y >= 7) col = stripe ? '#d8d0c0' : cloth[0];
-      setRGB(b, x, y, col);
-    }
-  }
-  rect(b, 1, 16, 30, 3, WOOD[3]);
-  rect(b, 1, 16, 30, 1, WOOD[4]);
-  rect(b, 1, 19, 30, 6, WOOD[2]);
-  for (let x = 4; x < 30; x += 5) rect(b, x, 19, 1, 6, WOOD[1]);
-  // Goods: apples, cabbages, loaves.
-  for (let i = 0; i < 6; i++) {
-    const gx = 4 + i * 4;
-    const kind = (i + Math.floor(hash(seed, 2) * 3)) % 3;
-    const ramp = kind === 0 ? ['#7a1a14', '#c0321e', '#e85a3a', '#ff9a7a'] : kind === 1 ? ['#2e5a26', '#4e8a38', '#7ab44c', '#b8e07a'] : ['#7a4a1a', '#b0702a', '#d8984a', '#f0c27a'];
-    ball(b, gx + 1, 14.5, 2, 1.6, ramp);
-    ball(b, gx + 2.5, 13.5, 1.6, 1.4, ramp);
-  }
-  return { buf: inkOutline(b, INK), ax: 16, ay: 27 };
+  return { buf: outlineTinted(b), ax: 10, ay: 10 };
 }
 
 function well(biome: Biome): Art {
@@ -521,7 +490,7 @@ function well(biome: Biome): Art {
       setRGB(b, x, y, tx === 0 ? WOOD[1] : y < 2 ? WOOD[4] : y > 4 ? WOOD[2] : WOOD[3]);
     }
   }
-  return { buf: inkOutline(b, INK), ax: 11, ay: 29, ...(biome.liquid?.glow ? { light: { dx: 0, dy: -10, color: biome.liquid.glow, r: 30, flicker: false } } : {}) };
+  return { buf: outlineTinted(b), ax: 11, ay: 29, ...(biome.liquid?.glow ? { light: { dx: 0, dy: -10, color: biome.liquid.glow, r: 30, flicker: false } } : {}) };
 }
 
 export type VillageKind = 'house' | 'pot' | 'bench' | 'lampPost' | 'signpost' | 'sack' | 'woodpile' | 'noticeBoard' | 'flowerBed' | 'stall' | 'wellStone';
@@ -547,7 +516,7 @@ export function villageArt(kind: VillageKind, biome: Biome, seed: number): Art {
     case 'flowerBed':
       return flowerBed(seed);
     case 'stall':
-      return stall(seed);
+      return stallArt(seed);
     case 'wellStone':
       return well(biome);
   }

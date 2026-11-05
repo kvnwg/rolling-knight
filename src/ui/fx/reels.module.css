@@ -947,6 +947,28 @@
   animation: none;
 }
 
+/* ------------------------------------------------------------ inside the altar (altar.ts) */
+/*
+ * The bank is just the reel window: the altar's canvas (one art pixel per pixel) covers it and the
+ * altar round it, with holes over the drums, under the effects layer; it draws the frame, the glow and
+ * the light, so the bank's own frame, rings and bulbs are off. The badges sit on the rune rail.
+ */
+.bank[data-altar] {
+  background: none;
+  box-shadow: none !important;
+  animation: none !important;
+}
+.altar {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  image-rendering: pixelated;
+}
+.bank[data-altar] .badges {
+  top: auto;
+  bottom: calc(-6 * var(--u));
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rays {
     animation: raysIn 0.3s steps(3) backwards;

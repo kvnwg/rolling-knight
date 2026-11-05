@@ -16,7 +16,11 @@ export type PropKind =
   | 'reeds' | 'mushroomSmall' | 'pumpkin' | 'stump' | 'pillar' | 'statue' | 'well' | 'fence' | 'skull' | 'cart' | 'stoneLantern' | 'banner'
   | 'campfire' | 'tent' | 'hayBale' | 'cabbage' | 'wheat' | 'scarecrow' | 'trough' | 'sunflower'
   // The village (art/village.ts).
-  | 'house' | 'pot' | 'bench' | 'lampPost' | 'signpost' | 'sack' | 'woodpile' | 'noticeBoard' | 'flowerBed' | 'stall' | 'wellStone';
+  | 'house' | 'pot' | 'bench' | 'lampPost' | 'signpost' | 'sack' | 'woodpile' | 'noticeBoard' | 'flowerBed' | 'stall' | 'wellStone'
+  // The wilds and their ruins (art/wild.ts).
+  | 'lanternPost' | 'stringLights' | 'roughFence' | 'fern' | 'mossRock' | 'log' | 'brokenPillar' | 'stoneBlock' | 'ruinWall' | 'stairs'
+  // The town (art/town.ts).
+  | 'picket' | 'picketSide' | 'hedge' | 'fountain' | 'cafeTable' | 'stringPost' | 'bridgeRail';
 export type Weather = 'fireflies' | 'snow' | 'embers' | 'dust' | 'spores' | 'petals' | 'leaves' | 'ash' | 'motes' | 'rain';
 export type BodyPlan = 'slime' | 'beast' | 'humanoid' | 'flyer' | 'plant' | 'golem' | 'bug' | 'pumpkin' | 'ghost' | 'pig' | 'ram' | 'chicken';
 
@@ -29,10 +33,13 @@ export interface Biome {
   layout: 'cave' | 'rooms';
   ground: { kind: GroundKind; ramp: Ramp; accent?: Ramp };
   /** `dirt`: the packed earth a cobbled road wears down to at its edges. `wide`: extra tiles of road
-   * each side of the corridors' middle line. `plaza`: how big rooms' plazas are (1 = as big as fits). */
-  path: { kind: GroundKind; ramp: Ramp; accent?: Ramp; dirt?: Ramp; wide?: number; plaza?: number };
-  /** What the solid areas look like: dense trees over a dark floor, or walls with faces. */
-  solid: { kind: SolidKind; top: Ramp; face: Ramp; trees?: TreeKind[]; underRamp?: Ramp };
+   * each side of the corridors' middle line. `plaza`: how big rooms' plazas are (1 = as big as fits).
+   * `everywhere`: every street is paved (a town), right up to the curbs. */
+  path: { kind: GroundKind; ramp: Ramp; accent?: Ramp; dirt?: Ramp; wide?: number; plaza?: number; everywhere?: boolean };
+  /** What the solid areas look like: dense trees over a dark floor, or walls with faces. `ledge`: the
+   * wooded ground is raised, with an earthy cliff face (this ramp) where it drops to the floor.
+   * `curb`: the wooded ground is a lot (bright, open), edged by a stone curb (this ramp) on the street. */
+  solid: { kind: SolidKind; top: Ramp; face: Ramp; trees?: TreeKind[]; underRamp?: Ramp; ledge?: Ramp; curb?: Ramp };
   /** Trees and rocks standing inside rooms. */
   trees: TreeKind[];
   treeRamp: Ramp;
@@ -118,13 +125,13 @@ export const BIOMES: Record<BiomeId, Biome> = {
     id: 'hamlet',
     name: 'Mossy Hamlet',
     layout: 'cave',
-    ground: { kind: 'grass', ramp: ['#24361f', '#33502a', '#456a33', '#5c8740', '#7aa552'], accent: ['#b8c867', '#e8c86a', '#d76b5a', '#f0eee0'] },
-    path: { kind: 'cobble', ramp: ['#4c4238', '#6f6353', '#928570', '#b3a68d', '#d1c6aa'], dirt: ['#3e3022', '#5a4632', '#766041', '#917a55'], wide: 1, plaza: 0.6 },
-    solid: { kind: 'trees', top: ['#16251a', '#1f3322'], face: ['#2a2420', '#3f362f', '#56493e'], trees: ['oak', 'maple', 'oak'], underRamp: ['#1a2a1c', '#223522'] },
+    ground: { kind: 'grass', ramp: ['#2e6a1e', '#3e8424', '#5aa02c', '#66ae32', '#74be3a'], accent: ['#f8d838', '#f08a30', '#f4f0e0', '#f8d838'] },
+    path: { kind: 'cobble', ramp: ['#463c34', '#62564a', '#7c6f60', '#958877', '#ad9f8a'], dirt: ['#3e3022', '#5a4632', '#766041', '#917a55'], wide: 1, plaza: 0.6, everywhere: true },
+    solid: { kind: 'trees', top: ['#16251a', '#1f3322'], face: ['#2a2420', '#3f362f', '#56493e'], trees: ['oak', 'maple', 'oak'], underRamp: ['#1a2a1c', '#223522'], curb: ['#4e4a44', '#7a756c', '#a8a398', '#cac6ba'] },
     trees: ['oak', 'maple'],
     treeRamp: ['#1d3a22', '#2c5530', '#3f743b', '#5b9447', '#88b85a'],
-    liquid: { kind: 'water', ramp: ['#1b3d4f', '#245a6b', '#2f7c86', '#55a7a6', '#9fd8cc'] },
-    props: [['flowers', 6], ['bush', 5], ['rock', 3], ['barrel', 2], ['crate', 2], ['fence', 2], ['lantern', 2], ['well', 1], ['cart', 1], ['stump', 2], ['pumpkin', 1]],
+    liquid: { kind: 'water', ramp: ['#1e4a9a', '#2a62c0', '#3a7ad8', '#5a9ae8', '#8ac0f4'] },
+    props: [['flowerBed', 4], ['barrel', 3], ['crate', 2], ['bench', 2], ['pot', 3], ['sack', 1], ['cart', 1], ['lampPost', 1]],
     light: { ambient: '#d9c2a3', hero: '#ffd9a0', heroRadius: 40, fire: '#ffb35a', gradeTop: '#ffcf8a', gradeBottom: '#3a4a6a', vignette: 0.35 },
     weather: ['petals', 'motes'],
     mobs: { plans: ['slime', 'humanoid', 'beast', 'flyer'], adjectives: ['Feral', 'Rabid', 'Grumpy', 'Mangy', 'Rowdy'], palettes: [['#3b2a1e', '#6a4a2c', '#9a6d3e', '#c99a5a'], ['#2f3d22', '#4f6a2e', '#7a9a3e', '#a8c864']], eye: '#ffe066' },
@@ -135,7 +142,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
     layout: 'cave',
     ground: { kind: 'grass', ramp: ['#2f3b1b', '#465626', '#61732f', '#83923b', '#aab25a'], accent: ['#f4d65a', '#fbf4e0', '#e8904a', '#d88aa0'] },
     path: { kind: 'dirt', ramp: ['#3c2c1e', '#5a432c', '#79603e', '#9a7c52', '#bc9c6a'] },
-    solid: { kind: 'trees', top: ['#141e10', '#1a2814'], face: ['#2a2016', '#3e3222', '#54442e'], trees: ['apple', 'apple', 'oak'], underRamp: ['#18240f', '#1e2c14'] },
+    solid: { kind: 'trees', top: ['#141e10', '#1a2814'], face: ['#2a2016', '#3e3222', '#54442e'], trees: ['apple', 'apple', 'oak'], underRamp: ['#18240f', '#1e2c14'], curb: ['#3a3020', '#5a4a30', '#7a8a3e', '#98a850'] },
     trees: ['apple'],
     treeRamp: ['#1c3416', '#2c4e1e', '#43702a', '#62913a', '#93b855'],
     liquid: { kind: 'water', ramp: ['#1a3a3e', '#235855', '#2f7a6c', '#5aa28a', '#a6d6b4'] },
@@ -159,11 +166,11 @@ export const BIOMES: Record<BiomeId, Biome> = {
     layout: 'cave',
     ground: { kind: 'grass', ramp: ['#141f1c', '#1c2c25', '#26392d', '#324a36', '#45603f'], accent: ['#5f7d4a', '#6fd0c0', '#b48ae0', '#e0d070'] },
     path: { kind: 'dirt', ramp: ['#1e1814', '#2e241c', '#3e3125', '#514030', '#66523c'] },
-    solid: { kind: 'trees', top: ['#0a1210', '#0f1a16'], face: ['#1a1612', '#2a221a', '#3a3024'], trees: ['oak', 'pine', 'oak', 'dead'], underRamp: ['#0c1512', '#111d18'] },
+    solid: { kind: 'trees', top: ['#0a1210', '#0f1a16'], face: ['#1a1612', '#2a221a', '#3a3024'], trees: ['oak', 'pine', 'oak', 'dead'], underRamp: ['#0c1512', '#111d18'], ledge: ['#1e2a26', '#2c3c36', '#3e544a', '#56705f', '#76907c'] },
     trees: ['oak', 'pine', 'mushroom'],
     treeRamp: ['#0f2420', '#173a2e', '#22513b', '#336c47', '#4d8a55'],
     liquid: { kind: 'water', ramp: ['#0c1e26', '#123040', '#1a4656', '#2a6670', '#58a0a0'] },
-    props: [['mushroomSmall', 2], ['bush', 4], ['rock', 3], ['stump', 3], ['bones', 1], ['lantern', 1]],
+    props: [['fern', 6], ['mushroomSmall', 3], ['mossRock', 3], ['bush', 3], ['log', 2], ['stump', 2], ['brokenPillar', 1], ['stoneBlock', 1], ['bones', 1]],
     light: { ambient: '#4a5c7a', hero: '#b8e0ff', heroRadius: 52, fire: '#ffaa55', gradeTop: '#5a7aa0', gradeBottom: '#10182a', vignette: 0.55, fog: '#3a5a66' },
     weather: ['fireflies', 'leaves'],
     mobs: { plans: ['beast', 'bug', 'plant', 'flyer', 'humanoid'], adjectives: ['Gloom', 'Moss', 'Thorn', 'Hollow', 'Shade'], palettes: [['#1a2a24', '#2c4a3a', '#4a7050', '#7aa070'], ['#2a1e30', '#463050', '#6a4a7a', '#9a78b0']], eye: '#8affc8' },

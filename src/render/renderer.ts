@@ -23,6 +23,7 @@ import { FX_SHEETS, type FxName } from './packs/fx';
 import { renderText, type TextStyle } from './pixel/font';
 import { paintTerrain, type Terrain } from './terrain';
 import { Rain } from './rain';
+import { Ambient } from './ambient';
 import type { Sky } from '../world/sky';
 import { npcFrame, questMarker } from './art/npcs';
 import { npcMarker } from '../world/npcs';
@@ -105,6 +106,8 @@ export class Renderer {
   private time = 0;
   private weatherT = 0;
   private rain = new Rain();
+  /** Life over the floor: fireflies, butterflies, mist, waterfalls. */
+  private ambient: Ambient | null = null;
   /** The view's whole-pixel top-left in world pixels, this frame. */
   private origin = { x: 0, y: 0 };
   private flashT = 0;
@@ -169,6 +172,7 @@ export class Renderer {
     this.terrain = paintTerrain(w.map, w.biome);
     this.particles = [];
     this.rain.reset();
+    this.ambient = new Ambient(w.map, w.biome);
     this.props = w.map.props
       .map((p) => {
         const variant = p.seed % 5;
@@ -278,6 +282,7 @@ export class Renderer {
       this.rain.update(dt, w.map, w.sky.rain, cx, cy, this.LW, this.LH);
       this.rain.drawGround(g, cx, cy);
     }
+    this.ambient?.drawGround(g, cx, cy, this.LW, this.LH, this.time);
     if (!shader && game.state.settings.tiltShift && lead) this.tiltShift(g, sy(lead.y) - 6, w.biome.layout === 'rooms' ? 0.5 : 1);
     this.drawPortal(g, em, w, sx, sy);
     for (const a of w.areas) this.drawArea(g, em, a, sx, sy);
@@ -382,6 +387,7 @@ export class Renderer {
     }
     list.sort((a, b) => a.y - b.y);
     for (const d of list) d.draw();
+    this.ambient?.drawAir(em, cx, cy, this.LW, this.LH, this.time);
 
     // --- shots, sparks, leaves and weather
     for (const s of w.shots) this.drawShot(s.kind === 'arrow' ? st : em, s, sx, sy);
@@ -994,6 +1000,7 @@ export class Renderer {
       if (glow) out.push({ x: sx(h.x), y: sy(h.y) - 8, r: 16, color: glow, intensity: 0.2 + carry * 0.3, bloom: true });
       if (h.cls === 'arcanist') out.push({ x: sx(h.x) + h.dir * 4, y: sy(h.y) - 16, r: 10, color: L.plume[2], intensity: 0.35, bloom: true });
     }
+    if (this.ambient) for (const l of this.ambient.lights(cx, cy, this.W, this.H, this.time)) out.push(l);
     for (const s of w.shots) {
       if (s.kind === 'arrow') continue;
       out.push({ x: sx(s.x), y: sy(s.y), r: s.team === 'hero' ? 20 : 16, color: s.color, intensity: 0.9, bloom: true });

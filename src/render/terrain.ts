@@ -137,15 +137,6 @@ class Cobbles {
   }
 }
 
-/** Grass tufts: a few blade shapes as [dx, dy, tone change], the tips lit, a shadow at the root. */
-const TUFTS: ReadonlyArray<ReadonlyArray<readonly [number, number, number]>> = [
-  [[-1, -2, 1.3], [1, -2, 1.2], [-1, -1, 0.6], [0, -1, 0.9], [1, -1, 0.5], [-1, 0, -0.8], [0, 0, -0.8], [1, 0, -0.7]],
-  [[0, -2, 1.3], [-1, -1, 1.0], [0, -1, 0.6], [-1, 0, -0.8], [0, 0, -0.8]],
-  [[-2, -2, 1.1], [0, -2, 1.3], [2, -2, 1.0], [-2, -1, 0.5], [-1, -1, 0.8], [0, -1, 0.6], [1, -1, 0.8], [2, -1, 0.4], [-2, 0, -0.7], [-1, 0, -0.8], [0, 0, -0.8], [1, 0, -0.8], [2, 0, -0.6]],
-  [[1, -3, 1.3], [0, -2, 1.0], [1, -2, 0.7], [-1, -1, 1.1], [0, -1, 0.6], [-1, 0, -0.8], [0, 0, -0.8], [1, 0, -0.6]],
-];
-const TUFT_AT = TUFTS.map((t) => new Map(t.map(([dx, dy, d]) => [dx * 16 + dy, d])));
-
 interface MatCtx {
   seed: number;
   ramp: Ramp;
@@ -160,31 +151,26 @@ function paint(kind: GroundKind, x: number, y: number, m: MatCtx): string {
   switch (kind) {
     case 'grass':
     case 'moss': {
-      // Patches of lighter and darker grass with soft organic edges, three tones.
-      const n = vnoise(x, y, 30, s) + (vnoise(x, y, 9, s + 1) - 0.5) * 0.32;
-      let k = n < 0.38 ? 1.45 : n < 0.62 ? 2.1 : 2.75;
-      // Short tufts on a jittered grid: lit tips over a darker root.
-      const cx = Math.floor(x / 6);
-      const cy = Math.floor((y + 2) / 5);
-      if (h2(cx, cy, s + 2) < 0.55) {
-        const tx = cx * 6 + 2 + Math.floor(h2(cx, cy, s + 3) * 3);
-        const ty = cy * 5 + 2 + Math.floor(h2(cx, cy, s + 4) * 2);
-        const d = TUFT_AT[Math.floor(h2(cx, cy, s + 6) * TUFTS.length)].get((x - tx) * 16 + (y - ty));
-        if (d !== undefined) k += d;
+      // Two or three close greens in broad soft patches, a sparse small tuft, the odd flower dot.
+      const n = vnoise(x, y, 34, s) + (vnoise(x, y, 11, s + 1) - 0.5) * 0.18;
+      let k = n < 0.4 ? 1.7 : n < 0.66 ? 2.35 : 2.95;
+      const cx = Math.floor(x / 7);
+      const cy = Math.floor(y / 6);
+      if (h2(cx, cy, s + 2) < 0.3) {
+        const tx = cx * 7 + 2 + Math.floor(h2(cx, cy, s + 3) * 3);
+        const ty = cy * 6 + 2 + Math.floor(h2(cx, cy, s + 4) * 2);
+        if (y === ty && (x === tx || x === tx + 2)) k += 0.9;
+        else if (y === ty + 1 && x >= tx && x <= tx + 2) k -= 0.55;
       }
-      if (m.accent && kind === 'grass') {
-        const fx = Math.floor(x / 11);
-        const fy = Math.floor(y / 11);
-        const fh = h2(fx, fy, s + 5);
-        if (fh < 0.09) {
-          const px = fx * 11 + 3 + Math.floor(h2(fx, fy, s + 6) * 5);
-          const py = fy * 11 + 3 + Math.floor(h2(fx, fy, s + 7) * 5);
-          const col = m.accent[Math.floor(h2(fx, fy, s + 8) * m.accent.length)];
-          if (x === px && y === py) return col;
-          if (x === px && y === py + 1) return r[1];
+      if (m.accent) {
+        const fx = Math.floor(x / 9);
+        const fy = Math.floor(y / 9);
+        if (h2(fx, fy, s + 5) < 0.16) {
+          const px = fx * 9 + 2 + Math.floor(h2(fx, fy, s + 6) * 5);
+          const py = fy * 9 + 2 + Math.floor(h2(fx, fy, s + 7) * 5);
+          if (x === px && y === py) return m.accent[Math.floor(h2(fx, fy, s + 8) * m.accent.length)];
         }
       }
-      if (kind === 'moss' && m.accent && h2(Math.floor(x / 13), Math.floor(y / 13), s + 9) < 0.06 && h2(x, y, s) < 0.4) return m.accent[0];
       return r[clampK(k, r.length)];
     }
     case 'cobble': {
@@ -363,7 +349,8 @@ export function paintTerrainPixels(m: FloorMap, biome: Biome): Omit<Terrain, 'ca
     return a + (b - a) * tx + (c - a) * ty + (a - b - c + d) * tx * ty;
   };
   const isLiquid = (tx: number, ty: number) => (tile(tx, ty) === LIQUID ? 1 : 0);
-  const isPath = (tx: number, ty: number) => pathAt(tx, ty);
+  // A town: every street paved, right up to the curbs.
+  const isPath = biome.path.everywhere ? () => 1 : (tx: number, ty: number) => pathAt(tx, ty);
   const isOpen = (tx: number, ty: number) => (tile(tx, ty) === SOLID ? 0 : 1);
   // Fields keep neat edges (less raggedness than paths).
   const fieldMask = (x: number, y: number) => bil(isField, x, y) + (vnoise(x, y, 5, seed + 90) - 0.5) * 0.22;
@@ -375,11 +362,45 @@ export function paintTerrainPixels(m: FloorMap, biome: Biome): Omit<Terrain, 'ca
     px[i + 2] = b * f;
     px[i + 3] = 255;
   };
+  const open = (tx: number, ty: number) => tile(tx, ty) !== SOLID && !m.canal?.[ty * m.w + tx];
+  /** The stone curb round a lot, where it meets the street: a lit top, a face toward us on the south. */
+  const curbAt = (tx: number, ty: number, lx: number, ly: number, C: Ramp): string | null => {
+    const S = open(tx, ty + 1);
+    const N = open(tx, ty - 1);
+    const Wd = open(tx - 1, ty);
+    const E = open(tx + 1, ty);
+    if (S && ly >= 11) return ly === 11 ? C[2] : ly === 12 ? C[3] : ly === 15 ? C[0] : C[1];
+    if (N && ly <= 2) return ly === 0 ? C[2] : ly === 1 ? C[3] : C[1];
+    if (Wd && lx <= 2) return lx === 0 ? C[2] : lx === 1 ? C[3] : C[1];
+    if (E && lx >= 13) return lx === 15 ? C[1] : lx === 14 ? C[2] : C[3];
+    // Corners where the street turns.
+    if (open(tx + 1, ty + 1) && lx >= 13 && ly >= 11) return ly === 15 ? C[0] : ly <= 12 ? C[2] : C[1];
+    if (open(tx - 1, ty + 1) && lx <= 2 && ly >= 11) return ly === 15 ? C[0] : ly <= 12 ? C[2] : C[1];
+    if (open(tx + 1, ty - 1) && lx >= 13 && ly <= 2) return C[2];
+    if (open(tx - 1, ty - 1) && lx <= 2 && ly <= 2) return C[2];
+    return null;
+  };
+  const isCanal = (tx: number, ty: number) => (tx < 0 || ty < 0 || tx >= m.w || ty >= m.h ? 0 : m.canal?.[ty * m.w + tx] ?? 0);
+  const water = liquid?.ramp ?? ['#1e4a9a', '#2a62c0', '#3a7ad8', '#5a9ae8', '#8ac0f4'];
+  const bank = biome.solid.curb ?? biome.path.ramp;
+  /** A canal: saturated water with lighter streaks between stone banks (the north bank's face shows). */
+  const canalAt = (x: number, y: number, lx: number, ly: number, tx: number, ty: number): string => {
+    if (!isCanal(tx, ty - 1) && ly < 5) return ly === 0 ? bank[2] : ly === 1 ? bank[3] : ly === 4 ? bank[0] : bank[1];
+    if (!isCanal(tx, ty + 1) && ly > 13) return ly === 14 ? bank[2] : bank[3];
+    if (!isCanal(tx - 1, ty) && lx < 2) return lx === 0 ? bank[2] : bank[3];
+    if (!isCanal(tx + 1, ty) && lx > 13) return lx === 15 ? bank[1] : bank[2];
+    let k = 2 + (vnoise(x, y, 12, seed + 150) - 0.5) * 0.8;
+    // Streaks along the flow, a pixel or two long.
+    if ((x * 7 + Math.floor(y / 2) * 13) % 23 === 0) k = 3.6;
+    else if ((x * 5 + y * 3) % 31 === 0) k = 3;
+    if (!isCanal(tx, ty - 1) && ly < 7) k = Math.min(k, 1);
+    return water[clampK(k, water.length)];
+  };
   // What each pixel is (decals only go where they belong).
   const surf = new Uint8Array(W * H);
   // Cobbled roads: whole stones, so the road's edge wears away stone by stone into packed dirt,
   // then grass; grass grows in the mortar and some stones are greyer than others.
-  const cob = biome.path.kind === 'cobble' ? new Cobbles(seed + 140, 7) : null;
+  const cob = biome.path.kind === 'cobble' ? new Cobbles(seed + 140, 5) : null;
   // A cobbled road keeps a steadier edge than a dirt track (its stones wear it ragged instead).
   const ragged = cob ? 0.26 : 0.45;
   const pathMask = (x: number, y: number) => bil(isPath, x, y) + (vnoise(x, y, 6, seed + 80) - 0.5) * ragged;
@@ -402,20 +423,18 @@ export function paintTerrainPixels(m: FloorMap, biome: Biome): Omit<Terrain, 'ca
     const id = h2(st.gx, st.gy, seed + 141);
     const cut = 0.47 + (h2(st.gx, st.gy, seed + 142) - 0.5) * 0.16;
     // A stone missing here and there inside the road; a grassy hollow where the noise says so.
-    const lost = id < 0.02 || vnoise(st.px, st.py, 26, seed + 143) > 0.8;
+    const lost = !biome.path.everywhere && (id < 0.02 || vnoise(st.px, st.py, 26, seed + 143) > 0.8);
     if (mid > cut && !lost) {
       const gap = st.d2 - st.d1;
       const dx = x + 0.5 - st.px;
       const dy = y + 0.5 - st.py;
-      const grassy = vnoise(x, y, 16, seed + 144) > 0.57;
-      if (gap < 1.15 || st.d1 > 4.6) return grassy ? biome.ground.ramp[(x + y) % 3 === 0 ? 3 : 2] : mortar;
-      const ramp = h2(st.gx, st.gy, seed + 145) < 0.3 ? grey : warm;
-      let k = 2.15 + (id - 0.5) * 0.8;
+      // A dark mortar line round every stone, moss in a few of the joints.
+      if (gap < 0.95 || st.d1 > 3.3) return vnoise(x, y, 14, seed + 144) > 0.7 && h2(st.gx, st.gy, seed + 148) < 0.5 ? ((x + y) % 2 ? '#4a7a2a' : '#5e9234') : mortar;
+      const ramp = h2(st.gx, st.gy, seed + 145) < 0.35 ? grey : warm;
+      let k = 2.1 + (id - 0.5) * 1.6;
       const side = dx + dy * 1.1;
-      // A bevel: the rim lit on the top left, shaded on the bottom right; a soft spot of light on top.
-      if (gap < 2.5 || st.d1 > 3.4) k += side < 0 ? 1 : -1;
-      else if (dx < -0.5 && dy < -0.5) k += 0.45;
-      if (grassy && side > 0 && gap < 2.5 && vnoise(x, y, 16, seed + 144) > 0.66) return biome.ground.ramp[2];
+      // Each stone a flat tone, its top-left rim lit, its bottom-right rim a shade darker.
+      if (gap < 1.8) k += side < 0 ? 0.8 : -0.7;
       return ramp[clampK(k, ramp.length)];
     }
     if (pm > 0.36) {
@@ -438,11 +457,35 @@ export function paintTerrainPixels(m: FloorMap, biome: Biome): Omit<Terrain, 'ca
       if (t === SOLID) {
         const below = tile(tx, ty + 1);
         const faceTile = below !== SOLID;
+        const canal = m.canal?.[ty * m.w + tx];
+        if (canal) {
+          set(i, canalAt(x, y, lx, ly, tx, ty));
+          surf[y * W + x] = 3;
+          continue;
+        }
+        if (biome.solid.kind === 'trees' && biome.solid.curb) {
+          // A lot: bright ground for the trees, houses and gardens on it, a stone curb round it.
+          const c = curbAt(tx, ty, lx, ly, biome.solid.curb);
+          if (c) {
+            set(i, c);
+            surf[y * W + x] = 8;
+          } else {
+            set(i, paint(biome.ground.kind, x, y, ground), 0.03);
+            surf[y * W + x] = 9;
+          }
+          continue;
+        }
+        if (biome.solid.kind === 'trees' && biome.solid.ledge && faceTile) {
+          // A ledge: the wooded ground stands a step up, its earthy face toward us.
+          set(i, ledgeFace(x, y, ly, ty, seed, biome.solid.ledge, biome.ground.ramp));
+          surf[y * W + x] = 5;
+          continue;
+        }
         if (biome.solid.kind === 'trees') {
           // Under the trees: the same ground, sinking into deep shade away from the open floor (no hard
           // tile edges where a gap in the trees shows through).
           const open = bil(isOpen, x, y) + (vnoise(x, y, 6, seed + 51) - 0.5) * 0.35;
-          const shadeAmt = Math.max(0.28, Math.min(0.78, 0.78 - open * 0.75));
+          const shadeAmt = Math.max(0.08, Math.min(0.42, 0.42 - open * 0.4));
           set(i, paint(biome.ground.kind, x, y, ground), Math.round(shadeAmt * 8) / 8);
           continue;
         }
@@ -462,7 +505,8 @@ export function paintTerrainPixels(m: FloorMap, biome: Biome): Omit<Terrain, 'ca
             else if (by === 1) k += 0.8;
             else if (bx === bw - 1) k -= 0.6;
             if (k > 0) k += (TILE / 2 - fy) / TILE;
-            if (fy <= 1) k = 4;
+            // The wall's lit top cap.
+            if (fy <= 3) k = fy === 0 ? 4 : fy === 3 ? 1 : 3;
             if (fy >= TILE - 2) k = Math.min(k, 0.6);
             // Grime and moss toward the bottom.
             if (fy > 10 && vnoise(x, y, 6, seed + 61) > 0.62) k = Math.min(k, 1);
@@ -471,17 +515,20 @@ export function paintTerrainPixels(m: FloorMap, biome: Biome): Omit<Terrain, 'ca
             const n = vnoise(x * 0.5, y * 2.2, 5, seed + 62);
             let k = 1 + n * 2.4 + (fy < 4 ? 1 : 0) - (fy > 12 ? 0.8 : 0);
             if (Math.abs(((x * 0.5 + y * 2) % 7) - 3.5) < 0.3 && n > 0.5) k -= 1;
-            if (fy <= 1) k = 4;
+            if (fy <= 3) k = fy === 0 ? 4 : fy === 3 ? 1 : 3;
             set(i, face[clampK(k, face.length)]);
           }
           continue;
         }
-        // The top of a wall: dark, with a lit rim along floor edges.
+        // The top of a wall: dark slabs (readable, not a void), a lit cap where it meets the floor.
         const n = vnoise(x, y, 8, seed + 63);
         let col = top[n > 0.6 ? 1 : 0];
-        const nearFloorAbove = ly <= 1 && tile(tx, ty - 1) !== SOLID;
-        const nearSide = (lx <= 1 && tile(tx - 1, ty) !== SOLID) || (lx >= TILE - 2 && tile(tx + 1, ty) !== SOLID);
-        if (nearFloorAbove || nearSide) col = face[3];
+        if ((lx === 0 || ly === 0) && (tx + ty) % 2 === 0) col = shade(top[0], -0.3);
+        else if (lx === 1 && ly > 0 && h2(tx, ty, seed + 64) < 0.5) col = top[1];
+        const capAbove = tile(tx, ty - 1) !== SOLID ? ly : 99;
+        const capSide = Math.min(tile(tx - 1, ty) !== SOLID ? lx : 99, tile(tx + 1, ty) !== SOLID ? TILE - 1 - lx : 99);
+        const cap = Math.min(capAbove, capSide);
+        if (cap <= 2) col = cap === 0 ? face[4 % face.length] : cap === 1 ? face[3] : face[1];
         set(i, col);
         continue;
       }
@@ -515,6 +562,14 @@ export function paintTerrainPixels(m: FloorMap, biome: Biome): Omit<Terrain, 'ca
         if (lx === 8 && ly === 8 && liquid.glow) glows.push({ x, y, color: liquid.glow, r: 34 });
         continue;
       }
+      // A bridge's deck over a canal: planks across, darker gaps, the edges in shade.
+      if (m.canal?.[ty * m.w + tx]) {
+        const plank = ly % 3;
+        const edge = lx < 2 || lx > 13;
+        set(i, edge ? '#4a2e1c' : plank === 2 ? '#5a3a22' : plank === 0 ? '#a8784a' : (Math.floor(x / 5) + ty) % 2 ? '#8a5e38' : '#966a40');
+        surf[y * W + x] = 0;
+        continue;
+      }
       // Ground or path, blending with a ragged edge.
       const pm = pathMask(x, y);
       let road: string | null = null;
@@ -546,8 +601,14 @@ export function paintTerrainPixels(m: FloorMap, biome: Biome): Omit<Terrain, 'ca
       const sAbove = tile(tx, ty - 1) === SOLID ? ly : 99;
       const sLeft = tile(tx - 1, ty) === SOLID ? lx : 99;
       const sRight = tile(tx + 1, ty) === SOLID ? TILE - 1 - lx : 99;
-      const occ = Math.min(sAbove * 0.8, sLeft, sRight) + (vnoise(x, y, 4, seed + 52) - 0.5) * 3;
-      if (occ < 6) dark += Math.round((6 - occ) * 1.5) / 1.5 * (biome.solid.kind === 'trees' ? 0.06 : 0.1);
+      if (biome.solid.curb) {
+        // The curb's crisp shadow on the street below and beside it.
+        if (sAbove < 2) dark += sAbove === 0 ? 0.38 : 0.16;
+        if (sLeft < 1) dark += 0.2;
+      } else {
+        const occ = Math.min(sAbove * 0.8, sLeft, sRight) + (vnoise(x, y, 4, seed + 52) - 0.5) * 3;
+        if (occ < 6) dark += Math.round((6 - occ) * 1.5) / 1.5 * (biome.solid.kind === 'trees' ? 0.06 : 0.1);
+      }
       set(i, col, Math.min(0.7, dark));
     }
   }
@@ -624,6 +685,22 @@ export function paintTerrainPixels(m: FloorMap, biome: Biome): Omit<Terrain, 'ca
     }
   }
 
+  // --- waterfalls: a stream on the ledge's top, the water over its face, foam where it lands
+  for (const f of m.waterfalls ?? []) {
+    const lr = liquid?.ramp ?? ['#1b3d4f', '#245a6b', '#2f7c86', '#55a7a6', '#9fd8cc'];
+    for (let y = f.y - 14; y < f.y + f.h + 3; y++) {
+      for (let x = f.x; x < f.x + f.w; x++) {
+        if (x < 0 || y < 0 || x >= W || y >= H) continue;
+        const u = (x - f.x) / Math.max(1, f.w - 1);
+        let col: string;
+        if (y < f.y) col = y === f.y - 14 || u < 0.12 || u > 0.88 ? lr[0] : (x + y) % 5 === 0 ? lr[3] : lr[1];
+        else if (y < f.y + f.h) col = (x * 3 + Math.floor(y / 3)) % 4 === 0 ? lr[4] : u < 0.2 || u > 0.8 ? lr[2] : lr[3];
+        else col = (x + y) % 2 ? '#e8f4f8' : lr[4];
+        set((y * W + x) * 4, col);
+      }
+    }
+  }
+
   // --- shadows thrown toward the lower right by everything standing
   const sh = castShadows(m, biome, W, H);
   for (let k = 0; k < sh.length; k++) {
@@ -635,6 +712,27 @@ export function paintTerrainPixels(m: FloorMap, biome: Biome): Omit<Terrain, 'ca
     px[i + 2] *= fb;
   }
   return { w: W, h: H, px, glows, liquid: liquidTiles };
+}
+
+/**
+ * A ledge's face (16 px, the tile above the floor): a lip of grass hanging over the top edge, then
+ * earth and rock in layers lit from above, roots dangling from the lip, moss in the cracks, and a dark
+ * foot where it meets the floor.
+ */
+function ledgeFace(x: number, y: number, ly: number, ty: number, seed: number, L: Ramp, g: Ramp): string {
+  const lip = 2 + (h2(x, ty, seed + 90) < 0.35 ? 1 : 0) + (h2(Math.floor(x / 3), ty, seed + 91) < 0.22 ? 2 : 0);
+  if (ly < lip) return ly === 0 ? g[4] : ly === lip - 1 ? g[1] : g[3];
+  // Roots hanging from the lip in some columns.
+  const rootLen = h2(Math.floor(x / 2), ty, seed + 94) < 0.18 ? 4 + Math.floor(h2(x, ty, seed + 95) * 7) : 0;
+  if (rootLen && ly < lip + rootLen && x % 2 === 0) return ly === lip + rootLen - 1 ? '#3a2a1c' : '#5a4430';
+  const wob = Math.floor(vnoise(x, y, 7, seed + 92) * 3);
+  const band = Math.floor((ly + wob) / 4);
+  let k = 3.2 - ((ly - lip) / (16 - lip)) * 2.4 + (h2(Math.floor((x + band * 3) / 5), band + ty * 5, seed + 93) - 0.5) * 0.9;
+  if ((ly + wob) % 4 === 0) k -= 1.1;
+  if (h2(Math.floor(x / 4), ty * 7 + band, seed + 96) < 0.12 && x % 4 === 1) k = 0.3;
+  if (ly >= 15) k = Math.min(k, 0.4);
+  if (vnoise(x, y, 6, seed + 97) > 0.7 && ly < 13) return (x + ly) % 3 ? '#3e6a28' : '#5a8c34';
+  return L[clampK(k, L.length)];
 }
 
 /** Cast shadows: darker and cooler (a core, and a softer edge round it). */

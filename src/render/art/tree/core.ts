@@ -64,7 +64,7 @@ export function vnoise(x: number, y: number, size: number, s: number): number {
  * Leaf cells: a jittered grid of leaf centers (Worley). For a pixel, the nearest leaf's center, its
  * offset from it (-1..1 of the cell), and the leaf's own random value.
  */
-export function leafCell(x: number, y: number, size: number, s: number): { cx: number; cy: number; ox: number; oy: number; id: number; edge: number } {
+export function leafCell(x: number, y: number, size: number, s: number, aspect = 1.12): { cx: number; cy: number; ox: number; oy: number; id: number; edge: number } {
   const gx = Math.floor(x / size);
   const gy = Math.floor(y / size);
   let best = 1e9;
@@ -76,10 +76,11 @@ export function leafCell(x: number, y: number, size: number, s: number): { cx: n
     for (let ox = -1; ox <= 1; ox++) {
       const cx = gx + ox;
       const cy = gy + oy;
-      const px = (cx + 0.2 + h2(cx, cy, s) * 0.6) * size;
-      const py = (cy + 0.2 + h2(cx, cy, s + 1) * 0.6) * size;
-      // Leaves are a little wider than tall (seen from above at an angle).
-      const d = Math.hypot(x + 0.5 - px, (y + 0.5 - py) * 1.25);
+      const px = (cx + 0.05 + h2(cx, cy, s) * 0.9) * size;
+      const py = (cy + 0.05 + h2(cx, cy, s + 1) * 0.9) * size;
+      // Leaves come in a few sizes, and are a little wider than tall (seen from above at an angle).
+      const k = 0.8 + h2(cx, cy, s + 3) * 0.45;
+      const d = Math.hypot(x + 0.5 - px, (y + 0.5 - py) * aspect) / k;
       if (d < best) {
         second = best;
         best = d;

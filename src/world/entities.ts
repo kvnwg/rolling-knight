@@ -1,6 +1,7 @@
 /** Units, shots, ground effects and the bits of geometry they share. */
 import type { ClassId } from '../core/knights';
 import type { Rarity } from '../core/rarity';
+import type { SkillId } from '../core/skillbook';
 import type { MutationId } from '../core/state';
 import { BLOCKED, FLOOR, LIQUID, TILE, tileAt, type FloorMap } from './mapgen';
 import type { MobType } from './mobgen';
@@ -59,9 +60,27 @@ export interface Unit {
   specialT?: number;
   /** An active dodge: direction, time left, speed. */
   rolling?: { dx: number; dy: number; t: number; dur: number; speed: number; kind: 'roll' | 'blink' | 'vault' | 'flip'; hit: Set<number> };
-  /** An active special (Whirlwind, Dragon Lunge, Taunt). */
-  channel?: { kind: 'whirlwind' | 'lunge' | 'taunt'; t: number; dur: number; tick: number; dx: number; dy: number; hit: Set<number> };
+  /**
+   * An active skill that takes a moment (Whirlwind, a lunge). `dmg` (× attack), `r`, `speed` and
+   * `knock` are the skill's own numbers (Whirlwind's and Dragon Lunge's when left out).
+   */
+  channel?: { kind: 'whirlwind' | 'lunge' | 'taunt'; t: number; dur: number; tick: number; dx: number; dy: number; hit: Set<number>; dmg?: number; r?: number; speed?: number; knock?: number; every?: number };
   downed?: boolean;
+  // --- skill rolls (src/world/skills.ts; the skills themselves: src/core/skillbook.ts)
+  /**
+   * A skill roll spinning: the skill it lands on (decided as it starts, like the altar), seconds in,
+   * its length, a free roll (Tag Team: no cooldown after), the luck it rolled at and a seed for the
+   * HUD's reel. It lands, and the skill fires, when t reaches dur.
+   */
+  skillRoll?: { skill: SkillId; t: number; dur: number; free: boolean; luck: number; seed: number };
+  /** The last skill a roll landed on: which, the world time it landed, a count of landings (the HUD's cue). */
+  lastSkill?: { skill: SkillId; at: number; n: number; free: boolean };
+  /** The next roll lands on this skill (tests and dev tools: rigSkill in skills.ts). */
+  skillRig?: SkillId;
+  /** A skill's boost: attack speed and move speed multipliers, seconds left of `dur`, its color. */
+  skillBuff?: { t: number; dur: number; atkSpd: number; moveSpd: number; color: string };
+  /** Beats of a skill still to come (a second slash, aftershocks, a landing): seconds until each. */
+  skillQueue?: Array<{ t: number; run: () => void }>;
   /** AI memory. */
   ai?: {
     target: number | null;
@@ -73,6 +92,8 @@ export interface Unit {
     /** Heroes: the target's HP when last seen, and how long it hasn't dropped (a shot that can't land). */
     lastHp?: number;
     noHitT?: number;
+    /** Heroes: seconds the skill roll has been ready in this fight without a good moment to roll. */
+    rollWait?: number;
   };
   // --- mobs
   type?: MobType;

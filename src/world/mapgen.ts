@@ -58,6 +58,12 @@ export interface FloorMap {
   field?: Uint8Array;
   /** Tiles something big stands on (a house and its roof): trees keep off them. */
   reserved?: Uint8Array;
+  /** The corridors' middle line, before roads were widened (kept clear of furniture). */
+  route?: Uint8Array;
+  /** A canal through the lots: 1 water (in the lots), and on the street the bridge's deck over it. */
+  canal?: Uint8Array;
+  /** Water falling over a ledge's face into a pool (world pixels: its left, top, width, height). */
+  waterfalls?: Array<{ x: number; y: number; w: number; h: number }>;
   rooms: Room[];
   start: { x: number; y: number };
   exit: { x: number; y: number };
@@ -313,6 +319,7 @@ export function generateFloor(opts: GenOptions): FloorMap {
       }
     }
   }
+  m.route = m.path.slice();
   // Wider roads: the path spreads a tile or two either side, over open floor.
   for (let k = 0; k < (biome.path.wide ?? 0); k++) {
     const grown = m.path.slice();
@@ -330,7 +337,8 @@ export function generateFloor(opts: GenOptions): FloorMap {
 
   // --- pools (never cutting the floor in two)
   const total = () => countFloor(m);
-  if (biome.liquid) {
+  // (A paved town keeps its water in canals, not in pools on the street.)
+  if (biome.liquid && !biome.path.everywhere) {
     for (const r of rooms) {
       if (r.kind === 'start' || r.kind === 'exit' || !rng.chance(r.kind === 'arena' ? 0.6 : 0.45)) continue;
       const pools = r.kind === 'arena' ? 2 : 1;
@@ -404,7 +412,7 @@ export function generateFloor(opts: GenOptions): FloorMap {
   }
   // Room props: trees, rocks, barrels... standing on the floor.
   const weights = biome.props;
-  const decor: PropKind[] = ['flowers', 'bones', 'mushroomSmall', 'reeds', 'skull', 'wheat', 'cabbage', 'sunflower'];
+  const decor: PropKind[] = ['flowers', 'bones', 'mushroomSmall', 'reeds', 'skull', 'wheat', 'cabbage', 'sunflower', 'fern'];
   const blocking = (k: PropKind) => !decor.includes(k) && k !== 'torch';
   // Houses, yards, lamps, squares and set pieces (decor.ts); after the trees, which they clear.
   dressFloor({ m, biome, rng: new Rng(Rng.hashSeed(opts.seed ^ Math.imul(floor, 40503) ^ 0xdec0)), rooms, occupied, nearCenter, connected: () => countReach(m, start.cx, start.cy) === total() });

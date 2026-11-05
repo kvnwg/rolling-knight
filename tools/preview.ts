@@ -81,9 +81,9 @@ if (what === 'props') {
   const { BIOMES } = await import('../src/world/biomes');
   const { propArt, treeArt } = await import('../src/render/art/props');
   const biome = BIOMES[(process.argv[4] ?? 'farmland') as keyof typeof BIOMES];
-  const kinds = ['rock', 'bush', 'flowers', 'barrel', 'crate', 'bones', 'torch', 'lantern', 'brazier', 'gravestone', 'crystalSmall', 'reeds', 'mushroomSmall', 'pumpkin', 'stump', 'pillar', 'statue', 'well', 'fence', 'skull', 'cart', 'stoneLantern', 'banner', 'campfire', 'tent', 'hayBale', 'cabbage', 'wheat', 'scarecrow', 'trough', 'sunflower', 'pot', 'bench', 'lampPost', 'signpost', 'sack', 'woodpile', 'noticeBoard', 'flowerBed', 'stall', 'wellStone'] as const;
-  const cw = 34;
-  const ch = 40;
+  const kinds = ['rock', 'bush', 'flowers', 'barrel', 'crate', 'bones', 'torch', 'lantern', 'brazier', 'gravestone', 'crystalSmall', 'reeds', 'mushroomSmall', 'pumpkin', 'stump', 'pillar', 'statue', 'well', 'fence', 'skull', 'cart', 'stoneLantern', 'banner', 'campfire', 'tent', 'hayBale', 'cabbage', 'wheat', 'scarecrow', 'trough', 'sunflower', 'pot', 'bench', 'lampPost', 'signpost', 'sack', 'woodpile', 'noticeBoard', 'flowerBed', 'stall', 'wellStone', 'lanternPost', 'roughFence', 'fern', 'mossRock', 'log', 'brokenPillar', 'stoneBlock', 'ruinWall', 'stairs', 'picket', 'picketSide', 'hedge', 'fountain', 'cafeTable', 'stringPost', 'bridgeRail'] as const;
+  const cw = 52;
+  const ch = 50;
   const cols = 10;
   const trees = [...new Set([...biome.trees, ...(biome.solid.trees ?? [])])];
   const rows = Math.ceil(kinds.length / cols) * 2 + 2;
@@ -157,8 +157,33 @@ if (what === 'floor') {
   });
   list.sort((a, b) => a.y - b.y);
   for (const d of list) d.draw();
+  if (process.env.AMB) {
+    // The ambient life at a moment (AMB=seconds), painted into the picture.
+    const { Ambient } = await import('../src/render/ambient');
+    const amb = new Ambient(m, biome);
+    let style = '#000000';
+    let alpha = 1;
+    const paint = {
+      get fillStyle() { return style; },
+      set fillStyle(v: string) { style = v; },
+      get globalAlpha() { return alpha; },
+      set globalAlpha(v: number) { alpha = v; },
+      fillRect(x: number, y: number, w: number, h: number) {
+        const [r, g, b] = rgb(style);
+        for (let yy = Math.max(0, y); yy < Math.min(img.h, y + h); yy++) for (let xx = Math.max(0, x); xx < Math.min(img.w, x + w); xx++) {
+          const i = (yy * img.w + xx) * 4;
+          img.px[i] += (r - img.px[i]) * alpha;
+          img.px[i + 1] += (g - img.px[i + 1]) * alpha;
+          img.px[i + 2] += (b - img.px[i + 2]) * alpha;
+        }
+      },
+    };
+    const t = Number(process.env.AMB);
+    amb.drawGround(paint as never, 0, 0, img.w, img.h, t);
+    amb.drawAir(paint as never, 0, 0, img.w, img.h, t);
+  }
   // The light, roughly: the ambient multiplied over everything.
-  const [ar, ag, ab] = rgb(biome.light.ambient);
+  const [ar, ag, ab] = process.env.RAW ? [255, 255, 255] : rgb(biome.light.ambient);
   for (let i = 0; i < img.px.length; i += 4) {
     img.px[i] = (img.px[i] * ar) / 255;
     img.px[i + 1] = (img.px[i + 1] * ag) / 255;

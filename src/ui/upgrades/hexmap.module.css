@@ -1,0 +1,460 @@
+/*
+ * The full-screen upgrade map (UpgradeMap.tsx): Dumpster Legend's pannable, zoomable honeycomb of tier
+ * hexes, with its layout and feel, dressed in the medieval skin (skin.ts, the end of styles.css): a
+ * dungeon-dark ground, a header that hangs from a dark wooden beam, the buy card on parchment, the
+ * bar on a beam of dark planks, and wood, iron, brass, emerald and crimson buttons. Sizes are whole art
+ * pixels (var(--px)); the hexes themselves are drawn on the canvas (hexMapDraw.ts).
+ */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--upgrade-map-z, 13);
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 50% 44%, rgba(255, 166, 74, 0.16), transparent 58%),
+    radial-gradient(ellipse at 50% 120%, rgba(120, 60, 200, 0.12), transparent 60%),
+    linear-gradient(180deg, #23140d 0%, #170c08 55%, #0c0604 100%);
+  animation: mapIn 0.22s steps(4) both;
+}
+@keyframes mapIn {
+  from {
+    opacity: 0;
+  }
+}
+.viewport {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+  cursor: grab;
+}
+.viewport:active {
+  cursor: grabbing;
+}
+/* The faint honeycomb behind the hexes: one screen of it, its tile moved and scaled with the map. */
+.grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-repeat: repeat;
+}
+/* A vignette over the ground and grid (under the hexes). */
+.viewport::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 46%, transparent 55%, rgba(6, 2, 1, 0.55) 100%);
+}
+/* The map itself: one canvas the size of the screen, its pixels matched to the screen's (capped). */
+.canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------ header */
+.head {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  right: 0;
+  top: 0;
+  padding: calc(7 * var(--px) + env(safe-area-inset-top, 0px)) max(calc(5 * var(--px)), env(safe-area-inset-right, 0px)) calc(14 * var(--px))
+    max(calc(5 * var(--px)), env(safe-area-inset-left, 0px));
+  display: flex;
+  align-items: flex-start;
+  gap: calc(3 * var(--px));
+  background: linear-gradient(180deg, rgba(18, 9, 5, 0.95) 0%, rgba(18, 9, 5, 0.66) 62%, rgba(18, 9, 5, 0) 100%);
+  pointer-events: none;
+}
+/* The beam it hangs from: dark planks with a lit edge, like the bottom nav. */
+.head::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: calc(3 * var(--px) + env(safe-area-inset-top, 0px));
+  background: var(--sk-planks-dark) 0 100% / calc(32 * var(--px)) calc(16 * var(--px)) repeat-x;
+  image-rendering: pixelated;
+  box-shadow: 0 var(--px) 0 0 var(--ink), 0 calc(2 * var(--px)) 0 0 #94583e, 0 calc(3 * var(--px)) 0 0 var(--ink);
+}
+.titles {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(1 * var(--px));
+}
+.sub {
+  max-width: calc(150 * var(--px));
+  font-size: calc(4.4 * var(--px));
+  line-height: 1.25;
+  color: var(--text);
+  text-shadow: var(--pixel-text);
+}
+.hint {
+  font-size: calc(4 * var(--px));
+  line-height: 1.25;
+  color: var(--muted);
+  text-shadow: var(--pixel-text);
+}
+.centerBtn {
+  pointer-events: auto;
+  flex: none;
+}
+
+/* ------------------------------------------------------------ footer */
+.foot {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: calc(16 * var(--px)) max(calc(4 * var(--px)), env(safe-area-inset-right, 0px)) 0 max(calc(4 * var(--px)), env(safe-area-inset-left, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: calc(3 * var(--px));
+  background: linear-gradient(180deg, rgba(18, 9, 5, 0) 0%, rgba(18, 9, 5, 0.82) calc(18 * var(--px)), rgba(18, 9, 5, 0.96) 100%);
+  pointer-events: none;
+}
+.foot [data-ui] {
+  pointer-events: auto;
+}
+.cardWrap {
+  width: 100%;
+  max-width: calc(200 * var(--px));
+  margin: 0 auto;
+}
+.card {
+  display: flex;
+  align-items: center;
+  gap: calc(3 * var(--px));
+  padding: calc(5 * var(--px)) calc(5 * var(--px)) calc(5 * var(--px)) calc(5 * var(--px));
+  animation: cardIn 0.16s steps(3) both;
+}
+@keyframes cardIn {
+  from {
+    transform: translateY(calc(3 * var(--px)));
+    opacity: 0.4;
+  }
+}
+/* The selected upgrade's icon on a tile colored like its hex, set in an iron rim. */
+.cardTile {
+  position: relative;
+  flex: none;
+  width: calc(24 * var(--px));
+  height: calc(24 * var(--px));
+  display: grid;
+  place-items: center;
+  border: var(--px) solid var(--ink);
+  box-shadow: inset 0 0 0 var(--px) #d4ecff, inset 0 0 0 calc(2 * var(--px)) var(--ink);
+  background: linear-gradient(180deg, #9fd2ff 0 50%, #2f66b0 50% 100%);
+  cursor: pointer;
+}
+.cardTile[data-view='open'] {
+  box-shadow: inset 0 0 0 var(--px) #8a7e73, inset 0 0 0 calc(2 * var(--px)) var(--ink);
+  background: linear-gradient(180deg, #5d534c 0 50%, #241d1a 50% 100%);
+}
+.cardTile[data-special] {
+  box-shadow: inset 0 0 0 var(--px) #fff0c0, inset 0 0 0 calc(2 * var(--px)) var(--ink);
+  background: linear-gradient(180deg, #ffeaa0 0 50%, #df9a2c 50% 100%);
+}
+.cardTile[data-view='mystery'] {
+  box-shadow: inset 0 0 0 var(--px) #4a3e37, inset 0 0 0 calc(2 * var(--px)) var(--ink);
+  background: linear-gradient(180deg, #3b312c 0 50%, #1a1310 50% 100%);
+  cursor: default;
+}
+.cardQ {
+  font-weight: 700;
+  font-size: calc(14 * var(--px));
+  line-height: 1;
+  color: #fff4dc;
+  -webkit-text-stroke: calc(1.4 * var(--px)) var(--ink);
+  paint-order: stroke fill;
+}
+.cardTile[data-special] .cardQ {
+  color: #ffd257;
+}
+.cardBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(0.5 * var(--px));
+}
+.cardName {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(1 * var(--px)) calc(2 * var(--px));
+  font-weight: 700;
+  font-size: calc(5.6 * var(--px));
+  line-height: 1.1;
+  color: var(--text-dark);
+  cursor: pointer;
+}
+.cardTag {
+  padding: 0 var(--px);
+  box-shadow: var(--pixel-edge);
+  background: #ffc233;
+  font-style: normal;
+  font-size: calc(3.8 * var(--px));
+  color: var(--text-dark);
+}
+.cardTag[data-kind='chance'] {
+  background: #b6ff5c;
+}
+.cardDesc {
+  font-size: calc(4 * var(--px));
+  line-height: 1.25;
+  color: #6b5446;
+}
+.cardFx {
+  font-weight: 700;
+  font-size: calc(4 * var(--px));
+  line-height: 1.25;
+  color: #7a6250;
+}
+.cardFx b {
+  color: #2f8a1c;
+}
+.fxNext {
+  color: #2f7a1c;
+}
+.buyCol {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: calc(1 * var(--px));
+}
+.buy {
+  flex: none;
+  min-width: calc(42 * var(--px));
+  min-height: calc(19 * var(--px));
+  font-size: calc(6.4 * var(--px));
+  touch-action: none;
+  -webkit-touch-callout: none;
+}
+/* Out of reach: an iron button (pressing it does nothing). */
+.buy[data-afford='false'] {
+  --sk: var(--sk-btn-iron);
+  --skd: var(--sk-btn-iron-down);
+  color: var(--muted);
+}
+.short {
+  font-size: calc(3.6 * var(--px));
+  text-align: center;
+  color: #7a6250;
+}
+
+/* The bar: gold on the left, Close in the middle, the squad's power and luck on the right, on a beam. */
+.bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: calc(3 * var(--px));
+  margin: 0 calc(-4 * var(--px));
+  padding: calc(3 * var(--px)) max(calc(5 * var(--px)), env(safe-area-inset-right, 0px)) calc(3 * var(--px) + env(safe-area-inset-bottom, 0px))
+    max(calc(5 * var(--px)), env(safe-area-inset-left, 0px));
+  background: var(--sk-planks-dark) 0 0 / calc(32 * var(--px)) calc(16 * var(--px)) repeat;
+  image-rendering: pixelated;
+  box-shadow: 0 calc(-1 * var(--px)) 0 0 var(--ink), 0 calc(-2 * var(--px)) 0 0 #94583e, 0 calc(-3 * var(--px)) 0 0 var(--ink);
+  pointer-events: auto;
+}
+.coins {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: calc(2 * var(--px));
+  font-weight: 700;
+  font-size: calc(7.5 * var(--px));
+  color: var(--gold);
+  -webkit-text-stroke: calc(1.2 * var(--px)) var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 var(--px) 0 var(--ink);
+  white-space: nowrap;
+}
+.close {
+  flex: none;
+  min-width: calc(54 * var(--px));
+  min-height: calc(18 * var(--px));
+  font-size: calc(7 * var(--px));
+}
+.barRight {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: calc(1 * var(--px));
+}
+/* The squad's power and the altar's luck (they show here so a buy's effect shows at once). */
+.stat {
+  display: flex;
+  align-items: center;
+  gap: calc(1.5 * var(--px));
+  font-weight: 700;
+  font-size: calc(5 * var(--px));
+  color: var(--text);
+  -webkit-text-stroke: calc(1 * var(--px)) var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 calc(0.6 * var(--px)) 0 var(--ink);
+  white-space: nowrap;
+}
+.stat[data-k='luck'] {
+  color: var(--good);
+}
+
+.overlay[data-calm],
+.overlay[data-calm] .card {
+  animation: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .card {
+    animation: none !important;
+  }
+}
+
+/*
+ * The wide layout (a PC, a tablet or a phone held sideways): the map gets the whole left side at full
+ * height. The page's words run in one strip along its top; the card, the gold, the stats and Close
+ * stand in a panel down the right side, a dark wood board (UpgradeMap.tsx centers the map in what is
+ * left).
+ */
+.overlay[data-wide] .head {
+  right: calc(100 * var(--px));
+  padding-bottom: calc(10 * var(--px));
+}
+.overlay[data-wide] .titles {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: calc(5 * var(--px));
+  align-items: center;
+}
+.overlay[data-wide] .titles > :first-child {
+  grid-row: 1 / span 2;
+}
+.overlay[data-wide] .sub {
+  max-width: none;
+}
+.overlay[data-wide] .foot {
+  left: auto;
+  right: 0;
+  top: 0;
+  width: calc(100 * var(--px));
+  padding: calc(6 * var(--px) + env(safe-area-inset-top, 0px)) max(calc(5 * var(--px)), env(safe-area-inset-right, 0px)) 0 calc(6 * var(--px));
+  gap: calc(4 * var(--px));
+  background: linear-gradient(180deg, rgba(16, 8, 4, 0.72), rgba(16, 8, 4, 0.5)), var(--sk-planks-dark) 0 0 / calc(32 * var(--px)) calc(16 * var(--px)) repeat;
+  image-rendering: pixelated;
+  box-shadow: calc(-1 * var(--px)) 0 0 0 var(--ink), calc(-2 * var(--px)) 0 0 0 #94583e, calc(-3 * var(--px)) 0 0 0 var(--ink);
+  /* Over the map: a drag or the wheel here doesn't move it. */
+  pointer-events: auto;
+}
+.overlay[data-wide] .card {
+  flex-wrap: wrap;
+}
+.overlay[data-wide] .cardBody {
+  flex: 1 1 calc(50 * var(--px));
+}
+.overlay[data-wide] .buyCol {
+  flex: 1 1 100%;
+}
+.overlay[data-wide] .bar {
+  margin: auto calc(-5 * var(--px)) 0 calc(-6 * var(--px));
+  flex-wrap: wrap;
+  row-gap: calc(3 * var(--px));
+  box-shadow: 0 calc(-1 * var(--px)) 0 0 var(--ink);
+}
+.overlay[data-wide] .close {
+  order: 3;
+  flex: 1 1 100%;
+}
+
+/* ------------------------------------------------------------ the line's details (UpgradePopup.tsx) */
+.popTop {
+  display: flex;
+  align-items: center;
+  gap: calc(3 * var(--px));
+  padding-right: calc(14 * var(--px));
+}
+.popTop .cardTile {
+  cursor: default;
+}
+.popNames {
+  display: flex;
+  flex-direction: column;
+  gap: calc(1 * var(--px));
+  min-width: 0;
+}
+.popDesc {
+  margin: 0;
+  font-size: calc(4.4 * var(--px));
+  line-height: 1.35;
+  color: var(--text);
+}
+.popFrom {
+  font-size: calc(4 * var(--px));
+  color: var(--muted);
+}
+.ladder {
+  display: flex;
+  flex-direction: column;
+  gap: calc(1.5 * var(--px));
+}
+.rung {
+  display: grid;
+  grid-template-columns: calc(13 * var(--px)) 1fr auto;
+  align-items: center;
+  gap: calc(2 * var(--px));
+  min-height: calc(12 * var(--px));
+  padding: calc(1 * var(--px)) calc(2.5 * var(--px));
+  font-size: calc(4.4 * var(--px));
+  color: var(--muted);
+  background: rgba(10, 5, 3, 0.45);
+  box-shadow: var(--pixel-edge);
+}
+.rung b {
+  font-size: calc(5 * var(--px));
+  color: var(--gold);
+  text-shadow: var(--pixel-text);
+}
+.rung[data-state='owned'] {
+  color: var(--text);
+  background: rgba(47, 102, 176, 0.32);
+}
+.rung[data-state='owned'] b {
+  color: #9fd2ff;
+}
+.rung[data-state='open'] {
+  color: var(--text);
+  background: rgba(60, 150, 74, 0.25);
+  box-shadow: var(--pixel-edge), inset 0 0 0 var(--px) rgba(130, 220, 124, 0.6);
+}
+.rung[data-state='hidden'] {
+  justify-content: center;
+  grid-template-columns: 1fr;
+  text-align: center;
+  font-style: italic;
+}
+.rungPrice {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(1 * var(--px));
+  font-weight: 700;
+  color: var(--gold);
+  text-shadow: var(--pixel-text);
+}
+.popBuy {
+  display: flex;
+  justify-content: center;
+}

@@ -45,10 +45,10 @@ export interface DecalTable {
 export const DECALS: Record<BiomeId, DecalTable> = {
   hamlet: {
     ground: [['tuft', 9], ['flowers', 8], ['daisies', 6], ['clover', 3], ['pebbles', 2], ['leaves', 1], ['mushrooms', 1]],
-    path: [['pebbles', 3], ['tuft', 3], ['puddle', 1], ['crack', 1], ['leaves', 1]],
-    edge: [['flowers', 8], ['fern', 4], ['roots', 3], ['tuft', 4], ['mushrooms', 1], ['daisies', 4]],
+    path: [['pebbles', 3], ['puddle', 1], ['moss', 1]],
+    edge: [['pebbles', 2], ['moss', 1]],
     water: [['lily', 5], ['lotus', 2], ['reedBed', 2]],
-    density: { ground: 48, path: 12, edge: 65, water: 30 },
+    density: { ground: 30, path: 4, edge: 6, water: 30 },
   },
   farmland: {
     ground: [['tuft', 10], ['daisies', 4], ['flowers', 3], ['clover', 3], ['hay', 3], ['pebbles', 2]],

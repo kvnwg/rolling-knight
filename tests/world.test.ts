@@ -46,8 +46,9 @@ describe('floors', () => {
       for (const p of m.props) {
         if (!p.solid || p.kind === 'tree') continue;
         const t = tileAt(m, Math.floor(p.x / TILE), Math.floor((p.y - 1) / TILE));
-        // Houses stand in the walls (their fronts to a room); everything else on the floor it blocks.
-        if (p.kind === 'house') expect(t).toBe(SOLID);
+        // Houses, ruins and the fences round the lots stand in the walls; everything else on the
+        // floor it blocks.
+        if (t === SOLID) expect(['house', 'ruinWall', 'picket', 'picketSide', 'hedge', 'roughFence']).toContain(p.kind);
         else expect([BLOCKED, FLOOR]).toContain(t);
       }
     }

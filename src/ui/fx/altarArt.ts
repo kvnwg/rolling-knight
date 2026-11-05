@@ -24,9 +24,9 @@ export const SOLID = 1;
 export const HOLE = 2;
 
 /** Materials: how much a pixel shines (specular strength) and how tight its highlight is. */
-export const MAT_SPEC = [0, 0.07, 0.95, 0.5, 1.1, 0.03, 0.2] as const;
-export const MAT_SHIN = [1, 6, 18, 10, 34, 4, 8] as const;
-const M = { ink: 0, wood: 1, brass: 2, iron: 3, gem: 4, slot: 5, wax: 6 } as const;
+export const MAT_SPEC = [0, 0.08, 0.85, 0.5, 1.1, 0.03, 0.25, 0.12] as const;
+export const MAT_SHIN = [1, 4, 7, 5, 14, 4, 6, 4] as const;
+const M = { ink: 0, wood: 1, brass: 2, iron: 3, gem: 4, slot: 5, wax: 6, leaf: 7 } as const;
 
 /** The palette (the skin's materials, a little extended). */
 export const C = {
@@ -108,6 +108,8 @@ export interface AltarArt {
   emblem: { px: number[]; x: number; y: number } | null;
   /** Each reel window's rim pixels (mini: lit in the find's color). */
   rims: number[][];
+  /** Glowing blossoms on the vines: pixel, color, and a phase for their slow pulse. */
+  blossoms: Array<{ i: number; x: number; y: number; col: string; phase: number }>;
   /** Lights: the flames, the orb, the sigil, each rune, each gem, the emblem, and each reel (landing bursts). */
   lights: {
     flames: PointLight[];
@@ -320,7 +322,14 @@ function finish(p: Painter, kind: AltarArt['kind'], rest: Omit<AltarArt, 'kind' 
 // ------------------------------------------------------------------ the big altar
 
 /** The big altar's measures (art px): pillar inset and width, the trim round the window, the crest above it, what's below. */
-export const BIG = { inset: 2, pillar: 13, trim: 2, crest: 40, rail: 9, plinth: 7, floor: 11 } as const;
+export const BIG = { inset: 2, pillar: 13, trim: 2, crest: 44, rail: 9, plinth: 7 } as const;
+
+/** The magic circle on the floor in front of a big altar `W` wide: its radii and the floor it needs. */
+function bigCircle(W: number): { rx: number; ry: number; floor: number } {
+  const rx = Math.round(W * 0.4);
+  const ry = Math.max(5, Math.round(rx * 0.12));
+  return { rx, ry, floor: 2 * ry + 1 };
+}
 
 /** Where the reel window goes in a big altar `W` wide. */
 export function bigWindow(W: number): { x: number; y: number; w: number } {
@@ -328,8 +337,8 @@ export function bigWindow(W: number): { x: number; y: number; w: number } {
   return { x, y: BIG.crest, w: W - 2 * x };
 }
 
-export function bigHeight(winH: number): number {
-  return BIG.crest + winH + BIG.trim + BIG.rail + BIG.plinth + BIG.floor;
+export function bigHeight(winH: number, W: number): number {
+  return BIG.crest + winH + BIG.trim + BIG.rail + BIG.plinth + bigCircle(W).floor;
 }
 
 /**
@@ -337,7 +346,7 @@ export function bigHeight(winH: number): number {
  * reel drums `holes` (in canvas px) and the payline at `payY`.
  */
 export function paintBig(W: number, win: Rect, holes: Rect[], payY: number): AltarArt {
-  const H = bigHeight(win.h);
+  const H = bigHeight(win.h, W);
   const p = new Painter(W, H);
   const I = BIG.inset;
   const PW = BIG.pillar;
@@ -467,9 +476,9 @@ export function paintBig(W: number, win: Rect, holes: Rect[], payY: number): Alt
   }
 
   // The orb's place: at the top of the pediment, which arches over the window between the braziers.
-  const orbR = 7;
+  const orbR = 9;
   const ox = cx;
-  const oy = 13;
+  const oy = 14;
   const apex = oy + orbR - 3;
   const xa0 = I + PW + 4;
   const span = (W - 2 * xa0) / 2;
@@ -492,10 +501,11 @@ export function paintBig(W: number, win: Rect, holes: Rect[], payY: number): Alt
     for (let y = yt + T; y < Ly; y++) {
       const a = (Math.atan2(y - oy, x - ox) * 180) / Math.PI;
       const m = ((a % 14) + 14) % 14;
-      const groove = Math.abs(m - 7) < 1.3;
+      const groove = Math.abs(m - 7) < 1.1;
+      const ridge = Math.abs(m - 7) > 5.6;
       const rr = Math.hypot(x - ox, y - oy);
-      const ring = Math.abs(rr - (orbR + 7)) < 0.8;
-      p.sym(x, y, ring ? C.br2 : groove ? C.dk0 : rr < orbR + 11 ? C.dk2 : C.dk1, ring ? 4.5 : groove ? 1.2 : 2.6, ring ? M.brass : M.wood);
+      const ring = Math.abs(rr - (orbR + 6)) < 0.8;
+      p.sym(x, y, ring ? C.br3 : groove ? C.dk0 : ridge ? C.dk4 : rr < orbR + 10 ? C.dk3 : C.dk2, ring ? 5.5 : groove ? 1 : ridge ? 3.8 : 2.8, ring ? M.brass : M.wood);
     }
   }
   // Scrolls where the arch meets the entablature.
@@ -526,7 +536,7 @@ export function paintBig(W: number, win: Rect, holes: Rect[], payY: number): Alt
   p.set(Math.round(ox - 0.5), fy - 2, C.br4, 9, M.brass);
   p.set(Math.round(ox + 0.5), fy - 2, C.ink, 4, M.ink);
   // A rune each side of the orb, carved in the tympanum (where it's tall enough).
-  const gl = Math.round(ox - orbR - 9);
+  const gl = Math.round(ox - orbR - 8);
   if (archTop(gl) + T <= Ly - 6 && archTop(gl - 4) + T <= Ly - 6) {
     runes.push(carveRune(p, gl - 4, Ly - 6, GLYPHS5[5]));
     runes.push(carveRune(p, W - 1 - gl, Ly - 6, GLYPHS5[2]));
@@ -584,8 +594,8 @@ export function paintBig(W: number, win: Rect, holes: Rect[], payY: number): Alt
   const plaqueW = 26 + (W % 2);
   const px0 = (W - plaqueW) / 2;
   for (let k = 0; ; k++) {
-    const x = px0 - 9 - k * 8;
-    if (x < I) break;
+    const x = px0 - 10 - k * 12;
+    if (x < I + 1) break;
     runes.push(carveRune(p, x, rb + 3, GLYPHS5[(k + 1) % GLYPHS5.length], 0));
     runes.push(carveRune(p, W - 5 - x, rb + 3, GLYPHS5[(k + 4) % GLYPHS5.length], 0));
   }
@@ -636,28 +646,57 @@ export function paintBig(W: number, win: Rect, holes: Rect[], payY: number): Alt
   for (const side of [0, 1]) {
     const gx = side ? win.x + win.w + 1 : win.x - 2;
     const gpx: number[] = [];
-    for (const [dx, dy] of [
-      [0, -2],
-      [-1, -1],
-      [0, -1],
-      [1, -1],
-      [-1, 0],
-      [0, 0],
-      [1, 0],
-      [-1, 1],
-      [0, 1],
-      [1, 1],
-      [0, 2],
-    ]) {
-      const edge = Math.abs(dx) + Math.abs(dy) >= 2;
-      p.set(gx + dx, payY + dy, edge ? C.ink : '#2a0e3a', edge ? 5 : 8, edge ? M.ink : M.gem);
-      if (!edge) gpx.push(p.idx(gx + dx, payY + dy));
+    for (let dy = -3; dy <= 3; dy++) {
+      for (let dx = -3; dx <= 3; dx++) {
+        const d = Math.abs(dx) + Math.abs(dy);
+        if (d > 3) continue;
+        const edge = d === 3;
+        p.set(gx + dx, payY + dy, edge ? C.ink : '#2a0e3a', edge ? 5 : 9 - d, edge ? M.ink : M.gem);
+        // (Its first pixel is the glint.)
+        if (!edge) {
+          if (dx === -1 && dy === -1) gpx.unshift(p.idx(gx + dx, payY + dy));
+          else gpx.push(p.idx(gx + dx, payY + dy));
+        }
+      }
     }
     gems.push({ px: gpx, x: gx, y: payY });
   }
 
-  const sigil = { x: cx, y: pb + 6, rx: Math.min(Math.floor(W / 2) - 4, 86), ry: 0 };
-  sigil.ry = Math.max(4, Math.round(sigil.rx * 0.13));
+  const circ = bigCircle(W);
+  const sigil = { x: cx, y: pb + 6 + circ.ry - 1, rx: circ.rx, ry: circ.ry };
+
+  // Vines climbing the pillars, with glowing blossoms (an overgrown shrine).
+  const blossoms: AltarArt['blossoms'] = [];
+  const vine = (x0: number, yTop: number, yBot: number, dir: 1 | -1, seed: number) => {
+    let x = x0;
+    for (let y = yBot; y >= yTop; y--) {
+      const k = yBot - y;
+      if (k > 0 && hash2(k, seed) < 0.28) x += hash2(k, seed + 1) < 0.5 ? -1 : 1;
+      x = Math.max(x0 - 1, Math.min(x0 + 1, x));
+      p.set(x, y, k % 5 === 0 ? '#2f8a45' : '#1f4f3a', 7.5, M.leaf);
+      if (k % 4 === 2) {
+        // A leaf to one side, lit on top.
+        const s = (Math.floor(k / 4) % 2 ? 1 : -1) * dir;
+        p.set(x + s, y, '#5dc14c', 8, M.leaf);
+        p.set(x + 2 * s, y - 1, '#b0ec6c', 8, M.leaf);
+        p.set(x + s, y - 1, '#2f8a45', 8, M.leaf);
+      }
+      if (k % 11 === 7) {
+        const bx = x - dir;
+        p.set(bx, y, '#4a1030', 8, M.leaf);
+        blossoms.push({ i: p.idx(bx, y), x: bx, y, col: hash2(k, seed + 2) < 0.5 ? '#ff8ad8' : '#9cf2df', phase: hash2(k, seed + 3) * 6.28 });
+      }
+    }
+  };
+  vine(I + 1, win.y - 2, rb + 7, 1, 11);
+  vine(W - I - 2, Math.round(win.y + win.h * 0.45), rb + 7, -1, 29);
+  // A trailing tendril along the entablature from the left.
+  for (let x = I + 1, y = Ly + 1, k = 0; x < I + 24; x++, k++) {
+    if (hash2(k, 5) < 0.3) y += y > Ly ? -1 : 1;
+    p.set(x, y, k % 3 === 0 ? '#2f8a45' : '#1f4f3a', 9, M.leaf);
+    if (k % 5 === 3) p.set(x, y + 1, '#5dc14c', 9, M.leaf);
+    if (k === 15) blossoms.push({ i: p.idx(x, y - 1), x, y: y - 1, col: '#ffe27a', phase: 1.3 });
+  }
   orderRunes(runes, cx, win.y + win.h / 2);
   const reels = holes.map((r) => ({ x: r.x + r.w / 2, y: r.y + r.h / 2, z: 18, r: Math.max(70, W * 0.62) }));
   return finish(
@@ -671,10 +710,11 @@ export function paintBig(W: number, win: Rect, holes: Rect[], payY: number): Alt
       gems,
       emblem: { px: emPx, x: cx, y: ey0 + 2 },
       rims: [],
+      blossoms,
       lights: {
-        flames: flames.map((f) => ({ x: f.x, y: f.y - 5, z: 16, r: Math.max(64, Math.round(H * 0.72)) })),
-        orb: { x: ox, y: oy, z: 12, r: 64 },
-        sigil: { x: cx, y: sigil.y + 3, z: 7, r: Math.min(96, Math.round(W * 0.5)) },
+        flames: flames.map((f) => ({ x: f.x, y: f.y - 5, z: 16, r: Math.max(84, Math.round(W * 0.66)) })),
+        orb: { x: ox, y: oy, z: 12, r: Math.max(70, Math.round(W * 0.42)) },
+        sigil: { x: cx, y: sigil.y, z: 7, r: Math.min(100, Math.round(W * 0.52)) },
         emblem: { x: cx, y: ey0 + 2, z: 6, r: 20 },
         gems: gems.map((g) => ({ x: g.x, y: g.y, z: 6, r: 12 })),
         runes: runes.map((r) => ({ x: r.x, y: r.y, z: 4, r: 9 })),
@@ -807,18 +847,19 @@ export function paintMini(n: number): AltarArt {
       else if (d <= orbR + 2.4 && y >= oy - 1) p.set(x, y, C.ink, 3, M.ink);
     }
   }
-  // Two candles on the frame's top corners.
+  // Two candles on the frame's top corners, in brass cups.
   const flames: Flame[] = [];
   for (const side of [0, 1]) {
-    const bx = side ? W - 3 : 2;
-    for (let y = top - 5; y < top; y++) {
+    const bx = side ? W - 4 : 3;
+    for (let y = top - 4; y < top - 1; y++) {
       for (let dx = -2; dx <= 2; dx++) {
-        const edge = Math.abs(dx) === 2 || y === top - 5;
+        const edge = Math.abs(dx) === 2;
         p.set(bx + dx, y, edge ? C.ink : dx < 0 ? C.wax2 : dx === 0 ? C.wax1 : C.wax0, edge ? 3 : 5, edge ? M.ink : M.wax);
       }
     }
-    p.set(bx, top - 6, C.ink, 4, M.ink);
-    flames.push({ x: bx, y: top - 7, hw: 1, h: 4, coals: [] });
+    for (let dx = -3; dx <= 3; dx++) p.set(bx + dx, top - 1, Math.abs(dx) === 3 ? C.ink : dx < 0 ? C.br4 : C.br2, 6, Math.abs(dx) === 3 ? M.ink : M.brass);
+    p.set(bx, top - 5, C.ink, 4, M.ink);
+    flames.push({ x: bx, y: top - 6, hw: 1, h: 5, coals: [] });
   }
   // The base: a short plinth.
   for (let x = 1; x <= half; x++) {
@@ -841,9 +882,10 @@ export function paintMini(n: number): AltarArt {
       gems: [],
       emblem: null,
       rims,
+      blossoms: [],
       lights: {
-        flames: flames.map((f) => ({ x: f.x, y: f.y - 2, z: 9, r: 30 })),
-        orb: { x: ox, y: oy, z: 8, r: 30 },
+        flames: flames.map((f) => ({ x: f.x, y: f.y - 2, z: 9, r: 40 })),
+        orb: { x: ox, y: oy, z: 8, r: 36 },
         sigil: null,
         emblem: null,
         gems: [],
