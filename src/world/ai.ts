@@ -8,19 +8,72 @@
  */
 import { CLASSES } from '../core/knights';
 import { signatureSkill } from '../core/skillbook';
-import { dist, lineOfSight, moveUnit, norm, type Unit } from './entities';
+import { dist, lineOfSight, moveUnit, norm, walkClear, type Unit } from './entities';
 import { flowDist, flowStep, type Flow } from './flow';
 import { heroDodge, heroSpecial } from './skills';
 import { uid, type World } from './world';
 
 /** Steering toward a point: straight when in sight, else along a flow field. */
 function steer(w: World, u: Unit, tx: number, ty: number, flow: Flow | null): [number, number] {
-  if (lineOfSight(w.map, u.x, u.y, tx, ty)) return norm(tx - u.x, ty - u.y);
+  // Straight there only when the way is really open (trees and props block a body, not sight), and
+  // not while taking a detour round something it got caught on.
+  const detour = (u.ai?.detourT ?? 0) > 0;
+  if (!detour && walkClear(w.map, u.x, u.y, tx, ty, u.r, u.flying)) return norm(tx - u.x, ty - u.y);
   if (flow) {
     const s = flowStep(flow, u.x, u.y);
     if (s) return s;
   }
   return norm(tx - u.x, ty - u.y);
+}
+
+/**
+ * Keeps a squadmate from getting pinned on a tree or a corner: every half second, if it wanted to
+ * move and barely did, it takes the long way round (the flow field) for a while; still pinned after
+ * a couple of seconds and away from the leader, it hops to a free spot at the leader's side.
+ */
+function unstick(w: World, h: Unit, lead: Unit | undefined, want: [number, number], dt: number): void {
+  const ai = h.ai!;
+  if ((ai.detourT ?? 0) > 0) ai.detourT! -= dt;
+  ai.checkT = (ai.checkT ?? 0.5) - dt;
+  if (ai.checkT > 0) return;
+  ai.checkT = 0.5;
+  const moved = dist(h.x, h.y, ai.lastX ?? h.x, ai.lastY ?? h.y);
+  ai.lastX = h.x;
+  ai.lastY = h.y;
+  const trying = Math.hypot(want[0], want[1]) > 0.3 && !h.rolling && h.stunT <= 0 && !h.channel;
+  if (!trying || moved > 4) {
+    ai.stuck = 0;
+    return;
+  }
+  ai.stuck += 1;
+  if (ai.stuck >= 2) ai.detourT = 1.6;
+  if (ai.stuck >= 5 && lead && lead !== h && dist(h.x, h.y, lead.x, lead.y) > 36) {
+    const spot = freeSpotNear(w, lead.x - lead.aimX * 12, lead.y + 8, h.r);
+    if (spot) {
+      w.fx.push({ kind: 'dust', x: h.x, y: h.y });
+      h.x = spot[0];
+      h.y = spot[1];
+      w.fx.push({ kind: 'spark', x: h.x, y: h.y - 8, color: '#e8f0ff' });
+    }
+    ai.stuck = 0;
+    ai.detourT = 0;
+    ai.lastX = h.x;
+    ai.lastY = h.y;
+  }
+}
+
+/** A spot a body of radius r can stand on, as close to (x, y) as possible (null if none nearby). */
+function freeSpotNear(w: World, x: number, y: number, r: number): [number, number] | null {
+  for (let ring = 0; ring <= 5; ring++) {
+    const n = ring === 0 ? 1 : ring * 8;
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2;
+      const px = x + Math.cos(a) * ring * 6;
+      const py = y + Math.sin(a) * ring * 6;
+      if (walkClear(w.map, px, py, px, py + 0.1, r)) return [px, py];
+    }
+  }
+  return null;
 }
 
 /** Is something about to hit this unit? (Shots on a collision course, telegraphed areas, chargers.) */
@@ -114,6 +167,12 @@ export function heroAutoRoll(w: World, h: Unit, dt: number): void {
 
 /** One knight's decision for this frame: where to move (and maybe a dodge or a skill roll). */
 export function heroAi(w: World, h: Unit, lead: Unit | undefined, dt: number): [number, number] {
+  const want = heroAiMove(w, h, lead, dt);
+  unstick(w, h, lead, want, dt);
+  return want;
+}
+
+function heroAiMove(w: World, h: Unit, lead: Unit | undefined, dt: number): [number, number] {
   const ai = h.ai!;
   const cls = CLASSES[h.cls!];
   const isLead = lead === h;

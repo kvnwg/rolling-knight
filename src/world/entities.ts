@@ -94,6 +94,11 @@ export interface Unit {
     noHitT?: number;
     /** Heroes: seconds the skill roll has been ready in this fight without a good moment to roll. */
     rollWait?: number;
+    /** Heroes: where it was at the last progress check, the next check, and seconds left on a detour. */
+    lastX?: number;
+    lastY?: number;
+    checkT?: number;
+    detourT?: number;
   };
   // --- mobs
   type?: MobType;
@@ -223,6 +228,20 @@ export function moveUnit(m: FloorMap, u: Pick<Unit, 'x' | 'y' | 'r' | 'flying'>,
     moved = true;
   }
   return moved;
+}
+
+/**
+ * Can a body of radius `r` walk straight from a to b? Unlike sight, anything it can't stand on blocks
+ * it: walls, props such as tree trunks, water (for walkers). Checked every 3 px along the way.
+ */
+export function walkClear(m: FloorMap, ax: number, ay: number, bx: number, by: number, r: number, flying = false): boolean {
+  const d = Math.hypot(bx - ax, by - ay);
+  const n = Math.ceil(d / 3);
+  for (let i = 1; i <= n; i++) {
+    const t = i / n;
+    if (!clear(m, ax + (bx - ax) * t, ay + (by - ay) * t, r, flying)) return false;
+  }
+  return true;
 }
 
 /**
