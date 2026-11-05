@@ -1,12 +1,17 @@
 /**
- * Dressing a floor so it looks lived-in. The hamlet gets houses along the north edges of its rooms
- * (standing in the trees with their fronts to the room, so they never block the way), a yard in
- * front of each (pots by the door, a footpath down to the road, barrels and crates, a bench, a wood
- * pile), lamp posts along the road, a well and a market stall on its squares, sign posts and a
- * notice board. Everything solid that lands on the floor is checked never to cut the floor in two.
+ * Dressing a floor so it looks like a place. The hamlet becomes a town: its floor all cobbled
+ * streets, the walls around them bright lots behind stone curbs, with half-timbered houses fronting
+ * the streets (standing in the lots, so they never block the way), picket fences and hedges along the
+ * lots with gates and flowers, a market square (striped stalls, a fountain with planters, strings of
+ * lights between posts, café tables), lamp posts along the curbs, a well, benches and barrels, sign
+ * posts, and a canal through the lots under a plank bridge. The other biomes get their wilds
+ * (WILDS): ruins in the walls, lights along the paths, strings of lights across the narrows, a camp,
+ * a ring of something in a quiet room, fences, waterfalls from the ledges into pools, stairs.
+ * Everything solid that lands on the floor is checked never to cut the floor in two.
  *
- * Runs after the trees are placed: anything that needs room (a house) clears the trees in its way and
- * marks its ground in `m.reserved`, so a tree placer that runs later can keep off it too.
+ * Runs after the trees are placed: anything that needs room (a house, a ruin, a canal, a fence)
+ * clears the trees in its way and marks its ground in `m.reserved`, so a tree placer that runs later
+ * can keep off it too.
  */
 import { Rng } from '../core/rng';
 import type { Biome, PropKind } from './biomes';

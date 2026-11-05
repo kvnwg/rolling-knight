@@ -12,7 +12,8 @@ import type { World } from '../world/world';
 import { flash, makeCanvas, mixHex, shade, toCanvas } from './art/draw';
 import { CLASS_HAS_SHIELD, KNIGHT_ANCHOR, knightFrame, knightGlow, knightLook, shieldArt, weaponArt, type KnightLook, type View } from './art/knights';
 import { mobFrame, poseFrames, type MobPose } from './art/mobs';
-import { flameArt, propArt, treeArt, type PropArt } from './art/props';
+import { flameArt, type PropArt } from './art/props';
+import { artOf } from './art/artOf';
 import { Camera } from './camera';
 import { Lighting, type Light } from './lighting';
 import { Post, type PostParams } from './post';
@@ -177,7 +178,7 @@ export class Renderer {
       .map((p) => {
         const variant = p.seed % 5;
         const key = `prop|${w.biome.id}|${p.kind}|${p.tree ?? ''}|${variant}`;
-        const art = p.kind === 'tree' ? treeArt(p.tree!, w.biome, variant * 7919 + 13) : propArt(p.kind, w.biome, variant * 104729 + 7);
+        const art = artOf(p, w.biome);
         const canvas = this.cached(key, () => toCanvas(art.buf));
         const ghost = p.kind === 'tree' ? this.cached(`${key}|ghost`, () => toCanvas(art.buf)) : undefined;
         return { ...p, art, canvas, ghost };
@@ -1293,7 +1294,7 @@ const DEFAULT_GRADE: Grade = {
 };
 
 /** Biomes in daylight. */
-const DAYLIGHT: ReadonlySet<string> = new Set(['hamlet', 'farmland', 'desert', 'tundra', 'shrine']);
+const DAYLIGHT: ReadonlySet<string> = new Set(['hamlet', 'farmland', 'desert', 'tundra']);
 
 /**
  * The light the scene is multiplied by. Daylight is lifted most of the way to white (a bright, clean
@@ -1305,7 +1306,9 @@ function ambientOf(b: Biome, sky: Sky | null): string {
   const day = DAYLIGHT.has(b.id);
   if (kind === 'rain') return mixHex(b.light.ambient, day ? '#c4ccd8' : '#7a8496', 0.7);
   if (kind === 'overcast') return mixHex(b.light.ambient, day ? '#dfe4ea' : '#8a94a6', 0.6);
-  return day ? mixHex(b.light.ambient, '#fff8ec', 0.5) : b.light.ambient;
+  if (day) return mixHex(b.light.ambient, '#fffaf0', 0.6);
+  // Gloomwood's lanterns and fireflies carry the mood now: its dark can lift a little.
+  return b.id === 'forest' ? mixHex(b.light.ambient, '#a8b8cc', 0.36) : b.light.ambient;
 }
 
 /** How dark the drifting cloud shadows get: on sunny days outdoors; faint under a grey sky; none in rain or below ground. */
@@ -1325,10 +1328,10 @@ function gradeOf(b: Biome, sky: Sky | null): Grade {
   return {
     haze: wet ? [0.74, 0.79, 0.86] : v3(b.light.fog ?? b.light.gradeTop),
     hazeAmount: wet ? 0.07 : b.light.fog ? 0.2 : indoor ? 0.06 : day ? 0.04 : 0.1,
-    rays: grey ? 0 : day ? 0.07 : b.id === 'forest' ? 0.06 : b.id === 'crystal' ? 0.05 : 0,
-    rayColor: v3(b.light.gradeTop),
+    rays: grey ? 0 : day ? 0.05 : b.id === 'forest' ? 0.06 : b.id === 'crystal' ? 0.05 : 0,
+    rayColor: day ? v3(mixHex(b.light.gradeTop, '#fff6e6', 0.6)) : v3(b.light.gradeTop),
     shadowTint: grey ? tint('#4a5a7a', 0.3) : tint(b.light.gradeBottom, day ? 0.25 : 0.35),
-    highlightTint: grey ? tint('#e8f0ff', 0.12) : tint(b.light.gradeTop, day ? 0.16 : 0.22),
+    highlightTint: grey ? tint('#e8f0ff', 0.12) : tint(b.light.gradeTop, day ? 0.09 : 0.22),
     saturation: wet ? 1.04 : grey ? 1.02 : day ? 1.12 : 1.16,
     contrast: day || grey ? 1.04 : 1.06,
     vignette: day || grey ? Math.min(0.32, b.light.vignette * 0.7) : Math.min(0.75, b.light.vignette + 0.1),
