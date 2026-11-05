@@ -187,13 +187,30 @@ describe('the squad in a fight', () => {
     expect(w.exited).toBe(true);
   });
 
-  it('auto attacks without being told to', () => {
+  it('your knight attacks only while you hold the attack, toward your aim', () => {
     const w = world([knightId('rare', 'ranger')]);
     const h = w.heroes[0];
     const m = w.mobs.find((x) => !x.dead)!;
     // The mob steps up close in the open start room.
     m.x = h.x + 30;
     m.y = h.y;
+    w.wake(m);
+    const hp = m.hp;
+    for (let t = 0; t < 1; t += 1 / 30) w.update(1 / 30);
+    expect(m.hp).toBe(hp);
+    w.input.attack = true;
+    w.input.aimX = m.x;
+    w.input.aimY = m.y;
+    for (let t = 0; t < 2; t += 1 / 30) w.update(1 / 30);
+    expect(m.hp).toBeLessThan(hp);
+  });
+
+  it('squadmates (and your knight on Auto) attack by themselves', () => {
+    const w = world([knightId('rare', 'blade'), knightId('rare', 'ranger')]);
+    const ally = w.heroes[1];
+    const m = w.mobs.find((x) => !x.dead)!;
+    m.x = ally.x + 30;
+    m.y = ally.y;
     w.wake(m);
     const hp = m.hp;
     for (let t = 0; t < 2; t += 1 / 30) w.update(1 / 30);

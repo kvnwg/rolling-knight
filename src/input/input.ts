@@ -1,23 +1,33 @@
 /**
- * Controls. Keyboard: WASD or arrows to move, Space or Shift to dodge roll, E or Q for the special,
- * 1/2/3 to take control of a squad member, T to toggle Auto. Touch: a joystick that appears wherever
- * the left half of the screen is touched (anywhere, when `stickAnywhere` says so: at the hub, where
- * there are no fight buttons on the right), and the buttons the HUD draws (they call press()).
+ * Controls. Keyboard: WASD or arrows to move, the left mouse button (held) or J/K to attack toward the
+ * mouse, Space or Shift to dodge roll, E or Q to roll your skill early, 1/2/3 to take control of a squad
+ * member, T to toggle Auto. Touch: a joystick that appears wherever the left half of the screen is
+ * touched (anywhere, when `stickAnywhere` says so: at the hub, where there are no fight buttons on the
+ * right), and the buttons the HUD draws (they call press(), and hold() for the attack button).
  */
 export interface Controls {
   mx: number;
   my: number;
   dodge: boolean;
   special: boolean;
+  /** Attacking (the mouse button, J or K, or the touch Attack button held). */
+  attack: boolean;
+  /** Where the mouse points (screen px), to aim at; null on touch (the attack aims itself). */
+  aim: { x: number; y: number } | null;
   switchTo: number | null;
   toggleAuto: boolean;
   /** The touch joystick, for the HUD to draw (screen pixels). */
   stick: { active: boolean; ox: number; oy: number; x: number; y: number };
 }
 
-export function createControls(onKey?: (key: string) => void, stickAnywhere?: () => boolean): { controls: Controls; dispose: () => void; press: (what: 'dodge' | 'special') => void } {
-  const c: Controls = { mx: 0, my: 0, dodge: false, special: false, switchTo: null, toggleAuto: false, stick: { active: false, ox: 0, oy: 0, x: 0, y: 0 } };
+export function createControls(onKey?: (key: string) => void, stickAnywhere?: () => boolean): { controls: Controls; dispose: () => void; press: (what: 'dodge' | 'special') => void; hold: (on: boolean) => void } {
+  const c: Controls = { mx: 0, my: 0, dodge: false, special: false, attack: false, aim: null, switchTo: null, toggleAuto: false, stick: { active: false, ox: 0, oy: 0, x: 0, y: 0 } };
   const keys = new Set<string>();
+  let mouseAttack = false;
+  let touchAttack = false;
+  const attackNow = () => {
+    c.attack = mouseAttack || touchAttack || keys.has('j') || keys.has('k');
+  };
   const typing = (e: KeyboardEvent) => e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
   const update = () => {
     if (c.stick.active) return;
@@ -39,15 +49,36 @@ export function createControls(onKey?: (key: string) => void, stickAnywhere?: ()
     if (k.startsWith('arrow')) e.preventDefault();
     keys.add(k);
     update();
+    attackNow();
     onKey?.(k);
   };
   const up = (e: KeyboardEvent) => {
     keys.delete(e.key.toLowerCase());
     update();
+    attackNow();
   };
   const blur = () => {
     keys.clear();
+    mouseAttack = false;
+    touchAttack = false;
     update();
+    attackNow();
+  };
+  // The mouse: hold the left button on the play area to attack toward the pointer.
+  const mouseDown = (e: PointerEvent) => {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return;
+    if (!(e.target as HTMLElement).dataset?.play) return;
+    mouseAttack = true;
+    c.aim = { x: e.clientX, y: e.clientY };
+    attackNow();
+  };
+  const mouseMove = (e: PointerEvent) => {
+    if (e.pointerType === 'mouse') c.aim = { x: e.clientX, y: e.clientY };
+  };
+  const mouseUp = (e: PointerEvent) => {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return;
+    mouseAttack = false;
+    attackNow();
   };
   // Touch joystick on the left half of the play area.
   let touchId: number | null = null;
@@ -87,12 +118,23 @@ export function createControls(onKey?: (key: string) => void, stickAnywhere?: ()
   window.addEventListener('pointermove', move);
   window.addEventListener('pointerup', end);
   window.addEventListener('pointercancel', end);
+  window.addEventListener('pointerdown', mouseDown);
+  window.addEventListener('pointermove', mouseMove);
+  window.addEventListener('pointerup', mouseUp);
   return {
     controls: c,
     press: (what) => {
       c[what] = true;
     },
+    hold: (on) => {
+      touchAttack = on;
+      if (on) c.aim = null;
+      attackNow();
+    },
     dispose: () => {
+      window.removeEventListener('pointerdown', mouseDown);
+      window.removeEventListener('pointermove', mouseMove);
+      window.removeEventListener('pointerup', mouseUp);
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
       window.removeEventListener('blur', blur);

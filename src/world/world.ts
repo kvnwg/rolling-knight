@@ -52,6 +52,11 @@ export interface Input {
   my: number;
   dodge: boolean;
   special: boolean;
+  /** Your knight attacks only while this is held (not on Auto, where it fights by itself). */
+  attack?: boolean;
+  /** Where to aim (world px), from the mouse; null: at the nearest foe in reach, else straight ahead. */
+  aimX?: number | null;
+  aimY?: number | null;
 }
 
 export interface WorldOptions {

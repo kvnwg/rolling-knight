@@ -69,10 +69,12 @@ npm run dev
 
 Open http://localhost:5173. Keyboard: WASD or arrows to move. At the hub, E or Enter talks to the
 keeper you're standing by; walk down the steps at the foot of the square to go into the dungeon (or
-tell the warden you're ready). In the dungeon: Space or Shift to dodge roll; every knight's skill rolls and
-fires by itself once it's ready in a fight (E or Q rolls yours early); Enter or F to talk to someone, 1 2 3 to take control of a knight, T for Auto, Esc to head back up to the
-hub. Touch: drag to move (anywhere at the hub; on the left side in a fight); the buttons do the rest. Your knights attack on their own whenever
-something is in range.
+tell the warden you're ready). In the dungeon: hold the left mouse button (or J) to attack toward the mouse;
+Space or Shift to dodge roll; every knight's skill rolls and fires by itself once it's ready in a fight
+(E or Q rolls yours early); Enter or F to talk to someone, 1 2 3 to take control of a knight, T for Auto, Esc to head back up to the
+hub. Touch: drag to move (anywhere at the hub; on the left side in a fight), hold the Attack button to
+attack (it aims at the nearest foe); the other buttons do the rest. Your other two knights attack on
+their own whenever something is in range (and yours too, on Auto).
 
 Dev shortcuts by URL: `?floor=16` starts on that floor with a ready squad, `&squad=mythic` sets its
 rarity, `&classes=arcanist,guardian,cleric` its classes, `&auto` plays itself, `&gold=100000`;

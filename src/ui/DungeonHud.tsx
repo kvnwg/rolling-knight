@@ -22,10 +22,12 @@ import { TopBar } from './TopBar';
 const touch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
 
-export function DungeonHud({ game, controls, press, onCamp, onSettings, onLuck, onAltar, onTalk }: {
+export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, onLuck, onAltar, onTalk }: {
   game: Game;
   controls: Controls;
   press: (w: 'dodge' | 'special') => void;
+  /** The attack: held while the Attack button is pressed. */
+  hold: (on: boolean) => void;
   onCamp: () => void;
   onSettings: () => void;
   onLuck: () => void;
@@ -118,7 +120,32 @@ export function DungeonHud({ game, controls, press, onCamp, onSettings, onLuck, 
         })}
       </div>
 
-      <div className="actions">
+      <div className={`actions ${touch ? 'touch' : ''}`}>
+        {touch && (
+          <button
+            className={`slot-btn attack ${me ? 'ready' : 'cooling'}`}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              // Keep the finger's events even if it slides off the button (released when it lifts).
+              try {
+                (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+              } catch {
+                /* no capture: sliding off the button releases it instead */
+              }
+              hold(true);
+            }}
+            onPointerUp={() => hold(false)}
+            onPointerCancel={() => hold(false)}
+            onPointerLeave={() => hold(false)}
+            onLostPointerCapture={() => hold(false)}
+            title="Attack"
+          >
+            <span className="well" style={{ ['--ring' as string]: 'var(--sk-slot-brass-steel)' }}>
+              <Px icon="swords" s={2} />
+            </span>
+            <span className="lbl">ATTACK</span>
+          </button>
+        )}
         <button className={`slot-btn small ${s.settings.autoPlay ? 'on' : ''}`} onClick={() => (uiSound('tap'), game.setAuto(!s.settings.autoPlay))} title="Auto (T)">
           <span className="well" style={{ ['--ring' as string]: `var(--sk-slot-sm-${s.settings.autoPlay ? 'brass' : 'iron'}-dark)` }}>
             <Px icon="reel" size="sm" s={1} />

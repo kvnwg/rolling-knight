@@ -213,6 +213,12 @@ export function App() {
         w.input.my = hold ? 0 : c.my;
         if (c.dodge) w.input.dodge = true;
         if (c.special) w.input.special = true;
+        // Attacking: held, toward the mouse (touch aims at the nearest foe by itself).
+        const fight = game.inDungeon && !hold;
+        w.input.attack = fight && c.attack;
+        const aim = fight && c.aim ? r.screenToWorld(c.aim.x, c.aim.y) : null;
+        w.input.aimX = aim ? aim.x : null;
+        w.input.aimY = aim ? aim.y : null;
       }
       c.dodge = false;
       c.special = false;
@@ -300,6 +306,7 @@ export function App() {
           game={game}
           controls={ctl.controls}
           press={ctl.press}
+          hold={ctl.hold}
           onCamp={() => game.leaveDungeon()}
           onSettings={() => setSettings(true)}
           onLuck={() => setLuck(true)}

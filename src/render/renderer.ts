@@ -163,6 +163,12 @@ export class Renderer {
     this.resize();
   }
 
+  /** A point on the screen (CSS px) as a world point (the mouse's aim). */
+  screenToWorld(x: number, y: number): { x: number; y: number } {
+    const dpr = Math.min(3, window.devicePixelRatio || 1);
+    return { x: this.camX + (x * dpr) / this.P, y: this.camY + (y * dpr) / this.P };
+  }
+
   /** Fits the canvas to the window and the art layers to the zoom (call again when either changes). */
   resize(): void {
     const dpr = Math.min(3, window.devicePixelRatio || 1);

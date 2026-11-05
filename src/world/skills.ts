@@ -88,14 +88,22 @@ export function heroTick(w: World, h: Unit, dt: number, mx: number, my: number):
   } else {
     h.moving = false;
   }
-  // --- the auto attack: fires by itself at the nearest foe in range
+  // --- attacks: the squad's fire by themselves at the nearest foe in range; the knight you steer
+  // attacks only while you hold the attack (the mouse, J or K, the Attack button), toward your aim
   if (h.atkT! > 0) h.atkT! -= dt * (1 + w.banner * 0.04) * (h.skillBuff?.atkSpd ?? 1);
   if (h.atkT! <= 0 && h.stunT <= 0 && h.channel?.kind !== 'whirlwind') {
     const reach = h.range! + (h.cls === 'guardian' || h.cls === 'blade' || h.cls === 'lancer' ? 6 : 0);
-    const t = w.nearestEnemy(h, reach, true);
-    if (t) {
-      autoAttack(w, h, t);
-      h.atkT = h.atkCd!;
+    if (h.slot === w.controlled && !w.auto) {
+      if (w.input.attack) {
+        playerAttack(w, h, reach);
+        h.atkT = h.atkCd!;
+      }
+    } else {
+      const t = w.nearestEnemy(h, reach, true);
+      if (t) {
+        autoAttack(w, h, t);
+        h.atkT = h.atkCd!;
+      }
     }
   }
 }
@@ -113,13 +121,59 @@ function crit(w: World): boolean {
   return w.rng.chance(0.1);
 }
 
+/**
+ * Your knight's attack, when you click or tap: toward where you aim (the mouse), else the nearest foe a
+ * little past reach, else straight ahead; it swings (or shoots) even with nothing there.
+ */
+function playerAttack(w: World, h: Unit, reach: number): void {
+  const ax = w.input.aimX;
+  const ay = w.input.aimY;
+  let tx: number;
+  let ty: number;
+  let t: Unit | null;
+  if (ax !== null && ax !== undefined && ay !== null && ay !== undefined) {
+    tx = ax;
+    ty = ay;
+    t = foeToward(w, h, tx - h.x, ty - h.y, reach);
+  } else {
+    t = w.nearestEnemy(h, reach * 1.4, true);
+    tx = t ? t.x : h.x + (h.aimX || h.dir) * 30;
+    ty = t ? t.y : h.y + h.aimY * 30;
+  }
+  attack(w, h, tx, ty, t);
+}
+
+/** The foe in reach closest to the line from h along (dx, dy) (within about 70 degrees of it). */
+function foeToward(w: World, h: Unit, dx: number, dy: number, reach: number): Unit | null {
+  const [nx, ny] = norm(dx, dy);
+  let best: Unit | null = null;
+  let bestScore = Infinity;
+  for (const e of w.enemiesIn('hero', h.x, h.y, reach + 4)) {
+    const [ex, ey] = norm(e.x - h.x, e.y - h.y);
+    const along = ex * nx + ey * ny;
+    if (along < 0.34) continue;
+    const score = dist(e.x, e.y, h.x, h.y) * (2 - along);
+    if (score < bestScore) {
+      bestScore = score;
+      best = e;
+    }
+  }
+  return best;
+}
+
 function autoAttack(w: World, h: Unit, t: Unit): void {
-  face(h, t.x, t.y);
+  attack(w, h, t.x, t.y, t);
+}
+
+/** One attack toward (tx, ty): at `t` if there's a foe to hit (melee classes swing at the air otherwise). */
+function attack(w: World, h: Unit, tx: number, ty: number, t: Unit | null): void {
+  face(h, tx, ty);
   h.swingT = h.swingDur = h.cls === 'ranger' || h.cls === 'cleric' || h.cls === 'arcanist' ? 0.22 : 0.26;
   const c = crit(w);
   const dmg = h.atk * (c ? 1.6 : 1);
   switch (h.cls) {
     case 'guardian':
+      if (!t) break;
       w.damage(t, dmg, h, { crit: c, knock: 12 });
       w.fx.push({ kind: 'hit', x: t.x, y: t.y - 6, color: '#d8e0f0' });
       break;
@@ -144,21 +198,21 @@ function autoAttack(w: World, h: Unit, t: Unit): void {
       break;
     }
     case 'ranger':
-      shoot(w, h, t, { kind: 'arrow', speed: 210, dmg, color: '#f0e0b0', r: 2 });
+      shoot(w, h, tx, ty, { kind: 'arrow', speed: 210, dmg, color: '#f0e0b0', r: 2 });
       break;
     case 'cleric':
-      shoot(w, h, t, { kind: 'orb', speed: 120, dmg, color: '#fff0a0', r: 3, heal: h.atk * 0.5 });
+      shoot(w, h, tx, ty, { kind: 'orb', speed: 120, dmg, color: '#fff0a0', r: 3, heal: h.atk * 0.5 });
       break;
     case 'arcanist':
-      shoot(w, h, t, { kind: 'bolt', speed: 150, dmg, color: '#b08aff', r: 3, homing: 6, splash: 16 });
+      shoot(w, h, tx, ty, { kind: 'bolt', speed: 150, dmg, color: '#b08aff', r: 3, homing: 6, splash: 16 });
       break;
   }
 }
 
-function shoot(w: World, h: Unit, t: Unit, o: { kind: 'arrow' | 'orb' | 'bolt'; speed: number; dmg: number; color: string; r: number; heal?: number; homing?: number; splash?: number }): void {
+function shoot(w: World, h: Unit, tx: number, ty: number, o: { kind: 'arrow' | 'orb' | 'bolt'; speed: number; dmg: number; color: string; r: number; heal?: number; homing?: number; splash?: number }): void {
   const sx = h.x + h.dir * 4;
   const sy = h.y - 10;
-  const [nx, ny] = norm(t.x - sx, t.y - 6 - sy);
+  const [nx, ny] = norm(tx - sx, ty - 6 - sy);
   w.shots.push({
     uid: uid(),
     team: 'hero',
