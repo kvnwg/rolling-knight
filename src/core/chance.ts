@@ -1,5 +1,6 @@
 /**
- * The chance lines of the upgrade map, as numbers: combat tricks that roll their dice in every fight.
+ * The chance lines (rolled at the tinker's, on its Combat tab), as numbers: combat tricks that roll
+ * their dice in every fight.
  * This file is pure (no world, no DOM): what each line's tiers add up to, and the rolls themselves,
  * which take an Rng so a run stays the same for the same seed. src/world/chance.ts plays them on a
  * dungeon floor (hits, kills, a knight going down, foes tripping).

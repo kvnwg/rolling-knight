@@ -1,11 +1,11 @@
 /**
- * An upgrade tab as a map: Dumpster Legend's upgrade map, a full-screen honeycomb that grows out of
- * the tab's root (Luck I for the Luck tab, Whetstone I for Combat); the tinker's counter opens it from
- * either tab (src/ui/keeper/TinkerShop.tsx). Every tier of every upgrade line on the tab is one hex. Owned hexes are bright, the next buyable ones show their
- * price, the ones just past those show "?", and everything further out stays hidden until you get
- * close. Gold hexes are one-off specials (and the Extra Reel line). Drag to pan, pinch or scroll to
- * zoom, tap a hex for its details (tap it again for the whole line: UpgradePopup.tsx), and hold Buy to
- * keep buying up a line.
+ * The Luck tab as a map: Dumpster Legend's upgrade map, a full-screen honeycomb that grows out of
+ * Luck I; the tinker's counter opens onto it (src/ui/keeper/TinkerShop.tsx). Every tier of every Luck
+ * line is one hex. Owned hexes are bright, the next buyable ones show their price, the ones just past
+ * those show "?", and everything further out stays hidden until you get close. Gold hexes are one-off
+ * specials (and the Extra Reel line). Drag to pan, pinch or scroll to zoom, tap a hex for its details
+ * (tap it again for the whole line: UpgradePopup.tsx), and hold Buy to keep buying up a line. (Combat
+ * upgrades are rolled, not bought: COMBAT leaves the map for the tinker's roll.)
  *
  * The map is drawn on one screen-sized canvas (hexMapDraw.ts): a page element per hex, hundreds late in
  * the game, ran phones out of graphics memory in Dumpster Legend. Zooming scales the hex shapes, lines
@@ -13,7 +13,7 @@
  * zoomed far out). Positions are in Dumpster Legend's stage px (6 to an art pixel), so its geometry,
  * zoom range and gestures carry over unchanged.
  *
- *   <UpgradeMap game={game} tab="combat" onClose={() => ...} />
+ *   <UpgradeMap game={game} onClose={() => ...} />
  *
  * It covers the screen (position fixed, z-index var(--upgrade-map-z, 13): under sheets and reveals,
  * over the HUD) and follows the game on its own, whatever its parent's render cadence.
@@ -21,8 +21,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { currentLuck } from '../../core/luck';
 import { squadPower } from '../../core/power';
-import { HEX_BY_KEY, ROOT_KEYS, UPGRADE_MAPS, effectAt, hexTab, hexView, lineOf, nodeKey, nodeName, roman, type HexNode, type HexView } from '../../core/upgradeTree';
-import { UPGRADES, buyUpgrade, tier, upgradeCost, upgradeNodeState, type UpgradeDef, type UpgradeTab } from '../../core/upgrades';
+import { HEX_BY_KEY, ROOT_KEY, UPGRADE_MAP, effectAt, hexView, lineOf, nodeKey, nodeName, roman, type HexNode, type HexView } from '../../core/upgradeTree';
+import { UPGRADES, buyUpgrade, tier, upgradeCost, upgradeNodeState, type UpgradeDef } from '../../core/upgrades';
 import type { Game } from '../../game';
 import { Chunky } from '../common';
 import { fmt } from '../format';
@@ -42,8 +42,6 @@ const K_MAX = 1.7;
 const homeZoom = (wide: boolean) => (wide ? 0.85 : 1);
 /** The canvas's pixels at most (about 16 MB): a screen's worth on any phone, a little softer on a 4K monitor. */
 const MAX_CANVAS_PX = 4_200_000;
-/** Lines that change the squad's stats on the floor (the World needs them refreshed). */
-export const SQUAD_STATS = new Set(['might', 'vitality', 'swiftness', 'quickRoll', 'excalibur', 'dragonscale']);
 
 function hexPoints(r: number): string {
   return [0, 60, 120, 180, 240, 300]
@@ -81,20 +79,15 @@ function nameLines(ctx: CanvasRenderingContext2D, def: UpgradeDef): { lines: str
 
 /* ---------------------------------------------------------------- what stays between visits */
 
-/** Each tab's selected hex and where its map was panned and zoomed to (kept while the app runs). */
-const memories: Record<UpgradeTab, { sel: string; view: View | null }> = {
-  luck: { sel: ROOT_KEYS.luck, view: null },
-  combat: { sel: ROOT_KEYS.combat, view: null },
-};
+/** The selected hex and where the map was panned and zoomed to (kept while the app runs). */
+const memory: { sel: string; view: View | null } = { sel: ROOT_KEY, view: null };
 const scaleMemory = { scale: 2.5 / UI_PX };
 
-/** Opens its tab's map next time on this hex (`${line id}:${tier}`, e.g. "luckyStrike:1"), centered on it. */
+/** Opens the map next time on this hex (`${line id}:${tier}`, e.g. "spinSpeed:2"), centered on it. */
 export function focusUpgradeHex(key: string): void {
-  const n = HEX_BY_KEY.get(key);
-  if (!n) return;
-  const m = memories[hexTab(n)];
-  m.sel = key;
-  m.view = null;
+  if (!HEX_BY_KEY.has(key)) return;
+  memory.sel = key;
+  memory.view = null;
 }
 
 /* ---------------------------------------------------------------- small hooks */
@@ -151,7 +144,6 @@ export function buyHex(game: Game, key: string, repeat = 0): { ok: boolean; next
   if (def.special && def.max === 1) uiSound('unlock');
   else uiSound(repeat === 0 ? 'buy' : 'coin');
   if (n.tier >= def.max && !def.special) uiSound('ding');
-  if (SQUAD_STATS.has(def.id)) game.syncSquad();
   game.touch();
   return { ok: true, next: n.tier < def.max ? nodeKey(n.id, n.tier + 1) : key };
 }
@@ -243,21 +235,18 @@ function MapGold({ gold }: { gold: number }) {
 
 /* ---------------------------------------------------------------- the screen */
 
-export function UpgradeMap({ game, tab = 'luck', onClose, closeText = 'CLOSE', onTab, onCards }: {
+export function UpgradeMap({ game, onClose, closeText = 'CLOSE', onCombat, onCards }: {
   game: Game;
-  tab?: UpgradeTab;
   onClose?: () => void;
   closeText?: string;
-  /** Switch between the Luck and Combat maps from the map itself (the tinker opens straight onto it). */
-  onTab?: (t: UpgradeTab) => void;
+  /** Go to the tinker's Combat tab (its roll) from the map itself (the tinker opens straight onto the map). */
+  onCombat?: () => void;
   /** Show the same upgrades as a list of cards instead. */
   onCards?: () => void;
 }) {
   useFollow(game);
   const st = game.state;
-  const memory = memories[tab];
-  const ROOT_KEY = ROOT_KEYS[tab];
-  const MAP = UPGRADE_MAPS[tab];
+  const MAP = UPGRADE_MAP;
   const calm = !!st.settings.reduceMotion;
   const [sel, setSelState] = useState(() => memory.sel);
   const selRef = useRef(sel);
@@ -765,26 +754,30 @@ export function UpgradeMap({ game, tab = 'luck', onClose, closeText = 'CLOSE', o
 
       <div className={s.head}>
         <div className={s.titles} ref={titlesRef}>
-          {onTab ? (
+          {onCombat || onCards ? (
             <>
               <span className="row" data-ui style={{ gap: 'calc(2 * var(--px))', pointerEvents: 'auto' }}>
-              {(['luck', 'combat'] as const).map((t) => (
-                <button key={t} className={`btn small ${t === tab ? (t === 'luck' ? 'green' : 'red') : ''}`} onClick={() => t !== tab && (uiSound('tap'), onTab(t))}>
-                  <Px icon={t === 'luck' ? 'clover' : 'swords'} size="sm" />
-                  {t === 'luck' ? 'LUCK' : 'COMBAT'}
+                <button className="btn small green" aria-pressed>
+                  <Px icon="clover" size="sm" />
+                  LUCK
                 </button>
-              ))}
-              {onCards && (
-                <button className="btn small" onClick={() => (uiSound('tap'), onCards())} title="The same upgrades as a list of cards">
-                  <Px icon="bag" size="sm" />
-                  LIST
-                </button>
-              )}
+                {onCombat && (
+                  <button className="btn small" onClick={() => (uiSound('tap'), onCombat())} title="Roll for combat upgrades">
+                    <Px icon="swords" size="sm" />
+                    COMBAT
+                  </button>
+                )}
+                {onCards && (
+                  <button className="btn small" onClick={() => (uiSound('tap'), onCards())} title="The same upgrades as a list of cards">
+                    <Px icon="bag" size="sm" />
+                    LIST
+                  </button>
+                )}
               </span>
-              <span className={s.sub}>{tab === 'luck' ? 'Upgrades for the altar.' : 'Upgrades for your squad.'} Tap a hex to see it; buying one opens the hexes next to it.</span>
+              <span className={s.sub}>Upgrades for the altar. Tap a hex to see it; buying one opens the hexes next to it.</span>
             </>
           ) : (
-            <Chunky text={tab === 'luck' ? 'LUCK MAP' : 'COMBAT MAP'} size={11} grad={tab === 'luck' ? 'green' : 'red'} />
+            <Chunky text="LUCK MAP" size={11} grad="green" />
           )}
         </div>
         <button className={`btn blue square ${s.centerBtn}`} data-ui onClick={center} aria-label="Center the map" title="Center the map">

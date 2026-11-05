@@ -75,8 +75,9 @@ export function knightStats(state: GameState, id: string): KnightStats {
     hp *= 0.5;
     atk *= 2;
   }
+  // Move Speed makes the squad walk faster; Attack Speed shortens the time between attacks.
   const speedMult = 1 + up.speedPct / 100;
-  let atkCd = cls.atkCd / speedMult;
+  let atkCd = cls.atkCd * (1 - up.atkCdPct / 100);
   if (hasPerk(state, 'rollDancer')) atkCd *= 1.2;
   let dodgeCd = cls.dodgeCd;
   if (hasPerk(state, 'rollDancer')) dodgeCd *= 0.5;

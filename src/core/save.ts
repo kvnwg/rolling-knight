@@ -6,6 +6,7 @@ import { cleanDeck, isDesign, shuffleDeck } from './deck';
 import { newGame } from './newGame';
 import { Rng } from './rng';
 import { KNIGHTS_BY_ID } from './knights';
+import { PERKS_BY_ID } from './perks';
 import { dupeGold } from './roster';
 import { SAVE_VERSION, type GameState, type KnightRec } from './state';
 import { sanitizeUpgrades } from './upgrades';
@@ -52,9 +53,20 @@ export function mend(raw: unknown): GameState {
   mendDeck(out, s.run);
   out.version = SAVE_VERSION;
   // Upgrade tiers within each line's range (the map was rebuilt: some lines have fewer tiers now).
+  // Combat lines hang off nothing now (they're rolled), so every combat tier a save has stays.
   sanitizeUpgrades(out);
+  mendPerks(out);
   cashInSpares(out);
   return out;
+}
+
+/**
+ * Perks owned stay owned (bought from the trees before perks were rolled, or rolled since): only
+ * perks that still exist, each once, so the sage's roll never lands one you have.
+ */
+function mendPerks(out: GameState): void {
+  const raw: unknown[] = Array.isArray(out.perks) ? out.perks : [];
+  out.perks = [...new Set(raw.filter((id): id is string => typeof id === 'string' && PERKS_BY_ID.has(id)))];
 }
 
 /**

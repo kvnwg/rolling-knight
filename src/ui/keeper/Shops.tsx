@@ -2,17 +2,17 @@
  * The other keepers' counters in the shared layout: a line under the purse says what each is for,
  * numbers say what they are, buttons say what they do, and the whole story waits in the popups
  * their cards open:
- *  - Sage Orrin: perks for sigils, by tree (core/perks.ts);
+ *  - Sage Orrin: perks, rolled for sigils (core/perks.ts);
  *  - Sister Maren: rebirth, what it gives and what it takes, and the button (core/newGame.ts);
  *  - the notice board: your jobs, their progress and rewards (core/quests.ts);
  *  - Oracle Vesper: the altar's reels, your latest summons and the odds;
  *  - Warden Tobb: who goes down (your squad and who leads), levelling and reforging them, the way down.
  */
-import { useState, type CSSProperties, type ReactNode } from 'react';
+import { Fragment, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { BAL } from '../../core/balance';
 import { CLASSES, KNIGHTS, knightDef, knightId, unlockedClasses } from '../../core/knights';
 import { canRebirth, rebirthFloor } from '../../core/newGame';
-import { PERKS, PERK_TREES, buyPerk, canBuyPerk, hasPerk, perksOpen, type PerkDef, type PerkTree } from '../../core/perks';
+import { PERKS, PERK_TREES, canRollPerk, perkOdds, perkRollPrice, perkRollsAffordable, perksOpen, rollPerk, type PerkDef, type PerkRoll, type PerkTree } from '../../core/perks';
 import { CHALLENGE, floorDifficulty, knightRating, squadPower } from '../../core/power';
 import { activeQuests, MAX_ACTIVE_QUESTS, mobNoun, plural, questGoal, rewardText, type Quest } from '../../core/quests';
 import { RARITIES, RARITY_COLOR, RARITY_NAME, RARITY_ODDS, rarityChances } from '../../core/rarity';
@@ -27,8 +27,9 @@ import { fmt, oneIn } from '../format';
 import { Px, type IconName } from '../px';
 import { uiSound } from '../sound';
 import { InfoPopup } from './InfoPopup';
-import { Delta, Glyph, KeeperScreen, Purse, ShopBody, ShopFoot, ShopGrid, ShopHeading, ShopHint, ShopTop, Stat, keeperStyles as s, useGameTick, type KeeperCat } from './KeeperScreen';
+import { Delta, Glyph, KeeperScreen, Purse, ShopBody, ShopFoot, ShopGrid, ShopHeading, ShopHint, ShopTop, Stat, keeperStyles as s, useGameTick } from './KeeperScreen';
 import { OfferCard } from './OfferCard';
+import { RollBody, RollButton, RollHead, RollLabel, RollList, RollReel, RollRow, RollStage, pctShort, rarityInk, type ReelSpin } from './RollMachine';
 import { Icon } from './TinkerShop';
 import { CLASS_ICON } from '../classIcons';
 import { Codex } from '../panels';
@@ -44,119 +45,160 @@ function inkOf(c: string): string {
 
 const TREE_ICON: Record<PerkTree, string> = { underdog: 'pitchfork', command: 'banner', reels: 'reel', chaos: 'bomb' };
 const TREE_LABEL: Record<PerkTree, string> = { underdog: 'UNDERDOGS', command: 'COMMAND', reels: 'REELS', chaos: 'BAD IDEAS' };
-/** A perk's picture: its own icon, drawn in the upgrade icons' style (iconRows.ts) or one of the UI's. */
-const perkIcon = (p: PerkDef) => p.icon;
-const sageMemory = { tree: 'underdog' as PerkTree };
 
+let sageSpins = 0;
+
+/**
+ * Sage Orrin's counter: ROLL for a random perk you don't have yet (core/perks.ts), for sigils, the
+ * reel landing on it; under it every perk by tree, with its chance on the next roll in its rarity's
+ * color, or OWNED. Tap a perk for what it does. Until the reel lands, the list and the count show
+ * things as they were. Before the first rebirth the roll is locked, and the list shows what's to come.
+ */
 export function SageShop({ game, station, onClose }: { game: Game; station: HubStation; onClose: () => void }) {
   useGameTick(game);
   const st = game.state;
-  const [tree, setTree] = useState<PerkTree>(sageMemory.tree);
+  const calm = !!st.settings.reduceMotion;
+  const [spin, setSpin] = useState<ReelSpin | null>(null);
+  const [roll, setRoll] = useState<PerkRoll | null>(null);
+  const [landed, setLanded] = useState(true);
+  const [skip, setSkip] = useState(0);
   const [info, setInfo] = useState<string | null>(null);
-  const [, bump] = useState(0);
+  /** The perks before the roll in flight (shown until it lands). */
+  const before = useRef<string[] | null>(null);
+  const spinning = !!spin && !landed;
+  const shown = spinning && before.current ? { ...st, perks: before.current } : st;
   const open = perksOpen(st);
-  const buy = (id: string): boolean => {
-    if (!buyPerk(st, id)) return false;
-    uiSound('perk');
+  const odds = new Map(perkOdds(shown).map((o) => [o.perk.id, o]));
+  const price = perkRollPrice(st);
+
+  const press = () => {
+    if (spinning) {
+      setSkip((x) => x + 1);
+      return;
+    }
+    const was = [...st.perks];
+    const pool = perkOdds(st).map((o) => ({ icon: o.perk.icon, rarity: o.perk.rarity }));
+    const r = rollPerk(st, () => game.rng.next());
+    if (!r) return;
+    before.current = was;
+    setRoll(r);
+    setLanded(false);
+    setSpin({ n: ++sageSpins, face: { icon: r.perk.icon, rarity: r.perk.rarity }, pool });
     game.syncSquad();
     game.touch();
-    bump((x) => x + 1);
-    return true;
   };
-  const reqMet = (p: PerkDef) => p.requires.length === 0 || p.requires.every((r) => hasPerk(st, r)) || (p.requires.length > 1 && p.requires.some((r) => hasPerk(st, r)));
-  const cats: KeeperCat[] = PERK_TREES.map((t) => ({ id: t.id, label: TREE_LABEL[t.id], icon: <Icon icon={TREE_ICON[t.id]} />, badge: PERKS.filter((p) => p.tree === t.id && canBuyPerk(st, p.id)).length }));
-  const infoPerk = info ? PERKS.find((p) => p.id === info) : undefined;
-  return (
-    <>
-      <KeeperScreen game={game} station={station} tabs={[{ id: 'perks', label: 'PERKS', icon: 'sigil', badge: PERKS.filter((p) => canBuyPerk(st, p.id)).length }]} tab="perks" onTab={() => {}} onClose={onClose}>
-        <ShopTop purse={<Purse amount={st.sigils} icon="sigil" label="Sigils" />} title={<Stat icon="check" label="Owned">{st.perks.length}/{PERKS.length}</Stat>} />
-        <ShopHint>
-          {open ? (
+  const onLand = (n: number) => {
+    if (n !== sageSpins || !roll) return;
+    before.current = null;
+    setLanded(true);
+    uiSound('perk', roll.perk.rarity === 'rare' || roll.perk.rarity === 'epic' ? 1 : 0);
+  };
+
+  const label =
+    roll && landed ? (
+      <RollLabel key={spin?.n} name={roll.perk.name} rarity={roll.perk.rarity} line={roll.perk.short} />
+    ) : (
+      <RollLabel
+        spinning={spinning}
+        hint={
+          open ? (
             <>
-              Perks are <b>bonuses that last through rebirths</b>. Pay with sigils: you get one each rebirth and one for every boss. Tap a perk to read it.
+              A random <b>perk</b> you don't have yet.
             </>
           ) : (
             <>
-              Perks are <b>bonuses that last through rebirths</b>. They open after your <b>first rebirth</b> (Sister Maren, at floor {rebirthFloor(st.rebirths)}).
+              Perks open after your <b>first rebirth</b> (floor {rebirthFloor(st.rebirths)}).
             </>
-          )}
-        </ShopHint>
-        <ShopBody cats={cats} cat={tree} onCat={(t) => ((sageMemory.tree = t as PerkTree), setTree(t as PerkTree))} scrollKey={tree}>
-          <ShopGrid>
-            {PERKS.filter((p) => p.tree === tree).map((p) => {
-              const owned = hasPerk(st, p.id);
-              const met = reqMet(p);
-              const needs = p.requires.map((r) => PERKS.find((x) => x.id === r)!.name).join(p.requires.length > 1 ? ' or ' : '');
-              return (
-                <OfferCard
-                  key={p.id}
-                  art={<Icon icon={perkIcon(p)} big />}
-                  name={p.name}
-                  lines={[{ text: p.short }]}
-                  state={owned ? 'done' : open && met ? 'open' : 'locked'}
-                  onArt={() => (uiSound('open'), setInfo(p.id))}
-                  note={!owned && open && !met ? `Needs ${needs}` : undefined}
-                  button={
-                    owned
-                      ? { kind: 'done', label: 'OWNED' }
-                      : !open
-                        ? { kind: 'locked', label: 'REBIRTH FIRST' }
-                        : !met
-                          ? { kind: 'locked', label: 'LOCKED' }
-                          : { kind: 'buy', verb: 'BUY', label: `${p.cost}`, icon: 'sigil', ready: st.sigils >= p.cost, onPress: () => buy(p.id), paid: `-${p.cost}`, short: `need ${p.cost - st.sigils} more` }
-                  }
-                />
-              );
-            })}
-          </ShopGrid>
-        </ShopBody>
+          )
+        }
+      />
+    );
+  const infoPerk = info ? PERKS.find((p) => p.id === info) : undefined;
+  return (
+    <>
+      <KeeperScreen game={game} station={station} tabs={[{ id: 'perks', label: 'PERKS', icon: 'sigil', badge: perkRollsAffordable(st) }]} tab="perks" onTab={() => {}} onClose={onClose}>
+        <ShopTop
+          purse={<Purse amount={st.sigils} icon="sigil" label="Sigils" />}
+          title={
+            <Stat icon="check" label="Owned">
+              {shown.perks.length}/{PERKS.length}
+            </Stat>
+          }
+        />
+        <RollBody>
+          <RollStage
+            reel={<RollReel spin={spin} idle="sigil" calm={calm} skip={skip} onLand={onLand} />}
+            label={label}
+            button={
+              <RollButton
+                state={!open ? 'locked' : odds.size === 0 ? 'done' : spinning ? 'spinning' : canRollPerk(st) ? 'ready' : 'short'}
+                price={`${price}`}
+                icon="sigil"
+                onPress={press}
+                short={`need ${price - st.sigils} more`}
+                doneText="ALL OWNED"
+                lockedText="REBIRTH FIRST"
+              />
+            }
+          />
+          <RollList>
+            {PERK_TREES.map((t) => (
+              <Fragment key={t.id}>
+                <RollHead icon={TREE_ICON[t.id]}>{TREE_LABEL[t.id]}</RollHead>
+                {PERKS.filter((p) => p.tree === t.id).map((p) => {
+                  const o = odds.get(p.id);
+                  return (
+                    <RollRow
+                      key={p.id}
+                      icon={p.icon}
+                      name={p.name}
+                      chance={o?.chance ?? 0}
+                      rarity={o ? p.rarity : null}
+                      done={!o}
+                      doneText="OWNED"
+                      flash={landed && roll?.perk.id === p.id}
+                      onTap={() => (uiSound('open'), setInfo(p.id))}
+                    />
+                  );
+                })}
+              </Fragment>
+            ))}
+          </RollList>
+        </RollBody>
       </KeeperScreen>
-      {infoPerk && (
-        <InfoPopup
-          art={<Icon icon={perkIcon(infoPerk)} big />}
-          name={infoPerk.name}
-          sub={
-            <span style={{ color: inkOf(PERK_TREES.find((t) => t.id === infoPerk.tree)!.color) }}>
-              {PERK_TREES.find((t) => t.id === infoPerk.tree)!.name}
-            </span>
-          }
-          onClose={() => setInfo(null)}
-          actions={
-            open && !hasPerk(st, infoPerk.id) && reqMet(infoPerk) ? (
-              <button className={`btn ${s.buy}`} data-kind={st.sigils >= infoPerk.cost ? 'buy' : 'short'} onClick={() => buy(infoPerk.id) && setInfo(null)}>
-                <span className={s.verb}>BUY</span>
-                <Px icon="sigil" size="sm" />
-                <span>{infoPerk.cost}</span>
-              </button>
-            ) : undefined
-          }
-        >
-          <p>{infoPerk.text}</p>
-          {!open && (
-            <div className={s.popRow} data-tone="bad">
-              <Px icon="lock" size="sm" />
-              Opens after your first rebirth.
-            </div>
-          )}
-          {!hasPerk(st, infoPerk.id) && infoPerk.requires.length > 0 && (
-            <div className={s.popRow} data-tone={reqMet(infoPerk) ? 'muted' : 'bad'}>
-              <Px icon={reqMet(infoPerk) ? 'check' : 'lock'} size="sm" />
-              Needs
-              {infoPerk.requires.map((r, i) => {
-                const q = PERKS.find((x) => x.id === r)!;
-                return (
-                  <span key={r} className={s.popRow}>
-                    {i > 0 && <span>{infoPerk.requires.length > 1 ? 'or' : ''}</span>}
-                    <Icon icon={perkIcon(q)} />
-                    {q.name}
-                  </span>
-                );
-              })}
-            </div>
-          )}
-        </InfoPopup>
-      )}
+      {infoPerk && <PerkInfo perk={infoPerk} chance={odds.get(infoPerk.id)?.chance ?? null} open={open} onClose={() => setInfo(null)} />}
     </>
+  );
+}
+
+/** A perk's details: its tree and rarity, what it does, and its chance on the next roll (or that it's yours). */
+function PerkInfo({ perk, chance, open, onClose }: { perk: PerkDef; chance: number | null; open: boolean; onClose: () => void }) {
+  const tree = PERK_TREES.find((t) => t.id === perk.tree)!;
+  return (
+    <InfoPopup
+      art={<Icon icon={perk.icon} big />}
+      name={perk.name}
+      sub={
+        <>
+          <span style={{ color: inkOf(tree.color) }}>{tree.name}</span>·<span style={{ color: rarityInk(perk.rarity) }}>{RARITY_NAME[perk.rarity]}</span>
+        </>
+      }
+      onClose={onClose}
+    >
+      <p>{perk.text}</p>
+      {chance === null ? (
+        <div className={s.popRow} data-tone="good">
+          <Px icon="check" size="sm" />
+          Yours for this run
+        </div>
+      ) : (
+        <div className={s.popRow} data-tone="muted">
+          <Px icon="dice" size="sm" />
+          {open ? 'Next roll' : 'Its chance'}
+          <b style={{ color: rarityInk(perk.rarity) }}>{pctShort(chance)}</b>
+        </div>
+      )}
+    </InfoPopup>
   );
 }
 
@@ -179,13 +221,13 @@ export function ShrineShop({ game, station, onClose }: { game: Game; station: Hu
     { id: 'gold', art: <Px icon="coin" size="lg" s={1} />, name: 'Gold', icon: 'coin', line: <Delta now={`x${goldNow.toFixed(1)}`} next={`x${goldNext.toFixed(1)}`} />, text: 'More gold from everything, for good.' },
     { id: 'stats', art: <Px icon="sword" size="lg" s={1} />, name: 'Power', icon: 'sword', line: <Delta now={`x${rebirthStatMult(st.rebirths).toFixed(1)}`} next={`x${rebirthStatMult(next).toFixed(1)}`} />, text: "Every knight's stats, for good." },
     ...fresh.map((c) => ({ id: `cls-${c}`, art: <HeroArt id={knightId('rare', c)} s={1} />, name: CLASSES[c].name, icon: 'helm' as IconName, line: <b style={{ color: 'var(--good)' }}>NEW</b>, text: `${CLASSES[c].name} knights start turning up at the altar.` })),
-    ...(next === BAL.perks.unlockRebirths ? [{ id: 'perks', art: <Px icon="sigil" size="lg" s={1} />, name: 'Perks', icon: 'sigil' as IconName, line: <b style={{ color: 'var(--good)' }}>OPEN</b>, text: 'Sage Orrin sells perks for sigils.' }] : []),
+    ...(next === BAL.perks.unlockRebirths ? [{ id: 'perks', art: <Px icon="sigil" size="lg" s={1} />, name: 'Perks', icon: 'sigil' as IconName, line: <b style={{ color: 'var(--good)' }}>OPEN</b>, text: 'Sage Orrin rolls perks for sigils.' }] : []),
   ];
   const losses: Array<{ id: string; icon: string; name: string; line: string; text: string }> = [
     { id: 'knights', icon: 'helm10', name: 'Knights', line: 'All of them', text: 'Your knights, with their levels, shards and duplicates (the Codex stays).' },
     { id: 'gold', icon: 'coin', name: 'Gold', line: 'Back to 0', text: 'All your gold.' },
     { id: 'upgrades', icon: 'gear', name: 'Upgrades', line: 'Back to 0', text: "The tinker's upgrades." },
-    { id: 'perks', icon: 'sigil', name: 'Perks', line: 'Bought again', text: 'Your perks go; you start the run with a sigil for each rebirth to buy them again.' },
+    { id: 'perks', icon: 'sigil', name: 'Perks', line: 'Rolled again', text: 'Your perks go; you start the run with a sigil for each rebirth to roll them again.' },
   ];
   const all = [...gains.map((g) => ({ ...g, lose: false })), ...losses.map((l) => ({ id: `lose-${l.id}`, art: l.icon in { helm10: 1 } ? <Icon icon={l.icon} big /> : <Px icon={l.icon as IconName} size="lg" s={1} />, name: l.name, icon: l.icon, line: l.line as ReactNode, text: l.text, lose: true }))];
   const card = (g: (typeof all)[number]) => (

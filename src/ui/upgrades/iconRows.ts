@@ -292,6 +292,19 @@ export const UPGRADE_ICON_ROWS: Record<string, Rows> = {
     '....kkkkk.',
     '..........',
   ],
+  // Attack Speed: a sky-blue blade swung fast, Quick Roll's speed lines trailing behind it.
+  atkSpeed: [
+    '........kk',
+    '.kkk...kwk',
+    '......kCck',
+    'kkk..kCck.',
+    '....kCck..',
+    '.kk.kck...',
+    '..kyyk....',
+    '.kNkyOk...',
+    'kYk..kk...',
+    'kk........',
+  ],
   // ---------------------------------------------------------------- the keepers' other offers
   // Extra Reel: two slot windows and a green plus.
   reelPlus: [
@@ -488,7 +501,7 @@ export const UPGRADE_ICON_ROWS: Record<string, Rows> = {
     '..k11111k.',
     '...kkkkk..',
   ],
-  // Swift Boots: a winged boot.
+  // Move Speed: a winged boot.
   boot: [
     '....kkk...',
     '...kNtNk.k',

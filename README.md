@@ -7,9 +7,10 @@ graveyards, lava caves, crystal grottoes, moonlit shrines), control one knight a
 fight by their class; in a fight each knight keeps rolling a random skill from its class's list,
 firing it and rolling the next at once (no cooldowns). Between dives
 you walk round the hub, a lamplit square before the Gilded Reel, where each keeper runs one counter:
-the Oracle's altar (summons, the odds and the Codex), the tinker's upgrades on two tabs, Luck and
-Combat (with chance upgrades like Ricochet and Double or Nothing, and Quick Roll for faster skill
-rolls), the sage's perks, the rebirth shrine, the notice board, and Warden Tobb by the steps down,
+the Oracle's altar (summons, the odds and the Codex), the tinker's upgrades on two tabs (Luck,
+bought on a honeycomb map, and Combat, rolled for gold on a reel: Strength, Vitality, Attack Speed,
+Move Speed, Quick Roll for faster skill rolls, chance upgrades like Ricochet and Double or Nothing,
+and rare one-offs), the sage's perks (rolled for sigils), the rebirth shrine, the notice board, and Warden Tobb by the steps down,
 who picks the three you send down, levels them up and reforges them: one job each, nothing twice. Talk to a keeper and their screen opens with them big at their counter, lamplit
 among the things of their trade, and their wares below as cards on beige paper: a picture, a level,
 a number or two and a price, the details a tap away. Above all of them, at 1 in 2.5 billion, sits the Absolute tier and its one knight: Kevin, a
@@ -154,8 +155,9 @@ and the tell before it, dashes and leaps that hit a knight standing in them and 
 one rolling, an ogre throwing a boulder across water at a knight it can't reach (and at one that
 keeps away) onto the ring it marked, quake rings, the spawn-in, perfect rolls marked once per roll,
 the squad's AI seeing a lunge's lane or landing ring, the lunges' crouch, arc and squash and the red
-wind-up warning; the camera, the weather, the hub's map and keepers, folk and quests, the two upgrade
-maps, Quick Roll and every chance upgrade in a fight, the keepers' scenes and cards, a full game
+wind-up warning; the camera, the weather, the hub's map and keepers, folk and quests, the Luck
+map, the combat and perk rolls (their odds, prices, doubles and free rolls; a full pool rolls nothing),
+Attack Speed, Quick Roll and every chance upgrade in a fight, the keepers' scenes and cards, a full game
 starting up; and the PixelForge art: every sheet holding what the game plays in four directions, the
 body plan to monster mapping, the material recolors, every rarity's and mutation's ramps, and the
 animations the sim's state picks (attacks on the hit's tick, windups over the mobs' telegraphs,
@@ -175,7 +177,7 @@ Checks the music files too: each one's length and loudness (with ffmpeg installe
 npm run sim -- --minutes 40
 ```
 
-The real game logic on Auto with a bot that levels, buys upgrades and perks and rebirths.
+The real game logic on Auto with a bot that levels, buys Luck upgrades, rolls combat upgrades and perks, and rebirths.
 Current result over seeds 1 to 8 (`--seed N`): floor 5 at about 4 minutes (3 to 5), floor 10 at about
 13 (10 to 19), the first rebirth at about 24 (15 to 31; one seed of the eight not yet by 40 minutes),
 with three or so wipes (none on floors 1 to 5) and about 160 perfect rolls in 40 minutes.

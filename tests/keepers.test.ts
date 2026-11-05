@@ -22,8 +22,8 @@ describe("the tinker's counter", () => {
       expect([...listed].sort(), tab).toEqual(tabLines(tab).map((u) => u.id).sort());
       for (const id of listed) expect(upgradeTab(UPGRADES.find((u) => u.id === id)!), id).toBe(tab);
     }
-    // Quick Roll is on the Combat tab, with Swift Boots.
-    expect(TINKER_CATS.combat.find((c) => c.lines.includes('quickRoll'))?.lines).toContain('swiftness');
+    // Quick Roll is on the Combat tab, with Attack Speed and Move Speed.
+    expect(TINKER_CATS.combat.find((c) => c.lines.includes('quickRoll'))?.lines).toEqual(['atkSpeed', 'swiftness', 'quickRoll']);
   });
 
   it('says what every line does in a few words, at every tier (the lines on its card)', () => {

@@ -219,7 +219,7 @@ const SKILL_SOUNDS = Object.fromEntries(
 // ------------------------------------------------------------------ the altar, the reveal, the menus
 const LEGACY = {
   // --- the dungeon
-  coin: legacy('Dungeon', 'Gold picked up, and the upgrade map’s repeat buys: each coin a step higher through a run of them.', 'A coin’s ping.'),
+  coin: legacy('Dungeon', 'Gold picked up, the upgrade map’s repeat buys (each coin a step higher through a run of them), and paying for a roll at the tinker’s (and a free one coming back).', 'A coin’s ping.'),
   pickup: legacy('Dungeon', 'Something picked up off the floor.' + UNUSED, 'A bag’s rustle and a bell.'),
   potion: legacy('Dungeon', 'A Luck Potion picked up.', 'Three gulps, then the long jingle.'),
   xp: legacy('Dungeon', 'XP reaching a bar.' + UNUSED, 'A soft upward blip.'),
@@ -236,11 +236,11 @@ const LEGACY = {
   title_start: legacy('Dungeon', 'Setting off: down the hub’s steps into the dungeon, or the warden’s button.', 'A punchy press, a run up the chord and sparkles.'),
   rebirth: legacy('Dungeon', 'A rebirth.', 'Two pickup notes, the chord, bells and a shower of coins.'),
   // --- the altar
-  reel_start: legacy('Altar', 'The altar spins (quiet when the altar isn’t on screen).', 'A lever clack and a short whirr.'),
-  reel_tick: legacy('Altar', 'A cell clicking past an altar reel’s line (the altar on screen), and the reveal’s odds counting.', 'A tick that climbs as the reel slows.'),
-  reel_creep: legacy('Altar', 'A rare find crawling the last few cells toward the line.', 'Notches climbing a step each.'),
-  reel_land: legacy('Altar', 'An altar reel lands, heavier for rarer finds.', 'A thud and a bell.'),
-  glow_up: legacy('Altar', 'A teased find’s glow climbs a tier.', 'An upward flick and two bells.'),
+  reel_start: legacy('Altar', 'The altar spins (quiet when the altar isn’t on screen), and a roll at the tinker’s or the sage’s.', 'A lever clack and a short whirr.'),
+  reel_tick: legacy('Altar', 'A cell clicking past an altar reel’s line (the altar on screen) or a keeper’s roll’s, and the reveal’s odds counting.', 'A tick that climbs as the reel slows.'),
+  reel_creep: legacy('Altar', 'A rare find crawling the last few cells toward the line (the altar, a keeper’s roll).', 'Notches climbing a step each.'),
+  reel_land: legacy('Altar', 'An altar reel or a keeper’s roll lands, heavier for rarer finds.', 'A thud and a bell.'),
+  glow_up: legacy('Altar', 'A teased find’s glow climbs a tier (the altar, a keeper’s roll).', 'An upward flick and two bells.'),
   rattle: legacy('Altar', 'The build-up before a reveal: the reel shakes.', 'Rattling beats with a heartbeat.'),
   riser_short: legacy('Altar', 'A teased find’s short build-up.', 'A rising tone.'),
   riser_long: legacy('Altar', 'The long build-up before a reveal (HYPER RARE’s summoning too).', 'A tone that seems to keep rising.'),
@@ -259,9 +259,9 @@ const LEGACY = {
   hyper_intro: legacy('Reveal', 'HYPER RARE’s summoning.' + UNUSED, 'A swelling rumble, the long riser and an alarm.'),
   hyper_boom: legacy('Reveal', 'HYPER RARE bursts open.' + UNUSED, 'A huge boom and crash, a big chord and sparkles.'),
   firework: legacy('Reveal', 'Fireworks after an INSANE or HYPER RARE reveal.', 'A pop and a crackle.'),
-  stamp: legacy('Reveal', 'A seal stamped down (a rarity stamp, NEW!), and an Epic or better skill landing on the HUD.', 'A thump, a paper slap and a small ring.'),
+  stamp: legacy('Reveal', 'A seal stamped down (a rarity stamp, NEW!), an Epic or better skill landing on the HUD, and an Epic or better roll at a keeper’s.', 'A thump, a paper slap and a small ring.'),
   // --- knights and menus
-  jingle: legacy('Menus', 'A new knight joins; a lucky spin; the signature three notes.', 'Three bells up the chord.'),
+  jingle: legacy('Menus', 'A new knight joins; a lucky spin; a double roll at the tinker’s; the signature three notes.', 'Three bells up the chord.'),
   jingle_long: legacy('Menus', 'Bigger wins: a token combo, a Luck Potion, a boss down without the music’s sting.', 'Five bells up the chord.'),
   dupe: legacy('Menus', 'A duplicate lands at the altar (on screen), and the hero sheet’s mutate button.', 'A small soft pop and a swish.'),
   mutation: legacy('Menus', 'A better mutation.', 'A shimmer up and a sparkle.'),
@@ -270,8 +270,8 @@ const LEGACY = {
   haul: legacy('Menus', 'A big haul of gold.' + UNUSED, 'A ka-ching and coins pouring in.'),
   buy: legacy('Menus', 'An upgrade bought.', 'A coin, a bright arpeggio up and a sparkle.'),
   equip: legacy('Menus', 'A knight takes its place in the squad (Best squad, choosing your knight).', 'A thump and a clank, a chime climbing with its rarity.'),
-  perk: legacy('Menus', 'A perk picked.' + UNUSED, 'A sweep up into a chord.'),
-  unlock: legacy('Menus', 'Something new opens up (a special upgrade).', 'A rising sparkle.'),
+  perk: legacy('Menus', 'A perk rolled at the sage’s (fuller for a Rare or Epic one).', 'A sweep up into a chord.'),
+  unlock: legacy('Menus', 'Something new opens up (a special upgrade, a Legendary roll at the tinker’s).', 'A rising sparkle.'),
   collect: legacy('Menus', 'Earnings collected.' + UNUSED, 'A cascade of coins and a ka-ching.'),
   ding: legacy('Menus', 'An upgrade maxed out.', 'A bright ding.'),
   tap: legacy('Menus', 'A button press.', 'A pop, a semitone higher each tap through quick taps.'),

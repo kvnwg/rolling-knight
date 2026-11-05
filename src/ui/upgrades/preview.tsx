@@ -1,7 +1,7 @@
 /**
  * The upgrade map on its own page, for working on it and for screenshots (dev server only):
  *   http://localhost:5173/upgrades-preview.html?floor=8&squad=epic&classes=blade,ranger,cleric&camp&gold=500000
- * Takes the game's dev flags (src/dev.ts), plus `up=luck:5,spinSpeed:3` to own tiers and `sel=might:2`
+ * Takes the game's dev flags (src/dev.ts), plus `up=luck:5,spinSpeed:3` to own tiers and `sel=spinSpeed:2`
  * to select a hex. The game runs underneath, so gold and luck move as they would.
  */
 import { createRoot } from 'react-dom/client';

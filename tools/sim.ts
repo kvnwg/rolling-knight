@@ -1,14 +1,16 @@
 /**
  * Headless balance run: the real game logic on Auto (every knight played by its class AI), with a
- * simple bot that buys upgrades, levels the squad and rebirths when it can (duplicates turn into gold by themselves).
+ * simple bot that levels the squad, spends on upgrades (the cheaper of the cheapest Luck tier and a
+ * combat roll), rolls perks and rebirths when it can (duplicates turn into gold by themselves).
  *   npm run sim -- --minutes 60 --seed 3
  */
 import { Game } from '../src/game';
 import { RARITIES } from '../src/core/rarity';
 import { UPGRADES, buyUpgrade, canBuy, upgradeCost } from '../src/core/upgrades';
+import { canRollCombat, combatRollPrice, combatTiers, rollCombat } from '../src/core/combatRoll';
 import { bestSquad, canLevel, levelUp } from '../src/core/roster';
 import { canRebirth } from '../src/core/newGame';
-import { PERKS, buyPerk, canBuyPerk } from '../src/core/perks';
+import { canRollPerk, rollPerk } from '../src/core/perks';
 import { squadPower } from '../src/core/power';
 import { World } from '../src/world/world';
 
@@ -60,11 +62,13 @@ for (let t = 0; t < minutes * 60; t += dt) {
   if (botT > 5) {
     botT = 0;
     const s = g.state;
-    // Level the squad, then buy the cheapest upgrade.
+    // Level the squad, then the cheaper of the cheapest Luck tier and a combat roll; roll every perk the sigils cover.
     for (const id of s.squad) while (id && canLevel(s, id)) levelUp(s, id);
-    const ups = UPGRADES.filter((u) => canBuy(s, u.id)).sort((a, b) => upgradeCost(s, a.id) - upgradeCost(s, b.id));
-    if (ups[0]) buyUpgrade(s, ups[0].id);
-    for (const p of PERKS) if (canBuyPerk(s, p.id)) buyPerk(s, p.id);
+    const luck = UPGRADES.filter((u) => canBuy(s, u.id)).sort((a, b) => upgradeCost(s, a.id) - upgradeCost(s, b.id))[0];
+    const roll = canRollCombat(s) ? combatRollPrice(s) : Infinity;
+    if (luck && upgradeCost(s, luck.id) <= roll) buyUpgrade(s, luck.id);
+    else if (roll < Infinity) rollCombat(s, () => g.rng.next());
+    while (canRollPerk(s)) rollPerk(s, () => g.rng.next());
     const before = s.squad.join();
     bestSquad(s);
     if (s.squad.join() !== before) g.syncSquad();
@@ -85,6 +89,7 @@ console.log('---');
 console.log(`after ${minutes} min: floor ${s.run.floor}, best ${s.run.bestFloor}, rebirths ${s.rebirths}, gold ${Math.round(s.gold)}, kills ${s.records.kills}, spins ${s.records.spins}`);
 console.log('rolled:', RARITIES.filter((r) => counts[r]).map((r) => `${r} ${counts[r]}`).join(', '));
 console.log('squad:', s.squad.map((id) => (id ? `${id} L${s.roster[id]?.level}` : '-')).join(' | '), `power ${Math.round(squadPower(s))}`);
+console.log(`combat tiers ${combatTiers(s)}, perks ${s.perks.length}`);
 const avg = floorTimes.length ? floorTimes.reduce((a, b) => a + b, 0) / floorTimes.length : 0;
 console.log(`floors cleared ${floorTimes.length}, avg ${avg.toFixed(0)} s per floor, knights downed ${downs}, wipes ${wipes}`);
 console.log(`perfect rolls ${perfect} (${perfectMine} by the knight you control)`);
