@@ -409,7 +409,7 @@ export function HeroDetail({ game, id, onClose }: { game: Game; id: string; onCl
           ✕
         </button>
         <div className="stage-art">
-          <HeroLive id={id} mutation={rec.mutation} s={3} />
+          <HeroLive id={id} mutation={rec.mutation} s={2} />
         </div>
         <div className="hero-banner">
           <Chunky text={def.name} size={def.name.length > 16 ? 7 : 9} grad={rarityGrad(def.rarity)} />

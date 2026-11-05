@@ -17,11 +17,16 @@ How every system works, with its numbers: [`DESIGN.md`](DESIGN.md). Art sources 
 
 ## The look
 
-- Every character is built on Snoblin's prototype mannequin, dressed in code: class helmets in three
-  views (a Guardian's great helm, a Blade's plumed sallet, a Ranger's hood, a Cleric's mitre, an
-  Arcanist's hat, a Lancer's winged helm), rarity armor, capes from Epic, halos from Celestial,
-  cycling colors at Primordial, and mutations (Gilded, Shadow, Radiant, Void). Humanoid mobs use the
-  same skeleton; other mobs are painted from shapes at their own size.
+- The knights and most mobs come from PixelForge, the game's character pipeline: chibi sprites in
+  one muted palette with a 1 px plum outline, drawn in four directions with real attacks, dodges,
+  hurts, deaths and victories (`src/render/pf/`). Each knight's class sheet is recolored at runtime
+  for its rarity (iron and undyed cloth at Common, then bronze, steel, violet silver, gold, rose
+  steel, verdigris, crimson steel, star-silver, aurora steel, white gold, obsidian, and cycling
+  colors at Primordial, with cloth dyed in the rarity's color), with capes from Epic, halos from
+  Celestial and the mutations (Gilded, Shadow, Radiant, Void). Mobs map by body plan (slimes, bats,
+  wolves, goblins, goblin archers and chiefs, orcs, skeletons, ogres; the Stone Warden is the boss)
+  and wear their floor's colors. The farm's animals, ghosts, pumpkins, bugs, plants, casters and the
+  demon keep the game's own sprites (built on Snoblin's prototype mannequin or painted from shapes).
 - The look follows Firefly Garden turned into pixels: bright, readable places edge to edge. The
   hamlet is a town of half-timbered houses, fenced lots, hedges, a market square with striped stalls,
   a fountain and string lights, and a canal with a bridge; trees stand in clumps on the lawns
@@ -75,13 +80,16 @@ every floor's weather. `?fresh` starts a new game. The game is on
 npm test
 ```
 
-121 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
+132 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
 timing, extra reels, the tutorial's scripted rolls, bad-luck protection, Lucky Spins, duplicates,
 shards, selling, levels and reforging, Humble Beginnings' 3x, rebirth; every biome's floors fully
 connected with spawns reachable and deterministic by seed, mob and boss design, a squad clearing a
 floor on Auto, auto attacks, dodge invulnerability, skill rolls and their odds, Rewind, the balance
 curve, the camera, the weather, the hub's map and keepers, folk and quests, the upgrade map and every
-chance upgrade in a fight, and a full game starting up.
+chance upgrade in a fight, a full game starting up; and the PixelForge art: every sheet holding what
+the game plays in four directions, the body plan to monster mapping, the material recolors, every
+rarity's and mutation's ramps, and the animations the sim's state picks (attacks on the hit's tick,
+windups over the mobs' telegraphs, dodges, walks stepped by distance, deaths and revives).
 
 ```bash
 npm run sim -- --minutes 40
@@ -126,4 +134,12 @@ python3 -I tools/packs/ui.py "<MediavelFree.png>" "<UiCozyFree.png>"
 
 ```bash
 python3 -I tools/packs/fx.py "<Gigapack>/PNG" "<Mini Pack 1>/PNG" src/render/packs/fx.ts
+```
+
+The PixelForge sheets (`src/assets/pf/`), from a PixelForge checkout after `pf build --all` and
+`pf fx build --all` (it keeps the animations the game plays, each distinct frame once, as indexed
+PNGs with every color's material and shade, for the runtime recolors):
+
+```bash
+python3 -I tools/packs/pixelforge.py "<pixelforge>" src/assets/pf
 ```

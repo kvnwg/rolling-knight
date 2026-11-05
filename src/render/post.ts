@@ -19,6 +19,8 @@ export interface PostLayers {
   emit: HTMLCanvasElement;
   light: HTMLCanvasElement;
   ui: HTMLCanvasElement;
+  /** Where the light is held to `capRange` (the PixelForge characters' solid pixels; alpha is the mask). */
+  cap: HTMLCanvasElement;
 }
 
 export interface PostParams {
@@ -53,6 +55,8 @@ export interface PostParams {
   flash: number;
   fade: number;
   rewind: number;
+  /** The least and most light on the `cap` layer's pixels (the rest of the scene is lit as is). */
+  capRange?: [number, number];
 }
 
 const VERT = `#version 300 es
@@ -104,6 +108,8 @@ uniform sampler2D u_groundBlur;
 uniform sampler2D u_stand;
 uniform sampler2D u_emit;
 uniform sampler2D u_light;
+uniform sampler2D u_cap;
+uniform vec2 u_capRange;
 uniform vec2 u_artScale;
 uniform vec2 u_artOff;
 uniform float u_focus;
@@ -144,6 +150,9 @@ void main() {
   }
   // Light: the map is stored at half strength so it can reach 2x (over-bright glows).
   vec3 L = texture(u_light, a).rgb * 2.0;
+  // Characters on the cap layer keep their own colors: the light on them is held in a range.
+  float cm = texture(u_cap, a).a;
+  L = mix(L, clamp(L, vec3(u_capRange.x), vec3(u_capRange.y)), cm);
   c *= L;
   // Emissive things glow on top of the light.
   vec4 em = texture(u_emit, a);
@@ -298,7 +307,7 @@ export class Post {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
       return t;
     };
-    this.tex = { ground: mkTex(), stand: mkTex(), emit: mkTex(), light: mkTex(), ui: mkTex() };
+    this.tex = { ground: mkTex(), stand: mkTex(), emit: mkTex(), light: mkTex(), ui: mkTex(), cap: mkTex() };
     this.nearest = gl.createSampler()!;
     gl.samplerParameteri(this.nearest, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.samplerParameteri(this.nearest, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
@@ -414,6 +423,8 @@ export class Post {
     this.bind(2, this.tex!.stand, this.nearest!, c, 'u_stand');
     this.bind(3, this.tex!.emit, this.nearest!, c, 'u_emit');
     this.bind(4, this.tex!.light, this.linear!, c, 'u_light');
+    this.bind(5, this.tex!.cap, this.nearest!, c, 'u_cap');
+    gl.uniform2f(gl.getUniformLocation(c, 'u_capRange'), p.capRange?.[0] ?? 0, p.capRange?.[1] ?? 100);
     gl.uniform2f(gl.getUniformLocation(c, 'u_artScale'), artScale[0], artScale[1]);
     gl.uniform2f(gl.getUniformLocation(c, 'u_artOff'), artOff[0], artOff[1]);
     gl.uniform1f(gl.getUniformLocation(c, 'u_focus'), p.focusY);

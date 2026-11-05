@@ -312,7 +312,7 @@ export function CharacterSelect({ game, onPick, onSelect }: { game: Game; onPick
       </div>
       <div className="cs-stage">
         <div className="cs-light" style={{ ['--rc' as string]: RARITY_COLOR[def.rarity] }} />
-        <HeroArt id={sel} mutation={s.roster[sel]?.mutation ?? null} s={4} />
+        <HeroArt id={sel} mutation={s.roster[sel]?.mutation ?? null} s={3} />
       </div>
       <div className="cs-name outlined">
         <Chunky text={def.name.toUpperCase()} size={9} grad="white" />

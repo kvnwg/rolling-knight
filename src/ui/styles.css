@@ -577,7 +577,6 @@ button.pill {
 }
 .hero-card .art img {
   position: relative;
-  margin-bottom: calc(1 * var(--px));
 }
 .hero-card .name {
   font-weight: 700;
@@ -708,6 +707,8 @@ select.select {
   position: relative;
   display: grid;
   place-items: end center;
+  /* (A scrolling sheet's flex column would otherwise squeeze it to nothing.) */
+  flex: none;
   height: calc(58 * var(--px));
   background: radial-gradient(ellipse at 50% 82%, color-mix(in srgb, var(--rc) 70%, #fff) 0 16%, transparent 17%),
     radial-gradient(ellipse at 50% 60%, color-mix(in srgb, var(--rc) 45%, transparent) 0 45%, transparent 46%),

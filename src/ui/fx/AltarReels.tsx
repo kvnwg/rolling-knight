@@ -34,7 +34,7 @@ import { RARITIES, RARITY_COLOR, RARITY_NAME, rarityIndex } from '../../core/rar
 import { chainFloor, reelCount } from '../../core/roller';
 import type { Spin } from '../../core/state';
 import type { Game } from '../../game';
-import { knightUrl } from '../sprites';
+import { KNIGHT_PIC_H, KNIGHT_PIC_W, knightUrl } from '../sprites';
 import { Chunky } from './Chunky';
 import { fxSound } from './fxSound';
 import { Altar, type AltarSignals } from './altar';
@@ -66,9 +66,9 @@ function orbFill(luck: number): number {
 
 // ------------------------------------------------------------------ shared
 
-/** Knight pictures are 30 x 21 image pixels (sprites.tsx knightUrl). */
-const KW = 30;
-const KH = 21;
+/** Knight pictures are KNIGHT_PIC_W x KNIGHT_PIC_H image pixels (sprites.tsx knightUrl). */
+const KW = KNIGHT_PIC_W;
+const KH = KNIGHT_PIC_H;
 /** A token's pop out of its reel and its flight into the reel's stack (ms). */
 const FLIGHT = { pop: 90, fly: 300 } as const;
 const FLIGHT_MS = FLIGHT.pop + FLIGHT.fly;

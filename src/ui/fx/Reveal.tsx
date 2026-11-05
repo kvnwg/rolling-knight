@@ -22,7 +22,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { CLASSES, knightDef } from '../../core/knights';
 import { RARITIES, RARITY_COLOR, RARITY_NAME, RARITY_ODDS, rarityAtLeast, rarityIndex, type Rarity } from '../../core/rarity';
 import type { MutationId } from '../../core/state';
-import { knightUrl } from '../sprites';
+import { KNIGHT_PIC_H, KNIGHT_PIC_W, knightUrl } from '../sprites';
 import { Chunky } from './Chunky';
 import { fxSound } from './fxSound';
 import { HyperBands, HyperFx, type HyperHandle, type RevealClock } from './HyperFx';
@@ -58,9 +58,9 @@ const MUTATION_LOOK: Record<MutationId, { name: string; color: string }> = {
   void: { name: 'VOID', color: '#2a2a6a' },
 };
 
-/** Knight pictures are 30 x 21 image pixels (sprites.tsx knightUrl). */
-const KW = 30;
-const KH = 21;
+/** Knight pictures are KNIGHT_PIC_W x KNIGHT_PIC_H image pixels (sprites.tsx knightUrl). */
+const KW = KNIGHT_PIC_W;
+const KH = KNIGHT_PIC_H;
 
 const keys = new WeakMap<RevealItem, number>();
 let nextKey = 1;

@@ -30,6 +30,13 @@ import { HubPaint } from './hubPaint';
 import type { Sky } from '../world/sky';
 import { npcFrame, questMarker } from './art/npcs';
 import { npcMarker } from '../world/npcs';
+import { pfReady, SHEETS, type SheetName } from './pf/assets';
+import { frameCanvas, frameMask, haloCanvas, haloSpot } from './pf/frames';
+import { heroPose, pruneHeroes, type HeroPose } from './pf/heroAnim';
+import { knightPaint, paintStep } from './pf/knightLook';
+import { deathPoofMs, deathPose, lastMoveOf, mobDirOf, mobPose, pruneMobs } from './pf/mobAnim';
+import { mobPaint, type MobPaint } from './pf/mobLook';
+import { facing, type Dir } from './pf/sheet';
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -66,6 +73,17 @@ const FX_LIGHT: Partial<Record<FxName, [string, number]>> = {
 /** Target art pixels on the screen's short side. */
 const SHORT_SIDE = 270;
 
+/** PixelForge FX are drawn in their own colors. */
+const NO_PAINT = { recolor: {}, key: 'fx' } as const;
+
+/**
+ * The most light a PixelForge character takes (1 = its own colors). Lanterns and glows still light
+ * the ground round it; past this they would only bleach its muted palette.
+ */
+const EXPOSURE = 1.12;
+/** And the least, in the dark (muted colors under a dim, tinted ambient would sink into the ground). */
+const EXPOSURE_MIN = 0.7;
+
 export class Renderer {
   canvas: HTMLCanvasElement;
   /** The 2D context of the visible canvas (only when WebGL isn't available). */
@@ -75,7 +93,7 @@ export class Renderer {
   /** Art-resolution layers: the ground, standing things, glowing things, the light map, the HUD. */
   scene: HTMLCanvasElement;
   sctx: Ctx;
-  private layers: Record<'stand' | 'emit' | 'light' | 'ui', { c: HTMLCanvasElement; x: Ctx }>;
+  private layers: Record<'stand' | 'emit' | 'light' | 'ui' | 'cap', { c: HTMLCanvasElement; x: Ctx }>;
   /** The view's focus for menus that cover part of the screen (0..1). */
   focus = { x: 0.5, y: 0.5 };
   /** The view in whole art pixels (rounded up), and exactly. */
@@ -116,6 +134,11 @@ export class Renderer {
   /** The view's whole-pixel top-left in world pixels, this frame. */
   private origin = { x: 0, y: 0 };
   private flashT = 0;
+  /** PixelForge: this frame's knight poses, and dying mobs playing out their deaths. */
+  private heroPoses = new Map<number, HeroPose>();
+  private corpses: Array<{ uid: number; x: number; y: number; paint: MobPaint; dir: Dir; at: number; world: World; poofed: boolean; boss: boolean }> = [];
+  /** PixelForge FX playing in the world (death poofs, a skeleton's crumble), on the world's clock. */
+  private pfFx: Array<{ name: SheetName; x: number; y: number; at: number; world: World }> = [];
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -128,7 +151,7 @@ export class Renderer {
       const c = makeCanvas(this.W, this.H) as HTMLCanvasElement;
       return { c, x: c.getContext('2d')! };
     };
-    this.layers = { stand: mk(), emit: mk(), light: mk(), ui: mk() };
+    this.layers = { stand: mk(), emit: mk(), light: mk(), ui: mk(), cap: mk() };
     this.light = new Lighting(this.W, this.H);
     this.resize();
   }
@@ -220,13 +243,14 @@ export class Renderer {
     const em = this.layers.emit.x;
     const ui = this.layers.ui.x;
     const w = scene;
-    for (const c of [g, st, em, ui]) {
+    for (const c of [g, st, em, ui, this.layers.cap.x]) {
       c.setTransform(1, 0, 0, 1, 0, 0);
       c.globalAlpha = 1;
       c.globalCompositeOperation = 'source-over';
     }
     st.clearRect(0, 0, this.LW, this.LH);
     em.clearRect(0, 0, this.LW, this.LH);
+    this.layers.cap.x.clearRect(0, 0, this.LW, this.LH);
     ui.clearRect(0, 0, this.LW, this.LH);
     if (!w) {
       g.fillStyle = '#0b0d16';
@@ -295,7 +319,24 @@ export class Renderer {
     this.drawPortal(g, em, w, sx, sy);
     for (const a of w.areas) this.drawArea(g, em, a, sx, sy);
 
-    // --- shadows (soft ovals under everything standing)
+    // --- PixelForge: knight poses for this frame, and mobs that just died start their deaths
+    const pf = pfReady();
+    this.heroPoses.clear();
+    if (pf) {
+      for (const h of w.heroes) this.heroPoses.set(h.uid, heroPose(w, h));
+      pruneHeroes(new Set(w.heroes.map((h) => h.uid)));
+      for (const m of w.mobs) {
+        if (!m.dead || this.corpses.some((c) => c.uid === m.uid)) continue;
+        const paint = mobPaint(m.type!, !!m.elite, !!m.boss, (m.bossPhase ?? 0) > 0);
+        // A bomber that went off leaves nothing to fall over.
+        if (!paint || (lastMoveOf(m.uid) === 'bomb' && (m.windT ?? 0) <= 0)) continue;
+        this.corpses.push({ uid: m.uid, x: m.x, y: m.y, paint, dir: mobDirOf(m.uid) ?? (m.dir < 0 ? 'w' : 'e'), at: w.time, world: w, poofed: false, boss: !!m.boss });
+      }
+      this.corpses = this.corpses.filter((c) => c.world === w && w.time - c.at < 4);
+      pruneMobs(new Set(w.mobs.filter((m) => !m.dead).map((m) => m.uid)));
+    }
+
+    // --- shadows (soft ovals under everything standing; PixelForge sprites bring their own)
     g.fillStyle = 'rgba(8,6,16,0.38)';
     for (const p of this.props) {
       if (!visible(p.x, p.y)) continue;
@@ -310,6 +351,7 @@ export class Renderer {
     for (const u of [...w.heroes, ...w.mobs]) {
       if (u.dead && u.hurtT < -0.3) continue;
       if (!visible(u.x, u.y)) continue;
+      if (pf && (u.team === 'hero' || (!u.dead && mobPaint(u.type!, !!u.elite, !!u.boss)) || this.corpses.some((c) => c.uid === u.uid))) continue;
       const big = u.boss ? 3 : u.elite ? 1.4 : 1;
       this.ellipse(g, sx(u.x), sy(u.y), Math.round((u.r + 1) * big), Math.max(1, Math.round(2 * big)), u.flying ? 0.6 : 1);
     }
@@ -357,6 +399,10 @@ export class Renderer {
       if (!visible(m.x, m.y)) continue;
       list.push({ y: m.y, draw: () => this.drawMob(st, w, m, sx, sy) });
     }
+    for (const c of this.corpses) {
+      if (!visible(c.x, c.y)) continue;
+      list.push({ y: c.y, draw: () => this.drawCorpse(st, w, c, sx, sy) });
+    }
     for (const h of w.heroes) {
       if (!visible(h.x, h.y)) continue;
       list.push({
@@ -366,7 +412,7 @@ export class Renderer {
           if (hub) {
             // Walking in front of a lit window covers it.
             em.globalCompositeOperation = 'destination-out';
-            this.drawHero(em, w, h, sx, sy);
+            this.drawHero(em, w, h, sx, sy, true);
             em.globalCompositeOperation = 'source-over';
           }
         },
@@ -419,6 +465,7 @@ export class Renderer {
     if (hub) list.push(...hub.items(st, em, cx, cy, this.LW, this.LH, this.time));
     list.sort((a, b) => a.y - b.y);
     for (const d of list) d.draw();
+    this.drawPfFx(st, w, sx, sy);
     if (hub) {
       hub.drawFore(st, em, cx, cy, this.LW, this.LH);
       hub.updateMotes(dt);
@@ -426,7 +473,10 @@ export class Renderer {
     } else this.ambient?.drawAir(em, cx, cy, this.LW, this.LH, this.time);
 
     // --- shots, sparks, leaves and weather
-    for (const s of w.shots) this.drawShot(s.kind === 'arrow' ? st : em, s, sx, sy);
+    for (const s of w.shots) {
+      if (pf && this.wardenShot(w, s)) this.drawRockShard(st, s, sx, sy);
+      else this.drawShot(s.kind === 'arrow' ? st : em, s, sx, sy);
+    }
     this.spawnFx(w);
     if (!hub) this.weather(biome, dt, cx, cy);
     if (outdoors && !hub) this.dropLeaves(biome, cx, cy, dt);
@@ -604,7 +654,7 @@ export class Renderer {
       this.light.drawMap(L, hubLook ? hubLook.ambient.color : biome ? ambientOf(biome, sky) : '#000000', lights);
       const grade: Grade = hubLook ? { ...hubLook.grade, rays: 0, rayColor: [1, 0.85, 0.6] } : biome ? gradeOf(biome, sky) : DEFAULT_GRADE;
       this.post.render(
-        { ground: this.scene, stand: this.layers.stand.c, emit: this.layers.emit.c, light: this.layers.light.c, ui: this.layers.ui.c },
+        { ground: this.scene, stand: this.layers.stand.c, emit: this.layers.emit.c, light: this.layers.light.c, ui: this.layers.ui.c, cap: this.layers.cap.c },
         {
           time: this.time,
           artW: this.LW,
@@ -621,6 +671,7 @@ export class Renderer {
           flash: this.flashT,
           fade: Math.round(game.fade * 8) / 8,
           rewind: w?.rewind ? Math.min(1, w.rewind.t * 6) : 0,
+          capRange: [EXPOSURE_MIN, EXPOSURE],
         },
       );
       return;
@@ -654,7 +705,90 @@ export class Renderer {
 
   // ------------------------------------------------------------------ units
 
-  private drawHero(ctx: Ctx, w: World, h: Unit, sx: (x: number) => number, sy: (y: number) => number): void {
+  /** A knight: PixelForge's sheet for its class in its rarity's colors, playing what the sim says it's doing. */
+  private drawHero(ctx: Ctx, w: World, h: Unit, sx: (x: number) => number, sy: (y: number) => number, cut = false): void {
+    const pose = this.heroPoses.get(h.uid);
+    if (!pose) return this.drawHeroLegacy(ctx, w, h, sx, sy);
+    const paint = knightPaint(h.knightId!, h.mutation ?? null, paintStep(h.rarity!, this.time));
+    const [px, py] = SHEETS[paint.sheet].meta.pivot;
+    const x = sx(h.x) - px;
+    const y = sy(h.y) - py;
+    if (cut) {
+      ctx.drawImage(frameCanvas(paint.sheet, pose.k, paint, false, pose.anim, pose.dir), x, y);
+      return;
+    }
+    // A ring under the knight you control.
+    if (h.slot === w.controlled && !h.downed) {
+      ctx.fillStyle = 'rgba(255,226,122,0.55)';
+      for (let a = 0; a < 16; a++) {
+        if ((a + Math.floor(this.time * 8)) % 4 === 0) continue;
+        const ang = (a / 16) * Math.PI * 2;
+        ctx.fillRect(sx(h.x) + Math.round(Math.cos(ang) * 6), sy(h.y) + Math.round(Math.sin(ang) * 3) + 1, 1, 1);
+      }
+    }
+    // The Arcanist's blink leaves an afterimage where it stood.
+    if (pose.ghost && pose.ghost.alpha > 0) {
+      ctx.globalAlpha = pose.ghost.alpha;
+      ctx.drawImage(frameCanvas(paint.sheet, pose.ghost.k, paint, true, pose.ghost.anim, pose.ghost.dir), sx(pose.ghost.x) - px, sy(pose.ghost.y) - py);
+    }
+    ctx.globalAlpha = pose.alpha;
+    ctx.drawImage(frameCanvas(paint.sheet, pose.k, paint, pose.flash, pose.anim, pose.dir), x, y);
+    ctx.globalAlpha = 1;
+    const cap = this.layers.cap.x;
+    cap.globalAlpha = pose.alpha;
+    cap.drawImage(frameMask(paint.sheet, pose.k, paint, pose.flash, pose.anim, pose.dir), x, y);
+    cap.globalAlpha = 1;
+    // The halo glows (drawn on the light-emitting layer).
+    if (paint.halo && !h.downed) {
+      const [hx, hy] = haloSpot(paint.sheet, pose.k);
+      const em = this.layers.emit.x;
+      em.globalAlpha = pose.alpha;
+      em.drawImage(haloCanvas(paint.halo), x + hx, y + hy + Math.round(Math.sin(this.time * 2.2 + h.uid) * 0.6));
+      em.globalAlpha = 1;
+    }
+    if (pose.stunned) this.stunStars(this.layers.emit.x, sx(h.x), y + SHEETS[paint.sheet].meta.tops[pose.k][0] - 3);
+    if (h.drT > 0 && h.cls === 'guardian' && !h.downed) {
+      // Bulwark: a shimmer around the Guardian.
+      ctx.fillStyle = 'rgba(255,216,74,0.5)';
+      const r = 9;
+      for (let a = 0; a < 20; a++) if ((a + Math.floor(this.time * 12)) % 3 === 0) {
+        const ang = (a / 20) * Math.PI * 2;
+        ctx.fillRect(sx(h.x) + Math.round(Math.cos(ang) * r), sy(h.y) - 8 + Math.round(Math.sin(ang) * r), 1, 1);
+      }
+    }
+  }
+
+  /** PixelForge's stun stars circling over a head whose top row is at (x, y). */
+  private stunStars(ctx: Ctx, x: number, y: number): void {
+    const sheet = SHEETS.fx_status_stun;
+    const f = sheet.clip('loop', 's');
+    const i = Math.floor((this.time * 1000) / f[0][1]) % f.length;
+    const [px, py] = sheet.meta.anims.loop.pivots?.s ?? sheet.meta.pivot;
+    ctx.drawImage(frameCanvas('fx_status_stun', f[i][0], NO_PAINT), x - px, y - py + 3);
+  }
+
+  /** PixelForge FX in the world, each played once on the world's clock. */
+  private drawPfFx(ctx: Ctx, w: World, sx: (x: number) => number, sy: (y: number) => number): void {
+    this.pfFx = this.pfFx.filter((f) => f.world === w);
+    for (const f of this.pfFx) {
+      const sheet = SHEETS[f.name];
+      const anim = Object.keys(sheet.meta.anims)[0];
+      const frames = sheet.clip(anim, 's');
+      let ms = (w.time - f.at) * 1000;
+      let i = 0;
+      while (i < frames.length && ms >= frames[i][1]) ms -= frames[i++][1];
+      if (i >= frames.length) {
+        f.at = -1;
+        continue;
+      }
+      const [px, py] = sheet.meta.anims[anim].pivots?.s ?? sheet.meta.pivot;
+      ctx.drawImage(frameCanvas(f.name, frames[i][0], NO_PAINT), sx(f.x) - px, sy(f.y) - py);
+    }
+    this.pfFx = this.pfFx.filter((f) => f.at >= 0);
+  }
+
+  /** The game's own knight art (when PixelForge's sheets aren't loaded). */
+  private drawHeroLegacy(ctx: Ctx, w: World, h: Unit, sx: (x: number) => number, sy: (y: number) => number): void {
     const L = knightLook(h.knightId!, h.mutation ?? null, h.rarity === 'primordial' ? this.time : 0);
     const tkey = h.rarity === 'primordial' ? Math.floor(this.time * 6) % 40 : 0;
     const mut = h.mutation ?? '';
@@ -751,7 +885,71 @@ export class Renderer {
     }
   }
 
+  /** A mob: its PixelForge monster in its floor's colors when it has one, else the game's own sprite. */
   private drawMob(ctx: Ctx, w: World, m: Unit, sx: (x: number) => number, sy: (y: number) => number): void {
+    const paint = pfReady() ? mobPaint(m.type!, !!m.elite, !!m.boss, (m.bossPhase ?? 0) > 0) : null;
+    if (!paint) return this.drawMobLegacy(ctx, w, m, sx, sy);
+    if (m.dead) return;
+    const pose = mobPose(w, m, paint.monster, paint.sheet);
+    const meta = SHEETS[paint.sheet].meta;
+    const [px, py] = meta.pivot;
+    const x = sx(m.x);
+    const y = sy(m.y);
+    // Elites shine in their eyes' color.
+    if (m.elite) {
+      ctx.fillStyle = mixHex(paint.recolor.eyes?.[0] ?? m.type!.ramp[3], '#ffffff', 0.3);
+      ctx.globalAlpha = 0.5 + 0.2 * Math.sin(this.time * 6);
+      for (let a = 0; a < 12; a++) {
+        const ang = (a / 12) * Math.PI * 2 + this.time;
+        ctx.fillRect(x + Math.round(Math.cos(ang) * (m.r + 3)), y - 1 + Math.round(Math.sin(ang) * 2), 1, 1);
+      }
+      ctx.globalAlpha = 1;
+    }
+    ctx.drawImage(frameCanvas(paint.sheet, pose.k, paint, pose.flash), x - px, y - py);
+    this.layers.cap.x.drawImage(frameMask(paint.sheet, pose.k, paint, pose.flash), x - px, y - py);
+    const top = y - py + meta.tops[pose.k][0];
+    if (pose.stunned) this.stunStars(this.layers.emit.x, x, top - 3);
+    // Asleep: a little "z".
+    if (!m.awake && Math.floor(this.time * 1.5 + m.uid) % 3 === 0) {
+      const z = this.textCanvas('Z', { face: 'small', fill: '#d8e0ff', ink: '#1a1326' });
+      ctx.drawImage(z, x + 3, top - 6);
+    }
+    // A charge's telegraph: a line of dots where it will run.
+    if (m.windT && m.windT > 0 && m.move === 'charge') {
+      ctx.fillStyle = 'rgba(255,90,90,0.8)';
+      for (let k = 1; k < 12; k++) {
+        if ((k + Math.floor(this.time * 20)) % 2) continue;
+        ctx.fillRect(sx(m.x + (m.moveX ?? 0) * k * 8), sy(m.y + (m.moveY ?? 0) * k * 8), 1, 1);
+      }
+    }
+  }
+
+  /** A PixelForge mob playing out its death after the sim has let it go, then fading; a poof where its sheet has one. */
+  private drawCorpse(ctx: Ctx, w: World, c: Renderer['corpses'][number], sx: (x: number) => number, sy: (y: number) => number): void {
+    const ms = (w.time - c.at) * 1000;
+    const d = deathPose(c.paint.monster, c.paint.sheet, c.dir, ms);
+    if (!d) {
+      this.corpses = this.corpses.filter((o) => o !== c);
+      return;
+    }
+    if (!c.poofed && ms >= deathPoofMs(c.paint.monster, c.paint.sheet)) {
+      c.poofed = true;
+      // PixelForge's own: a skeleton crumbles, the rest go up in a puff (a boss in three).
+      const name: SheetName = c.paint.monster === 'skeleton' ? 'fx_bone_crumble' : 'fx_poof_smoke';
+      const spots: Array<[number, number]> = c.boss ? [[0, 0], [-12, -10], [12, -14]] : [[0, 0]];
+      for (const [dx, dy] of spots) this.pfFx.push({ name, x: c.x + dx, y: c.y + dy, at: w.time, world: w });
+    }
+    const [px, py] = SHEETS[c.paint.sheet].meta.pivot;
+    ctx.globalAlpha = d.alpha;
+    ctx.drawImage(frameCanvas(c.paint.sheet, d.k, c.paint, false), sx(c.x) - px, sy(c.y) - py);
+    ctx.globalAlpha = 1;
+    const cap = this.layers.cap.x;
+    cap.globalAlpha = d.alpha;
+    cap.drawImage(frameMask(c.paint.sheet, d.k, c.paint, false), sx(c.x) - px, sy(c.y) - py);
+    cap.globalAlpha = 1;
+  }
+
+  private drawMobLegacy(ctx: Ctx, w: World, m: Unit, sx: (x: number) => number, sy: (y: number) => number): void {
     const t = m.type!;
     if (m.dead) {
       // A quick puff of fading.
@@ -846,6 +1044,23 @@ export class Renderer {
       return cv;
     });
     ctx.drawImage(c, x - 3, y - 6);
+  }
+
+  /** Was this shot thrown by a boss drawn as the Stone Warden? */
+  private wardenShot(w: World, s: Shot): boolean {
+    if (s.team !== 'mob' || s.kind !== 'bullet') return false;
+    const m = w.bossUnit && w.bossUnit.uid === s.from ? w.bossUnit : null;
+    return !!m && mobPaint(m.type!, !!m.elite, true)?.monster === 'stone_warden';
+  }
+
+  /** A Stone Warden's shard: PixelForge's spinning stone, turned to its flight (whole quarter turns). */
+  private drawRockShard(ctx: Ctx, s: Shot, sx: (x: number) => number, sy: (y: number) => number): void {
+    const sheet = SHEETS.fx_rock_shard;
+    const dir = facing(s.vx, s.vy);
+    const f = sheet.clip('travel', dir);
+    const i = Math.floor((this.time * 1000) / f[0][1]) % f.length;
+    const [px, py] = sheet.meta.anims.travel.pivots?.[dir] ?? sheet.meta.pivot;
+    ctx.drawImage(frameCanvas('fx_rock_shard', f[i][0], NO_PAINT), sx(s.x) - px, sy(s.y) - py);
   }
 
   private drawShot(ctx: Ctx, s: Shot, sx: (x: number) => number, sy: (y: number) => number): void {
@@ -1038,15 +1253,26 @@ export class Renderer {
       if (h.downed) continue;
       const mine = h.slot === w.controlled;
       out.push({ x: sx(h.x), y: sy(h.y) - 6, r: biome.light.heroRadius * (mine ? 1.2 : 0.9), color: biome.light.hero, intensity: carry * (mine ? 1 : 0.7) });
-      const L = knightLook(h.knightId!, h.mutation ?? null, h.rarity === 'primordial' ? this.time : 0);
-      const glow = knightGlow(L);
+      let glow: string | null;
+      let orb: string;
+      if (pfReady()) {
+        const paint = knightPaint(h.knightId!, h.mutation ?? null, paintStep(h.rarity!, this.time));
+        glow = paint.glow;
+        orb = paint.recolor.accent?.[1] ?? '#b08aff';
+      } else {
+        const L = knightLook(h.knightId!, h.mutation ?? null, h.rarity === 'primordial' ? this.time : 0);
+        glow = knightGlow(L);
+        orb = L.plume[2];
+      }
       if (glow) out.push({ x: sx(h.x), y: sy(h.y) - 8, r: 16, color: glow, intensity: 0.2 + carry * 0.3, bloom: true });
-      if (h.cls === 'arcanist') out.push({ x: sx(h.x) + h.dir * 4, y: sy(h.y) - 16, r: 10, color: L.plume[2], intensity: 0.35, bloom: true });
+      if (h.cls === 'arcanist') out.push({ x: sx(h.x) + h.dir * 4, y: sy(h.y) - 16, r: 10, color: orb, intensity: 0.35, bloom: true });
     }
     if (this.ambient) for (const l of this.ambient.lights(cx, cy, this.W, this.H, this.time)) out.push(l);
     for (const s of w.shots) {
       if (s.kind === 'arrow') continue;
-      out.push({ x: sx(s.x), y: sy(s.y), r: s.team === 'hero' ? 20 : 16, color: s.color, intensity: 0.9, bloom: true });
+      // A Stone Warden's thrown stones only catch a little light (they don't glow like spells).
+      if (pfReady() && this.wardenShot(w, s)) out.push({ x: sx(s.x), y: sy(s.y), r: 12, color: '#fff2d8', intensity: 0.35 });
+      else out.push({ x: sx(s.x), y: sy(s.y), r: s.team === 'hero' ? 20 : 16, color: s.color, intensity: 0.9, bloom: true });
     }
     for (const a of w.areas) {
       if (a.kind === 'fire' || (a.kind === 'meteor' && a.delay < 0.4)) out.push({ x: sx(a.x), y: sy(a.y), r: a.r * 1.6, color: '#ff7a2a', intensity: 0.9, bloom: true });
@@ -1055,7 +1281,9 @@ export class Renderer {
     }
     for (const m of w.mobs) {
       if (m.dead) continue;
-      if (m.elite || m.boss) out.push({ x: sx(m.x), y: sy(m.y) - 8, r: m.boss ? 46 : 22, color: m.type!.ramp[3], intensity: 0.55, bloom: m.boss });
+      // PixelForge monsters light the dark with their glow eyes' color (a Stone Warden's core).
+      const pfEye = pfReady() ? mobPaint(m.type!, !!m.elite, !!m.boss, (m.bossPhase ?? 0) > 0)?.recolor.eyes?.[0] : undefined;
+      if (m.elite || m.boss) out.push({ x: sx(m.x), y: sy(m.y) - (m.boss && pfEye ? 24 : 8), r: m.boss ? 46 : 22, color: pfEye ?? m.type!.ramp[3], intensity: pfEye ? 0.45 : 0.55, bloom: m.boss });
       else if (m.type!.plan === 'flyer' && /Wisp|Spirit/.test(m.type!.name)) out.push({ x: sx(m.x), y: sy(m.y) - 8, r: 18, color: m.type!.ramp[3], intensity: 0.8, bloom: true });
       else if (m.type!.plan === 'golem') out.push({ x: sx(m.x), y: sy(m.y) - 10, r: 14, color: m.type!.eye, intensity: 0.6, bloom: true });
     }
@@ -1118,7 +1346,8 @@ export class Renderer {
         else if (f.src === 'boss') {
           this.fx('levelUp', f.x, f.y - 12);
           this.fx('electric', f.x, f.y - 6);
-        } else this.fx(f.src === 'slime' ? 'splat' : 'smoke', f.x, f.y - 2);
+        } else if (!this.corpses.some((c) => Math.abs(c.x - f.x) < 1 && Math.abs(c.y - 4 - f.y) < 1)) this.fx(f.src === 'slime' ? 'splat' : 'smoke', f.x, f.y - 2);
+        // (A PixelForge mob plays its own death, and poofs at its end: drawCorpse.)
         break;
       case 'blast':
         if (f.src === 'slam') this.fx('shock', f.x, f.y);

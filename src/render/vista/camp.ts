@@ -1,12 +1,16 @@
 /**
  * The camp: the campfire (animated pixel flames, the ring of stones, crossed logs and a bed of coals),
- * the tent with a lantern glowing inside, a log seat, and the squad drawn with the game's own knight
- * art dressed in the scene's light: warm firelight on the side facing the fire, lilac dusk on the
+ * the tent with a lantern glowing inside, a log seat, and the squad (PixelForge's knights, as in the
+ * dungeon) dressed in the scene's light: warm firelight on the side facing the fire, lilac dusk on the
  * other, and a coral rim where the sunset behind them catches their outline.
  */
 import type { MutationId } from '../../core/state';
 import { CLASS_HAS_SHIELD, KNIGHT_ANCHOR, KNIGHT_H, KNIGHT_W, knightFrame, knightGlow, knightLook, shieldArt, weaponArt, type View } from '../art/knights';
-import { blank, blit, flipX, scale3x, type PixelBuf } from '../pixel/buf';
+import { blank, blit, flipX, scale3x, scaleUp, type PixelBuf } from '../pixel/buf';
+import { pfReady } from '../pf/assets';
+import { knightStill } from '../pf/frames';
+import { paintStep } from '../pf/knightLook';
+import { knightDef } from '../../core/knights';
 import { fireLight, type Ground, type Layout } from './land';
 import { canvas, clamp, ctx2d, hex, mix, Pix, rng, type Canvas, type RGB } from './pix';
 
@@ -281,6 +285,8 @@ export interface KnightSprite {
 
 const MX = 9;
 const MT = 9;
+/** Scene pixels per PixelForge pixel at the camp (whole, never smoothed). */
+const PF_SCALE = 2;
 
 /** Draws `src` rotated by `ang` around its pivot, the pivot landing at (hx, hy) (nearest pixel, like a canvas). */
 function rotateInto(dst: PixelBuf, src: PixelBuf, pivX: number, pivY: number, hx: number, hy: number, ang: number): void {
@@ -313,6 +319,24 @@ function toCanvas(b: PixelBuf): Canvas {
   img.data.set(b.px);
   g.putImageData(img, 0, 0);
   return c;
+}
+
+/**
+ * The knight standing: PixelForge's idle facing `view` (west when `west`), cape and halo on, its soft
+ * ground shadow left out (the camp casts its own, away from the fire).
+ */
+function composePF(id: string, mutation: MutationId | null, view: View, west: boolean, frame: number, t: number): { buf: PixelBuf; ax: number; ay: number; glow: RGB | null } {
+  const dir = view === 'down' ? 's' : view === 'up' ? 'n' : west ? 'w' : 'e';
+  const { buf, pivot, paint } = knightStill(id, mutation, dir, frame, paintStep(knightDef(id).rarity, t));
+  const comp = blank(buf.w + MX * 2, buf.h + MT + 2);
+  for (let y = 0; y < buf.h; y++) {
+    for (let x = 0; x < buf.w; x++) {
+      const i = (y * buf.w + x) * 4;
+      if (buf.px[i + 3] !== 255) continue;
+      comp.px.set(buf.px.subarray(i, i + 4), ((y + MT) * comp.w + x + MX) * 4);
+    }
+  }
+  return { buf: comp, ax: MX + pivot[0], ay: MT + pivot[1], glow: paint.glow ? hex(paint.glow) : null };
 }
 
 /** The knight with its weapon (and shield) as the game holds them at rest, facing right. */
@@ -395,8 +419,18 @@ function lightUp(b: PixelBuf, fireDir: number, rimSide: number): [PixelBuf, Pixe
   return [dim, lit];
 }
 
-/** A knight ready for the scene: composed, mirrored to face left if asked, tripled with Scale3x, lit. */
+/**
+ * A knight ready for the scene: composed, facing left if asked, tripled, lit. PixelForge's knights
+ * face west in their own drawing and are tripled pixel for pixel; the old art was mirrored and
+ * smoothed with Scale3x.
+ */
 export function knightSprite(id: string, mutation: MutationId | null, view: View, frame: number, flip: boolean, t: number, fireDir: number, rimSide: number): KnightSprite {
+  if (pfReady()) {
+    const c = composePF(id, mutation, view, flip, frame, t);
+    const buf = scaleUp(c.buf, PF_SCALE);
+    const [dim, lit] = lightUp(buf, fireDir, rimSide);
+    return { dim: toCanvas(dim), lit: toCanvas(lit), w: buf.w, h: buf.h, ax: c.ax * PF_SCALE + Math.floor(PF_SCALE / 2), ay: c.ay * PF_SCALE + PF_SCALE - 1, glow: c.glow };
+  }
   const c = compose(id, mutation, view, frame, t);
   let buf = c.buf;
   let ax = c.ax;

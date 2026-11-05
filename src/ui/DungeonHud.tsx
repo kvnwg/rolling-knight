@@ -16,7 +16,7 @@ import { SkillRoll, skillSlotLabel, skillSlotState } from './SkillRoll';
 import { AltarReels } from './fx/AltarReels';
 import daggerUrl from '../assets/ui/dagger.png';
 import { uiSound } from './sound';
-import { knightUrl } from './sprites';
+import { knightFaceUrl } from './sprites';
 import { TopBar } from './TopBar';
 
 const touch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
@@ -112,7 +112,7 @@ export function DungeonHud({ game, controls, press, onCamp, onSettings, onLuck, 
               style={{ ['--rc' as string]: RARITY_COLOR[def.rarity] }}
               onClick={() => (uiSound('tap'), game.switchTo(slot))}
             >
-              <img className="px face" src={knightUrl(id, s.roster[id].mutation)} alt="" draggable={false} />
+              <img className="px face" src={knightFaceUrl(id, s.roster[id].mutation)} alt="" draggable={false} />
               <span className="nm outlined">
                 {!touch && <span className="key">{slot + 1} </span>}
                 {def.name}

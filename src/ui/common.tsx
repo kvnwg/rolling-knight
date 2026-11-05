@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { knightDef } from '../core/knights';
 import { RARITY_COLOR, rarityIndex, type Rarity } from '../core/rarity';
 import type { MutationId } from '../core/state';
-import { knightUrl } from './sprites';
+import { KNIGHT_PIC_H, KNIGHT_PIC_W, knightUrl } from './sprites';
 
 export const GRADIENTS = {
   gold: ['#fff7b0', '#ffc233', '#ff8a00'],
@@ -53,7 +53,7 @@ export function Bar({ value, kind = 'hp', style, children }: { value: number; ki
   );
 }
 
-/** A knight at s art pixels per sprite pixel (on var(--px)). The sprite image is 30 x 21. */
+/** A knight at s art pixels per sprite pixel (on var(--px)). The sprite image is KNIGHT_PIC_W x KNIGHT_PIC_H. */
 export function HeroArt({ id, mutation = null, s = 1, frame, silhouette, style }: { id: string; mutation?: MutationId | null; s?: number; frame?: number; silhouette?: string; style?: CSSProperties }) {
   return (
     <img
@@ -61,7 +61,7 @@ export function HeroArt({ id, mutation = null, s = 1, frame, silhouette, style }
       src={knightUrl(id, mutation, { frame, silhouette })}
       alt={knightDef(id).name}
       draggable={false}
-      style={{ width: `calc(${30 * s} * var(--px))`, height: `calc(${21 * s} * var(--px))`, flex: 'none', ...style }}
+      style={{ width: `calc(${KNIGHT_PIC_W * s} * var(--px))`, height: `calc(${KNIGHT_PIC_H * s} * var(--px))`, flex: 'none', ...style }}
     />
   );
 }

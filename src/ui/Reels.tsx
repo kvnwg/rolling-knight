@@ -10,7 +10,7 @@ import { CLASS_IDS, knightId } from '../core/knights';
 import { RARITIES, RARITY_COLOR, rarityIndex, type Rarity } from '../core/rarity';
 import type { Spin } from '../core/state';
 import type { Game } from '../game';
-import { knightUrl } from './sprites';
+import { KNIGHT_PIC_H, KNIGHT_PIC_W, knightUrl } from './sprites';
 
 const FILLER: Record<Rarity, number> = {
   common: 12, uncommon: 16, rare: 18, epic: 20, legendary: 18, mythic: 10, ancient: 8, exalted: 7, celestial: 6, astral: 6, divine: 4, eternal: 3, primordial: 2,
@@ -168,9 +168,9 @@ export function ReelsCanvas({ game, cell, reelsMax = 5, className }: { game: Gam
           }
           const im = img(knightUrl(cellData.id, showColor ? reel.mutation : null, { silhouette: showColor ? undefined : '#08060a' }));
           if (im.complete) {
-            const s = Math.max(1, Math.floor((ch - 2) / 21));
-            const iw = 30 * s;
-            const ih = 21 * s;
+            const s = Math.max(1, Math.floor((ch - 2) / KNIGHT_PIC_H));
+            const iw = KNIGHT_PIC_W * s;
+            const ih = KNIGHT_PIC_H * s;
             ctx.drawImage(im, Math.round(x0 + cw / 2 - iw / 2), Math.round(y + ch - ih), iw, ih);
           }
           if (!showColor && cw >= 40) {
