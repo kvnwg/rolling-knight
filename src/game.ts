@@ -11,7 +11,7 @@ import { runOffline, type OfflineReport } from './core/offline';
 import { perksOpen } from './core/perks';
 import { Rng } from './core/rng';
 import { rollTick } from './core/roller';
-import { fillSquad, goldMult, killGold, knightStats } from './core/roster';
+import { bestSquad, fillSquad, goldMult, killGold, knightStats } from './core/roster';
 import { clearSave, loadGame, saveGame } from './core/save';
 import type { GameState } from './core/state';
 import { biomeForFloor, isBossFloor, type Biome } from './world/biomes';
@@ -57,7 +57,14 @@ export class Game {
   }
 
   emit = (e: CoreEvent): void => {
-    if (e.type === 'land') this.version++;
+    if (e.type === 'land') {
+      this.version++;
+      // The tutorial's two big finds go straight into the squad.
+      if (e.scripted === 'first' || e.scripted === 'beginner') {
+        bestSquad(this.state);
+        this.syncSquad();
+      }
+    }
     for (const fn of this.listeners) fn(e);
   };
 

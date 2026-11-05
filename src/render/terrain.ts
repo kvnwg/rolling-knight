@@ -287,7 +287,7 @@ export function paintTerrain(m: FloorMap, biome: Biome): Terrain {
         if (biome.solid.kind === 'trees') {
           // Under the trees: dark forest floor, with a bushy rim where it meets the open ground.
           const n = vnoise(x, y, 10, seed + 50);
-          const rim = faceTile && ly >= TILE - wallFaceH;
+          const rim = faceTile && ly >= TILE - wallFaceH + Math.round((vnoise(x, ty * 16, 5, seed + 51) - 0.5) * 6);
           if (rim) {
             const k = ly >= TILE - 2 ? 0 : n > 0.5 ? 2 : 1;
             set(i, [under[0], biome.treeRamp[1], biome.treeRamp[2]][k] ?? under[1]);
@@ -308,8 +308,9 @@ export function paintTerrain(m: FloorMap, biome: Biome): Terrain {
             if (by === 0 || bx === 0) k = 0;
             else if (by === 1) k += 0.8;
             else if (bx === bw - 1) k -= 0.6;
+            if (k > 0) k += (TILE / 2 - fy) / TILE;
             if (fy <= 1) k = 4;
-            if (fy >= TILE - 2) k = Math.min(k, 1);
+            if (fy >= TILE - 2) k = Math.min(k, 0.6);
             // Grime and moss toward the bottom.
             if (fy > 10 && vnoise(x, y, 6, seed + 61) > 0.62) k = Math.min(k, 1);
             set(i, face[clampK(k, face.length)]);
@@ -382,8 +383,8 @@ export function paintTerrain(m: FloorMap, biome: Biome): Terrain {
       const sAbove = tile(tx, ty - 1) === SOLID ? ly : 99;
       const sLeft = tile(tx - 1, ty) === SOLID ? lx : 99;
       const sRight = tile(tx + 1, ty) === SOLID ? TILE - 1 - lx : 99;
-      const occ = Math.min(sAbove * 0.8, sLeft, sRight);
-      if (occ < 6) dark += (6 - occ) * (biome.solid.kind === 'trees' ? 0.07 : 0.09);
+      const occ = Math.min(sAbove * 0.8, sLeft, sRight) + (vnoise(x, y, 4, seed + 52) - 0.5) * 3;
+      if (occ < 6) dark += Math.round((6 - occ) * 1.5) / 1.5 * (biome.solid.kind === 'trees' ? 0.06 : 0.1);
       set(i, col, Math.min(0.7, dark));
     }
   }

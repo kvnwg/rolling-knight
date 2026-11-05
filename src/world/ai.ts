@@ -6,7 +6,7 @@
  * Mobs: chasers, archers, chargers (wind up, then dash), bombers, casters (circles on the ground),
  * tanks (ground slams), swarms, and bosses with patterns of their own.
  */
-import { CLASSES } from '../core/knights';
+import { CLASSES, SIGNATURES } from '../core/knights';
 import { dist, lineOfSight, moveUnit, norm, type Unit } from './entities';
 import { flowDist, flowStep, type Flow } from './flow';
 import { heroDodge, heroSpecial } from './skills';
@@ -70,7 +70,12 @@ export function heroAi(w: World, h: Unit, lead: Unit | undefined, dt: number): [
     const down = w.heroes.some((o) => o.downed);
     const boss = foes.some((m) => m.boss && dist(m.x, m.y, h.x, h.y) < 140);
     let go = false;
-    switch (cls.role) {
+    const rewinder = SIGNATURES[h.knightId!]?.id === 'rewind';
+    switch (rewinder ? 'rewind' : cls.role) {
+      case 'rewind':
+        // Rewind when the last few seconds went badly: someone fell, or the squad lost a lot.
+        go = down || hurt >= 2;
+        break;
       case 'tank':
         go = near(70) >= 3 || (boss && near(60) >= 1) || w.heroes.some((o) => o !== h && !o.downed && o.hp / o.maxHp < 0.4 && w.enemiesIn('hero', o.x, o.y, 30).length > 0);
         break;

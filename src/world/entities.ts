@@ -155,6 +155,8 @@ export interface Fx {
   color?: string;
   size?: number;
   dir?: number;
+  /** What made it, so the renderer can pick the right effect (a slime pops, a knight falls, a slam shakes the ground). */
+  src?: 'slime' | 'hero' | 'boss' | 'slam' | 'bomb' | 'meteor' | 'taunt';
 }
 
 export function dist(ax: number, ay: number, bx: number, by: number): number {

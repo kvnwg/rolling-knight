@@ -96,13 +96,13 @@ const NAMES: Record<Rarity, readonly string[]> = {
   rare: ['Dame Ironhold', 'Sir Kestrel', 'Lyra Swiftwind', 'Father Aldous', 'Morwen Starling', 'Sir Valen'],
   epic: ['Grimwald the Bastion', 'Seraphine Duskblade', 'Thorne Nightquill', 'Abbess Ylva', 'Zephyrine Hexweaver', 'Draven Stormspear'],
   legendary: ['Aurelion Goldwall', 'Lancelyn the Radiant', 'Sylvaris Dawnbow', 'Saint Benedra', 'Archmage Orlanth', 'Sir Gideon Sunlance'],
-  mythic: ['Brakkus Dragonhide', 'Kaida Bloodmoon', 'Ysolde Moonshadow', 'Oracle Celestine', 'Malakar Voidcaller', 'Valkyr Skyrender'],
+  mythic: ['Brakkus Dragonhide', 'Kaida Bloodmoon', 'Ysolde Moonshadow', 'Oracle Celestine', 'Chronomancer Aeon', 'Valkyr Skyrender'],
   ancient: ['The Stone Warden', 'Rhovan the Undying', 'Elder Fennwick', 'High Priestess Anwe', 'Thalgrim Elder Rune', 'Tarsus Bronzehelm'],
   exalted: ['Exarch Corin', 'Sir Aethelstan', 'Vael Starfletch', 'Hierophant Lumen', 'Magister Ozymand', 'Halberdier Seraph'],
   celestial: ['Atlas Skyward', 'Orion Stellarblade', 'Vega Comet-Eye', 'Lumina of the Spheres', 'Nebulon Starwright', 'Polaris Spearstar'],
   astral: ['Bulwark of Aeons', 'Riven Astralis', 'Quasar Huntress', 'Aurora Mender', 'Cosmara Riftmind', 'Zenith Lancer'],
   divine: ['Godshield Theron', 'Excalibrant', 'Artemisia', 'Saint Solenne', 'Merlinus Prime', 'Michael of the Spear'],
-  eternal: ['The Unbroken', 'Eternblade Kairo', 'Everbow Nyx', 'Mother of Mercy', 'Chronomancer Aeon', 'Infinity Pike'],
+  eternal: ['The Unbroken', 'Eternblade Kairo', 'Everbow Nyx', 'Mother of Mercy', 'Malakar Voidcaller', 'Infinity Pike'],
   primordial: ['Titan of First Dawn', 'The Origin Blade', 'Genesis Archer', 'The First Light', 'Primarch Arcanum', 'Worldspear Ymir'],
 };
 
@@ -126,6 +126,32 @@ export const KNIGHTS: KnightDef[] = RARITIES.flatMap((rarity, ri) =>
 );
 
 export const KNIGHTS_BY_ID = new Map(KNIGHTS.map((k) => [k.id, k]));
+
+/**
+ * Signature specials: a few rare knights replace their class's special with one of their own.
+ * Chronomancer Aeon (Mythic Arcanist) rewinds time.
+ */
+export interface Signature extends SkillDef {
+  id: 'rewind';
+  cd: number;
+}
+
+export const SIGNATURES: Readonly<Record<string, Signature>> = {
+  'mythic-arcanist': {
+    id: 'rewind',
+    name: 'Rewind',
+    cd: 20,
+    text: 'Turns time back 4 seconds for the squad: everyone returns to where they stood, with the HP they had, fallen knights included. Enemy shots and spells in the air vanish; every bit of damage the squad dealt stays.',
+  },
+};
+
+/** The special a knight actually has: its signature, or its class's. */
+export function specialOf(id: string): SkillDef & { cd: number; signature?: Signature['id'] } {
+  const sig = SIGNATURES[id];
+  if (sig) return { name: sig.name, text: sig.text, cd: sig.cd, signature: sig.id };
+  const cls = CLASSES[knightDef(id).cls];
+  return { ...cls.special, cd: cls.specialCd };
+}
 
 export function knightId(rarity: Rarity, cls: ClassId): string {
   return `${rarity}-${cls}`;

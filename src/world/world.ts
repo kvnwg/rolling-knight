@@ -37,6 +37,11 @@ export type WorldEvent =
   | { type: 'switch'; slot: number }
   | { type: 'bossPhase' };
 
+interface Snapshot {
+  heroes: Map<number, { x: number; y: number; hp: number; downed: boolean; view: Unit['view']; dir: 1 | -1 }>;
+  mobs: Map<number, { x: number; y: number }>;
+}
+
 export interface Input {
   mx: number;
   my: number;
@@ -104,6 +109,11 @@ export class World {
   bannerT = 0;
   tagTeamT = 0;
   scale: { hp: number; atk: number };
+  /** The last 5 seconds, a snapshot every 0.1 s (for Rewind). */
+  private history: Snapshot[] = [];
+  private historyT = 0;
+  /** A rewind playing: the snapshots from now back to the target, and how far through it is. */
+  rewind: { frames: Snapshot[]; t: number; dur: number } | null = null;
 
   constructor(o: WorldOptions) {
     this.map = o.map;
@@ -386,7 +396,7 @@ export class World {
     m.dead = true;
     m.hp = 0;
     const t = m.type!;
-    this.fx.push({ kind: 'death', x: m.x, y: m.y - 4, color: t.ramp[2], size: m.boss ? 3 : m.elite ? 2 : 1 });
+    this.fx.push({ kind: 'death', x: m.x, y: m.y - 4, color: t.ramp[2], size: m.boss ? 3 : m.elite ? 2 : 1, src: m.boss ? 'boss' : t.plan === 'slime' ? 'slime' : undefined });
     const gold = Math.max(1, Math.round(this.goldPerKill * (m.boss ? 25 : m.elite ? 4 : 1)));
     this.events.push({ type: 'kill', gold, elite: !!m.elite, boss: !!m.boss, x: m.x, y: m.y });
     // Coins burst out and fly to the squad.
@@ -417,7 +427,7 @@ export class World {
     h.downed = true;
     h.rolling = undefined;
     h.channel = undefined;
-    this.fx.push({ kind: 'death', x: h.x, y: h.y - 6, color: '#c8c8d8', size: 1 });
+    this.fx.push({ kind: 'death', x: h.x, y: h.y - 6, color: '#c8c8d8', size: 1, src: 'hero' });
     this.events.push({ type: 'heroDown', slot: h.slot! });
     if (h.slot === this.controlled) {
       const next = this.heroes.find((x) => !x.downed);
@@ -453,7 +463,84 @@ export class World {
     this.goalFlow = goals.length ? flowFrom(this.map, goals) : null;
   }
 
+  private snapshot(): Snapshot {
+    return {
+      heroes: new Map(this.heroes.map((h) => [h.uid, { x: h.x, y: h.y, hp: h.hp, downed: !!h.downed, view: h.view, dir: h.dir }])),
+      mobs: new Map(this.mobs.filter((m) => !m.dead).map((m) => [m.uid, { x: m.x, y: m.y }])),
+    };
+  }
+
+  /** Rewind (Chronomancer Aeon): time runs backwards to 4 seconds ago, for the squad. */
+  startRewind(): boolean {
+    if (this.rewind || this.history.length < 5) return false;
+    const back = Math.min(this.history.length, 40);
+    this.rewind = { frames: [this.snapshot(), ...this.history.slice(-back).reverse()], t: 0, dur: 0.8 };
+    this.text(this.leader()?.x ?? 0, (this.leader()?.y ?? 0) - 30, 'REWIND!', '#9ad8ff', true);
+    return true;
+  }
+
+  private updateRewind(dt: number): void {
+    const r = this.rewind!;
+    r.t += dt;
+    const k = Math.min(r.frames.length - 1, Math.floor((r.t / r.dur) * r.frames.length));
+    const f = r.frames[k];
+    // Play the recording backwards: everyone slides back along the way they came.
+    for (const h of this.heroes) {
+      const p = f.heroes.get(h.uid);
+      if (!p) continue;
+      h.x = p.x;
+      h.y = p.y;
+      h.view = p.view;
+      h.dir = p.dir;
+      h.moving = true;
+      h.animT -= dt * 2;
+    }
+    for (const m of this.mobs) {
+      const p = f.mobs.get(m.uid);
+      if (!p || m.dead) continue;
+      m.x = p.x;
+      m.y = p.y;
+    }
+    if (r.t < r.dur) return;
+    // Landed in the past: the squad's HP and fallen knights come back; damage dealt stays dealt.
+    const past = r.frames[r.frames.length - 1];
+    for (const h of this.heroes) {
+      const p = past.heroes.get(h.uid);
+      if (!p) continue;
+      if (!p.downed && p.hp > 0) {
+        h.downed = false;
+        h.hp = Math.max(h.downed ? 0 : h.hp, Math.min(h.maxHp, p.hp));
+      }
+      h.rolling = undefined;
+      h.channel = undefined;
+      h.invuln = Math.max(h.invuln, 0.6);
+      this.fx.push({ kind: 'revive', x: h.x, y: h.y });
+    }
+    this.shots = this.shots.filter((s) => s.team === 'hero');
+    this.areas = this.areas.filter((a) => a.team === 'hero');
+    for (const m of this.mobs) {
+      m.windT = 0;
+      m.chargeT = 0;
+      m.move = undefined;
+    }
+    this.history = [];
+    this.rewind = null;
+    this.wiped = false;
+    this.refreshFlows();
+  }
+
   update(dt: number): void {
+    if (this.rewind) {
+      this.time += dt;
+      this.updateRewind(dt);
+      return;
+    }
+    this.historyT += dt;
+    if (this.historyT >= 0.1) {
+      this.historyT = 0;
+      this.history.push(this.snapshot());
+      if (this.history.length > 50) this.history.shift();
+    }
     if (this.hitStop > 0) {
       this.hitStop -= dt;
       dt *= 0.15;
@@ -644,7 +731,7 @@ function updateAreas(w: World, dt: number): void {
           if (e.team === 'hero' && (e.invuln > 0 || e.rolling)) continue;
           w.damage(e, a.dmg, from, { knock: 10, crit: a.kind === 'meteor' });
         }
-        w.fx.push({ kind: 'blast', x: a.x, y: a.y, color: a.color, size: a.r / 12 });
+        w.fx.push({ kind: 'blast', x: a.x, y: a.y, color: a.color, size: a.r / 12, src: a.kind === 'slam' ? 'slam' : a.kind === 'bomb' ? 'bomb' : a.kind === 'meteor' ? 'meteor' : undefined });
         w.shakeIt(a.kind === 'meteor' ? 5 : 3, 0.3);
         if (a.kind === 'meteor') {
           // The meteor leaves fire behind.

@@ -15,6 +15,8 @@ import { mobFrame, poseFrames, type MobPose } from './art/mobs';
 import { flameArt, propArt, treeArt, type PropArt } from './art/props';
 import { Lighting, type Light } from './lighting';
 import { flipX } from './pixel/buf';
+import { frameBuf } from './pixel/indexed';
+import { FX_SHEETS, type FxName } from './packs/fx';
 import { renderText, type TextStyle } from './pixel/font';
 import { paintTerrain, type Terrain } from './terrain';
 
@@ -34,6 +36,21 @@ interface Particle {
   kind: 'spark' | 'dust' | 'ember' | 'snow' | 'firefly' | 'leaf' | 'mote' | 'coin' | 'ring' | 'petal' | 'ash' | 'spore' | 'rain';
   glow?: boolean;
 }
+
+interface FxSprite {
+  name: FxName;
+  x: number;
+  y: number;
+  t: number;
+  flip: boolean;
+}
+
+/** Effects that glow (drawn over the light, and lighting what's around them). */
+const EMISSIVE: ReadonlySet<FxName> = new Set(['hit', 'crit', 'slash', 'boom', 'sparkle', 'levelUp', 'lightning', 'heal', 'electric', 'explosion']);
+const FX_LIGHT: Partial<Record<FxName, [string, number]>> = {
+  crit: ['#ffd84a', 26], boom: ['#ff8a3a', 40], explosion: ['#ff8a3a', 34], sparkle: ['#a8d8ff', 24], levelUp: ['#ffd84a', 50],
+  lightning: ['#d88aff', 36], heal: ['#fff0a0', 44], electric: ['#b08aff', 60], slash: ['#ffffff', 18],
+};
 
 /** Target art pixels on the screen's short side. */
 const SHORT_SIDE = 216;
@@ -55,6 +72,7 @@ export class Renderer {
   private cache = new Map<string, HTMLCanvasElement>();
   private mobMeta = new Map<string, { ax: number; ay: number }>();
   private particles: Particle[] = [];
+  private fxs: FxSprite[] = [];
   private time = 0;
   private weatherT = 0;
   private flashT = 0;
@@ -251,9 +269,15 @@ export class Renderer {
     this.spawnFx(w);
     this.weather(biome, dt, cx, cy);
     this.updateParticles(ctx, dt, sx, sy);
+    this.advanceFx(dt);
+    this.drawFx(ctx, sx, sy, false);
 
     // --- light
     const lights = this.collectLights(w, biome, cx, cy, sx, sy);
+    for (const f of this.fxs) {
+      const l = FX_LIGHT[f.name];
+      if (l) out_push(lights, { x: sx(f.x), y: sy(f.y), r: l[1], color: l[0], intensity: 0.9, bloom: true });
+    }
     if (w.cleared && !game.state.settings.reduceMotion) this.flashT = Math.max(0, this.flashT - dt);
     this.light.apply(ctx, biome.light.ambient, lights, {
       gradeTop: biome.light.gradeTop,
@@ -262,6 +286,8 @@ export class Renderer {
       flash: this.flashT,
     });
     if (biome.light.fog) this.drawFog(ctx, biome.light.fog, cx, cy);
+    this.drawFx(ctx, sx, sy, true);
+    if (w.rewind) this.drawRewind(ctx, w.rewind.t / w.rewind.dur);
 
     // --- unlit overlay: health bars, numbers, pointers
     this.drawOverlay(ctx, w, sx, sy);
@@ -270,6 +296,28 @@ export class Renderer {
       ctx.fillRect(0, 0, this.W, this.H);
     }
     this.present();
+  }
+
+  /** Time running backwards: a cold tint, rolling scanlines, a jittering band and a big rewind sign. */
+  private drawRewind(ctx: Ctx, k: number): void {
+    ctx.save();
+    ctx.globalCompositeOperation = 'color';
+    ctx.globalAlpha = 0.65;
+    ctx.fillStyle = '#4a7aff';
+    ctx.fillRect(0, 0, this.W, this.H);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = '#000000';
+    const roll = Math.floor(this.time * 40) % 3;
+    for (let y = roll; y < this.H; y += 3) ctx.fillRect(0, y, this.W, 1);
+    // A band of the picture slipping sideways, like a tape running back.
+    const by = Math.floor((1 - k) * this.H);
+    ctx.globalAlpha = 0.9;
+    ctx.drawImage(this.scene, 0, by, this.W, 6, Math.round(Math.sin(this.time * 60) * 3), by, this.W, 6);
+    ctx.globalAlpha = 1;
+    const sign = this.textCanvas('<< REWIND', { face: 'huge', fill: ['#e8f4ff', '#9ad8ff'], ink: '#0a1430' });
+    if (Math.floor(this.time * 6) % 2 === 0) ctx.drawImage(sign, Math.round(this.W / 2 - sign.width / 2), 40);
+    ctx.restore();
   }
 
   private present(): void {
@@ -699,7 +747,73 @@ export class Renderer {
     w.fx.length = 0;
   }
 
+  private fx(name: FxName, x: number, y: number, flip = false): void {
+    this.fxs.push({ name, x, y, t: 0, flip });
+    if (this.fxs.length > 60) this.fxs.shift();
+  }
+
+  private advanceFx(dt: number): void {
+    for (const f of this.fxs) f.t += dt;
+    this.fxs = this.fxs.filter((f) => {
+      const s = FX_SHEETS[f.name];
+      return f.t < s.anims.play.frames.length / s.anims.play.fps;
+    });
+  }
+
+  private drawFx(ctx: Ctx, sx: (x: number) => number, sy: (y: number) => number, emissive: boolean): void {
+    for (const f of this.fxs) {
+      if (EMISSIVE.has(f.name) !== emissive) continue;
+      const sheet = FX_SHEETS[f.name];
+      const a = sheet.anims.play;
+      const i = Math.min(a.frames.length - 1, Math.floor(f.t * a.fps));
+      const key = `fx|${f.name}|${i}|${f.flip ? 1 : 0}`;
+      const c = this.cached(key, () => {
+        const b = frameBuf(sheet, a.frames[i]);
+        return toCanvas(f.flip ? flipX(b) : b);
+      });
+      const ax = f.flip ? sheet.w - 1 - sheet.anchor.x : sheet.anchor.x;
+      ctx.drawImage(c, sx(f.x) - ax, sy(f.y) - sheet.anchor.y);
+    }
+  }
+
   private burst(f: Fx): void {
+    // The pack effects (Will Tice / unTied Games), on top of the particles.
+    switch (f.kind) {
+      case 'hit':
+        this.fx('hit', f.x, f.y, Math.random() < 0.5);
+        break;
+      case 'crit':
+        this.fx(Math.random() < 0.5 ? 'crit' : 'slash', f.x, f.y, Math.random() < 0.5);
+        break;
+      case 'death':
+        if (f.src === 'hero') this.fx('death', f.x, f.y - 6);
+        else if (f.src === 'boss') {
+          this.fx('levelUp', f.x, f.y - 12);
+          this.fx('electric', f.x, f.y - 6);
+        } else this.fx(f.src === 'slime' ? 'splat' : 'smoke', f.x, f.y - 2);
+        break;
+      case 'blast':
+        if (f.src === 'slam') this.fx('shock', f.x, f.y);
+        else if (f.src === 'bomb') this.fx('explosion', f.x, f.y - 6);
+        else if (f.src === 'meteor') {
+          this.fx('boom', f.x, f.y - 8);
+          this.fx('electric', f.x, f.y - 6);
+        } else this.fx((f.size ?? 1) >= 1.5 ? 'boom' : 'explosion', f.x, f.y - 6);
+        break;
+      case 'shock':
+        this.fx('shock', f.x, f.y);
+        this.fx('lightning', f.x, f.y - 8);
+        break;
+      case 'levelup':
+        this.fx('heal', f.x, f.y - 10);
+        break;
+      case 'revive':
+      case 'portal':
+        this.fx('sparkle', f.x, f.y - 8);
+        break;
+      default:
+        break;
+    }
     const add = (n: number, make: (i: number) => Particle) => {
       for (let i = 0; i < n; i++) this.particles.push(make(i));
     };
@@ -891,6 +1005,10 @@ export class Renderer {
       ctx.fillRect(ex + Math.round(Math.cos(ang) * 3), ey + Math.round(Math.sin(ang) * 3), 1, 1);
     }
   }
+}
+
+function out_push(list: Light[], l: Light): void {
+  list.push(l);
 }
 
 export { BIOMES, RARITY_COLOR };

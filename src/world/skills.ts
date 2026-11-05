@@ -2,6 +2,7 @@
  * The knights' kits. Every class has the same three skills on every knight: an auto attack that
  * fires by itself whenever a foe is in range, a dodge roll, and a special.
  */
+import { SIGNATURES } from '../core/knights';
 import { dist, moveUnit, norm, type Unit } from './entities';
 import { uid, type World } from './world';
 
@@ -210,6 +211,15 @@ export function heroDodge(w: World, h: Unit, mx: number, my: number, fromHive = 
 export function heroSpecial(w: World, h: Unit, free: boolean): boolean {
   if (h.downed || h.stunT > 0) return false;
   if (!free && h.specialT! > 0) return false;
+  if (SIGNATURES[h.knightId!]?.id === 'rewind') {
+    if (!w.startRewind()) {
+      if (!free) h.specialT = 0.5;
+      return false;
+    }
+    if (!free) h.specialT = h.specialCd!;
+    h.swingT = h.swingDur = 0.35;
+    return true;
+  }
   if (!free) h.specialT = h.specialCd!;
   h.swingT = h.swingDur = 0.35;
   switch (h.cls) {
@@ -224,7 +234,7 @@ export function heroSpecial(w: World, h: Unit, free: boolean): boolean {
         if (!e.awake) w.wake(e);
         w.damage(e, h.atk * 1.5, h, { knock: 18 });
       }
-      w.fx.push({ kind: 'shock', x: h.x, y: h.y, color: '#ffd84a', size: 4 });
+      w.fx.push({ kind: 'shock', x: h.x, y: h.y, color: '#ffd84a', size: 4, src: 'taunt' });
       w.shakeIt(3, 0.25);
       w.text(h.x, h.y - 30, 'TAUNT!', '#ffd84a', true);
       break;

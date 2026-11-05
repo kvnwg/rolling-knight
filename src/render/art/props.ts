@@ -205,9 +205,13 @@ export function treeArt(kind: TreeKind, biome: Biome, seed: number): PropArt {
 
 // ------------------------------------------------------------------ props
 
+/** Five stone tones from the biome's wall colors (tree biomes have only three: lighten them out). */
 function stoneRamp(biome: Biome): string[] {
   const f = biome.solid.face;
-  return [f[0], f[1], f[2], f[3], f[4] ?? f[3]];
+  if (f.length >= 5) return [f[0], f[1], f[2], f[3], f[4]];
+  const mid = f[Math.min(f.length - 1, 2)];
+  const base = mixHex(mid, '#8a8a90', 0.45);
+  return [shade(base, -0.55), shade(base, -0.3), base, shade(base, 0.22), shade(base, 0.42)];
 }
 
 export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {

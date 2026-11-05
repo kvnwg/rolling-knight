@@ -145,8 +145,8 @@ export function generateFloor(opts: GenOptions): FloorMap {
       rx = cave ? 4 : 5;
       ry = cave ? 3 : 4;
     } else {
-      rx = cave ? rng.int(5, 8) : rng.int(4, 7);
-      ry = cave ? rng.int(4, 6) : rng.int(4, 5);
+      rx = cave ? rng.int(6, 9) : rng.int(4, 7);
+      ry = cave ? rng.int(5, 7) : rng.int(4, 5);
     }
     const lo = margin + rx + 1;
     const hi = W - margin - rx - 2;
@@ -239,7 +239,7 @@ export function generateFloor(opts: GenOptions): FloorMap {
         else yy += dy;
         if (rng.chance(0.08)) x += rng.pick([-1, 1]);
         x = Math.max(3, Math.min(W - 4, x));
-        for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) set(x + ox, yy + oy, FLOOR);
+        for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 2; ox++) set(x + ox, yy + oy, FLOOR);
         markPath(x, yy);
         if (rng.chance(0.5)) markPath(x + rng.pick([-1, 1]), yy);
       }
@@ -344,7 +344,7 @@ export function generateFloor(opts: GenOptions): FloorMap {
   const floorTiles: number[] = [];
   for (let i = 0; i < m.tiles.length; i++) if (m.tiles[i] === FLOOR) floorTiles.push(i);
   const solidNextToFloor = (x: number, yy: number) => {
-    for (let oy = -2; oy <= 2; oy++) for (let ox = -2; ox <= 2; ox++) if (tileAt(m, x + ox, yy + oy) === FLOOR) return true;
+    for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) if (tileAt(m, x + ox, yy + oy) === FLOOR) return true;
     return false;
   };
   // The forest wall: trees on solid ground near the floor (denser at the edge).
@@ -354,13 +354,16 @@ export function generateFloor(opts: GenOptions): FloorMap {
       for (let x = 0; x < W; x++) {
         if (m.tiles[yy * W + x] !== SOLID) continue;
         const edge = solidNextToFloor(x, yy);
-        if (!edge && !propRng.chance(0.18)) continue;
-        if (!edge && (x + yy) % 2 === 1) continue;
+        // Deeper in the woods, a tree on every other tile (the dark floor shows between them).
+        if (!edge && ((x + yy) % 2 === 1 || !propRng.chance(0.55))) continue;
+        // Along a room's south side the trees stand lower, so their crowns don't hide the floor.
+        const southWall = tileAt(m, x, yy - 1) === FLOOR;
+        if (edge && !southWall && propRng.chance(0.25)) continue;
         m.props.push({
           kind: 'tree',
           tree: propRng.pick(kinds),
           x: x * TILE + 8 + propRng.int(-4, 4),
-          y: yy * TILE + 14 + propRng.int(-3, 2),
+          y: yy * TILE + (southWall ? 16 : 12) + propRng.int(-2, 2),
           solid: true,
           seed: propRng.int(0, 1 << 30),
           edge: true,
@@ -393,7 +396,7 @@ export function generateFloor(opts: GenOptions): FloorMap {
       const yy = r.cy + propRng.int(-r.ry, r.ry);
       const i = yy * W + x;
       if (tileAt(m, x, yy) !== FLOOR || occupied.has(i) || nearCenter(x, yy)) continue;
-      const useTree = biome.trees.length > 0 && propRng.chance(0.28);
+      const useTree = biome.trees.length > 0 && propRng.chance(0.14);
       const kind: PropKind | 'tree' = useTree ? 'tree' : propRng.weighted(weights);
       const solid = kind === 'tree' || blocking(kind as PropKind);
       // Solid props stay off the paths and never cut the floor in two.
