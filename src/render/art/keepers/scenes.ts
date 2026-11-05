@@ -144,7 +144,7 @@ const SCENES: Record<StationId, Painter> = {
     lantern(L, cx - 50, 0, Math.max(14, base - 58), { light: 0.7 });
     lantern(L, cx + 56, 0, Math.max(12, base - 70), { light: 0.45, r: 50 });
     keyLight(L, f);
-    const bust = paintBust(L, cx, base, bustFor('upgrades', { tool: 'wrench', mouth: 'grin' }));
+    const bust = paintBust(L, cx, base, bustFor('upgrades', { tool: 'wrench', mouth: 'grin', brows: 'raised' }));
     counter(L, 0, w, base, h, { seed: 7, ramp: PLANK });
     bust.front(L);
     // On the bench: a vise, gears and screws, a little clockwork reel, an oil can.
@@ -389,8 +389,9 @@ const SCENES: Record<StationId, Painter> = {
       drape(L, cx - sx - 44, cx - sx, 0, base, PLUM, { seed: sx, gather: 1 });
       drape(L, cx + sx, cx + sx + 44, 0, base, PLUM, { seed: sx + 3, gather: 1 });
     }
-    // The great reel of the Gilded Reel, glowing behind her: a gilded ring of bulbs, spokes, a star.
-    const ry = Math.max(22, base - 52);
+    // The great reel of the Gilded Reel, glowing behind her: a gilded ring of bulbs, spokes, a star,
+    // round her head like a halo.
+    const ry = Math.max(22, base - 36);
     const R = 24;
     for (let y = ry - R - 3; y <= ry + R + 3; y++) {
       for (let x = cx - R - 3; x <= cx + R + 3; x++) {
@@ -530,7 +531,7 @@ const SCENES: Record<StationId, Painter> = {
       }
     }
     keyLight(L, f, '#ffd29a', 0.85);
-    const bust = paintBust(L, cx, base, bustFor('gate', { tool: 'spear', mouth: 'flat' }));
+    const bust = paintBust(L, cx, base, bustFor('gate', { tool: 'spear', mouth: 'flat', brows: 'stern' }));
     // A stone parapet in front of him.
     wallStone(L, 0, base, w, h, 23, STONE);
     for (let x = 0; x < w; x++) {
