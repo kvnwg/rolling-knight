@@ -153,7 +153,7 @@ export function ReelsCanvas({ game, cell, reelsMax = 5, className }: { game: Gam
             ctx.fillStyle = '#1e3a1e';
             ctx.fillRect(x0 + 2, y + 2, cw - 4, ch - 4);
             ctx.fillStyle = isStop ? '#8af07a' : '#4a8a3a';
-            ctx.font = `bold ${Math.round(ch * 0.42)}px "Pixelify Sans", monospace`;
+            ctx.font = `bold ${Math.round(ch * 0.42)}px "RK Digits", "Pixelify Sans", monospace`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(`×${cellData.token}`, x0 + cw / 2, y + ch / 2);

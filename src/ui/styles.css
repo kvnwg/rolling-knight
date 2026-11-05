@@ -31,7 +31,7 @@
   --good: #8af07a;
   --bad: #ff7a6b;
   --sky: #8ad8ff;
-  --font: 'Pixelify Sans', 'Courier New', monospace;
+  --font: 'RK Digits', 'Pixelify Sans', 'Courier New', monospace;
   --pixel-edge: 0 calc(-1 * var(--px)) 0 0 var(--ink), 0 var(--px) 0 0 var(--ink), calc(-1 * var(--px)) 0 0 0 var(--ink), var(--px) 0 0 0 var(--ink);
   --pixel-text: calc(0.6 * var(--px)) 0 0 var(--ink), calc(-0.6 * var(--px)) 0 0 var(--ink), 0 calc(0.6 * var(--px)) 0 var(--ink),
     0 calc(-0.6 * var(--px)) 0 var(--ink), calc(0.6 * var(--px)) calc(0.6 * var(--px)) 0 var(--ink), calc(-0.6 * var(--px)) calc(0.6 * var(--px)) 0 var(--ink),

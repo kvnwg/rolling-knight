@@ -1,0 +1,18 @@
+/* The UI's digits: Pixelify Sans's own, with a 2 and a 5 that read as numbers (tools/fonts/digits.py).
+   Only the digits come from this face; everything else falls through to Pixelify Sans. */
+@font-face {
+  font-family: 'RK Digits';
+  src: url('../assets/fonts/rk-digits-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+  unicode-range: U+0030-0039;
+}
+@font-face {
+  font-family: 'RK Digits';
+  src: url('../assets/fonts/rk-digits-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: block;
+  unicode-range: U+0030-0039;
+}
