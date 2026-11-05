@@ -255,7 +255,7 @@ export function ShrineShop({ game, station, onClose }: { game: Game; station: Hu
 
 // ------------------------------------------------------------------ the notice board
 
-function questIcon(q: Quest): string {
+export function questIcon(q: Quest): string {
   switch (q.kind) {
     case 'slay':
       return 'sword';
@@ -271,7 +271,7 @@ function questIcon(q: Quest): string {
 }
 
 /** What a job is after, in a word or two: "Slimes", "Elites", "Floor 9". */
-function goalName(q: Quest): string {
+export function goalName(q: Quest): string {
   switch (q.kind) {
     case 'slay':
       return q.mobName ? plural(mobNoun(q.mobName)) : 'Monsters';

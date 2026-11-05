@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { knightDef } from '../core/knights';
 import { CHALLENGE } from '../core/power';
-import { activeQuests, questGoal } from '../core/quests';
+import { activeQuests } from '../core/quests';
 import type { Npc } from '../world/npcs';
 import { RARITY_COLOR } from '../core/rarity';
 import { drySpell } from '../core/roller';
@@ -20,6 +20,8 @@ import daggerUrl from '../assets/ui/dagger.png';
 import { uiSound } from './sound';
 import { knightFaceUrl } from './sprites';
 import { CLASS_ICON } from './keeper/KnightShops';
+import { Glyph } from './keeper/KeeperScreen';
+import { goalName, questIcon } from './keeper/Shops';
 import { TopBar } from './TopBar';
 import { keyWell, type KeySize } from './skin';
 
@@ -216,6 +218,7 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
       </div>
 
       {/* On a phone the squad sits up under the floor's plate, leaving the bottom left free for the thumb that steers. */}
+      <div className={`hud-left ${touch ? 'top' : ''}`}>
       <div className={`squad ${touch ? 'top' : ''}`}>
         {s.squad.map((id, slot) => {
           if (!id || !s.roster[id]) return null;
@@ -250,6 +253,22 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
             </button>
           );
         })}
+      </div>
+
+        {jobs.length > 0 && (
+          <div className="quests">
+            {jobs.map((q) => {
+              const p = Math.min(q.progress, q.target);
+              return (
+                <div key={q.id} className={`quest ${q.done ? 'done' : ''}`} title={q.title}>
+                  <Glyph icon={q.done ? 'check' : questIcon(q)} size="xs" />
+                  <span className="what">{goalName(q)}</span>
+                  <span className="n">{q.done ? `to ${(q.giverName ?? 'the giver').split(' ')[0]}` : `${p}/${q.target}`}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className={`actions ${touch ? 'touch' : ''}`}>
@@ -289,17 +308,6 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
           {dodge > 0 && me && <i className="cool" style={{ ['--cd' as string]: `${Math.ceil((dodge / me.dodgeCd!) * 8) * 12.5}%` }} />}
         </Key>
       </div>
-
-      {jobs.length > 0 && (
-        <div className="quests">
-          {jobs.map((q) => (
-            <div key={q.id} className={`quest glass outlined ${q.done ? 'done' : ''}`}>
-              <b>{q.done ? `Back to ${q.giverName ?? 'the giver'}` : q.title}</b>
-              <span>{questGoal(q)}</span>
-            </div>
-          ))}
-        </div>
-      )}
 
       {npc && (
         <div className="talk-prompt dungeon">

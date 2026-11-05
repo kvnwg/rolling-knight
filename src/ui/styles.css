@@ -1527,26 +1527,70 @@ select.select {
   padding: calc(0.5 * var(--px)) calc(2 * var(--px));
 }
 
+/* The left column: on a desktop the squad sits at the bottom left and the jobs at the top left (the
+   column is see-through to layout); on a phone the squad's cards and the jobs under them are one
+   column, so nothing ever lands on top of anything else. */
+.hud-left {
+  display: contents;
+}
+.hud-left.top {
+  position: absolute;
+  left: calc(3 * var(--px) + env(safe-area-inset-left, 0px));
+  top: calc(36 * var(--px) + env(safe-area-inset-top, 0px));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: calc(2.5 * var(--px));
+  pointer-events: none;
+}
+.hud-left.top > * {
+  pointer-events: auto;
+}
+.hud-left.top .squad,
+.hud-left.top .quests {
+  position: static;
+}
+/* The jobs: a slip of paper each, one line: what (or a check when it's done), how far, or who to go back to. */
 .quests {
   position: absolute;
   left: calc(3 * var(--px) + env(safe-area-inset-left, 0px));
   top: calc(30 * var(--px) + env(safe-area-inset-top, 0px));
   display: flex;
   flex-direction: column;
-  gap: calc(1.5 * var(--px));
-  max-width: calc(80 * var(--px));
+  gap: calc(1 * var(--px));
+  width: calc(56 * var(--px));
   pointer-events: none !important;
 }
 .quest {
-  padding: calc(1.5 * var(--px)) calc(2.5 * var(--px));
-  font-size: calc(3.8 * var(--px));
-  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: calc(1.5 * var(--px));
+  min-width: 0;
+  padding: calc(0.5 * var(--px)) calc(2 * var(--px)) calc(0.5 * var(--px)) calc(1.5 * var(--px));
+  font-size: calc(3.6 * var(--px));
+  font-weight: 700;
+  line-height: 1.3;
+  color: #3b2716;
+  background: #f0dfb8;
+  box-shadow: 0 0 0 var(--px) #4a2f1b, inset var(--px) var(--px) 0 0 #fff4d8, 0 var(--px) 0 var(--px) rgba(30, 16, 6, 0.35);
 }
-.quest b {
-  color: var(--text);
+.quest .what {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.quest.done b {
-  color: var(--good);
+.quest .n {
+  flex: none;
+  color: #7a5a3a;
+  font-variant-numeric: tabular-nums;
+}
+.quest.done {
+  background: #e4f0c8;
+}
+.quest.done .n {
+  color: #2c7a22;
 }
 
 .stick {
@@ -2930,13 +2974,29 @@ body,
   bottom: auto;
   top: 70%;
 }
-/* On tall screens the boss's name plate needs the width: the little altar steps down beneath it. */
+/* On tall screens the boss's name plate gets its own band across the screen under the top bar, and
+   everything below the top bar (the squad and jobs on the left, the little altar on the right) steps
+   down under it. The talk button sits above the action keys. */
 @media (max-aspect-ratio: 1/1) {
-  .dhud.has-boss .mini-roller {
-    top: calc(64 * var(--px) + env(safe-area-inset-top, 0px));
-  }
   .dhud.has-boss .bossbar {
-    width: calc(100vw - 30 * var(--px));
+    top: calc(35 * var(--px) + env(safe-area-inset-top, 0px));
+    width: calc(100vw - 16 * var(--px));
+  }
+  .dhud.has-boss .mini-roller {
+    top: calc(62 * var(--px) + env(safe-area-inset-top, 0px));
+  }
+  .dhud.has-boss .hud-left.top {
+    top: calc(62 * var(--px) + env(safe-area-inset-top, 0px));
+  }
+  .talk-prompt.dungeon {
+    top: auto;
+    bottom: calc(88 * var(--px) + env(safe-area-inset-bottom, 0px));
+  }
+}
+/* Short phones in a boss fight: no room for the jobs under the squad (they come back after). */
+@media (max-aspect-ratio: 1/1) and (max-height: 720px) {
+  .dhud.has-boss .hud-left.top .quests {
+    display: none;
   }
 }
 @media (max-aspect-ratio: 1/1) {
