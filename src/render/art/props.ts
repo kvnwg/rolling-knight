@@ -5,7 +5,7 @@
  * lanterns, braziers, crystals, glowing mushrooms, jack-o'-lanterns) that the lighting pass picks up.
  */
 import type { Biome, PropKind, TreeKind } from '../../world/biomes';
-import { blank, type PixelBuf } from '../pixel/buf';
+import { blank, blit, type PixelBuf } from '../pixel/buf';
 import { BODY_ANIMS, BODY_FRAMES } from '../packs/mannequin';
 import { ball, hash, inkOutline, line, mixHex, rect, setRGB, shade } from './draw';
 import { outlineTinted } from './ink';
@@ -339,10 +339,8 @@ export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {
       if (hash(seed, 2) < 0.5) for (let x = 1; x < 8; x++) if (hash(seed, x) < 0.5) setRGB(b, x, 11, '#3e5a3a');
       return { buf: outlineTinted(b), ax: 5, ay: 13 };
     }
-    case 'crystalSmall': {
-      const t = crystalTree(biome.id === 'crystal' ? biome.treeRamp : ['#1a2a5a', '#2a4a9a', '#4a8ad8', '#8ac8ff', '#e0f8ff'], seed);
-      return { ...t, light: { dx: 0, dy: -8, color: biome.id === 'ember' ? '#ff8a4a' : '#7ac8ff', r: 34, flicker: false } };
-    }
+    case 'crystalSmall':
+      return crystalCluster(biome, seed);
     case 'reeds': {
       const b = blank(9, 10);
       for (let i = 0; i < 4; i++) {
@@ -535,6 +533,118 @@ export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {
       return { buf: outlineTinted(b), ax: 2, ay: 21 };
     }
   }
+}
+
+// ------------------------------------------------------------------ crystals
+
+/**
+ * Seven steps of a crystal, from the deep shadow in its core to the white of a glint: the tundra's
+ * ice, the grotto's prism glass, the depths' amber.
+ */
+const ICE = ['#122a50', '#1d457c', '#2c67aa', '#4892d2', '#7cc0ec', '#c2eafb', '#ffffff'];
+const PRISM = ['#1c1244', '#36287e', '#5650c0', '#7a8aee', '#9ccfff', '#d8f4ff', '#ffffff'];
+const AMBER = ['#3a1006', '#6a240c', '#a84414', '#e0742a', '#ffaa58', '#ffdc9c', '#fff6e0'];
+const SNOWS = ['#7e96b8', '#aec2da', '#dae6f2', '#ffffff'];
+
+/** A shard: its foot's x (from the cluster's middle), height, half its width, and lean (px across per px up). */
+type Shard = readonly [x: number, h: number, hw: number, lean: number];
+
+/** Three clusters, back to front: a spire with shards round it, a leaning spike, a low outcrop. */
+const CLUSTERS: Shard[][] = [
+  [[0, 18, 2.6, 0.03], [-4, 11, 2.0, -0.24], [4, 13, 2.2, 0.2], [-2, 6, 1.5, -0.4], [6, 5, 1.3, 0.5]],
+  [[-1, 20, 3.0, 0.13], [-5, 8, 1.7, -0.32], [3, 6, 1.5, 0.42]],
+  [[-1, 11, 2.2, -0.06], [3, 9, 2.0, 0.2], [-5, 8, 1.8, -0.3], [6, 5, 1.4, 0.5], [-3, 4, 1.3, -0.5]],
+];
+
+/**
+ * A cluster of crystals, each a pointed prism in 3/4 view: a lit facet on the left, a bright ridge
+ * where the facets meet, the right facet in shade with a little light showing through it, the tip
+ * catching the sun and a glint on it. In the tundra they're ice, with snow on their shoulders and
+ * drifted round their feet; in the grotto prism glass and in the depths amber, on a little rubble.
+ * A soft light of their own color.
+ */
+function crystalCluster(biome: Biome, seed: number): PropArt {
+  const tundra = biome.id === 'tundra';
+  const C = tundra || (biome.id !== 'crystal' && biome.id !== 'ember') ? ICE : biome.id === 'crystal' ? PRISM : AMBER;
+  const v = Math.floor(hash(seed, 1) * 3);
+  const flip = hash(seed, 2) < 0.5 ? -1 : 1;
+  const W = 26;
+  const H = 27;
+  const b = blank(W, H);
+  const bx = 13;
+  const by = 23;
+  const shards = CLUSTERS[v];
+  const tips: Array<[number, number]> = [];
+  const span = Math.max(...shards.map(([x, , hw]) => Math.abs(x) + hw));
+  for (const [sx, h, hw, sl] of shards) {
+    const x0 = bx + sx * flip;
+    const lean = sl * flip;
+    const tipH = hw * 1.7;
+    // Each shard on its own first, so where it stands in front of another it gets a dark edge.
+    const s = blank(W, H);
+    for (let yy = 0; yy <= h; yy++) {
+      const y = by - yy;
+      const cx = x0 + lean * yy;
+      const fromTop = h - yy;
+      const half = fromTop < tipH ? (hw * fromTop) / tipH : hw;
+      for (let x = Math.floor(cx - half - 0.5); x <= Math.ceil(cx + half); x++) {
+        const u = (x + 0.5 - cx) / Math.max(0.6, half);
+        if (u < -1.05 || u > 1.05) continue;
+        // Facets: lit left, the ridge, shaded right (darkest at its far edge); a step darker low down.
+        let k = u < -0.3 ? 4 : u < 0.12 ? 5 : u > 0.68 ? 1 : 2;
+        if (fromTop < tipH) k = u < 0.12 ? 5 : 3;
+        else if (yy < 3 && k < 5) k -= 1;
+        // Light through the shaded facet: a paler streak inside it, up the middle of the shaft.
+        if (k === 2 && Math.abs(u - 0.42) < 0.17 && yy > 2 && fromTop > tipH + 1) k = 3;
+        setRGB(s, x, y, C[Math.max(0, k)]);
+      }
+    }
+    if (tundra) {
+      // Snow on the shoulder where the point begins, on the lit side.
+      const yy = Math.round(h - tipH);
+      const cx = x0 + lean * yy;
+      const l = Math.round(cx - hw + 0.4);
+      setRGB(s, l, by - yy, SNOWS[3]);
+      setRGB(s, l + 1, by - yy - 1, SNOWS[3]);
+      setRGB(s, l + 1, by - yy, SNOWS[2]);
+    }
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const i = (y * W + x) * 4;
+        if (s.px[i + 3]) continue;
+        const nb = (xx: number, yy: number) => xx >= 0 && yy >= 0 && xx < W && yy < H && s.px[(yy * W + xx) * 4 + 3] > 0;
+        if (b.px[i + 3] && (nb(x - 1, y) || nb(x + 1, y) || nb(x, y - 1))) setRGB(b, x, y, C[0]);
+      }
+    }
+    blit(b, s, 0, 0);
+    tips.push([Math.round(x0 + lean * h), by - h]);
+  }
+  const out = outlineTinted(b);
+  // Their feet (over the outline, so they settle into the ground): drifted snow, lit on top, blue in
+  // its shade, or a little rubble.
+  const rx = span + 2.5;
+  for (let y = by - 5; y <= by + 2; y++) {
+    for (let x = Math.floor(bx - rx - 1); x <= Math.ceil(bx + rx + 1); x++) {
+      const dx = (x + 0.5 - bx) / rx;
+      // A mound, highest in the middle, its top wavy where it banks against the crystals.
+      const top = by - (tundra ? 3.2 : 1.4) * (1 - dx * dx) + 0.8 + Math.sin(x * 1.9 + seed) * 0.5;
+      if (y < top || y > by + 1 || Math.abs(dx) > 1) continue;
+      const ox = x + 1;
+      const oy = y + 1;
+      if (tundra) {
+        const lit = y < top + 1 ? (dx < 0.45 ? 3 : 2) : dx > 0.45 || y === by + 1 ? 1 : 2;
+        setRGB(out, ox, oy, SNOWS[lit]);
+      } else if (hash(seed, x, y) < 0.55) setRGB(out, ox, oy, hash(seed, x) < 0.5 ? '#3a3448' : '#56506a');
+    }
+  }
+  // A glint on the tallest point (drawn over the outline: light, not a shape).
+  const [gx, gy] = tips[0];
+  const glint = (x: number, y: number, c: string) => setRGB(out, x + 1, y + 1, c);
+  glint(gx, gy - 1, C[6]);
+  glint(gx - 1, gy, C[5]);
+  glint(gx + 1, gy, C[5]);
+  glint(gx, gy - 2, C[5]);
+  return { buf: out, ax: bx + 1, ay: by + 2, light: { dx: 0, dy: -9, color: tundra ? '#8ed8ff' : C[4], r: 30, flicker: false } };
 }
 
 // ------------------------------------------------------------------ the farm

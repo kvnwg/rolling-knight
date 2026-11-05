@@ -61,13 +61,16 @@ export function castShadows(m: FloorMap, biome: Biome, W: number, H: number): Ui
       }
     }
   }
-  // The soft rim: a pixel round every core pixel.
+  // The soft rim: a pixel round every core pixel (the floor's outermost pixels keep none).
   const out = mask.slice();
-  for (let y = 1; y < H - 1; y++) {
-    for (let x = 1; x < W - 1; x++) {
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
       const i = y * W + x;
-      if (mask[i]) continue;
-      if (mask[i - 1] === 2 || mask[i + 1] === 2 || mask[i - W] === 2 || mask[i + W] === 2) out[i] = 1;
+      if (mask[i] !== 2) continue;
+      if (x > 1 && y > 0 && y < H - 1 && !mask[i - 1]) out[i - 1] = 1;
+      if (x < W - 2 && y > 0 && y < H - 1 && !mask[i + 1]) out[i + 1] = 1;
+      if (y > 1 && x > 0 && x < W - 1 && !mask[i - W]) out[i - W] = 1;
+      if (y < H - 2 && x > 0 && x < W - 1 && !mask[i + W]) out[i + W] = 1;
     }
   }
   return out;

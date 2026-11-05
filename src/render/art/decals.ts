@@ -42,27 +42,29 @@ export interface DecalTable {
   density: { ground: number; path: number; edge: number; water: number };
 }
 
+// (Lawns grow their own blades, tufts, clover, moss, petals and flowers: art/grass.ts. Their tables
+// keep to what lies on the grass: stones, leaves, mushrooms, ferns, roots, hay.)
 export const DECALS: Record<BiomeId, DecalTable> = {
   hamlet: {
-    ground: [['tuft', 9], ['flowers', 8], ['daisies', 6], ['clover', 3], ['pebbles', 2], ['leaves', 1], ['mushrooms', 1]],
+    ground: [['pebbles', 2], ['leaves', 1], ['mushrooms', 1]],
     path: [['pebbles', 3], ['puddle', 1], ['moss', 1]],
     edge: [['pebbles', 2], ['moss', 1]],
     water: [['lily', 5], ['lotus', 2], ['reedBed', 2]],
-    density: { ground: 30, path: 4, edge: 6, water: 30 },
+    density: { ground: 8, path: 4, edge: 6, water: 30 },
   },
   farmland: {
-    ground: [['tuft', 10], ['daisies', 4], ['flowers', 3], ['clover', 3], ['hay', 3], ['pebbles', 2]],
+    ground: [['hay', 3], ['pebbles', 1]],
     path: [['pebbles', 3], ['hay', 2], ['tuft', 2], ['puddle', 1]],
-    edge: [['flowers', 4], ['fern', 2], ['roots', 3], ['tuft', 5], ['leaves', 2]],
+    edge: [['fern', 2], ['roots', 3], ['leaves', 2]],
     water: [['lily', 5], ['lotus', 1], ['reedBed', 2]],
-    density: { ground: 26, path: 10, edge: 40, water: 20 },
+    density: { ground: 8, path: 10, edge: 18, water: 20 },
   },
   forest: {
-    ground: [['leaves', 6], ['fern', 5], ['tuft', 5], ['moss', 4], ['mushrooms', 3], ['glowShrooms', 2], ['twigs', 3], ['pebbles', 2], ['roots', 2]],
+    ground: [['fern', 5], ['mushrooms', 3], ['glowShrooms', 2], ['twigs', 3], ['pebbles', 1], ['roots', 2]],
     path: [['leaves', 5], ['twigs', 3], ['pebbles', 2], ['roots', 2], ['puddle', 1]],
-    edge: [['fern', 8], ['roots', 7], ['moss', 4], ['mushrooms', 3], ['glowShrooms', 3], ['leaves', 4]],
+    edge: [['fern', 8], ['roots', 7], ['mushrooms', 3], ['glowShrooms', 3]],
     water: [['lily', 6], ['lotus', 2], ['reedBed', 1]],
-    density: { ground: 42, path: 16, edge: 60, water: 24 },
+    density: { ground: 26, path: 16, edge: 50, water: 24 },
   },
   tundra: {
     ground: [['snowDrift', 6], ['pebbles', 3], ['iceCrack', 2], ['twigs', 2], ['needles', 2]],
@@ -80,7 +82,7 @@ export const DECALS: Record<BiomeId, DecalTable> = {
   },
   swamp: {
     ground: [['moss', 5], ['puddle', 4], ['mushrooms', 3], ['glowShrooms', 3], ['twigs', 3], ['tuft', 4], ['roots', 2]],
-    path: [['moss', 3], ['tuft', 3], ['puddle', 2], ['twigs', 2]],
+    path: [['puddle', 2], ['twigs', 2]],
     edge: [['roots', 6], ['fern', 4], ['glowShrooms', 4], ['mushrooms', 3], ['moss', 4]],
     water: [['lily', 8], ['lotus', 2], ['reedBed', 5]],
     density: { ground: 36, path: 14, edge: 55, water: 32 },
@@ -93,11 +95,11 @@ export const DECALS: Record<BiomeId, DecalTable> = {
     density: { ground: 22, path: 16, edge: 40, water: 16 },
   },
   graveyard: {
-    ground: [['tuft', 6], ['leaves', 5], ['bones', 2], ['mushrooms', 2], ['glowShrooms', 2], ['twigs', 4], ['pebbles', 2], ['moss', 2]],
+    ground: [['bones', 2], ['mushrooms', 2], ['glowShrooms', 2], ['twigs', 4], ['pebbles', 1]],
     path: [['leaves', 4], ['twigs', 3], ['crack', 2], ['pebbles', 2]],
     edge: [['roots', 5], ['leaves', 5], ['bones', 2], ['glowShrooms', 3], ['cobweb', 2], ['fern', 2]],
     water: [],
-    density: { ground: 32, path: 14, edge: 50, water: 0 },
+    density: { ground: 18, path: 14, edge: 50, water: 0 },
   },
   ember: {
     ground: [['emberCrack', 5], ['ash', 5], ['scorch', 3], ['rubble', 3], ['bones', 2], ['crack', 2]],
@@ -114,11 +116,11 @@ export const DECALS: Record<BiomeId, DecalTable> = {
     density: { ground: 30, path: 12, edge: 52, water: 8 },
   },
   shrine: {
-    ground: [['petals', 7], ['moss', 4], ['tuft', 4], ['flowers', 3], ['pebbles', 2], ['fern', 2]],
+    ground: [['pebbles', 2], ['fern', 2]],
     path: [['petals', 5], ['moss', 3], ['crack', 1]],
-    edge: [['fern', 5], ['moss', 5], ['petals', 5], ['flowers', 3], ['roots', 2]],
+    edge: [['fern', 5], ['petals', 3], ['roots', 2]],
     water: [['lily', 6], ['lotus', 4]],
-    density: { ground: 34, path: 16, edge: 52, water: 30 },
+    density: { ground: 10, path: 16, edge: 40, water: 30 },
   },
 };
 

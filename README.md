@@ -33,10 +33,14 @@ How every system works, with its numbers: [`DESIGN.md`](DESIGN.md). Art sources 
 - The look follows Firefly Garden turned into pixels: bright, readable places edge to edge. The
   hamlet is a town of half-timbered houses, fenced lots, hedges, a market square with striped stalls,
   a fountain and string lights, and a canal with a bridge; trees stand in clumps on the lawns
-  (blossom trees, maples, dark pines), each throwing its shadow down and to the right. The ground is
-  painted once per floor (cobbles with mortar, grass with flowers, flagstones, snow, sand, mud,
-  basalt, water with banks, lava), with about 30 kinds of decals and every standing thing's shadow
-  baked in. Fireflies, butterflies and mist drift over it.
+  (oaks, maples, apples and blossom trees with crowns of round leaf clumps, reddish forked trunks and
+  spreading roots; dark pines), each throwing its shadow down and to the right. The ground is
+  painted once per floor (cobbles with mortar, flagstones, snow, sand, mud, basalt, water with banks,
+  lava, and lawns: lush and sunlit patches with dithered edges, blade texture, tufts in three sizes,
+  clover, flower clumps in each biome's colors, moss cushions, leaf litter and petals, fairy rings,
+  blades breaking over the edges of paths, curbs and walls), with about 30 kinds of decals and every
+  standing thing's shadow baked in. The tundra's ice crystals stand in faceted clusters in snow
+  drifts. Fireflies, butterflies and mist drift over it.
 - Cinematic light: the scene is multiplied by each biome's ambient (cool and dim, or warm), torches,
   lanterns, braziers, lava, crystals, spells and the knights themselves light it in stepped bands
   with bloom, then a grade and a vignette. Daylight is lifted near white; out in the open each floor
