@@ -4,7 +4,7 @@ import { newGame } from '../src/core/newGame';
 import { addKnight, knightStats } from '../src/core/roster';
 import { Game } from '../src/game';
 import { BIOME_ORDER, BIOMES, biomeForFloor, isBossFloor } from '../src/world/biomes';
-import { BLOCKED, FLOOR, TILE, bfs, generateFloor, tileAt } from '../src/world/mapgen';
+import { BLOCKED, FLOOR, SOLID, TILE, bfs, generateFloor, tileAt } from '../src/world/mapgen';
 import { floorBoss, floorMobs } from '../src/world/mobgen';
 import { World, type HeroSpec } from '../src/world/world';
 
@@ -43,8 +43,30 @@ describe('floors', () => {
   it('never let a prop block the way', () => {
     for (const biome of [BIOMES.hamlet, BIOMES.farmland]) {
       const m = generateFloor({ floor: 9, biome, seed: 77, boss: false });
-      for (const p of m.props) if (p.solid && p.kind !== 'tree') expect([BLOCKED, FLOOR]).toContain(tileAt(m, Math.floor(p.x / TILE), Math.floor((p.y - 1) / TILE)));
+      for (const p of m.props) {
+        if (!p.solid || p.kind === 'tree') continue;
+        const t = tileAt(m, Math.floor(p.x / TILE), Math.floor((p.y - 1) / TILE));
+        // Houses stand in the walls (their fronts to a room); everything else on the floor it blocks.
+        if (p.kind === 'house') expect(t).toBe(SOLID);
+        else expect([BLOCKED, FLOOR]).toContain(t);
+      }
     }
+  });
+
+  it('build the hamlet a village: houses on the walls, their yards open to the road', () => {
+    let houses = 0;
+    for (const seed of [1, 77, 1234]) {
+      const m = generateFloor({ floor: 2, biome: BIOMES.hamlet, seed, boss: false });
+      for (const p of m.props) {
+        if (p.kind !== 'house') continue;
+        houses++;
+        // The row in front of the house is open floor.
+        expect(tileAt(m, Math.floor(p.x / TILE), Math.floor((p.y + 2) / TILE))).not.toBe(SOLID);
+        // No tree grows through it.
+        expect(m.props.some((q) => q.kind === 'tree' && Math.abs(q.x - p.x) < 32 && q.y < p.y && q.y > p.y - 70)).toBe(false);
+      }
+    }
+    expect(houses).toBeGreaterThan(9);
   });
 
   it('are the same for the same seed', () => {

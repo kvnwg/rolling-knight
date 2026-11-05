@@ -124,6 +124,8 @@ interface Compiled {
   steps: Ev[][];
   when: Array<When | undefined>;
   pans: number[];
+  /** Each bar's chord root, from A3 up (what a tuned drum rings on). */
+  roots: number[];
 }
 
 const VEL: Record<string, number> = { X: 1, x: 0.72, o: 0.42 };
@@ -195,7 +197,9 @@ export function compile(song: Song): Compiled {
       }
     }
   });
-  const out: Compiled = { song, steps, when: song.parts.map((p) => p.when), pans: song.parts.map((p) => p.pan ?? 0) };
+  const out: Compiled = {
+    song, steps, when: song.parts.map((p) => p.when), pans: song.parts.map((p) => p.pan ?? 0), roots: chords.map((c) => atOrAbove(c.root, 57)),
+  };
   compiled.set(song.id, out);
   return out;
 }
@@ -310,7 +314,7 @@ export class Player {
       const jitter = (this.rnd() * 2 - 1) * 0.004;
       const vel = ev.vel * (0.92 + this.rnd() * 0.16);
       if (ev.kind === 'drum') {
-        const n = ev.inst === 'bowl' ? (bar % 4 === 0 ? 57 : 64) : undefined;
+        const n = ev.inst === 'bowl' || ev.inst === 'timpani' ? this.c.roots[bar] - (ev.inst === 'timpani' ? 24 : 0) : undefined;
         drum(this.voiceFor(ev.inst, pan), ev.inst, Math.max(at, t + jitter), vel, n);
         continue;
       }
@@ -367,16 +371,18 @@ function hold(p: AudioParam, at: number): void {
 /** Plays the victory sting into `out` from audio time `at`. */
 export function playVictory(out: Out, at: number): void {
   for (const [t, notes, len] of VICTORY.brass) {
-    for (const n of notes) play(out, 'brass', n, at + t, len, 0.32);
-    if (notes.length > 1) play(out, 'horn', notes[0] - 12, at + t, len, 0.3);
+    // (A chord's notes share the loudness of the call's single ones.)
+    const v = 0.26 / Math.sqrt(notes.length);
+    for (const n of notes) play(out, 'brass', n, at + t, len, v);
+    if (notes.length > 1) play(out, 'horn', notes[0] - 12, at + t, len, 0.16);
   }
-  VICTORY.harp.forEach((n, k) => play(out, 'harp', n, at + 0.5 + k * 0.055, 1.2, 0.3));
-  for (const [t, n] of VICTORY.bells) play(out, 'celesta', n, at + t, 1.6, 0.35);
-  for (const [t, n] of VICTORY.timpani) drum(out, 'timpani', at + t, 0.9, n);
+  VICTORY.harp.forEach((n, k) => play(out, 'harp', n, at + 0.5 + k * 0.055, 1.2, 0.18));
+  for (const [t, n] of VICTORY.bells) play(out, 'celesta', n, at + t, 1.6, 0.2);
+  for (const [t, n] of VICTORY.timpani) drum(out, 'timpani', at + t, 0.55, n);
   // A timpani roll into the last chord, and a cymbal on it.
-  for (let k = 0; k < 8; k++) drum(out, 'timpani', at + 1.05 + k * 0.055, 0.25 + k * 0.05, 43);
-  drum(out, 'cymbal', at + 1.5, 0.9);
-  for (const n of [60, 64, 67, 72]) play(out, 'strings', n, at + 1.5, 1.8, 0.2);
+  for (let k = 0; k < 8; k++) drum(out, 'timpani', at + 1.05 + k * 0.055, 0.15 + k * 0.03, 43);
+  drum(out, 'cymbal', at + 1.5, 0.5);
+  for (const n of [60, 64, 67, 72]) play(out, 'strings', n, at + 1.5, 1.8, 0.12);
 }
 
 // ------------------------------------------------------------------ the music

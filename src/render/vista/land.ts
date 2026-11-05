@@ -9,7 +9,7 @@
  * side. The sun sits low and behind the scene, so every silhouette is backlit: violet shadow sides
  * with a coral rim on the edges that face the sun.
  */
-import { blurRGBA, clamp, fbm1, hex, mix, noise1, noise2, Pix, rng, type RGB } from './pix';
+import { blurPlane, clamp, fbm1, h01, hex, mix, noise1, noise2, Pix, rng, type RGB } from './pix';
 import { skyAt } from './sky';
 
 export interface Layout {
@@ -159,15 +159,13 @@ function forest(p: Pix, o: ForestOpts): void {
     return m[(yy - top) * mw + xx - x0] > 0;
   };
   const bands = o.bands ?? 4;
+  const bandC = Array.from({ length: bands + 1 }, (_, q) => mix(o.body, o.mist, q / bands));
   for (let y = top; y < bot; y++) {
     for (let xx = x0; xx < x1; xx++) {
       if (!m[(y - top) * mw + xx - x0]) continue;
       const depth = y - ridge[xx - x0];
       let c = o.body;
-      if (depth > 0 && o.mistDepth > 0) {
-        const q = Math.floor(Math.min(1, depth / o.mistDepth) * bands) / bands;
-        c = mix(o.body, o.mist, q);
-      }
+      if (depth > 0 && o.mistDepth > 0) c = bandC[Math.floor(Math.min(1, depth / o.mistDepth) * bands)];
       if (o.rim) {
         const side = Math.sign(o.sunX - xx) || 1;
         const openTop = !has(xx, y - 1);
@@ -286,14 +284,15 @@ export function paintMid(L: Layout): { pix: Pix; glows: Glow[]; top: number } {
   const glows: Glow[] = [];
   const cx = L.castleX;
   const s = clamp(Math.min(L.W, L.H) / 470, 0.72, 1.15);
-  const hh = Math.round(clamp(L.hy * 0.11, 8, 18));
-  const hw = Math.round(66 * s);
+  const hh = Math.round(clamp(L.hy * 0.19, 12, 30));
+  const hw = Math.round(30 * s);
   const hn = noise1(L.seed + 11);
-  const flatW = 30 * s;
+  const flatW = 33 * s;
   const ridge = (x: number) => {
     const d = Math.abs(x - cx);
     const u = Math.max(0, d - flatW) / hw;
-    return L.shoreY + 1 - hh * Math.exp(-u * u * 2.2) + hn(x / 9) * 0.8 * Math.min(1, u * 2);
+    // A crag: a flat summit under the walls, steep rocky sides, forested skirts down to the water.
+    return L.shoreY + 1 - hh * Math.exp(-u * u * 1.7) + hn(x / 6) * 1.3 * Math.min(1, u * 2);
   };
   // Hills either side of the castle, a step nearer than the horizon.
   const sn = fbm1(L.seed + 12, 3);
@@ -316,8 +315,8 @@ export function paintMid(L: Layout): { pix: Pix; glows: Glow[]; top: number } {
   });
   forest(p, {
     ridge,
-    x0: cx - hw * 2.4,
-    x1: cx + hw * 2.4,
+    x0: cx - flatW - hw * 2.4,
+    x1: cx + flatW + hw * 2.4,
     tree: [4, 9],
     gap: [2, 4],
     body: hex('#6c3a7e'),
@@ -329,10 +328,29 @@ export function paintMid(L: Layout): { pix: Pix; glows: Glow[]; top: number } {
     rimFar: 0.3,
     sunX: L.sunX,
     seed: L.seed + 14,
-    skip: (x) => Math.abs(x - cx) < flatW + 8 * s,
+    skip: (x) => Math.abs(x - cx) < flatW + hw * 0.55,
   });
+  // The crag's rock: strata on the steep sides, a sunlit edge, fading into the forest skirts.
+  const rn = noise2(L.seed + 15);
+  const rockC = hex('#4a2c62');
+  const rockD = hex('#341f4c');
+  const rockL = hex('#ff9a86');
+  const side = Math.sign(L.sunX - cx) || 1;
+  for (let x = Math.floor(cx - flatW - hw); x <= cx + flatW + hw; x++) {
+    const d = Math.abs(x - cx);
+    const top = Math.ceil(ridge(x));
+    const depth = Math.round(hh * (d < flatW ? 0.7 : 0.7 * (1 - (d - flatW) / hw)));
+    for (let j = 0; j < depth; j++) {
+      const y = top + j;
+      const v = rn(x * 0.25, y * 0.5);
+      let c = v > 0.25 ? rockC : rockD;
+      if ((x - cx) * side > flatW * 0.6 && j < 2) c = mix(c, rockL, 0.6);
+      else if (j === 0) c = mix(c, rockL, 0.25);
+      p.set(x, y, mix(c, hex('#c27aa2'), (j / Math.max(1, depth)) * 0.5));
+    }
+  }
   const by = Math.round(ridge(cx)) + 1;
-  castle(p, cx, by, s, L.sunX, glows);
+  castle(p, cx, by, s, L.sunX, glows, (x) => Math.round(ridge(x)) + 2);
   village(p, L, cx - flatW - hw * 0.55, L.shoreY, s, glows, 7);
   village(p, L, cx + flatW + hw * 0.75, L.shoreY, s, glows, 9);
   let top = L.H;
@@ -359,7 +377,7 @@ const C = {
   pole: hex('#2a1838'),
 };
 
-function castle(p: Pix, cx: number, by: number, s: number, sunX: number, glows: Glow[]): void {
+function castle(p: Pix, cx: number, by: number, s: number, sunX: number, glows: Glow[], groundAt: (x: number) => number): void {
   const side = Math.sign(sunX - cx) || 1;
   const S = (v: number) => Math.round(v * s);
   const window = (x: number, y: number, w: number, h: number) => {
@@ -370,6 +388,10 @@ function castle(p: Pix, cx: number, by: number, s: number, sunX: number, glows: 
     const X0 = cx + S(x);
     const Wd = Math.max(2, S(w));
     const Y0 = by - S(h);
+    for (let xx = X0; xx < X0 + Wd; xx++) {
+      // Walls run down to meet the rock.
+      for (let y = by; y < groundAt(xx); y++) p.set(xx, y, (xx - X0 - Wd / 2) * side > 0 ? C.bodyLit : C.body);
+    }
     for (let y = Y0; y < by; y++) {
       for (let xx = X0; xx < X0 + Wd; xx++) {
         const d = side > 0 ? X0 + Wd - 1 - xx : xx - X0;
@@ -525,7 +547,7 @@ export function paintLake(L: Layout, far: Pix, mid: Pix, M: number): Pix {
     for (let j = 0; j < len; j++) p.tint(x + j, y, hex('#ffb3a0'), lightK);
   }
   // The far shore: a bright line where the land meets its reflection.
-  for (let x = 0; x < p.w; x++) p.tint(x, 0, hex('#ffd9a8'), 0.55);
+  for (let x = 0; x < p.w; x++) p.tint(x, 0, hex('#ffd9a8'), 0.3);
   return p;
 }
 
@@ -553,7 +575,18 @@ export function ground(L: Layout): Ground {
   const cornerY = Math.round(backAt(L.cornerX));
   const edgeAt = (y: number) => L.cornerX + Math.max(0, y - cornerY) * 0.3 + ne(y / 9) * 2;
   const frontAt = (x: number) => L.fy + 44 + (L.fx - x) * 0.1 + nf(x / 26) * 3 - Math.max(0, x - (L.cornerX - 46)) * 0.55;
-  const inMeadow = (x: number, y: number) => y <= frontAt(x) && (x <= L.cornerX ? y >= backAt(x) : y >= cornerY && x <= edgeAt(y));
+  // inMeadow runs per pixel: look the edges up in tables.
+  const M = 64;
+  const backT = new Float32Array(L.W + 2 * M);
+  const frontT = new Float32Array(L.W + 2 * M);
+  for (let i = 0; i < backT.length; i++) {
+    backT[i] = backAt(i - M);
+    frontT[i] = frontAt(i - M);
+  }
+  const edgeT = new Float32Array(L.H + 2 * M);
+  for (let i = 0; i < edgeT.length; i++) edgeT[i] = edgeAt(i - M);
+  const col = (t: Float32Array, v: number) => t[clamp(Math.round(v) + M, 0, t.length - 1)];
+  const inMeadow = (x: number, y: number) => y <= col(frontT, x) && (x <= L.cornerX ? y >= col(backT, x) : y >= cornerY && x <= col(edgeT, y));
   return { backAt, frontAt, edgeAt, cornerY, inMeadow };
 }
 
@@ -580,7 +613,7 @@ export function paintNear(L: Layout, G: Ground): Pix {
     mist: hex('#94527f'),
     mistDepth: 12,
     bands: 4,
-    bottom: L.H,
+    bottom: L.hy + gap * 0.84 + 8,
     rim: hex('#ff9a7c'),
     rimFar: 0.15,
     rimTopOnly: true,
@@ -591,11 +624,11 @@ export function paintNear(L: Layout, G: Ground): Pix {
     ridge: (x) => L.hy + gap * 0.84 + n2(x / 50) * 4,
     tree: [8, 18],
     gap: [4, 8],
-    body: hex('#2a1944'),
-    mist: hex('#673870'),
+    body: hex('#271a48'),
+    mist: hex('#5f3a74'),
     mistDepth: 18,
     bands: 4,
-    bottom: L.H,
+    bottom: G.cornerY + 22,
     rim: hex('#ff8a6e'),
     rimFar: 0.1,
     rimTopOnly: true,
@@ -603,31 +636,107 @@ export function paintNear(L: Layout, G: Ground): Pix {
     seed: L.seed + 46,
   });
   // Down the valley side below the cliff: rows of pines, nearer and darker, mist pooling between.
-  let ry = G.cornerY + 12;
-  for (let k = 0; k < 9 && ry < L.H + 30; k++) {
+  const rowY: number[] = [];
+  for (let k = 0, ry = G.cornerY + 12; k < 9 && ry < L.H + 30; k++) {
+    rowY.push(ry);
+    ry += 15 + k * 7;
+  }
+  for (let k = 0; k < rowY.length; k++) {
     const u = Math.min(1, k / 6);
     const nk = fbm1(L.seed + 140 + k, 3);
-    const base = ry;
+    const base = rowY[k];
+    // Each row only needs to reach the next one down, which covers everything below its ridge.
+    const bottom = k + 1 < rowY.length ? rowY[k + 1] + 4 + (k + 1) * 1.5 : L.H;
     forest(p, {
       ridge: (x) => base + nk(x / (36 + k * 8)) * (3 + k * 1.5),
       tree: [10 + k * 4, 18 + k * 6],
       gap: [3 + k, 7 + k * 2],
-      body: mix(hex('#2a1946'), hex('#0b0717'), u),
-      mist: mix(hex('#583068'), hex('#1a0f2c'), u),
+      body: mix(hex('#241a4a'), hex('#090818'), u),
+      mist: mix(hex('#4e3474'), hex('#16112e'), u),
       mistDepth: 14 + k * 5,
       bands: 4,
-      bottom: L.H,
-      rim: mix(mix(hex('#ff8a6e'), hex('#7a3a5a'), u), mix(hex('#2a1946'), hex('#0b0717'), u), 0.45),
+      bottom,
+      rim: mix(mix(hex('#ff8a6e'), hex('#7a3a5a'), u), mix(hex('#241a4a'), hex('#090818'), u), 0.45),
       rimFar: 0.05,
       rimTopOnly: true,
       sunX: L.sunX,
       seed: L.seed + 150 + k,
     });
-    ry += 15 + k * 7;
   }
+  river(p, L);
   meadow(p, L, G);
   cliff(p, L, G);
   return p;
+}
+
+/**
+ * The river's course: centre and half-width per row, from the lake's near shore to the bottom of the
+ * view. It meanders evenly on the ground, so in perspective its far bends are small and tight and its
+ * near ones wide and sweeping.
+ */
+export function riverPath(L: Layout): Array<[number, number, number]> {
+  const wn = noise1(L.seed + 81);
+  const y0 = Math.round(L.hy + (L.backY - L.hy) * 0.86);
+  const zFar = (L.H - L.hy) / Math.max(3, y0 - L.hy);
+  const startX = L.sunX + L.winW * 0.04;
+  const endX = L.winX0 + L.winW * 0.72;
+  const pts: Array<[number, number, number]> = [];
+  for (let y = y0; y < L.H; y++) {
+    const z = (L.H - L.hy) / Math.max(1, y - L.hy);
+    const t = clamp((z - 1) / Math.max(0.5, zFar - 1), 0, 1);
+    const base = endX + (startX - endX) * Math.pow(t, 0.6);
+    const meander = Math.sin(z * 2.3 + 0.6) * L.winW * 0.3 * (1 - t * 0.6);
+    const cx = base + meander / z + wn(y * 0.04) * 2;
+    const hw = (L.winW * 0.085) / z + 0.6 + Math.max(0, wn(y * 0.05 + 9)) * (3 / z);
+    pts.push([cx, y, hw]);
+  }
+  return pts;
+}
+
+/**
+ * A river winding down the valley toward the viewer, mirroring the sunset sky (the far reaches the
+ * bright horizon, the near reaches the higher, deeper sky), with dark banks and pines on its edges.
+ */
+function river(p: Pix, L: Layout): void {
+  const pts = riverPath(L);
+  const y0 = pts[0][1];
+  const bank = hex('#110b22');
+  const r = rng(L.seed + 82);
+  for (const [cx, y, hw] of pts) {
+    const u = (y - y0) / Math.max(1, L.H - y0);
+    const v = clamp(0.97 - u * 0.62, 0.3, 1);
+    const sky = mix(skyAt(v), hex('#ffc890'), Math.max(0, 0.35 - u) * sunHalo(L, cx, L.sunY) * 1.5);
+    const deep = mix(sky, hex('#1c1440'), 0.25 + u * 0.4);
+    for (let x = Math.floor(cx - hw - 2); x <= Math.ceil(cx + hw + 2); x++) {
+      const d = Math.abs(x + 0.5 - cx);
+      if (d > hw + 1.5) continue;
+      if (d > hw) {
+        p.set(x, y, bank);
+        continue;
+      }
+      // Brighter down the middle, where it mirrors the open sky; ripples as broken lighter dashes.
+      const k = 1 - d / hw;
+      let c = mix(deep, sky, (Math.floor(k * 3) / 3) * 0.75);
+      if (h01(x >> 2, y, 7) > 0.88) c = mix(c, hex('#ffd8b0'), 0.35);
+      p.set(x, y, c);
+    }
+  }
+  // A clump of pines where it comes out of the forest, then pines crowding the banks.
+  for (let k = 0; k < 6; k++) {
+    const [cx, y, hw] = pts[Math.min(pts.length - 1, Math.floor(r() * 3))];
+    bigPine(p, cx + (r() - 0.5) * (hw * 2 + 10), y + 2 + r() * 3, 8 + r() * 8, hex('#1e1844'), hex('#7a4a6e'), L.sunX, L.seed + 900 + k, 3);
+  }
+  for (let i = 0; i < pts.length; i += 2 + Math.floor(r() * 4)) {
+    const [cx, y, hw] = pts[i];
+    const u = (y - y0) / Math.max(1, L.H - y0);
+    for (const sd of [-1, 1]) {
+      if (r() < 0.4) continue;
+      const th = 5 + u * 30 + r() * 6;
+      const tx = cx + sd * (hw + 1 + r() * (2 + u * 6));
+      const body = mix(hex('#1e1844'), hex('#08061a'), u);
+      bigPine(p, tx, y + 2, th, body, mix(body, hex('#ff8a6e'), 0.25 + u * 0.35), L.sunX, L.seed + i * 7 + (sd > 0 ? 1 : 0), th * 0.28);
+    }
+  }
 }
 
 function meadow(p: Pix, L: Layout, G: Ground): void {
@@ -667,29 +776,27 @@ function meadow(p: Pix, L: Layout, G: Ground): void {
     const near = clamp((gy - L.backY) / Math.max(40, L.H - L.backY), 0, 1);
     const cw = cell * (1 + near * 1.6);
     for (let gx = -cw * r(); gx < L.W; gx += cw) {
-      if (clump(gx * 0.04, gy * 0.07) < 0.05 || r() < 0.3) continue;
+      if (clump(gx * 0.04, gy * 0.07) < 0.12 || r() < 0.35) continue;
       const x = Math.round(gx + r() * cw);
       const y = Math.round(gy + r() * cell * 0.6);
       if (!G.inMeadow(x, y) || !G.inMeadow(x, y - 4)) continue;
+      // Not on the trodden earth round the fire.
+      if (((x - L.fx) / 52) ** 2 + ((y - L.fy) / 16) ** 2 < 1) continue;
       const base = p.rgb(x, y);
       const f = fireLight(L, x, y);
       const tipC = f > 0.08 ? mix(base, hex('#ffc46a'), 0.25 + f * 0.35) : mix(base, hex('#ff9c84'), 0.3 * (1 - near * 0.5));
-      const midC = mix(base, tipC, 0.45);
-      const shadowC = mix(base, hex('#06061a'), 0.4);
+      const midC = mix(base, tipC, 0.35);
       const hgt = 2 + Math.floor(r() * (1.5 + near * 4));
-      const blades = near > 0.4 ? 5 : 3;
+      const blades = 2 + Math.floor(r() * (2 + near * 2));
       for (let b = 0; b < blades; b++) {
-        const off = b - (blades - 1) / 2;
-        const bh = Math.max(1, hgt - Math.round(Math.abs(off) * (1 + r())));
-        const lean = off < 0 ? -1 : off > 0 ? 1 : 0;
+        const off = Math.round((r() - 0.5) * (3 + near * 3));
+        const bh = Math.max(1, Math.round(hgt * (0.45 + r() * 0.55)));
+        const lean = r() < 0.5 ? -1 : 1;
         for (let j = 0; j < bh; j++) {
-          const bx = x + Math.round(off) + (j > bh * 0.6 ? lean : 0);
+          const bx = x + off + (j > bh * 0.55 && bh > 2 ? lean : 0);
           p.set(bx, y - j, j === bh - 1 ? tipC : midC);
         }
       }
-      p.set(x - 1, y + 1, shadowC);
-      p.set(x, y + 1, shadowC);
-      p.set(x + 1, y + 1, shadowC);
     }
   }
   // Tall grass along the back edge, backlit: dark blades with glowing tips.
@@ -838,34 +945,57 @@ function cliff(p: Pix, L: Layout, G: Ground): void {
   }
 }
 
-/** A pine in silhouette with drooping tiers and a rim on its sun side. */
+/** A pine in silhouette: irregular tiers of drooping boughs, a rim on its sun side. */
 export function bigPine(p: Pix, cx: number, by: number, th: number, body: RGB, rim: RGB, sunX: number, seed: number, maxHW = th * 0.3): void {
   const r = rng(seed);
   const side = Math.sign(sunX - cx) || 1;
   const tip = Math.round(by - th);
-  const tier = Math.max(3, Math.round(th / (5 + r() * 2)));
-  const body2 = mix(body, hex('#3a2850'), 0.35);
-  const rows: Array<[number, number]> = [];
-  for (let j = 0; j <= by - tip; j++) {
-    const u = j / th;
-    const tu = (j % tier) / tier;
-    const hw = Math.min(maxHW, maxHW * (u * 0.72 + tu * 0.4 * Math.min(1, u * 2)) + (j > by - tip - 3 ? 0 : 0));
-    const jitter = Math.round((r() - 0.5) * Math.min(2, u * 3));
-    rows.push([Math.round(cx - hw + jitter), Math.round(cx + hw + jitter)]);
+  const body2 = mix(body, hex('#3a2850'), 0.3);
+  const rows = new Map<number, Array<[number, number]>>();
+  const add = (y: number, a: number, b: number) => {
+    const list = rows.get(y) ?? [];
+    list.push([Math.round(a), Math.round(b)]);
+    rows.set(y, list);
+  };
+  // The trunk line, then tiers: each a bough spreading from the trunk, its tips drooping.
+  for (let y = tip; y <= by + 1; y++) add(y, cx, cx);
+  let y = tip + 1;
+  let tierN = 0;
+  while (y < by - 1) {
+    const u = (y - tip) / th;
+    const tierH = Math.max(3, Math.round(th * (0.07 + r() * 0.05) * (0.7 + u * 0.6)));
+    const wL = Math.max(1, maxHW * Math.min(1, 0.18 + u * 0.95) * (0.8 + r() * 0.35));
+    const wR = Math.max(1, maxHW * Math.min(1, 0.18 + u * 0.95) * (0.8 + r() * 0.35));
+    for (let j = 0; j < tierH; j++) {
+      const v = (j + 1) / tierH;
+      // The bough widens down its tier; the outer tips hang lower.
+      const a = cx - wL * Math.pow(v, 0.7);
+      const b = cx + wR * Math.pow(v, 0.7);
+      add(y + j, a, b);
+    }
+    // Drooping tips below the tier's widest row.
+    const droop = Math.max(1, Math.round(tierH * 0.45));
+    for (let j = 1; j <= droop; j++) {
+      add(y + tierH - 1 + j, cx - wL + j * 0.6, cx - wL + 1 + j * 0.3);
+      add(y + tierH - 1 + j, cx + wR - 1 - j * 0.3, cx + wR - j * 0.6);
+    }
+    y += Math.max(2, Math.round(tierH * (0.62 + r() * 0.2)));
+    tierN++;
   }
-  for (let j = 0; j < rows.length; j++) {
-    const [a, b] = rows[j];
-    const y = tip + j;
-    for (let x = a; x <= b; x++) {
-      const sunEdge = side > 0 ? x === b : x === a;
-      const topEdge = j === 0 || (side > 0 ? x > rows[j - 1][1] : x < rows[j - 1][0]);
-      let c = (x - cx) * side > 0 ? body2 : body;
-      if (sunEdge || topEdge) c = mix(body, rim, sunEdge && topEdge ? 0.9 : 0.6);
-      p.set(x, y, c);
+  void tierN;
+  const has = (xx: number, yy: number) => (rows.get(yy) ?? []).some(([a, b]) => xx >= a && xx <= b);
+  for (const [yy, list] of rows) {
+    for (const [a, b] of list) {
+      for (let x = a; x <= b; x++) {
+        const sunEdge = !has(x + side, yy);
+        const topEdge = !has(x, yy - 1);
+        let c = (x - cx) * side > 0 ? body2 : body;
+        if (sunEdge && topEdge) c = mix(body, rim, 0.85);
+        else if (sunEdge || topEdge) c = mix(body, rim, (x - cx) * side > 0 ? 0.55 : 0.25);
+        p.set(x, yy, c);
+      }
     }
   }
-  // Trunk at the foot.
-  for (let y = by - 2; y <= by + 1; y++) p.set(cx, y, mix(body, hex('#000000'), 0.3));
 }
 
 // ------------------------------------------------------------------ front: out-of-focus framing
@@ -970,8 +1100,9 @@ function blade(p: Pix, x0: number, y0: number, len: number, ang: number, body: R
 
 /** A horizontally tiling strip of soft mist (blobs, blurred), `h` art pixels tall. */
 export function mistStrip(w: number, h: number, color: RGB, seed: number, density: number): Pix {
+  // Painted as alpha alone (the color is one), three tiles wide so the blur wraps, then the middle kept.
   const W3 = w * 3;
-  const p = new Pix(W3, h);
+  const a = new Float32Array(W3 * h);
   const r = rng(seed);
   const blobs = Math.round((w / h) * 6 * density);
   for (let i = 0; i < blobs; i++) {
@@ -979,19 +1110,31 @@ export function mistStrip(w: number, h: number, color: RGB, seed: number, densit
     const cy = h * (0.3 + r() * 0.4);
     const rx = h * (0.5 + r() * 1.6);
     const ry = h * (0.1 + r() * 0.18);
-    const a = 0.15 + r() * 0.45;
+    const k = 0.15 + r() * 0.45;
     for (let t = 0; t < 3; t++) {
       const ox = cx + t * w;
-      for (let y = Math.floor(cy - ry); y <= cy + ry; y++) {
-        for (let x = Math.floor(ox - rx); x <= ox + rx; x++) {
+      for (let y = Math.max(0, Math.floor(cy - ry)); y <= Math.min(h - 1, cy + ry); y++) {
+        for (let x = Math.max(0, Math.floor(ox - rx)); x <= Math.min(W3 - 1, ox + rx); x++) {
           const d = ((x - ox) / rx) ** 2 + ((y - cy) / ry) ** 2;
-          if (d < 1) p.over(x, y, color, a * (1 - d));
+          if (d < 1) {
+            const i = y * W3 + x;
+            a[i] = a[i] + k * (1 - d) * (1 - a[i]);
+          }
         }
       }
     }
   }
-  blurRGBA(p.d, W3, h, h * 0.12);
+  const tmp = new Float32Array(W3 * h);
+  blurPlane(a, tmp, W3, h, h * 0.12);
   const out = new Pix(w, h);
-  for (let y = 0; y < h; y++) out.d.set(p.d.subarray((y * W3 + w) * 4, (y * W3 + 2 * w) * 4), y * w * 4);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      out.d[i] = color[0];
+      out.d[i + 1] = color[1];
+      out.d[i + 2] = color[2];
+      out.d[i + 3] = a[y * W3 + x + w] * 255;
+    }
+  }
   return out;
 }

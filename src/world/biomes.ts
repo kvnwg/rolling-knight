@@ -14,7 +14,9 @@ export type LiquidKind = 'water' | 'lava' | 'swampWater' | 'iceWater' | 'spiritW
 export type PropKind =
   | 'rock' | 'bush' | 'flowers' | 'barrel' | 'crate' | 'bones' | 'torch' | 'lantern' | 'brazier' | 'gravestone' | 'crystalSmall'
   | 'reeds' | 'mushroomSmall' | 'pumpkin' | 'stump' | 'pillar' | 'statue' | 'well' | 'fence' | 'skull' | 'cart' | 'stoneLantern' | 'banner'
-  | 'campfire' | 'tent' | 'hayBale' | 'cabbage' | 'wheat' | 'scarecrow' | 'trough' | 'sunflower';
+  | 'campfire' | 'tent' | 'hayBale' | 'cabbage' | 'wheat' | 'scarecrow' | 'trough' | 'sunflower'
+  // The village (art/village.ts).
+  | 'house' | 'pot' | 'bench' | 'lampPost' | 'signpost' | 'sack' | 'woodpile' | 'noticeBoard' | 'flowerBed' | 'stall' | 'wellStone';
 export type Weather = 'fireflies' | 'snow' | 'embers' | 'dust' | 'spores' | 'petals' | 'leaves' | 'ash' | 'motes' | 'rain';
 export type BodyPlan = 'slime' | 'beast' | 'humanoid' | 'flyer' | 'plant' | 'golem' | 'bug' | 'pumpkin' | 'ghost' | 'pig' | 'ram' | 'chicken';
 
@@ -26,7 +28,9 @@ export interface Biome {
   name: string;
   layout: 'cave' | 'rooms';
   ground: { kind: GroundKind; ramp: Ramp; accent?: Ramp };
-  path: { kind: GroundKind; ramp: Ramp; accent?: Ramp };
+  /** `dirt`: the packed earth a cobbled road wears down to at its edges. `wide`: extra tiles of road
+   * each side of the corridors' middle line. `plaza`: how big rooms' plazas are (1 = as big as fits). */
+  path: { kind: GroundKind; ramp: Ramp; accent?: Ramp; dirt?: Ramp; wide?: number; plaza?: number };
   /** What the solid areas look like: dense trees over a dark floor, or walls with faces. */
   solid: { kind: SolidKind; top: Ramp; face: Ramp; trees?: TreeKind[]; underRamp?: Ramp };
   /** Trees and rocks standing inside rooms. */
@@ -115,7 +119,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
     name: 'Mossy Hamlet',
     layout: 'cave',
     ground: { kind: 'grass', ramp: ['#24361f', '#33502a', '#456a33', '#5c8740', '#7aa552'], accent: ['#b8c867', '#e8c86a', '#d76b5a', '#f0eee0'] },
-    path: { kind: 'cobble', ramp: ['#3d3430', '#5e5148', '#7d6c5d', '#9b8873', '#b9a58a'] },
+    path: { kind: 'cobble', ramp: ['#4c4238', '#6f6353', '#928570', '#b3a68d', '#d1c6aa'], dirt: ['#3e3022', '#5a4632', '#766041', '#917a55'], wide: 1, plaza: 0.6 },
     solid: { kind: 'trees', top: ['#16251a', '#1f3322'], face: ['#2a2420', '#3f362f', '#56493e'], trees: ['oak', 'maple', 'oak'], underRamp: ['#1a2a1c', '#223522'] },
     trees: ['oak', 'maple'],
     treeRamp: ['#1d3a22', '#2c5530', '#3f743b', '#5b9447', '#88b85a'],

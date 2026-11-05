@@ -146,11 +146,11 @@ const BAKE_RATE = 32000;
 const baked = new Map<string, AudioBuffer>();
 const baking = new Set<string>();
 
-function bake(key: string, seconds: number, noise: AudioBuffer, render: (o: Out) => void): Promise<void> {
+function bake(key: string, seconds: number, noise: AudioBuffer, render: (o: Out) => void, rate = BAKE_RATE): Promise<void> {
   if (baking.has(key) || typeof OfflineAudioContext === 'undefined') return Promise.resolve();
   baking.add(key);
   try {
-    const oc = new OfflineAudioContext(1, Math.ceil(seconds * BAKE_RATE), BAKE_RATE);
+    const oc = new OfflineAudioContext(1, Math.ceil(seconds * rate), rate);
     let seed = key.length * 7919;
     const rnd = () => {
       seed = (seed * 16807) % 2147483647;
@@ -169,11 +169,11 @@ function bake(key: string, seconds: number, noise: AudioBuffer, render: (o: Out)
 }
 
 /** Plays the baked sound `key` (at `rate` times its speed) if it's ready, else `live`, and bakes it for next time. */
-function oneShot(out: Out, key: string, seconds: number, at: number, vel: number, rate: number, render: (o: Out) => void, live: () => void): void {
+function oneShot(out: Out, key: string, seconds: number, at: number, vel: number, rate: number, render: (o: Out) => void, live: () => void, bakeRate = BAKE_RATE): void {
   const buf = baked.get(key);
   if (!buf) {
     live();
-    void bake(key, seconds, out.noise, render);
+    void bake(key, seconds, out.noise, render, bakeRate);
     return;
   }
   const { ctx } = out;
@@ -522,16 +522,21 @@ const DRUM_LEN: Record<DrumId, number> = {
 
 /** One drum hit at velocity `vel`; `n` tunes the ones that take a pitch (timpani, bowl). */
 export function drum(out: Out, id: DrumId, at: number, vel: number, n?: number): void {
-  oneShot(out, `${id}:${n ?? ''}`, DRUM_LEN[id], at, vel, 1, (o) => liveDrum(o, id, 0, 1, n), () => liveDrum(out, id, at, vel, n));
+  oneShot(out, `${id}:${n ?? ''}`, DRUM_LEN[id], at, vel, 1, (o) => liveDrum(o, id, 0, 1, n), () => liveDrum(out, id, at, vel, n), drumRate(id));
 }
 
-/** Bakes the drum kit ahead (call once the music starts): the timpani's and bowls' notes too. */
+/** Tuned drums have nothing high in them: baked at a lower rate (a fraction of the memory). */
+const drumRate = (id: DrumId) => (id === 'bowl' || id === 'timpani' ? 16000 : BAKE_RATE);
+
+/**
+ * Bakes the drum kit ahead (call once the music starts), and the victory sting's timpani. Tuned
+ * drums in the themes (bowls on each bar's root) bake as they're first struck.
+ */
 export function warmDrums(noise: AudioBuffer): Promise<void> {
   const jobs: Array<Promise<void>> = [];
-  const ids = Object.keys(DRUM_LEN) as DrumId[];
-  for (const id of ids) {
-    const notes: Array<number | undefined> = id === 'timpani' ? [36, 41, 43, 48] : id === 'bowl' ? [57, 64] : [undefined];
-    for (const n of notes) jobs.push(bake(`${id}:${n ?? ''}`, DRUM_LEN[id], noise, (o) => liveDrum(o, id, 0, 1, n)));
+  for (const id of Object.keys(DRUM_LEN) as DrumId[]) {
+    const notes: Array<number | undefined> = id === 'timpani' ? [36, 41, 43, 48] : id === 'bowl' ? [] : [undefined];
+    for (const n of notes) jobs.push(bake(`${id}:${n ?? ''}`, DRUM_LEN[id], noise, (o) => liveDrum(o, id, 0, 1, n), drumRate(id)));
   }
   return Promise.all(jobs).then(() => {});
 }

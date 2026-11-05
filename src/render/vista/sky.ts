@@ -11,17 +11,17 @@ import { clamp, hex, mix, Pix, rng, sample, type RGB, type Stops } from './pix';
 
 /** The sky from the top of the view (0) down to the horizon (1), and a little past it. */
 export const SKY: Stops = [
-  [0.0, '#120e36'],
-  [0.12, '#1c1650'],
-  [0.26, '#2c1f68'],
-  [0.4, '#45287c'],
-  [0.53, '#6b3389'],
-  [0.65, '#9c4290'],
-  [0.76, '#d0588e'],
-  [0.85, '#f47a86'],
-  [0.92, '#ffa07e'],
-  [0.97, '#ffc386'],
-  [1.0, '#ffd895'],
+  [0.0, '#0a1140'],
+  [0.12, '#121c58'],
+  [0.26, '#21216e'],
+  [0.38, '#3a2680'],
+  [0.5, '#62308c'],
+  [0.62, '#963e94'],
+  [0.73, '#cc5294'],
+  [0.83, '#f2708c'],
+  [0.91, '#ff9a80'],
+  [0.96, '#ffbf84'],
+  [1.0, '#ffd894'],
   [1.2, '#ffe4ae'],
 ];
 
@@ -32,7 +32,7 @@ export function skyAt(v: number): RGB {
 /** Cloud tones from deepest shadow to the sun-lit lining. */
 const CLOUD_RAMP: readonly RGB[] = ['#54418c', '#6c509e', '#8a5ea8', '#ac69aa', '#cf729e', '#ea7f94', '#ff998c', '#ffb98e', '#ffdba4'].map(hex);
 
-export type CloudKind = 'tower' | 'bank' | 'puff';
+export type CloudKind = 'tower' | 'bank' | 'puff' | 'stratus';
 
 export interface CloudOpts {
   w: number;
@@ -78,6 +78,10 @@ export function cumulus(o: CloudOpts): Pix {
     const n = 3 + Math.floor(r() * 2);
     for (let i = 0; i < n; i++) humps.push([W * (0.18 + (0.64 * i) / (n - 1) + (r() - 0.5) * 0.06), W * (0.13 + r() * 0.04), H * (0.62 + r() * 0.38)]);
     body = 0.5;
+  } else if (o.kind === 'stratus') {
+    const n = 4 + Math.floor(r() * 4);
+    for (let i = 0; i < n; i++) humps.push([W * (0.08 + (0.84 * i) / (n - 1) + (r() - 0.5) * 0.05), W * (0.06 + r() * 0.05), H * (0.45 + r() * 0.55)]);
+    body = 0.55;
   } else {
     humps.push([W * (0.46 + r() * 0.08), W * 0.2, H * 0.95]);
     humps.push([W * 0.26, W * 0.13, H * 0.62]);
@@ -230,24 +234,32 @@ export function cumulus(o: CloudOpts): Pix {
     }
   }
   // Clean bands: a pixel unlike all four neighbors takes their most common tone.
+  const nb = new Int8Array(4);
   for (let pass = 0; pass < 3; pass++) {
     for (let y = 0; y < H; y++) {
       for (let xx = 0; xx < W; xx++) {
         const i = y * W + xx;
-        if (tone[i] < 0) continue;
-        const nb: number[] = [];
-        if (xx > 0 && tone[i - 1] >= 0) nb.push(tone[i - 1]);
-        if (xx < W - 1 && tone[i + 1] >= 0) nb.push(tone[i + 1]);
-        if (y > 0 && tone[i - W] >= 0) nb.push(tone[i - W]);
-        if (y < H - 1 && tone[i + W] >= 0) nb.push(tone[i + W]);
-        if (nb.length < 2) continue;
-        let same = 0;
-        for (const v of nb) if (v === tone[i]) same++;
-        if (same >= 1) continue;
-        const counts = new Map<number, number>();
-        for (const v of nb) counts.set(v, (counts.get(v) ?? 0) + 1);
+        const t0 = tone[i];
+        if (t0 < 0) continue;
+        let n = 0;
+        if (xx > 0 && tone[i - 1] >= 0) nb[n++] = tone[i - 1];
+        if (xx < W - 1 && tone[i + 1] >= 0) nb[n++] = tone[i + 1];
+        if (y > 0 && tone[i - W] >= 0) nb[n++] = tone[i - W];
+        if (y < H - 1 && tone[i + W] >= 0) nb[n++] = tone[i + W];
+        if (n < 2) continue;
+        let same = false;
+        for (let k = 0; k < n; k++) if (nb[k] === t0) same = true;
+        if (same) continue;
         let best = nb[0];
-        for (const [v, c] of counts) if (c > (counts.get(best) ?? 0)) best = v;
+        let bestC = 0;
+        for (let a = 0; a < n; a++) {
+          let c = 0;
+          for (let b = 0; b < n; b++) if (nb[b] === nb[a]) c++;
+          if (c > bestC) {
+            bestC = c;
+            best = nb[a];
+          }
+        }
         tone[i] = best;
       }
     }

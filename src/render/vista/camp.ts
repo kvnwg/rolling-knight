@@ -8,7 +8,7 @@ import type { MutationId } from '../../core/state';
 import { CLASS_HAS_SHIELD, KNIGHT_ANCHOR, KNIGHT_H, KNIGHT_W, knightFrame, knightGlow, knightLook, shieldArt, weaponArt, type View } from '../art/knights';
 import { blank, blit, flipX, scale3x, type PixelBuf } from '../pixel/buf';
 import { fireLight, type Ground, type Layout } from './land';
-import { canvas, clamp, ctx2d, h01, hex, mix, Pix, rng, type Canvas, type RGB } from './pix';
+import { canvas, clamp, ctx2d, hex, mix, Pix, rng, type Canvas, type RGB } from './pix';
 
 // ------------------------------------------------------------------ the fire
 
@@ -126,8 +126,9 @@ export function paintCamp(p: Pix, L: Layout, G: Ground): void {
     for (let x = L.fx - 54; x <= L.fx + 54; x++) {
       const d = Math.hypot((x - L.fx) / 50, (y - L.fy) / 15);
       if (d > 1 || !G.inMeadow(x, y)) continue;
-      // A ragged edge where the grass takes over.
-      if (d > 0.78 && h01(x, y, 5) < (d - 0.78) * 4.5) continue;
+      // A ragged edge where the grass takes over (in clumps, not speckles).
+      const ang = Math.atan2((y - L.fy) * 3, x - L.fx);
+      if (d > 0.8 + Math.sin(ang * 5 + 1) * 0.06 + Math.sin(ang * 11 + 2) * 0.04) continue;
       const f = fireLight(L, x, y);
       p.set(x, y, earth[clamp(Math.floor(f * 5.2), 0, 4)]);
     }

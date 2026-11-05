@@ -10,7 +10,7 @@ const rm = q.get('rm') === '1';
 const c = document.getElementById('c') as HTMLCanvasElement;
 const ctx = c.getContext('2d')!;
 const v = new Vista();
-const heroes = (q.get('heroes') ?? 'legendary-blade,rare-cleric,epic-ranger').split(',').map((s) => {
+const heroes = (q.get('heroes') ?? 'legendary-blade,rare-cleric,epic-ranger').split(',').filter(Boolean).map((s) => {
   const [id, m] = s.split(':');
   return { id, mutation: (m || null) as 'gilded' | 'shadow' | 'radiant' | 'void' | null };
 });
@@ -34,6 +34,7 @@ function frame(now: number) {
   const t0 = performance.now();
   v.draw(ctx, w, h, t, { heroes, focusX: fx, focusY: fy, reduceMotion: rm });
   const dt = performance.now() - t0;
+  if (w0.__vistaFirst === undefined) w0.__vistaFirst = dt;
   times.push(dt);
   if (times.length > 120) times.shift();
   w0.__vistaMs = dt;
@@ -42,7 +43,29 @@ function frame(now: number) {
   w0.__vistaReady = true;
   requestAnimationFrame(frame);
 }
-if (q.get('mode') === 'clouds') {
+if (q.get('mode') === 'bench') {
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.round(innerWidth * dpr);
+  const h = Math.round(innerHeight * dpr);
+  c.width = w;
+  c.height = h;
+  const res: number[] = [];
+  const prof: Record<string, number[]> = {};
+  const orig = console.log;
+  console.log = (...a: unknown[]) => {
+    if (a[0] === 'PROF') (prof[String(a[1])] ??= []).push(Number(a[2]));
+  };
+  for (let i = 0; i < 6; i++) {
+    const t0 = performance.now();
+    v.draw(ctx, w + (i % 2), h, 1, { heroes, focusX: fx, focusY: fy });
+    res.push(performance.now() - t0);
+  }
+  console.log = orig;
+  const mins = Object.entries(prof).map(([k, arr]) => `${k}=${Math.min(...arr).toFixed(1)}`).join(' | ');
+  console.log('BENCH builds ms', res.map((x) => x.toFixed(0)).join(','), 'min', Math.min(...res).toFixed(0));
+  console.log('BENCH stages', mins);
+  w0.__vistaReady = true;
+} else if (q.get('mode') === 'clouds') {
   c.style.width = 'auto';
   c.style.height = 'auto';
   cloudSheet(c);

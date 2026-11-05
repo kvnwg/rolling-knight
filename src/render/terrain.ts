@@ -1,14 +1,20 @@
 /**
  * Paints a floor's ground once, when the floor is built: the biome's ground and path materials
- * (grass, cobbles, flagstones, snow, sand...) with organic edges between them, the farm's tilled
- * fields (plowed soil in furrows), pools of water or lava with banks and foam, walls and cliffs drawn
- * with their front faces (the 3/4 view), and ambient occlusion where floor meets wall. Trees, props
- * and everything that moves are drawn on top each frame (renderer.ts).
+ * (grass with tufts, rounded cobbles whose edges wear away into dirt, flagstones, snow, sand...) with
+ * organic edges between them, the farm's tilled fields (plowed soil in furrows), pools of water or
+ * lava with banks and foam, walls and cliffs drawn with their front faces (the 3/4 view), ambient
+ * occlusion where floor meets wall, then the little things on the ground (decals.ts: flowers,
+ * pebbles, leaves, roots, lily pads...) and the shadows everything standing casts toward the lower
+ * right (castShadows.ts). Trees, props and everything that moves are drawn on top each frame
+ * (renderer.ts).
  */
 import type { Biome, GroundKind, Ramp } from '../world/biomes';
 import { BLOCKED, FLOOR, LIQUID, SOLID, TILE, type FloorMap } from '../world/mapgen';
 import { rgb } from './pixel/buf';
-import { makeCanvas } from './art/draw';
+import { makeCanvas, mixHex, shade } from './art/draw';
+import { DECALS, drawDecal, type DecalCtx, type DecalKind } from './art/decals';
+import { castShadows } from './castShadows';
+import { frontDecor } from './art/village';
 
 // ------------------------------------------------------------------ noise
 
@@ -94,6 +100,52 @@ class Courses {
   }
 }
 
+/**
+ * Rounded cobbles: stones on a jittered grid (`size` apart), each pixel belonging to the stone whose
+ * middle is nearest. Gives the stone, its middle and how far the pixel is from it and from the next
+ * stone (close to both: the mortar between them).
+ */
+class Cobbles {
+  constructor(private seed: number, private size: number) {}
+  at(x: number, y: number): { gx: number; gy: number; px: number; py: number; d1: number; d2: number } {
+    const size = this.size;
+    const cx = Math.floor(x / size);
+    const cy = Math.floor(y / size);
+    let d1 = 1e9;
+    let d2 = 1e9;
+    let bx = 0;
+    let by = 0;
+    let bpx = 0;
+    let bpy = 0;
+    for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) {
+      const gx = cx + ox;
+      const gy = cy + oy;
+      // Rows offset by half a stone, like laid cobbles.
+      const px = (gx + 0.2 + h2(gx, gy, this.seed) * 0.6 + (gy & 1) * 0.5) * size;
+      const py = (gy + 0.25 + h2(gx, gy, this.seed + 1) * 0.5) * size;
+      const d = (x + 0.5 - px) ** 2 + ((y + 0.5 - py) * 1.15) ** 2;
+      if (d < d1) {
+        d2 = d1;
+        d1 = d;
+        bx = gx;
+        by = gy;
+        bpx = px;
+        bpy = py;
+      } else if (d < d2) d2 = d;
+    }
+    return { gx: bx, gy: by, px: bpx, py: bpy, d1: Math.sqrt(d1), d2: Math.sqrt(d2) };
+  }
+}
+
+/** Grass tufts: a few blade shapes as [dx, dy, tone change], the tips lit, a shadow at the root. */
+const TUFTS: ReadonlyArray<ReadonlyArray<readonly [number, number, number]>> = [
+  [[-1, -2, 1.3], [1, -2, 1.2], [-1, -1, 0.6], [0, -1, 0.9], [1, -1, 0.5], [-1, 0, -0.8], [0, 0, -0.8], [1, 0, -0.7]],
+  [[0, -2, 1.3], [-1, -1, 1.0], [0, -1, 0.6], [-1, 0, -0.8], [0, 0, -0.8]],
+  [[-2, -2, 1.1], [0, -2, 1.3], [2, -2, 1.0], [-2, -1, 0.5], [-1, -1, 0.8], [0, -1, 0.6], [1, -1, 0.8], [2, -1, 0.4], [-2, 0, -0.7], [-1, 0, -0.8], [0, 0, -0.8], [1, 0, -0.8], [2, 0, -0.6]],
+  [[1, -3, 1.3], [0, -2, 1.0], [1, -2, 0.7], [-1, -1, 1.1], [0, -1, 0.6], [-1, 0, -0.8], [0, 0, -0.8], [1, 0, -0.6]],
+];
+const TUFT_AT = TUFTS.map((t) => new Map(t.map(([dx, dy, d]) => [dx * 16 + dy, d])));
+
 interface MatCtx {
   seed: number;
   ramp: Ramp;
@@ -108,17 +160,17 @@ function paint(kind: GroundKind, x: number, y: number, m: MatCtx): string {
   switch (kind) {
     case 'grass':
     case 'moss': {
-      let k = 1.6 + vnoise(x, y, 26, s) * 1.6 + (vnoise(x, y, 9, s + 1) - 0.5) * 0.7;
-      // Tufts: little bright blades with a shadow under them.
-      const cx = Math.floor(x / 5);
-      const cy = Math.floor(y / 5);
-      const hh = h2(cx, cy, s + 2);
-      if (hh < 0.6) {
-        const tx = cx * 5 + 1 + Math.floor(h2(cx, cy, s + 3) * 3);
-        const ty = cy * 5 + 1 + Math.floor(h2(cx, cy, s + 4) * 3);
-        if (x === tx && y === ty) k += 1.2;
-        else if ((x === tx - 1 || x === tx + 1) && y === ty + 1) k += 0.7;
-        else if (x === tx && y === ty + 1) k -= 0.9;
+      // Patches of lighter and darker grass with soft organic edges, three tones.
+      const n = vnoise(x, y, 30, s) + (vnoise(x, y, 9, s + 1) - 0.5) * 0.32;
+      let k = n < 0.38 ? 1.45 : n < 0.62 ? 2.1 : 2.75;
+      // Short tufts on a jittered grid: lit tips over a darker root.
+      const cx = Math.floor(x / 6);
+      const cy = Math.floor((y + 2) / 5);
+      if (h2(cx, cy, s + 2) < 0.55) {
+        const tx = cx * 6 + 2 + Math.floor(h2(cx, cy, s + 3) * 3);
+        const ty = cy * 5 + 2 + Math.floor(h2(cx, cy, s + 4) * 2);
+        const d = TUFT_AT[Math.floor(h2(cx, cy, s + 6) * TUFTS.length)].get((x - tx) * 16 + (y - ty));
+        if (d !== undefined) k += d;
       }
       if (m.accent && kind === 'grass') {
         const fx = Math.floor(x / 11);
@@ -323,6 +375,57 @@ export function paintTerrainPixels(m: FloorMap, biome: Biome): Omit<Terrain, 'ca
     px[i + 2] = b * f;
     px[i + 3] = 255;
   };
+  // What each pixel is (decals only go where they belong).
+  const surf = new Uint8Array(W * H);
+  // Cobbled roads: whole stones, so the road's edge wears away stone by stone into packed dirt,
+  // then grass; grass grows in the mortar and some stones are greyer than others.
+  const cob = biome.path.kind === 'cobble' ? new Cobbles(seed + 140, 7) : null;
+  // A cobbled road keeps a steadier edge than a dirt track (its stones wear it ragged instead).
+  const ragged = cob ? 0.26 : 0.45;
+  const pathMask = (x: number, y: number) => bil(isPath, x, y) + (vnoise(x, y, 6, seed + 80) - 0.5) * ragged;
+  const stoneMask = new Map<number, number>();
+  const warm = biome.path.ramp;
+  const grey = warm.map((c) => mixHex(c, '#86868a', 0.38));
+  const mortar = shade(warm[0], -0.25);
+  const dirt = biome.path.dirt ?? warm.map((c, k) => mixHex(c, biome.ground.ramp[Math.min(k, biome.ground.ramp.length - 1)], 0.35));
+  let onDirt = false;
+  /** The road at a pixel: a stone or mortar color, packed dirt (sets `onDirt`), or null (no road here). */
+  const cobbleAt = (x: number, y: number, pm: number): string | null => {
+    onDirt = false;
+    const st = cob!.at(x, y);
+    const key = st.gx * 8192 + st.gy;
+    let mid = stoneMask.get(key);
+    if (mid === undefined) {
+      mid = pathMask(st.px, st.py);
+      stoneMask.set(key, mid);
+    }
+    const id = h2(st.gx, st.gy, seed + 141);
+    const cut = 0.47 + (h2(st.gx, st.gy, seed + 142) - 0.5) * 0.16;
+    // A stone missing here and there inside the road; a grassy hollow where the noise says so.
+    const lost = id < 0.02 || vnoise(st.px, st.py, 26, seed + 143) > 0.8;
+    if (mid > cut && !lost) {
+      const gap = st.d2 - st.d1;
+      const dx = x + 0.5 - st.px;
+      const dy = y + 0.5 - st.py;
+      const grassy = vnoise(x, y, 16, seed + 144) > 0.57;
+      if (gap < 1.15 || st.d1 > 4.6) return grassy ? biome.ground.ramp[(x + y) % 3 === 0 ? 3 : 2] : mortar;
+      const ramp = h2(st.gx, st.gy, seed + 145) < 0.3 ? grey : warm;
+      let k = 2.15 + (id - 0.5) * 0.8;
+      const side = dx + dy * 1.1;
+      // A bevel: the rim lit on the top left, shaded on the bottom right; a soft spot of light on top.
+      if (gap < 2.5 || st.d1 > 3.4) k += side < 0 ? 1 : -1;
+      else if (dx < -0.5 && dy < -0.5) k += 0.45;
+      if (grassy && side > 0 && gap < 2.5 && vnoise(x, y, 16, seed + 144) > 0.66) return biome.ground.ramp[2];
+      return ramp[clampK(k, ramp.length)];
+    }
+    if (pm > 0.36) {
+      // Packed dirt where the stones are gone, with the odd pebble.
+      const k = 1.6 + vnoise(x, y, 9, seed + 146) * 1.2 + (h2(x, y, seed + 147) < 0.04 ? 1.4 : 0);
+      onDirt = true;
+      return dirt[clampK(k, dirt.length)];
+    }
+    return null;
+  };
 
   for (let y = 0; y < H; y++) {
     const ty = Math.floor(y / TILE);
@@ -343,6 +446,7 @@ export function paintTerrainPixels(m: FloorMap, biome: Biome): Omit<Terrain, 'ca
           set(i, paint(biome.ground.kind, x, y, ground), Math.round(shadeAmt * 8) / 8);
           continue;
         }
+        if (faceTile) surf[y * W + x] = 5;
         if (faceTile) {
           // The wall's front face (3/4 view), bricks for crypts, rock strata for cliffs.
           const fy = ly;
@@ -407,17 +511,21 @@ export function paintTerrainPixels(m: FloorMap, biome: Biome): Omit<Terrain, 'ca
           }
         }
         set(i, lr[clampK(k, lr.length)]);
+        surf[y * W + x] = edge ? 7 : 3;
         if (lx === 8 && ly === 8 && liquid.glow) glows.push({ x, y, color: liquid.glow, r: 34 });
         continue;
       }
       // Ground or path, blending with a ragged edge.
-      const pm = bil(isPath, x, y) + (vnoise(x, y, 6, seed + 80) - 0.5) * 0.45;
-      const onPath = pm > 0.5;
+      const pm = pathMask(x, y);
+      let road: string | null = null;
+      if (cob && pm > 0.2) road = cobbleAt(x, y, pm);
+      const onPath = cob ? road !== null : pm > 0.5;
       const onField = !onPath && fieldMat !== null && fieldMask(x, y) > 0.5;
-      let col = onPath ? paint(biome.path.kind, x, y, path) : onField ? tilled(x, y, fieldMat!, fieldOf(tx, ty)) : paint(biome.ground.kind, x, y, ground);
+      let col = road ?? (onPath ? paint(biome.path.kind, x, y, path) : onField ? tilled(x, y, fieldMat!, fieldOf(tx, ty)) : paint(biome.ground.kind, x, y, ground));
+      surf[y * W + x] = onField ? 4 : !onPath ? 1 : cob && onDirt ? 6 : 2;
       let dark = 0;
       // The ground's edge throws a little shadow onto the path below it.
-      if (onPath) {
+      if (onPath && !cob) {
         const pmAbove = bil(isPath, x, y - 2) + (vnoise(x, y - 2, 6, seed + 80) - 0.5) * 0.45;
         if (pmAbove <= 0.5) dark += 0.28;
       }
@@ -444,7 +552,112 @@ export function paintTerrainPixels(m: FloorMap, biome: Biome): Omit<Terrain, 'ca
     }
   }
   for (let ty = 0; ty < m.h; ty++) for (let tx = 0; tx < m.w; tx++) if (m.tiles[ty * m.w + tx] === LIQUID) liquidTiles.push({ x: tx * TILE + 8, y: ty * TILE + 8 });
+
+  // --- the little things on the ground
+  const table = DECALS[biome.id];
+  const stone = stoneTones(biome);
+  let target = 1;
+  let glowsLeft = 70;
+  const okAt = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= W || y >= H) return false;
+    const s = surf[y * W + x];
+    // Ground decals spill onto the worn dirt at a road's edge, water ones stay off the shore.
+    return s === target || (target === 1 && s === 6) || (target === 6 && s === 1);
+  };
+  const dc: DecalCtx = {
+    put: (x, y, hex) => {
+      x = Math.round(x);
+      y = Math.round(y);
+      if (okAt(x, y)) set((y * W + x) * 4, hex);
+    },
+    dark: (x, y, f) => {
+      x = Math.round(x);
+      y = Math.round(y);
+      if (!okAt(x, y)) return;
+      const i = (y * W + x) * 4;
+      px[i] *= 1 - f;
+      px[i + 1] *= 1 - f;
+      px[i + 2] *= 1 - f;
+    },
+    ground: biome.ground.ramp,
+    accent: biome.ground.accent ?? ['#e8c86a', '#d76b5a', '#f0eee0'],
+    stone,
+    glow: (x, y, color, r) => {
+      if (glowsLeft-- > 0) glows.push({ x: Math.round(x), y: Math.round(y), color, r });
+    },
+  };
+  const solidNear = (tx: number, ty: number) => {
+    for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) if (tile(tx + ox, ty + oy) === SOLID) return [ox, oy] as const;
+    return null;
+  };
+  for (let ty = 0; ty < m.h; ty++) {
+    for (let tx = 0; tx < m.w; tx++) {
+      const t = tile(tx, ty);
+      if (t === SOLID || fieldAt(tx, ty)) continue;
+      const wet = t === LIQUID;
+      if (wet && (tile(tx - 1, ty) !== LIQUID || tile(tx + 1, ty) !== LIQUID || tile(tx, ty - 1) !== LIQUID || tile(tx, ty + 1) !== LIQUID)) continue;
+      const near = wet ? null : solidNear(tx, ty);
+      const cat = wet ? 'water' : near ? 'edge' : pathAt(tx, ty) ? 'path' : 'ground';
+      // Meadows: patches of the open ground where flowers gather.
+      const meadow = cat === 'ground' && vnoise(tx * TILE, ty * TILE, 90, seed + 610) > 0.62;
+      const list: Array<[DecalKind, number]> = meadow ? [['flowers', 5], ['daisies', 5], ['tuft', 2]] : table[cat];
+      if (!list.length || h2(tx, ty, seed + 600) * 100 >= table.density[cat] * (meadow ? 1.8 : 1)) continue;
+      let x = tx * TILE + 3 + Math.floor(h2(tx, ty, seed + 601) * 10);
+      let y = ty * TILE + 4 + Math.floor(h2(tx, ty, seed + 602) * 9);
+      // Edge things hug the wall or the trees.
+      if (near) {
+        if (near[1] < 0) y = ty * TILE + 3;
+        if (near[0] < 0) x = tx * TILE + 3;
+        else if (near[0] > 0) x = tx * TILE + 12;
+      }
+      const s0 = surf[y * W + x];
+      target = s0 === 7 ? 3 : s0;
+      if (target === 0 || target === 4 || target === 5) continue;
+      drawDecal(pickDecal(list, h2(tx, ty, seed + 603)), dc, x, y, Math.floor(h2(tx, ty, seed + 604) * 1e9));
+    }
+  }
+  // Flowers, pots and tufts along house fronts and other walls a prop says to dress.
+  for (const p of m.props) {
+    for (const d of frontDecor(p)) {
+      target = 1;
+      drawDecal(d.kind, dc, d.x, d.y, d.seed);
+    }
+  }
+
+  // --- shadows thrown toward the lower right by everything standing
+  const sh = castShadows(m, biome, W, H);
+  for (let k = 0; k < sh.length; k++) {
+    if (!sh[k]) continue;
+    const i = k * 4;
+    const [fr, fg, fb] = sh[k] === 2 ? SHADOW_CORE : SHADOW_EDGE;
+    px[i] *= fr;
+    px[i + 1] *= fg;
+    px[i + 2] *= fb;
+  }
   return { w: W, h: H, px, glows, liquid: liquidTiles };
+}
+
+/** Cast shadows: darker and cooler (a core, and a softer edge round it). */
+const SHADOW_CORE = [0.58, 0.62, 0.76] as const;
+const SHADOW_EDGE = [0.78, 0.8, 0.88] as const;
+
+function pickDecal(list: Array<[DecalKind, number]>, u: number): DecalKind {
+  let total = 0;
+  for (const [, w] of list) total += w;
+  let r = u * total;
+  for (const [k, w] of list) {
+    r -= w;
+    if (r < 0) return k;
+  }
+  return list[list.length - 1][0];
+}
+
+/** Five stone tones for pebbles and rubble, from the biome's walls or its path. */
+function stoneTones(biome: Biome): string[] {
+  const f = biome.solid.face;
+  if (f.length >= 5) return [f[0], f[1], f[2], f[3], f[4]];
+  const mid = biome.path.kind === 'cobble' || biome.path.kind === 'flagstone' ? biome.path.ramp[2] : mixHex(f[Math.min(f.length - 1, 2)], '#8a8a90', 0.45);
+  return [shade(mid, -0.55), shade(mid, -0.3), mid, shade(mid, 0.22), shade(mid, 0.42)];
 }
 
 export { FLOOR };

@@ -20,6 +20,9 @@ export function cloudSheet(c: HTMLCanvasElement): void {
     [{ w: 50, h: 22, seed: 14, kind: 'puff', side: 1, sideK: 0.9, haze: skyAt(0.5), hazeK: 0.3, gain: 1 }, 300, 90],
     [{ w: 150, h: 50, seed: 15, kind: 'bank', side: 1, sideK: 0.8, haze: skyAt(0.55), hazeK: 0.3, gain: 1 }, 220, 150],
     [{ w: 170, h: 90, seed: 16, kind: 'tower', side: -1, sideK: 0.4, haze: skyAt(0.5), hazeK: 0.25, gain: 1.1 }, 10, 140],
+    [{ w: 110, h: 9, seed: 17, kind: 'stratus', side: 1, sideK: 0.6, haze: skyAt(0.3), hazeK: 0.3, gain: 1.05 }, 200, 215],
+    [{ w: 80, h: 7, seed: 18, kind: 'stratus', side: 1, sideK: 0.8, haze: skyAt(0.6), hazeK: 0.3, gain: 1.1 }, 320, 235],
+    [{ w: 140, h: 12, seed: 19, kind: 'stratus', side: -1, sideK: 0.4, haze: skyAt(0.5), hazeK: 0.3, gain: 1.1 }, 190, 240],
   ];
   for (const [o, x, y] of items) g.drawImage(cumulus(o).toCanvas(), x * 3, y * 3, Math.round(o.w) * 3, Math.round(o.h) * 3);
   void hex;

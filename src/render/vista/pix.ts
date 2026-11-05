@@ -262,15 +262,27 @@ function boxPass(src: Float32Array, dst: Float32Array, len: number, lines: numbe
   const k = 1 / (2 * r + 1);
   for (let l = 0; l < lines; l++) {
     const o = l * stride;
-    const first = src[o];
-    const last = src[o + (len - 1) * step];
-    const at = (i: number) => (i < 0 ? (clampEdge ? first : 0) : i >= len ? (clampEdge ? last : 0) : src[o + i * step]);
-    let acc = 0;
-    for (let i = -r; i <= r; i++) acc += at(i);
+    const first = clampEdge ? src[o] : 0;
+    const last = clampEdge ? src[o + (len - 1) * step] : 0;
+    let acc = first * r;
+    for (let i = 0; i <= r; i++) acc += i < len ? src[o + i * step] : last;
     for (let i = 0; i < len; i++) {
       dst[o + i * step] = acc * k;
-      acc += at(i + r + 1) - at(i - r);
+      const add = i + r + 1;
+      const sub = i - r;
+      acc += (add < len ? src[o + add * step] : last) - (sub >= 0 ? src[o + sub * step] : first);
     }
+  }
+}
+
+/** Gaussian blur (three box passes) of one plane of values, in place (`tmp` is scratch of the same size). */
+export function blurPlane(a: Float32Array, tmp: Float32Array, w: number, h: number, sigma: number, clampEdge = false): void {
+  if (sigma < 0.3) return;
+  for (const size of boxes(sigma, 3)) {
+    const r = (size - 1) >> 1;
+    if (r < 1) continue;
+    boxPass(a, tmp, w, h, w, 1, r, clampEdge);
+    boxPass(tmp, a, h, w, 1, w, r, clampEdge);
   }
 }
 

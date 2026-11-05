@@ -8,6 +8,7 @@ import type { Biome, PropKind, TreeKind } from '../../world/biomes';
 import { blank, type PixelBuf } from '../pixel/buf';
 import { BODY_ANIMS, BODY_FRAMES } from '../packs/mannequin';
 import { ball, hash, inkOutline, line, mixHex, rect, setRGB, shade } from './draw';
+import { villageArt } from './village';
 
 export interface PropArt {
   buf: PixelBuf;
@@ -483,6 +484,18 @@ export function propArt(kind: PropKind, biome: Biome, seed: number): PropArt {
       rect(b, 12, 0, 3, 1, WOOD[2]);
       return { buf: inkOutline(b, '#140c0a'), ax: 14, ay: 20 };
     }
+    case 'house':
+    case 'pot':
+    case 'bench':
+    case 'lampPost':
+    case 'signpost':
+    case 'sack':
+    case 'woodpile':
+    case 'noticeBoard':
+    case 'flowerBed':
+    case 'stall':
+    case 'wellStone':
+      return villageArt(kind, biome, seed);
     case 'hayBale':
     case 'cabbage':
     case 'wheat':

@@ -7,6 +7,7 @@
  */
 import { Rng } from '../core/rng';
 import type { Biome, PropKind, TreeKind } from './biomes';
+import { dressFloor } from './decor';
 
 export const TILE = 16;
 export const SOLID = 0;
@@ -55,6 +56,8 @@ export interface FloorMap {
    * plus 4 where seedlings grow in them.
    */
   field?: Uint8Array;
+  /** Tiles something big stands on (a house and its roof): trees keep off them. */
+  reserved?: Uint8Array;
   rooms: Room[];
   start: { x: number; y: number };
   exit: { x: number; y: number };
@@ -302,13 +305,23 @@ export function generateFloor(opts: GenOptions): FloorMap {
   // --- room plazas on the path material
   for (const r of rooms) {
     if (r.kind === 'start' || r.kind === 'exit' || r.kind === 'arena' || rng.chance(0.4)) {
-      const pr = Math.max(2, Math.min(r.rx, r.ry) - 1);
+      const pr = Math.max(2, Math.round((Math.min(r.rx, r.ry) - 1) * (biome.path.plaza ?? 1)));
       for (let yy = r.cy - pr; yy <= r.cy + pr; yy++) {
         for (let x = r.cx - pr - 1; x <= r.cx + pr + 1; x++) {
           if (((x - r.cx) / (pr + 1)) ** 2 + ((yy - r.cy) / pr) ** 2 <= 1 + rng.next() * 0.3) markPath(x, yy);
         }
       }
     }
+  }
+  // Wider roads: the path spreads a tile or two either side, over open floor.
+  for (let k = 0; k < (biome.path.wide ?? 0); k++) {
+    const grown = m.path.slice();
+    for (let yy = 1; yy < H - 1; yy++) for (let x = 1; x < W - 1; x++) {
+      const i = yy * W + x;
+      if (m.path[i] || m.tiles[i] !== FLOOR) continue;
+      if (m.path[i - 1] || m.path[i + 1] || m.path[i - W] || m.path[i + W]) grown[i] = 1;
+    }
+    m.path = grown;
   }
   if (!cave) {
     // Crypt-style floors: every room is paved; halls stay the darker material.
@@ -393,6 +406,8 @@ export function generateFloor(opts: GenOptions): FloorMap {
   const weights = biome.props;
   const decor: PropKind[] = ['flowers', 'bones', 'mushroomSmall', 'reeds', 'skull', 'wheat', 'cabbage', 'sunflower'];
   const blocking = (k: PropKind) => !decor.includes(k) && k !== 'torch';
+  // Houses, yards, lamps, squares and set pieces (decor.ts); after the trees, which they clear.
+  dressFloor({ m, biome, rng: new Rng(Rng.hashSeed(opts.seed ^ Math.imul(floor, 40503) ^ 0xdec0)), rooms, occupied, nearCenter, connected: () => countReach(m, start.cx, start.cy) === total() });
   if (biome.fields) plantFields(m, biome, rooms, propRng.fork(3), occupied, nearCenter, () => countReach(m, start.cx, start.cy) === total());
   for (const r of rooms) {
     if (r.kind === 'start') continue;

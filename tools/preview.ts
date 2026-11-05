@@ -81,9 +81,9 @@ if (what === 'props') {
   const { BIOMES } = await import('../src/world/biomes');
   const { propArt, treeArt } = await import('../src/render/art/props');
   const biome = BIOMES[(process.argv[4] ?? 'farmland') as keyof typeof BIOMES];
-  const kinds = ['rock', 'bush', 'flowers', 'barrel', 'crate', 'bones', 'torch', 'lantern', 'brazier', 'gravestone', 'crystalSmall', 'reeds', 'mushroomSmall', 'pumpkin', 'stump', 'pillar', 'statue', 'well', 'fence', 'skull', 'cart', 'stoneLantern', 'banner', 'campfire', 'tent', 'hayBale', 'cabbage', 'wheat', 'scarecrow', 'trough', 'sunflower'] as const;
-  const cw = 30;
-  const ch = 36;
+  const kinds = ['rock', 'bush', 'flowers', 'barrel', 'crate', 'bones', 'torch', 'lantern', 'brazier', 'gravestone', 'crystalSmall', 'reeds', 'mushroomSmall', 'pumpkin', 'stump', 'pillar', 'statue', 'well', 'fence', 'skull', 'cart', 'stoneLantern', 'banner', 'campfire', 'tent', 'hayBale', 'cabbage', 'wheat', 'scarecrow', 'trough', 'sunflower', 'pot', 'bench', 'lampPost', 'signpost', 'sack', 'woodpile', 'noticeBoard', 'flowerBed', 'stall', 'wellStone'] as const;
+  const cw = 34;
+  const ch = 40;
   const cols = 10;
   const trees = [...new Set([...biome.trees, ...(biome.solid.trees ?? [])])];
   const rows = Math.ceil(kinds.length / cols) * 2 + 2;
@@ -105,6 +105,23 @@ if (what === 'props') {
   });
   writePng(out, sheet, 3);
   console.log('wrote', out, trees.join(' '));
+}
+
+if (what === 'houses') {
+  // The five house variants: npx tsx tools/preview.ts houses out.png
+  const { BIOMES } = await import('../src/world/biomes');
+  const { propArt } = await import('../src/render/art/props');
+  const biome = BIOMES[(process.argv[4] ?? 'hamlet') as keyof typeof BIOMES];
+  const arts = [0, 1, 2, 3, 4].map((v) => propArt('house', biome, v * 104729 + 7));
+  const sheet = blank(arts.reduce((a, x) => a + x.buf.w + 8, 8), Math.max(...arts.map((x) => x.buf.h)) + 16);
+  fill(sheet, biome.ground.ramp[2]);
+  let x = 8;
+  for (const a of arts) {
+    blit(sheet, a.buf, x, sheet.h - 8 - a.ay);
+    x += a.buf.w + 8;
+  }
+  writePng(out, sheet, 4);
+  console.log('wrote', out);
 }
 
 if (what === 'floor') {

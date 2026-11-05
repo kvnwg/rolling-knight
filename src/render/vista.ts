@@ -18,7 +18,7 @@
 import type { MutationId } from '../core/state';
 import type { View } from './art/knights';
 import { FIRE_H, FIRE_W, fireFrames, fireFront, knightSprite, paintCamp, type KnightSprite } from './vista/camp';
-import { ground, makeLayout, mistStrip, paintFar, paintFront, paintLake, paintMid, paintNear, type Glow, type Layout } from './vista/land';
+import { ground, makeLayout, mistStrip, paintFar, paintFront, paintLake, paintMid, paintNear, riverPath, type Glow, type Layout } from './vista/land';
 import { blurRGBA, blurred, canvas, clamp, crop, ctx2d, firstRow, glowSprite, hex, luma, padPix, Pix, rng, type Canvas } from './vista/pix';
 import { cumulus, SKY, skyAt, streak, type CloudKind } from './vista/sky';
 
@@ -104,10 +104,22 @@ const GOLD = hex('#ffd27a');
 const EMBER = hex('#ff7a30');
 const FLY = hex('#e8ff9a');
 
+/** How long a new size or focus must hold before the layers are rebuilt, and the crossfade after. */
+const SETTLE_MS = 200;
+const FADE_MS = 400;
+
+const now = (): number => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
 export class Vista {
   private key = '';
   private built: Built | null = null;
-  private knights = new Map<string, KnightSprite>();
+  /** The layout being faded out after a rebuild. */
+  private prev: Built | null = null;
+  private fadeAt = 0;
+  private fadeCanvas: Canvas | null = null;
+  private pendingKey = '';
+  private pendingAt = 0;
+  private knights = new Map<string, KnightSprite | null>();
   private still: Canvas | null = null;
   private stillKey = '';
 
@@ -118,44 +130,93 @@ export class Vista {
   draw(ctx: Ctx, w: number, h: number, t: number, opts: { heroes: Array<{ id: string; mutation: MutationId | null }>; focusX: number; focusY: number; reduceMotion?: boolean }): void {
     w = Math.max(1, Math.round(w));
     h = Math.max(1, Math.round(h));
-    const S = this.ensure(w, h, opts.focusX, opts.focusY);
+    const S = this.ensure(w, h, opts.focusX, opts.focusY, !!opts.reduceMotion);
     if (opts.reduceMotion) {
-      // A still frame: composed once, then just blitted.
+      // A still frame: composed once per layout, then just blitted.
       const k = `${this.key}|${opts.heroes.map((hh) => `${hh.id}:${hh.mutation ?? ''}`).join(',')}`;
       if (!this.still || this.stillKey !== k) {
-        this.still = canvas(w, h);
+        this.still = canvas(S.L.w, S.L.h);
         this.stillKey = k;
-        this.frame(ctx2d(this.still), S, 9.5, opts.heroes, true);
+        this.frame(ctx2d(this.still), S, 9.5, opts.heroes, true, 1, 1);
       }
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';
-      ctx.drawImage(this.still, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(this.still, 0, 0, w, h);
       ctx.restore();
       return;
     }
-    this.frame(ctx, S, t, opts.heroes, false);
+    // A layout that is being replaced is drawn stretched to the current size until the new one is ready.
+    this.frame(ctx, S, t, opts.heroes, false, w / S.L.w, h / S.L.h);
+    if (this.prev) {
+      const k = (now() - this.fadeAt) / FADE_MS;
+      if (k >= 1) {
+        this.prev = null;
+        this.fadeCanvas = null;
+      } else {
+        if (!this.fadeCanvas || this.fadeCanvas.width !== w || this.fadeCanvas.height !== h) this.fadeCanvas = canvas(w, h);
+        const fc = ctx2d(this.fadeCanvas);
+        this.frame(fc, this.prev, t, opts.heroes, false, w / this.prev.L.w, h / this.prev.L.h);
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1 - k * k * (3 - 2 * k);
+        ctx.drawImage(this.fadeCanvas, 0, 0);
+        ctx.restore();
+      }
+    }
   }
 
   // ------------------------------------------------------------------ building
 
-  private ensure(w: number, h: number, fx: number, fy: number): Built {
+  /**
+   * The layers for this size and focus. The first build happens at once; later changes wait until the
+   * size and focus have held still for a moment (a rotation, a window drag or a menu transition costs
+   * one rebuild, not one per frame), then the new layout fades in over the old.
+   */
+  private ensure(w: number, h: number, fx: number, fy: number, instant: boolean): Built {
     const key = `${w}x${h}|${Math.round(fx * 200)}|${Math.round(fy * 200)}`;
-    if (!this.built || key !== this.key) {
+    if (!this.built) {
       this.key = key;
       this.built = build(makeLayout(w, h, fx, fy));
+      return this.built;
+    }
+    if (key === this.key) {
+      this.pendingKey = '';
+      return this.built;
+    }
+    const tNow = now();
+    if (key !== this.pendingKey) {
+      this.pendingKey = key;
+      this.pendingAt = tNow;
+    }
+    if (instant || tNow - this.pendingAt >= SETTLE_MS) {
+      const old = this.built;
+      this.key = key;
+      this.pendingKey = '';
+      this.built = build(makeLayout(w, h, fx, fy));
+      if (!instant) {
+        this.prev = old;
+        this.fadeAt = now();
+      }
     }
     return this.built;
   }
 
-  private knight(id: string, mutation: MutationId | null, slot: Slot, frame: number, t: number, rimSide: number): KnightSprite {
+  /** A knight's lit sprite (cached), or null if the id is unknown (the camp just leaves the place empty). */
+  private knight(id: string, mutation: MutationId | null, slot: Slot, frame: number, t: number, rimSide: number): KnightSprite | null {
     // Primordial armor cycles color; its frames are keyed by time.
     const tk = id.startsWith('primordial') ? Math.floor(t * 6) % 40 : 0;
     const key = `${id}|${mutation ?? ''}|${slot.view}|${frame}|${slot.flip ? 1 : 0}|${slot.fireDir}|${rimSide}|${tk}`;
     let k = this.knights.get(key);
-    if (!k) {
-      k = knightSprite(id, mutation, slot.view, frame, slot.flip, tk / 6, slot.fireDir, rimSide);
+    if (k === undefined) {
+      try {
+        k = knightSprite(id, mutation, slot.view, frame, slot.flip, tk / 6, slot.fireDir, rimSide);
+      } catch {
+        k = null;
+      }
       this.knights.set(key, k);
       if (this.knights.size > 160) this.knights.delete(this.knights.keys().next().value!);
     }
@@ -164,11 +225,11 @@ export class Vista {
 
   // ------------------------------------------------------------------ a frame
 
-  private frame(g: Ctx, S: Built, t: number, heroes: VistaOptions['heroes'], still: boolean): void {
+  private frame(g: Ctx, S: Built, t: number, heroes: VistaOptions['heroes'], still: boolean, sx: number, sy: number): void {
     const L = S.L;
     const p = L.p;
     g.save();
-    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.setTransform(sx, 0, 0, sy, 0, 0);
     g.globalAlpha = 1;
     g.globalCompositeOperation = 'source-over';
     g.imageSmoothingEnabled = false;
@@ -176,6 +237,7 @@ export class Vista {
     // Sky, stars, high streaks, clouds, birds.
     g.drawImage(S.sky, 0, 0);
     this.stars(g, S, t);
+    if (!still) this.shootingStar(g, L, t);
     for (const d of S.streaksBack) this.drift(g, L, d, t);
     for (const d of S.clouds) this.drift(g, L, d, t);
     for (const d of S.streaksFront) this.drift(g, L, d, t);
@@ -208,7 +270,7 @@ export class Vista {
     // Light: sun shafts and flare, over the land.
     g.imageSmoothingEnabled = true;
     g.globalCompositeOperation = 'screen';
-    g.globalAlpha = 0.55 + 0.12 * Math.sin(t * 0.21);
+    g.globalAlpha = 0.7 + 0.15 * Math.sin(t * 0.21);
     g.drawImage(S.rays, 0, 0, L.W * p, L.H * p);
     g.globalAlpha = 1;
     g.globalCompositeOperation = 'lighter';
@@ -281,6 +343,38 @@ export class Vista {
         for (let rx = 0; rx < row.length; rx++) if (row[rx] === 'X') g.fillRect((x + rx - 2) * p, (y + ry - 1) * p, p, p);
       });
     }
+  }
+
+  /** Now and then a shooting star crosses the dark upper sky. */
+  private shootingStar(g: Ctx, L: Layout, t: number): void {
+    const period = 19;
+    const n = Math.floor(t / period);
+    const k = (t - n * period) / 0.9;
+    if (k < 0 || k > 1) return;
+    const p = L.p;
+    const rx = ((n * 0.618034) % 1) * 0.6 + 0.1;
+    const x0 = L.W * rx;
+    const y0 = L.hy * (0.06 + ((n * 0.414) % 1) * 0.16);
+    const len = Math.min(L.W, L.hy) * 0.28;
+    const dx = len * 0.94;
+    const dy = len * 0.34;
+    const hx = x0 + dx * k;
+    const hy = y0 + dy * k;
+    const a = Math.sin(k * Math.PI);
+    g.save();
+    g.globalCompositeOperation = 'lighter';
+    const gr = g.createLinearGradient((hx - dx * 0.35) * p, (hy - dy * 0.35) * p, hx * p, hy * p);
+    gr.addColorStop(0, 'rgba(255,220,240,0)');
+    gr.addColorStop(1, `rgba(255,244,250,${(0.85 * a).toFixed(3)})`);
+    g.strokeStyle = gr;
+    g.lineWidth = Math.max(1, p * 0.8);
+    g.lineCap = 'round';
+    g.beginPath();
+    g.moveTo((hx - dx * 0.35) * p, (hy - dy * 0.35) * p);
+    g.lineTo(hx * p, hy * p);
+    g.stroke();
+    glow(g, glowSprite(hex('#ffe6f4')), hx * p, hy * p, 4 * p, 4 * p, 0.7 * a);
+    g.restore();
   }
 
   private windows(g: Ctx, S: Built, t: number, mirrored: boolean): void {
@@ -358,7 +452,10 @@ export class Vista {
     g.globalCompositeOperation = 'source-over';
 
     // Shadows, cast away from the fire.
-    const placed = heroes.slice(0, SLOTS.length).map((hero, i) => ({ hero, slot: SLOTS[i] }));
+    // One knight stands behind the fire; two face each other across it; three make the full ring.
+    const valid = heroes.filter((hero) => this.knight(hero.id, hero.mutation, SLOTS[0], 0, t, 1) !== null).slice(0, SLOTS.length);
+    const order = valid.length === 2 ? [1, 2] : [0, 1, 2];
+    const placed = valid.map((hero, i) => ({ hero, slot: SLOTS[order[i]] }));
     for (const { slot } of placed) {
       const kx = L.fx + slot.dx;
       const ky = L.fy + slot.dy;
@@ -381,6 +478,7 @@ export class Vista {
       const { hero, slot } = placed[i];
       const frame = Math.floor(t * 1.9 + slot.phase * 2) % 2;
       const k = this.knight(hero.id, hero.mutation, slot, frame, t, rimSide);
+      if (!k) return;
       const x = L.fx + slot.dx - k.ax;
       const y = L.fy + slot.dy - k.ay;
       if (k.glow) {
@@ -395,7 +493,8 @@ export class Vista {
       g.drawImage(k.lit, x * p, y * p, k.w * p, k.h * p);
       g.globalAlpha = 1;
     };
-    if (placed.length > 0) drawKnight(0);
+    const behind = placed.length !== 2 && placed.length > 0;
+    if (behind) drawKnight(0);
 
     const fi = Math.floor(t * 11) % S.fire.length;
     g.imageSmoothingEnabled = false;
@@ -403,7 +502,7 @@ export class Vista {
     const ff = S.fireFront;
     g.drawImage(ff.c, ff.x * p, ff.y * p, ff.w * p, ff.h * p);
 
-    for (let i = 1; i < placed.length; i++) drawKnight(i);
+    for (let i = behind ? 1 : 0; i < placed.length; i++) drawKnight(i);
 
     // The fire's glow, embers and smoke.
     g.imageSmoothingEnabled = true;
@@ -483,12 +582,45 @@ function sunPix(R: number): Pix {
       const d = Math.hypot(x + 0.5 - c, y + 0.5 - c) / R;
       if (d > 1) continue;
       const low = (y + 0.5 - c) / R;
-      let col = d < 0.7 ? '#fffcf0' : d < 0.88 ? '#fff0c6' : '#ffd99c';
-      if (low > 0.45 && d >= 0.7) col = '#ffcc8e';
+      let col = d < 0.8 ? '#fffdf4' : d < 0.93 ? '#fff6dc' : '#ffefc4';
+      if (low > 0.5 && d >= 0.8) col = '#ffe8b8';
       p.set(x, y, hex(col));
     }
   }
   return p;
+}
+
+/** Half resolution (2 x 2 box average, premultiplied). */
+function half(src: Pix): Pix {
+  const out = new Pix(Math.ceil(src.w / 2), Math.ceil(src.h / 2));
+  for (let y = 0; y < out.h; y++) {
+    for (let x = 0; x < out.w; x++) {
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      let a = 0;
+      for (let dy = 0; dy < 2; dy++) {
+        for (let dx = 0; dx < 2; dx++) {
+          const sx = Math.min(src.w - 1, x * 2 + dx);
+          const sy = Math.min(src.h - 1, y * 2 + dy);
+          const i = (sy * src.w + sx) * 4;
+          const al = src.d[i + 3];
+          r += src.d[i] * al;
+          g += src.d[i + 1] * al;
+          b += src.d[i + 2] * al;
+          a += al;
+        }
+      }
+      const o = (y * out.w + x) * 4;
+      if (a > 0) {
+        out.d[o] = r / a;
+        out.d[o + 1] = g / a;
+        out.d[o + 2] = b / a;
+      }
+      out.d[o + 3] = a / 4;
+    }
+  }
+  return out;
 }
 
 /** Bright parts of a sprite, blurred: the bloom drawn additively over it. */
@@ -575,13 +707,22 @@ function build(L: Layout): Built {
   if (L.winX1 < W - 40) addCloud('bank', L.winX1 + (W - L.winX1) * 0.5, L.hy * 0.5, clamp((W - L.winX1) * 0.6, 60, 200), clamp(L.hy * 0.22, 12, 48), 0.18, 15);
   const streaksBack: Drifter[] = [];
   const streaksFront: Drifter[] = [];
-  for (let i = 0; i < 7; i++) {
-    const v = 0.12 + r() * 0.6;
-    const len = clamp(ww * (0.1 + r() * 0.22), 24, 150);
-    const thick = 2 + Math.floor(r() * 3);
-    const sp = streak(len, thick, 200 + i, v, skyAt(v));
-    const d: Drifter = { c: sp.toCanvas(), bloom: null, pad: 0, x0: r() * W, y: v * L.hy, w: sp.w, h: sp.h, speed: 0.25 + r() * 0.35 };
-    (v < 0.3 ? streaksBack : streaksFront).push(d);
+  // High, thin cirrus lines.
+  for (let i = 0; i < 4; i++) {
+    const v = 0.08 + r() * 0.24;
+    const len = clamp(ww * (0.1 + r() * 0.2), 24, 140);
+    const sp = streak(len, 2 + Math.floor(r() * 2), 200 + i, v, skyAt(v));
+    streaksBack.push({ c: sp.toCanvas(), bloom: null, pad: 0, x0: r() * W, y: v * L.hy, w: sp.w, h: sp.h, speed: 0.3 + r() * 0.3 });
+  }
+  // Lower down, long flat stratus lit from beneath.
+  for (let i = 0; i < 6; i++) {
+    const v = 0.36 + r() * 0.42;
+    const len = clamp(ww * (0.12 + r() * 0.22), 34, 170);
+    const sh = clamp(len * (0.07 + r() * 0.03), 6, 13);
+    const cx = r() * W;
+    const side = Math.sign(L.sunX - cx) || 1;
+    const pix = cumulus({ w: len, h: sh, seed: 300 + i, kind: 'stratus', side, sideK: 0.7, haze: skyAt(v), hazeK: 0.3, gain: 1.05 + clamp(v - 0.5, 0, 0.3) * 0.5 });
+    streaksFront.push({ c: pix.toCanvas(), bloom: null, pad: 0, x0: cx - pix.w / 2, y: v * L.hy - sh, w: pix.w, h: pix.h, speed: 0.22 + r() * 0.3 });
   }
 
   // --- Far and middle distance, blurred and crisp, into one device-res band.
@@ -592,7 +733,7 @@ function build(L: Layout): Built {
   const farMid = canvas(w, (fmBot - fmTop) * p);
   const fg = ctx2d(farMid);
   const farBand = crop(far, 0, fmTop, W, fmBot - fmTop);
-  const fb = blurred(farBand, 0.65, 2);
+  const fb = blurred(farBand, 0.6, 1);
   fg.imageSmoothingEnabled = true;
   fg.drawImage(fb.toCanvas(), 0, 0, W * p, (fmBot - fmTop) * p);
   // Haze between the mountains and the castle hill.
@@ -619,13 +760,14 @@ function build(L: Layout): Built {
   drawPix(ng, crop(nearPix, 0, nearY, W, H - nearY), 0, 0, p);
   const dofY = L.fy + 24;
   if (dofY < H - 6) {
+    // Blurred at half resolution (it is soft anyway), faded in below the camp.
     const pad = 8;
-    const region = crop(nearPix, 0, dofY - pad, W, H - dofY + pad);
-    blurRGBA(region.d, region.w, region.h, 1.6, true);
-    const mc = canvas(w, region.h * p);
+    const region = half(crop(nearPix, 0, dofY - pad, W, H - dofY + pad));
+    blurRGBA(region.d, region.w, region.h, 0.8, true);
+    const mc = canvas(w, (H - dofY + pad) * p);
     const mg = ctx2d(mc);
     mg.imageSmoothingEnabled = true;
-    mg.drawImage(region.toCanvas(), 0, 0, W * p, region.h * p);
+    mg.drawImage(region.toCanvas(), 0, 0, W * p, (H - dofY + pad) * p);
     mg.globalCompositeOperation = 'destination-in';
     const gr = mg.createLinearGradient(0, pad * p, 0, (pad + 80) * p);
     gr.addColorStop(0, 'rgba(0,0,0,0)');
@@ -646,7 +788,7 @@ function build(L: Layout): Built {
   // --- Mist drifting over the far shore and over the near forest.
   const mists: Mist[] = [];
   const mh1 = Math.round(clamp((L.lakeBot - L.hy) * 0.5, 8, 24));
-  mists.push({ c: mistStrip(W, mh1, hex('#ffc8a6'), L.seed + 91, 1).toCanvas(), y: L.shoreY - mh1 * 0.4, h: mh1, speed: 0.9, alpha: 0.4 });
+  mists.push({ c: mistStrip(W, mh1, hex('#ffc8a6'), L.seed + 91, 0.8).toCanvas(), y: L.shoreY - mh1 * 0.22, h: mh1, speed: 0.9, alpha: 0.3 });
   const mh2 = Math.round(clamp((L.backY - L.lakeBot) * 0.8, 10, 36));
   mists.push({ c: mistStrip(W, mh2, hex('#b884b4'), L.seed + 92, 1.2).toCanvas(), y: L.lakeBot - mh2 * 0.25, h: mh2, speed: -1.4, alpha: 0.32 });
   const mh3 = Math.round(clamp(H * 0.08, 18, 50));
@@ -656,7 +798,7 @@ function build(L: Layout): Built {
   ];
 
   // --- Light shafts from the sun (low res, blurred).
-  const rs = 2;
+  const rs = 4;
   const rays = new Pix(Math.ceil(W / rs), Math.ceil(H / rs));
   {
     const rc = rays.toCanvas();
@@ -682,7 +824,7 @@ function build(L: Layout): Built {
     }
     const img = rg.getImageData(0, 0, rc.width, rc.height);
     rays.d.set(img.data);
-    blurRGBA(rays.d, rays.w, rays.h, 2.5);
+    blurRGBA(rays.d, rays.w, rays.h, 1.3);
   }
 
   // --- Vignette and grade (low res, scaled up smooth).
@@ -696,14 +838,14 @@ function build(L: Layout): Built {
     const cy = (L.hy * 0.9 * p) / vs;
     const R = Math.hypot(vw, vh);
     const gr = vg.createRadialGradient(cx, cy, R * 0.18, cx, cy, R * 0.82);
-    gr.addColorStop(0, 'rgba(14,6,34,0)');
-    gr.addColorStop(0.55, 'rgba(14,6,34,0.18)');
-    gr.addColorStop(1, 'rgba(10,4,26,0.62)');
+    gr.addColorStop(0, 'rgba(14,8,40,0)');
+    gr.addColorStop(0.55, 'rgba(12,8,40,0.18)');
+    gr.addColorStop(1, 'rgba(8,6,30,0.62)');
     vg.fillStyle = gr;
     vg.fillRect(0, 0, vw, vh);
     const top = vg.createLinearGradient(0, 0, 0, (L.hy * 0.5 * p) / vs);
-    top.addColorStop(0, 'rgba(10,6,40,0.35)');
-    top.addColorStop(1, 'rgba(10,6,40,0)');
+    top.addColorStop(0, 'rgba(6,10,44,0.38)');
+    top.addColorStop(1, 'rgba(6,10,44,0)');
     vg.fillStyle = top;
     vg.fillRect(0, 0, vw, vh);
     const bot = vg.createLinearGradient(0, ((L.fy + 30) * p) / vs, 0, vh);
@@ -726,6 +868,13 @@ function build(L: Layout): Built {
     const spread = L.sunR * 0.7 + yy * 0.55;
     const gx = (r() + r() + r() - 1.5) * spread;
     glints.push({ x: L.sunX + gx, y: L.shoreY + yy, len: 1 + Math.floor(r() * (2 + yy * 0.12)), s: 1.2 + r() * 2.6, ph: r() * 6.28, b: clamp(1 - Math.abs(gx) / (spread * 1.6), 0.15, 1) });
+  }
+  // Glints down the river too, where it shows beside the ledge.
+  const rp = riverPath(L);
+  for (let i = 0; i < 40; i++) {
+    const [cx, y, hw] = rp[Math.floor(Math.pow(r(), 0.8) * (rp.length - 1))];
+    if (G.inMeadow(Math.round(cx), y) || y > L.H * 0.97) continue;
+    glints.push({ x: cx + (r() - 0.5) * hw * 1.4, y, len: 1 + Math.floor(r() * (1 + hw * 0.3)), s: 1 + r() * 2, ph: r() * 6.28, b: 0.5 });
   }
   const flies: Built['flies'] = [];
   for (let i = 0; i < 18; i++) {
