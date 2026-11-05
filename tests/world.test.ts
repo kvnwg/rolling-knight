@@ -6,7 +6,7 @@ import { Game } from '../src/game';
 import { BIOME_ORDER, BIOMES, biomeForFloor, isBossFloor } from '../src/world/biomes';
 import { BLOCKED, FLOOR, SOLID, TILE, bfs, generateFloor, tileAt } from '../src/world/mapgen';
 import { floorBoss, floorMobs } from '../src/world/mobgen';
-import { ROLL_TIME, rigSkill } from '../src/world/skills';
+import { CAST_TIME, rigSkill } from '../src/world/skills';
 import { EXIT_HOLD, World, type HeroSpec } from '../src/world/world';
 
 function squad(ids: string[]): HeroSpec[] {
@@ -293,10 +293,10 @@ describe('the squad in a fight', () => {
     const mobHp = mob.hp;
     aeon.specialT = 0;
     // The skill button rolls now: Rewind is Aeon's jackpot, so the roll is rigged to land on it.
-    // It spins for ROLL_TIME, then the rewind plays (0.8 s).
+    // It spins for ROLL_TIME and slams down (CAST_TIME in all), then the rewind plays (0.8 s).
     rigSkill(aeon, 'rewind');
     w.input.special = true;
-    for (let t = 0; t < ROLL_TIME + 0.1; t += 1 / 30) w.update(1 / 30);
+    for (let t = 0; t < CAST_TIME + 0.1; t += 1 / 30) w.update(1 / 30);
     expect(w.rewind).not.toBeNull();
     for (let t = 0; t < 1.2; t += 1 / 30) w.update(1 / 30);
     expect(w.rewind).toBeNull();

@@ -189,11 +189,16 @@ export class FightObserver {
       this.emit('skill_roll_start', { x: h.x, y: h.y, gain: mine ? 1 : 0.55, prio: mine ? 2 : 1 });
       return;
     }
-    // It landed and the skill fired just now: what it drew as it fired is its sound's.
+    const lesser: Prio = step >= 3 ? 2 : 1;
+    if (e.phase === 'reveal') {
+      // The reel stopped on its skill (it slams down and fires a moment later).
+      this.reels.delete(h.uid);
+      this.emit(landCue(e.skill.tier), { x: h.x, y: h.y, gain: mine ? 1 : 0.7, ...(mine ? {} : { prio: lesser }) });
+      return;
+    }
+    // It slammed down and the skill fired just now: what it drew as it fired is its sound's.
     this.reels.delete(h.uid);
     for (const f of w.fx) if (f.kind !== 'hit' && f.kind !== 'crit') this.seen.add(f);
-    const lesser: Prio = step >= 3 ? 2 : 1;
-    this.emit(landCue(e.skill.tier), { x: h.x, y: h.y, gain: mine ? 1 : 0.7, ...(mine ? {} : { prio: lesser }) });
     this.emit(skillCue(e.skill.id), { x: h.x, y: h.y, gain: mine ? 1 : 0.8, delay: 0.02, ...(mine ? {} : { prio: lesser }) });
   }
 

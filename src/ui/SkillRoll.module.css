@@ -25,6 +25,39 @@
 .root[data-round] .win {
   clip-path: circle(50%);
 }
+/* The big spell reel: a plain window, the cells above and below the line in the dark. */
+.root[data-rect] .win {
+  clip-path: none;
+  background: linear-gradient(180deg, #0c0810 0%, #1d1428 22%, #2a1f38 50%, #1d1428 78%, #0c0810 100%);
+}
+.root[data-rect] .win::before {
+  /* The line: brass rules above and below the middle cell. */
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: var(--cell);
+  transform: translateY(-50%);
+  border-top: var(--px) solid rgba(255, 214, 120, 0.55);
+  border-bottom: var(--px) solid rgba(255, 214, 120, 0.55);
+  pointer-events: none;
+  z-index: 1;
+}
+.root[data-rect] .win::after {
+  /* The glass: the cells off the line fall into shadow. */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(8, 5, 12, 0.85) 0%, rgba(8, 5, 12, 0) 30%, rgba(8, 5, 12, 0) 70%, rgba(8, 5, 12, 0.85) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+/* The skill flew out to slam down: its cell stands empty. */
+.root[data-slam] .strip {
+  opacity: 0.18;
+  filter: grayscale(1);
+}
 .bump {
   position: absolute;
   inset: 0;

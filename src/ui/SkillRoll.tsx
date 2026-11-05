@@ -107,12 +107,31 @@ function stripFor(list: readonly SkillDef[], result: SkillDef, from: SkillIcon, 
   return icons;
 }
 
-/** Where the strip is (in cells) `u` of the way through a roll: a kick back, then a brake onto RESULT. */
+/**
+ * Where the strip is (in cells) `u` of the way through a roll: a kick back, a fast spin braking onto
+ * RESULT, the last few cells ticking in one at a time (each holds on the line, then drops to the
+ * next), and the result dipping past the line and settling back as it lands.
+ */
 function stripPos(u: number, k: number): number {
   const kick = 0.08;
   if (u < kick) return -0.18 * Math.sin((Math.PI * u) / kick);
+  if (u >= 1) return RESULT;
   const v = Math.min(1, (u - kick) / (1 - kick));
-  return RESULT * (1 - Math.pow(1 - v, k));
+  const p = RESULT * (1 - Math.pow(1 - v, k));
+  let q = p;
+  if (p > RESULT - 3.2) {
+    // Tick, tick, tick: the cell holds most of its time, then snaps down.
+    const base = Math.floor(p);
+    const f = p - base;
+    q = base + (f < 0.55 ? 0 : Math.pow((f - 0.55) / 0.45, 2));
+  }
+  // The thud: past the line and back in the last moments.
+  const land = 0.94;
+  if (u > land) {
+    const t = (u - land) / (1 - land);
+    q = RESULT + 0.16 * Math.sin(t * Math.PI) * (1 - t);
+  }
+  return q;
 }
 
 interface Pop {
@@ -127,7 +146,30 @@ let popKeys = 0;
  * follows a squad slot instead of the knight you control; `size` is the well's size in art pixels
  * (34 for the special slot); `sound` plays the reel's ticks and thud (on by default).
  */
-export function SkillRoll({ game, slot, size = 34, sound = true, well, round }: { game: Game; slot?: number; size?: number; sound?: boolean; well?: number; round?: boolean }) {
+export function SkillRoll({
+  game,
+  slot,
+  size = 34,
+  sound = true,
+  well,
+  round,
+  tall,
+  rect,
+  pop: popOn = true,
+}: {
+  game: Game;
+  slot?: number;
+  size?: number;
+  sound?: boolean;
+  well?: number;
+  round?: boolean;
+  /** A window taller than a cell: the cells above and below peek in (the big spell reel). */
+  tall?: boolean;
+  /** A square-cornered window (the big spell reel's) instead of the slot's octagon. */
+  rect?: boolean;
+  /** The skill's name pops up over the slot as it lands (off where the spell slam shows it). */
+  pop?: boolean;
+}) {
   const rootRef = useRef<HTMLSpanElement>(null);
   const stripRef = useRef<HTMLSpanElement>(null);
   const bumpRef = useRef<HTMLSpanElement>(null);
@@ -139,10 +181,14 @@ export function SkillRoll({ game, slot, size = 34, sound = true, well, round }: 
   const inset = well ?? Math.round((size * 5) / 34);
   const win = size - 2 * inset;
   const scale = Math.max(1, Math.floor((win - 2) / 10));
-  const geo = useRef({ win, scale });
-  geo.current = { win, scale };
+  // A tall window shows the cells above and below the line; the line sits in its middle.
+  const winH = tall ? Math.round(win * 1.75) : win;
+  const geo = useRef({ win, scale, off: 0 });
+  geo.current = { win, scale, off: Math.round((winH - win) / 2) };
   const soundRef = useRef(sound);
   soundRef.current = sound;
+  const popOnRef = useRef(popOn);
+  popOnRef.current = popOn;
 
   useEffect(() => {
     let raf = 0;
@@ -157,6 +203,8 @@ export function SkillRoll({ game, slot, size = 34, sound = true, well, round }: 
     let idleI = 0;
     let lastTick = 0;
     let tease = false;
+    let slamObj: object | null = null;
+    let sawSlam = false;
     const dice = iconArt('dice', 'md');
 
     const setCell = (i: number, icon: SkillIcon | 'dice') => {
@@ -172,7 +220,7 @@ export function SkillRoll({ game, slot, size = 34, sound = true, well, round }: 
     const setPos = (p: number) => {
       const el = stripRef.current;
       if (!el) return;
-      const y = -Math.round((CELLS - 1 - p) * geo.current.win);
+      const y = -Math.round((CELLS - 1 - p) * geo.current.win - geo.current.off);
       el.style.transform = `translateY(calc(${y} * var(--px)))`;
     };
     const show = (icon: SkillIcon | null) => {
@@ -231,7 +279,7 @@ export function SkillRoll({ game, slot, size = 34, sound = true, well, round }: 
         uiSound('reelLand', rarityIndex(TIER_RARITY[sk.tier]));
         if (step >= 3) uiSound('stamp');
       }
-      setPop({ key: ++popKeys, skill: id });
+      if (popOnRef.current) setPop({ key: ++popKeys, skill: id });
     };
 
     const sparks = (step: number, color: string) => {
@@ -295,11 +343,24 @@ export function SkillRoll({ game, slot, size = 34, sound = true, well, round }: 
         show(h.lastSkill ? SKILLS[h.lastSkill.skill].icon : (list[0]?.icon ?? null));
         nextIdle = now + 900;
       }
-      // Landed (the world fired the skill this frame or since the last one).
+      // Landed: the roll stopped on its skill (on its way to slam down), or a skill fired with no slam.
+      if (h.skillSlam && h.skillSlam !== slamObj) {
+        slamObj = h.skillSlam;
+        sawSlam = true;
+        rollSeed = -1;
+        land(h.skillSlam.skill, calm);
+      }
       if (h.lastSkill && h.lastSkill.n !== lastN) {
         lastN = h.lastSkill.n;
         rollSeed = -1;
-        land(h.lastSkill.skill, calm);
+        if (!sawSlam) land(h.lastSkill.skill, calm);
+        sawSlam = false;
+      }
+      // While it slams, its icon has left the reel (the big reel's: the slam flies it to the middle).
+      if (rootRef.current) {
+        const out = !!h.skillSlam && !popOnRef.current && h.skillSlam.t / h.skillSlam.dur > 0.12;
+        if (out) rootRef.current.dataset.slam = '';
+        else delete rootRef.current.dataset.slam;
       }
       const r = h.skillRoll;
       if (r && h.knightId) {
@@ -367,13 +428,14 @@ export function SkillRoll({ game, slot, size = 34, sound = true, well, round }: 
       ref={rootRef}
       className={s.root}
       data-round={round || undefined}
+      data-rect={rect || undefined}
       data-state="off"
       style={{ ['--inset' as string]: `calc(${inset} * var(--px))`, ['--cell' as string]: `calc(${win} * var(--px))`, ['--size' as string]: size } as CSSProperties}
     >
       {sk && step >= 4 && !game.state.settings.reduceMotion && (
         <Rays key={`r${pop!.key}`} url={raysUrl(step >= 5 ? RAINBOW : [tierColor(sk.tier), '#ffffff'], 16, 0.5)} className={s.rays} style={{ ['--dur' as string]: `${POP_MS[step]}ms` } as CSSProperties} />
       )}
-      <span className={s.win}>
+      <span className={s.win} data-reel-win>
         <span ref={bumpRef} className={s.bump}>
           <span ref={stripRef} className={s.strip}>
             {Array.from({ length: CELLS }, (_, k) => {

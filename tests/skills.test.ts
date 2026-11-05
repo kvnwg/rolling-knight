@@ -20,7 +20,7 @@ import { BIOMES } from '../src/world/biomes';
 import type { Unit } from '../src/world/entities';
 import { generateFloor } from '../src/world/mapgen';
 import { floorMobs } from '../src/world/mobgen';
-import { ROLL_TIME, heroSpecial, onSkillRoll, rigSkill, rollLuck, startSkillRoll, type SkillRollEvent } from '../src/world/skills';
+import { CAST_TIME, ROLL_TIME, SLAM_TIME, heroSpecial, onSkillRoll, rigSkill, rollLuck, startSkillRoll, type SkillRollEvent } from '../src/world/skills';
 import { World, type HeroSpec } from '../src/world/world';
 
 const DT = 1 / 30;
@@ -187,6 +187,7 @@ describe('a skill roll', () => {
     const h = w.heroes[0];
     fightAt(w, 3);
     h.specialT = 0;
+    h.invuln = 99;
     const got = listen();
     w.input.special = true;
     w.input.mx = 1;
@@ -206,7 +207,15 @@ describe('a skill roll', () => {
     expect(h.x).toBeGreaterThan(x0 + 10);
     expect(h.lastSkill).toBeUndefined();
     expect(h.specialT).toBeLessThanOrEqual(0);
+    // It stops on its skill, which slams down a moment later (longer for a rarer skill) and only then fires.
     run(w, 0.2);
+    expect(got.filter((e) => e.phase === 'reveal').length).toBe(1);
+    expect(h.skillSlam?.skill).toBe(decided);
+    expect(h.skillSlam!.dur).toBe(SLAM_TIME[tierStep(SKILLS[decided].tier)]);
+    expect(got.filter((e) => e.phase === 'land').length).toBe(0);
+    expect(heroSpecial(w, h, false)).toBe(false);
+    run(w, SLAM_TIME[SLAM_TIME.length - 1]);
+    expect(h.skillSlam).toBeUndefined();
     const lands = got.filter((e) => e.phase === 'land');
     expect(lands.length).toBe(1);
     expect(lands[0].skill.id).toBe(decided);
@@ -215,7 +224,7 @@ describe('a skill roll', () => {
     expect(h.specialT).toBe(0);
     expect(h.skillRoll).toBeDefined();
     expect(got.filter((e) => e.phase === 'start').length).toBe(2);
-    run(w, ROLL_TIME * 2 + 0.3);
+    run(w, CAST_TIME * 2 + 0.3);
     expect(got.filter((e) => e.phase === 'land').length).toBeGreaterThanOrEqual(3);
   });
 
@@ -225,16 +234,16 @@ describe('a skill roll', () => {
     expect(heroSpecial(w, h, false)).toBe(true);
     // One at a time: no second roll while one spins.
     expect(heroSpecial(w, h, false)).toBe(false);
-    run(w, ROLL_TIME + 0.1);
+    run(w, CAST_TIME + 0.1);
     expect(h.lastSkill?.n).toBe(1);
     expect(h.specialT).toBe(0);
     // Straight away again (out of a fight it waits for the button; here, the call).
     expect(heroSpecial(w, h, false)).toBe(true);
-    run(w, ROLL_TIME + 0.1);
+    run(w, CAST_TIME + 0.1);
     expect(h.lastSkill?.n).toBe(2);
     // A free roll (Tag Team) works the same.
     expect(heroSpecial(w, h, true)).toBe(true);
-    run(w, ROLL_TIME + 0.1);
+    run(w, CAST_TIME + 0.1);
     expect(h.lastSkill?.free).toBe(true);
     // Stunned: no roll (unless free).
     h.stunT = 1;
@@ -295,12 +304,13 @@ describe('a skill roll', () => {
       const got = listen();
       rigSkill(h, id);
       expect(startSkillRoll(w, h), id).toBe(true);
-      for (let t = 0; t < ROLL_TIME + DT; t += DT) w.update(DT);
+      for (let t = 0; t < CAST_TIME + DT; t += DT) w.update(DT);
       expect(got.filter((e) => e.phase === 'land').map((e) => e.skill.id), id).toEqual([id]);
       expect(h.lastSkill?.skill).toBe(id);
-      // The shout over the knight (Rewind calls its own out).
+      // Your own knight's skill is stamped on the screen as it slams down (the HUD), not shouted over
+      // the knight (Rewind calls its own out).
       if (id === 'rewind') expect(w.rewind !== null || w.texts.some((t) => t.text === 'TIME STOP!')).toBe(true);
-      else expect(w.texts.some((t) => t.text === `${SKILLS[id].name.toUpperCase()}!`), id).toBe(true);
+      else expect(w.texts.some((t) => t.text === `${SKILLS[id].name.toUpperCase()}!`), id).toBe(false);
       // Let every beat play out, then look for the skill's mark: only the skill could have left it.
       let marked = false;
       for (let t = 0; t < 3.5; t += DT) {
@@ -324,7 +334,8 @@ describe('a skill roll', () => {
       const s = stage(id);
       rigSkill(s.h, id);
       startSkillRoll(s.w, s.h);
-      for (let t = 0; t < ROLL_TIME + DT; t += DT) s.w.update(DT);
+      for (let t = 0; t < CAST_TIME + DT && !s.h.lastSkill; t += DT) s.w.update(DT);
+      s.w.update(DT);
       return s;
     };
     {
@@ -367,7 +378,8 @@ describe('a skill roll', () => {
       expect(s.w.heroes[1].downed).toBe(true);
       rigSkill(s.h, 'guardianAngel');
       startSkillRoll(s.w, s.h);
-      for (let t = 0; t < ROLL_TIME + DT; t += DT) s.w.update(DT);
+      for (let t = 0; t < CAST_TIME + DT && !s.h.lastSkill; t += DT) s.w.update(DT);
+      s.w.update(DT);
       expect(s.w.heroes[1].downed).toBe(false);
       expect(s.w.heroes[1].hp / s.w.heroes[1].maxHp).toBeCloseTo(SKILLS.guardianAngel.n.revive, 1);
     }
@@ -386,7 +398,7 @@ describe('a skill roll', () => {
     aeon.specialT = 0;
     rigSkill(aeon, 'rewind');
     w.input.special = true;
-    run(w, ROLL_TIME + 0.1);
+    run(w, CAST_TIME + 0.1);
     expect(w.rewind).not.toBeNull();
     run(w, 1);
     expect(w.rewind).toBeNull();
@@ -443,7 +455,7 @@ describe('allies', () => {
     const w = world([knightId('rare', 'guardian'), knightId('rare', 'cleric')]);
     fightAt(w, 2, 80);
     for (const h of w.heroes) h.invuln = 99;
-    run(w, ROLL_TIME * 3 + 0.5);
+    run(w, CAST_TIME * 3 + 0.5);
     for (const h of w.heroes) expect(h.lastSkill?.n ?? 0, h.knightId).toBeGreaterThanOrEqual(2);
   });
 });

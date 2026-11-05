@@ -15,6 +15,7 @@ import type { Game } from '../game';
 import { Bar, Chunky } from './common';
 import { Px } from './px';
 import { SkillRoll, skillSlotLabel, skillSlotState } from './SkillRoll';
+import { SpellSlam } from './SpellSlam';
 import { AltarReels } from './fx/AltarReels';
 import daggerUrl from '../assets/ui/dagger.png';
 import { uiSound } from './sound';
@@ -23,7 +24,7 @@ import { CLASS_ICON } from './classIcons';
 import { Glyph } from './keeper/KeeperScreen';
 import { goalName, questIcon } from './keeper/Shops';
 import { TopBar } from './TopBar';
-import { keyWell, type KeySize } from './skin';
+import type { KeySize } from './skin';
 
 const touch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
@@ -161,6 +162,10 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
   const npc = w?.nearNpc() ?? null;
   const jobs = activeQuests(s.quests ?? []);
   const flash = useKeyFlash();
+  // The big spell reel: 30 art px wide on a phone (its icons 2x), 46 on a desktop (3x); the window
+  // is 1.75 cells tall inside a 4 px frame.
+  const reelN = touch ? 30 : 46;
+  const reel = { n: reelN, h: Math.round((reelN - 8) * 1.75) + 8 };
   return (
     <div className={`dhud ${boss ? 'has-boss' : ''}`}>
       <TopBar
@@ -271,6 +276,16 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
         )}
       </div>
 
+      {/* The big spell reel over the keys: it ticks down onto each skill, which then slams onto the screen. */}
+      {me && (
+        <div className={`spell-reel ${touch ? 'touch' : ''}`} data-spell-reel>
+          <div className="reel-frame" style={{ width: `calc(${reel.n} * var(--px))`, height: `calc(${reel.h} * var(--px))` }}>
+            <SkillRoll game={game} sound={false} size={reel.n} well={4} tall rect pop={false} />
+          </div>
+        </div>
+      )}
+      <SpellSlam game={game} />
+
       <div className={`actions ${touch ? 'touch' : ''}`}>
         {touch && (
           <Key size="lg" rim={me ? 'brass' : 'iron'} className="k-attack" label="ATTACK" title="Attack" capture onDown={() => hold(true)} onUp={() => hold(false)}>
@@ -292,7 +307,7 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
         </Key>
         <Key size="md" rim={roll === 'ready' || roll === 'rolling' ? 'brass' : 'iron'} className={`k-skill ${roll === 'ready' ? 'ready' : 'cooling'}`} label={me ? skillSlotLabel(me) : 'SKILL'} hint="E" flash={flash.skill} title="Skill roll (E)" onDown={() => press('special')}>
           {/* (Its reel's sounds come from the audio, for every knight's roll: src/audio/fight.ts.) */}
-          <SkillRoll game={game} sound={false} size={28} well={keyWell('md')} round />
+          <Px icon="dice" size="md" s={1} />
           {special > 0 && me && (
             <>
               <i className="cool" style={{ ['--cd' as string]: `${Math.ceil((special / me.specialCd!) * 8) * 12.5}%` }} />

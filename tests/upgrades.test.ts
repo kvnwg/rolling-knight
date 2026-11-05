@@ -420,7 +420,7 @@ describe('Quick Roll', () => {
       h.specialT = 0;
       const landed: number[] = [];
       const stop = onSkillRoll((e) => {
-        if (e.phase === 'land' && e.hero === h) landed.push(w.time);
+        if (e.phase === 'reveal' && e.hero === h) landed.push(w.time);
       });
       const t0 = w.time;
       expect(startSkillRoll(w, h)).toBe(true);

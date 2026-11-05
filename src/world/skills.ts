@@ -22,6 +22,15 @@ import { uid, type World } from './world';
  */
 export const ROLL_TIME = 1.8;
 
+/**
+ * Seconds from a roll landing to its skill casting, by tier step (Common .. the jackpot): the skill
+ * pops out of the reel, grows on its way to the middle of the screen and casts as it slams down. The
+ * rarer the skill, the bigger the moment (and the longer it takes).
+ */
+export const SLAM_TIME = [0.34, 0.4, 0.5, 0.64, 0.84, 1] as const;
+/** The longest a roll and its slam take together (tests and anything waiting on a cast). */
+export const CAST_TIME = ROLL_TIME + SLAM_TIME[SLAM_TIME.length - 1];
+
 /** Seconds this knight's skill roll spins: ROLL_TIME, shortened by Quick Roll. */
 export function rollTime(h: Pick<Unit, 'rollTimeMult'>): number {
   const m = h.rollTimeMult;
@@ -299,7 +308,7 @@ export function heroSpecial(w: World, h: Unit, free: boolean): boolean {
 
 /** Starts a skill roll; `skill` decides where it lands (otherwise it's rolled, at the world's luck). */
 export function startSkillRoll(w: World, h: Unit, o: { free?: boolean; skill?: SkillId } = {}): boolean {
-  if (h.downed || h.skillRoll || !h.knightId) return false;
+  if (h.downed || h.skillRoll || h.skillSlam || !h.knightId) return false;
   if (!o.free && ((h.specialT ?? 0) > 0 || h.stunT > 0)) return false;
   const luck = rollLuck(w);
   const forced = o.skill ?? h.skillRig;
@@ -326,8 +335,11 @@ export function rollLuck(w: World): number {
 }
 
 export interface SkillRollEvent {
-  /** 'start': a roll began spinning (its result already decided); 'land': it landed and the skill fired. */
-  phase: 'start' | 'land';
+  /**
+   * 'start': a roll began spinning (its result already decided); 'reveal': it stopped on its skill,
+   * which is on its way to slam down; 'land': it slammed and the skill fired.
+   */
+  phase: 'start' | 'reveal' | 'land';
   world: World;
   hero: Unit;
   skill: SkillDef;
@@ -349,7 +361,7 @@ export function onSkillRoll(fn: (e: SkillRollEvent) => void): () => void {
 function tickSkills(w: World, h: Unit, dt: number): void {
   // heroTick only runs for standing knights: a knight that fell loses its spinning roll, its
   // skill's beats still to come and its boost.
-  for (const o of w.heroes) if (o.downed && (o.skillRoll || o.skillQueue || o.skillBuff)) dropSkills(o);
+  for (const o of w.heroes) if (o.downed && (o.skillRoll || o.skillSlam || o.skillQueue || o.skillBuff)) dropSkills(o);
   if (h.skillQueue) {
     const q = h.skillQueue;
     for (const b of q) b.t -= dt;
@@ -362,7 +374,12 @@ function tickSkills(w: World, h: Unit, dt: number): void {
     r.t += dt;
     // A glint over the knight's head while it spins.
     if (Math.floor((r.t - dt) / 0.18) !== Math.floor(r.t / 0.18)) w.fx.push({ kind: 'spark', x: h.x + w.rng.float(-5, 5), y: h.y - 18, color: '#ffe27a' });
-    if (r.t >= r.dur) land(w, h, r);
+    if (r.t >= r.dur) reveal(w, h, r);
+  }
+  const sl = h.skillSlam;
+  if (sl) {
+    sl.t += dt;
+    if (sl.t >= sl.dur) land(w, h, sl);
   }
   const b = h.skillBuff;
   if (b) {
@@ -374,13 +391,28 @@ function tickSkills(w: World, h: Unit, dt: number): void {
 
 function dropSkills(h: Unit): void {
   h.skillRoll = undefined;
+  h.skillSlam = undefined;
   h.skillQueue = undefined;
   h.skillBuff = undefined;
 }
 
-function land(w: World, h: Unit, r: NonNullable<Unit['skillRoll']>): void {
+/** The roll stopped on its skill: it slams down (and casts) SLAM_TIME later. */
+function reveal(w: World, h: Unit, r: NonNullable<Unit['skillRoll']>): void {
   h.skillRoll = undefined;
   const skill = SKILLS[r.skill];
+  h.skillSlam = { skill: r.skill, t: 0, dur: SLAM_TIME[Math.min(SLAM_TIME.length - 1, tierStep(skill.tier))], free: r.free, luck: r.luck };
+  for (const fn of listeners) fn({ phase: 'reveal', world: w, hero: h, skill, free: r.free, luck: r.luck });
+}
+
+function land(w: World, h: Unit, r: NonNullable<Unit['skillSlam']>): void {
+  h.skillSlam = undefined;
+  const skill = SKILLS[r.skill];
+  if (h.slot === w.controlled) {
+    // Your skill slams onto the screen: the world feels it, harder the rarer it is.
+    const step = tierStep(skill.tier);
+    w.shakeIt([1, 1.5, 2, 3, 4.5, 6][Math.min(5, step)], 0.16 + step * 0.05);
+    if (step >= 3) w.hitStop = Math.max(w.hitStop, [0, 0, 0, 0.05, 0.09, 0.12][Math.min(5, step)]);
+  }
   castSkill(w, h, skill.id);
   // No cooldown: in a fight the next roll starts as soon as this one fires (roll, fire, roll, fire).
   h.specialT = 0;
@@ -399,11 +431,14 @@ export function castSkill(w: World, h: Unit, id: SkillId): void {
 /** The skill's name over the knight in its color; Epic and up say their tier, Legendary and up flash the screen. */
 function announce(w: World, h: Unit, sk: SkillDef): void {
   const step = tierStep(sk.tier);
-  // (Rewind calls itself out.)
-  if (sk.id !== 'rewind') w.text(h.x, h.y - 30, `${sk.name.toUpperCase()}!`, sk.color, true);
+  // (Rewind calls itself out; your own skill's name is stamped on the screen as it slams down.)
+  // (Not shown, a name still takes its jitter's draw: the world's random stream stays as it was.)
+  const mine = h.slot === w.controlled;
+  const say = (x: number, y: number, text: string, color: string) => (mine ? w.rng.float(-3, 3) : w.text(x, y, text, color, true));
+  if (sk.id !== 'rewind') say(h.x, h.y - 30, `${sk.name.toUpperCase()}!`, sk.color);
   if (step < 3) return;
   const tc = RARITY_COLOR[TIER_RARITY[sk.tier]];
-  w.text(h.x, h.y - 40, TIER_NAME[sk.tier].toUpperCase(), tc, true);
+  say(h.x, h.y - 40, TIER_NAME[sk.tier].toUpperCase(), tc);
   w.fx.push({ kind: 'levelup', x: h.x, y: h.y, color: tc });
   if (step < 4) return;
   // The renderer's portal burst carries the only full-screen flash: the rarest skills borrow it.

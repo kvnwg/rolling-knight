@@ -2256,6 +2256,26 @@ body,
     'auto skill'
     'camp dodge';
 }
+/* The big spell reel over the action keys: a brass-framed window where the knight's skills tick down
+   onto the one it casts (SkillRoll, tall and square-cornered), which then slams onto the screen. */
+.spell-reel {
+  position: absolute;
+  right: calc(5 * var(--px) + env(safe-area-inset-right, 0px));
+  bottom: calc(64 * var(--px) + env(safe-area-inset-bottom, 0px));
+  pointer-events: none;
+}
+.spell-reel.touch {
+  bottom: calc(76 * var(--px) + env(safe-area-inset-bottom, 0px));
+}
+.reel-frame {
+  position: relative;
+  width: calc(30 * var(--px));
+  height: calc(47 * var(--px));
+  border: 0 solid transparent;
+  border-image: var(--sk-plate-gold) 6 fill / calc(4 * var(--px)) stretch;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 var(--px) 0 #1a1326);
+}
 /* Touch screens: the Attack key, biggest, in the corner under the right thumb; the skill above the
    dodge beside it; Auto and Camp, small, on the outside. */
 .actions.touch {

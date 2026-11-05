@@ -12,11 +12,11 @@ import { SOUNDS, SOUND_NAMES, landCue, sfx, skillCue } from '../src/audio/sfx';
 import { voiceAt } from '../src/audio/synth';
 import { newGame } from '../src/core/newGame';
 import { addKnight, knightStats } from '../src/core/roster';
-import { SKILLS, SKILL_IDS, SKILL_TIERS } from '../src/core/skillbook';
+import { SKILLS, SKILL_IDS, SKILL_TIERS, tierStep } from '../src/core/skillbook';
 import { BIOMES } from '../src/world/biomes';
 import { generateFloor } from '../src/world/mapgen';
 import { floorMobs, type MobType } from '../src/world/mobgen';
-import { onSkillRoll, ROLL_TIME, startSkillRoll } from '../src/world/skills';
+import { CAST_TIME, onSkillRoll, SLAM_TIME, startSkillRoll } from '../src/world/skills';
 import { World, type HeroSpec } from '../src/world/world';
 import { soundsDoc } from '../tools/soundsDoc';
 
@@ -372,7 +372,7 @@ describe('the fight, heard', () => {
     }
   });
 
-  it('plays a skill’s landing by its tier and then its own sound, the moment it fires', () => {
+  it('plays the reel’s landing by its tier as it stops, then the skill’s own sound as it slams down and fires', () => {
     const w = world(['rare-guardian', 'rare-cleric', 'rare-lancer']);
     const heard: FightCue[] = [];
     const obs = new FightObserver((cue) => heard.push(cue));
@@ -381,12 +381,14 @@ describe('the fight, heard', () => {
     for (const id of ['titansWrath', 'mend', 'skyfall'] as const) {
       const k = w.heroes.find((x) => x.cls === SKILLS[id].cls)!;
       heard.length = 0;
+      const at = new Map<string, number>();
       k.skillRig = id;
       k.specialT = 0;
       expect(startSkillRoll(w, k)).toBe(true);
-      for (let i = 0; i < Math.ceil((ROLL_TIME + 0.6) * 30) && heard.indexOf(skillCue(id) as FightCue) < 0; i++) {
+      for (let i = 0; i < Math.ceil((CAST_TIME + 0.6) * 30) && heard.indexOf(skillCue(id) as FightCue) < 0; i++) {
         w.update(1 / 30);
         obs.frame(w);
+        for (const c of heard) if (!at.has(c)) at.set(c, i);
         w.fx.length = 0;
       }
       const land = heard.indexOf(landCue(SKILLS[id].tier));
@@ -394,7 +396,10 @@ describe('the fight, heard', () => {
       expect(heard[0]).toBe('skill_roll_start');
       expect(heard).toContain('skill_roll_spin');
       expect(land, id).toBeGreaterThan(0);
-      expect(cast, id).toBe(land + 1);
+      expect(cast, id).toBeGreaterThan(land);
+      // The slam between them: as long as the skill's tier takes.
+      const gap = (at.get(skillCue(id))! - at.get(landCue(SKILLS[id].tier))!) / 30;
+      expect(Math.abs(gap - SLAM_TIME[tierStep(SKILLS[id].tier)]), id).toBeLessThan(0.07);
     }
   });
 });

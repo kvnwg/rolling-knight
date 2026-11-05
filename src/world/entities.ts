@@ -82,6 +82,11 @@ export interface Unit {
    * HUD's reel. It lands, and the skill fires, when t reaches dur.
    */
   skillRoll?: { skill: SkillId; t: number; dur: number; free: boolean; luck: number; seed: number };
+  /**
+   * A roll that just landed, its skill on the way to the middle of the screen: it casts as it slams
+   * down (`t` reaches `dur`, longer for rarer skills: SLAM_TIME in skills.ts).
+   */
+  skillSlam?: { skill: SkillId; t: number; dur: number; free: boolean; luck: number };
   /** The last skill a roll landed on: which, the world time it landed, a count of landings (the HUD's cue). */
   lastSkill?: { skill: SkillId; at: number; n: number; free: boolean };
   /** The next roll lands on this skill (tests and dev tools: rigSkill in skills.ts). */

@@ -213,7 +213,7 @@ function fightFoes(w: World, h: Unit): Unit[] {
  */
 function autoRoll(w: World, h: Unit, _target: Unit | null, foes: readonly Unit[], dt: number): void {
   const ai = h.ai!;
-  if (h.skillRoll || !foes.length) ai.rollWait = 0;
+  if (h.skillRoll || h.skillSlam || !foes.length) ai.rollWait = 0;
   else {
     ai.rollWait = (ai.rollWait ?? 0) + dt;
     if (heroSpecial(w, h, false)) ai.rollWait = 0;
