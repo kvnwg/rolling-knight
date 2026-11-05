@@ -68,6 +68,16 @@
   filter: brightness(0);
   opacity: 0.8;
 }
+/* While a reel spins its strip rolls past (two cells); once it lands or holds a token, the still picture shows. */
+.roll {
+  visibility: hidden;
+}
+.win:not([data-state='spin']) .roll {
+  display: none;
+}
+.win[data-state='spin'] .still {
+  display: none;
+}
 .win[data-state='spin'] {
   background: #e3cfa6;
 }

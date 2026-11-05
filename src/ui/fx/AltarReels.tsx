@@ -1176,6 +1176,9 @@ interface MiniPlan {
   nextFlick: number;
   flick: number;
   fillers: string[];
+  /** The column of cells it rolls down through (the big reels' strip), and the last tick's notch. */
+  strip: Strip;
+  notch: number;
 }
 
 /** What the windows last showed, kept while the mini roller is away (so it comes back as it was). */
@@ -1190,6 +1193,8 @@ function MiniReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const wins = useRef<(HTMLDivElement | null)[]>([]);
   const imgs = useRef<(HTMLImageElement | null)[]>([]);
+  /** Each window's two rolling cells (the one on the line and the one coming down onto it). */
+  const rolls = useRef<Array<Array<HTMLImageElement | null>>>([]);
   const chips = useRef<(HTMLSpanElement | null)[]>([]);
   // The shrine round the windows (altarArt.ts paints it, altar.ts lights it).
   const shrine = useMemo(() => (altarOn ? { lay: miniLayout(n), art: paintMini(n) } : null), [n, altarOn]);
@@ -1225,6 +1230,8 @@ function MiniReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
     let raf = 0;
     let spinRef: Spin | null = null;
     let plan: MiniPlan[] = [];
+    /** Each reel's last result, at the bottom of its next strip. */
+    const lastCells: StripCell[] = [];
     let tease: Tease | null = null;
     let mults: number[][] = [];
     let matched: number[] = [];
@@ -1251,6 +1258,33 @@ function MiniReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
       // A whole knight stands on the window's floor (its feet two pixels up); faces and tokens center.
       const full = !bust && nw === KNIGHT_PIC_W && nh === KNIGHT_PIC_H;
       img.style.top = `${(full ? cell.h - 2 - KNIGHT_PIC_FEET : Math.floor((cell.h - nh) / 2)) * u}px`;
+    };
+    /** The two cells on screen at strip position `pos`: the one at the line and the one above, sliding down. */
+    const roll = (i: number, strip: Strip, pos: number) => {
+      const cell = cells[i];
+      const slots = rolls.current[i];
+      if (!cell || !slots) return;
+      const u = uRef.current;
+      const base = Math.floor(pos);
+      slots.forEach((img, s) => {
+        if (!img) return;
+        const c = strip.cells[base + s];
+        if (!c) {
+          img.style.visibility = 'hidden';
+          return;
+        }
+        const url = c.token !== null ? tokenPic(c.token).url : pic(c.id, null);
+        if (img.getAttribute('src') !== url) img.setAttribute('src', url);
+        const nw = img.naturalWidth;
+        const nh = img.naturalHeight;
+        if (!nw) return;
+        img.style.visibility = 'visible';
+        img.style.width = `${nw * u}px`;
+        img.style.height = `${nh * u}px`;
+        img.style.left = `${Math.floor((cell.w - nw) / 2) * u}px`;
+        // Cell k sits (pos - k) cells below the line: the strip rolls down as pos grows.
+        img.style.top = `${Math.round((Math.floor((cell.h - nh) / 2) + (pos - (base + s)) * cell.h) * u)}px`;
+      });
     };
     const setWin = (i: number, url: string, state: 'spin' | 'token' | 'landed', rim: string | null) => {
       const img = imgs.current[i];
@@ -1315,7 +1349,12 @@ function MiniReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
             nextFlick: 0,
             flick: 0,
             fillers: Array.from({ length: 12 }, (_, f) => pic(filler(spin.id * 31 + i * 101 + f, false, classes, false).id, null)),
+            strip: buildStrip(spin, i, lastCells[i], classes),
+            notch: -1,
           };
+        });
+        spin.reels.forEach((r, i) => {
+          lastCells[i] = { id: r.knightId, rarity: r.rarity, mutation: r.mutation, odds: 0, real: true, token: null };
         });
         shown = combosDone(matched, mults, plan.map((p) => p.reached));
         // Joined mid-spin: whatever has already landed shows as landed.
@@ -1369,18 +1408,27 @@ function MiniReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
           p.holdUntil = 0;
           p.nextFlick = 0;
         }
-        // Spinning: silhouettes flick past, slower as the stop comes (one still one, with reduce motion).
-        if (now < p.nextFlick) return;
+        // Spinning: the reel rolls down through its strip (the big reels' motion: a kick back, a
+        // launch, a cruise and a brake that clunks onto the line), a tick as each cell crosses it.
         if (calm) {
-          p.nextFlick = Infinity;
-          setWin(i, p.fillers[0], 'spin', null);
+          if (p.nextFlick !== Infinity) {
+            p.nextFlick = Infinity;
+            setWin(i, p.fillers[0], 'spin', null);
+          }
           return;
         }
-        const left = p.stops[p.reached].at - el;
-        const close = 1 - Math.max(0, Math.min(1, left / 700));
-        p.nextFlick = now + 55 + 115 * close;
-        p.flick += 1;
-        setWin(i, p.fillers[p.flick % p.fillers.length], 'spin', null);
+        const win = wins.current[i];
+        if (win && win.dataset.state !== 'spin') {
+          win.dataset.state = 'spin';
+          win.style.removeProperty('--rim');
+        }
+        const at = stripAt(p.strip, el, calm);
+        roll(i, p.strip, at.p);
+        const notch = Math.floor(at.p + 0.5);
+        if (notch !== p.notch) {
+          if (p.notch >= 0) tick(0);
+          p.notch = notch;
+        }
       });
       // The build-up's glow round the roller, climbing the tiers like the big reels'.
       let key = '';
@@ -1477,11 +1525,22 @@ function MiniReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
             data-state={was?.state ?? 'spin'}
             style={{ ...place, ...(was?.rim ? ({ ['--rim' as string]: was.rim } as CSSProperties) : {}) }}
           >
+            {[0, 1].map((s) => (
+              <img
+                key={s}
+                ref={(el) => {
+                  (rolls.current[i] ??= [null, null])[s] = el;
+                }}
+                className={`${m.pic} ${m.roll}`}
+                alt=""
+                draggable={false}
+              />
+            ))}
             <img
               ref={(el) => {
                 imgs.current[i] = el;
               }}
-              className={m.pic}
+              className={`${m.pic} ${m.still}`}
               src={was?.url || undefined}
               alt=""
               draggable={false}
