@@ -6,17 +6,21 @@
  *   rolling           the class's dodge: roll, backflip (Ranger), vault (Lancer), dodge with a blink fade
  *                     (Arcanist), stretched to the dodge's length, facing its way (backflips face away)
  *   stunT             stun
- *   channel           Whirlwind spins through the drawn directions; a lunge holds the thrust
- *   swingT jumps      an attack: auto attacks play the class's (Guardian and Blade attack_slash with an
- *                     attack_heavy now and then, Ranger shoot_bow, Cleric and Arcanist cast, Lancer the
- *                     thrust), skills theirs. The strike frame lands on the tick the sim deals the hit:
- *                     standing knights start the windup early, timed from atkT to the next auto attack;
- *                     the whole attack is squeezed to fit the class's attack speed
+ *   channel           Whirlwind plays the heavy attack's spin (its coil, the turn through every view
+ *                     looped while it lasts, then the last sweep and the settle); a lunge holds the
+ *                     thrust. (A sheet whose heavy attack is a single blow spins through its views.)
+ *   swingT jumps      an attack: auto attacks play the class's (Guardian and Blade the Cleave,
+ *                     attack_slash; Ranger shoot_bow, Cleric and Arcanist cast, Lancer the thrust),
+ *                     skills theirs (the Shield Slam the shield thrust forward). The strike frame lands
+ *                     on the tick the sim deals the hit: standing knights start the windup early, timed
+ *                     from atkT to the next auto attack; the whole attack is squeezed to fit the
+ *                     class's attack speed
  *   hurtT jumps       hurt (or a flash, when busy)
  *   drT (Guardian)    block while the guard is up
- *   moving            walk, its frames stepped by distance (stride_px) so the feet never slide
+ *   moving            walk, or run once it's quick (a knight's own pace is the run's), its frames
+ *                     stepped by distance (stride_px) so the feet never slide
  *   floor cleared     victory, for a few seconds
- *   foes awake near   combat_idle; otherwise idle, blinking now and then
+ *   foes awake near   combat_idle; otherwise idle (a breath), blinking now and then on its rest frame
  *
  * Facing comes from the aim (attacks), the dodge, or the travel vector's dominant axis, with a little
  * hysteresis so a diagonal walk doesn't flicker between views.
@@ -27,7 +31,7 @@ import type { Unit, View } from '../../world/entities';
 import type { World } from '../../world/world';
 import { SHEETS } from './assets';
 import { KNIGHT_SHEET, knightSheet } from './knightLook';
-import { eventFrame, facing, facing8, walkPace, type Dir, type FrameRef, type PFSheet } from './sheet';
+import { eventFrame, facing, facing8, RUN_MIN_FRAME, WALK_MIN_FRAME, walkPace, type Dir, type FrameRef, type PFSheet } from './sheet';
 
 export interface HeroPose {
   anim: string;
@@ -65,7 +69,6 @@ interface Mem {
   vy: number;
   speed: number;
   dir: Dir;
-  walk: number;
   swingT: number;
   hurtT: number;
   drT: number;
@@ -84,6 +87,14 @@ interface Mem {
   cleared: boolean;
   victoryAt: number;
   blinkAt: number;
+  blinkUntil: number;
+  /** The gait it moves in (by its speed, with some give) and how far through its cycle it is (cycles). */
+  gait: 'walk' | 'run';
+  step: number;
+  /** A Whirlwind: when it began, the way it faced, and when it ended (its last sweep plays after). */
+  spinAt: number;
+  spinDir: Dir;
+  spinEnd: number;
 }
 
 const mems = new Map<number, Mem>();
@@ -120,9 +131,17 @@ const HEAVY_SKILLS: ReadonlySet<SkillId> = new Set(['shieldSlam', 'groundPound',
 const CHEER_SKILLS: ReadonlySet<SkillId> = new Set(['battleCry', 'rallyingTaunt']);
 const GUARD_SKILLS: ReadonlySet<SkillId> = new Set(['ironSkin', 'aegis']);
 
-/** The attack a class plays for a swing: its auto attack, an occasional heavy, or a skill's. */
+/** True when a sheet's heavy attack is the Whirlwind (a spin it loops while it lasts) rather than one heavy blow. */
+export function heavySpins(sheet: PFSheet): boolean {
+  return !!sheet.meta.anims.attack_heavy?.loopFrames?.length;
+}
+
+/** The attack a class plays for a swing: its auto attack (the Cleave), an occasional heavy blow, or a skill's. */
 export function attackAnim(cls: ClassId, skill: SkillId | null, swing: number, sheet: PFSheet): string {
-  if (skill && HEAVY_SKILLS.has(skill) && sheet.has('attack_heavy')) return 'attack_heavy';
+  // A single heavy blow (an overhead smash) for the heavy skills; a sheet whose heavy attack is the
+  // Whirlwind keeps it for the Whirlwind and cleaves (or, the Shield Slam, drives the shield forward).
+  const blow = sheet.has('attack_heavy') && !heavySpins(sheet);
+  if (skill && HEAVY_SKILLS.has(skill)) return blow ? 'attack_heavy' : skill === 'shieldSlam' && sheet.has('block_enter') ? 'block_enter' : 'attack_slash';
   if (skill && CHEER_SKILLS.has(skill)) return 'victory';
   if (skill && GUARD_SKILLS.has(skill) && sheet.has('block_enter')) return 'block_enter';
   switch (cls) {
@@ -133,11 +152,28 @@ export function attackAnim(cls: ClassId, skill: SkillId | null, swing: number, s
       return 'cast';
     case 'guardian':
     case 'blade':
-      // Every fourth swing is the overhead smash.
-      return swing % 4 === 3 && sheet.has('attack_heavy') ? 'attack_heavy' : 'attack_slash';
+      // Every fourth swing is the overhead smash, on a sheet that has one.
+      return swing % 4 === 3 && blow ? 'attack_heavy' : 'attack_slash';
     default:
       return 'attack_slash';
   }
+}
+
+/** The Whirlwind's coil plays at this share of its drawn length; each frame of its turn lasts this long (ms). */
+const SPIN_COIL = 0.5;
+const SPIN_FRAME_MS = 85;
+
+/**
+ * Speeds (px/s) a knight breaks into its run above, and falls back to its walk below: a knight runs
+ * at its own pace (50 to 64 px/s) and walks when slowed (30 to 38) or easing in and out of a stop.
+ */
+export const RUN_FROM = 44;
+export const WALK_BELOW = 40;
+
+/** The gait for `speed` px/s: the run once it's quick (with some give either way), else the walk. */
+export function gaitFor(sheet: PFSheet, speed: number, cur: 'walk' | 'run'): 'walk' | 'run' {
+  if (!sheet.has('run')) return 'walk';
+  return speed >= RUN_FROM || (cur === 'run' && speed >= WALK_BELOW) ? 'run' : 'walk';
 }
 
 /** The dodge animation for a roll kind, and whether it faces away from the way it moves. */
@@ -205,12 +241,18 @@ function fitScale(sheet: PFSheet, anim: string, cycle: number): number {
 function fresh(w: World, h: Unit): Mem {
   return {
     world: w, t: w.time, x: h.x, y: h.y, vx: 0, vy: 0, speed: 0,
-    dir: viewDir(h.view, h.dir), walk: 0, swingT: h.swingT, hurtT: h.hurtT, drT: h.drT, guardAt: -9,
+    dir: viewDir(h.view, h.dir), swingT: h.swingT, hurtT: h.hurtT, drT: h.drT, guardAt: -9,
     downed: !!h.downed, downAt: h.downed ? w.time - 9 : -9, upAt: -9,
     atk: null, swings: 0, skillAt: h.lastSkill?.at ?? -1, skill: null,
     roll: h.rolling ?? null, rollAt: -9, rollFrom: [h.x, h.y], hurtAt: -9,
-    cleared: w.cleared, victoryAt: -9, blinkAt: w.time + 2 + Math.random() * 3,
+    cleared: w.cleared, victoryAt: -9, blinkAt: w.time + 2 + Math.random() * 3, blinkUntil: -9,
+    gait: 'walk', step: 0, spinAt: -9, spinDir: 's', spinEnd: -9,
   };
+}
+
+/** A gait's stride per frame (px): its own, or 2.5 a frame. */
+function strideOf(sheet: PFSheet, gait: 'walk' | 'run'): number[] {
+  return sheet.meta.anims[gait].stride ?? sheet.clip(gait, 'e').map(() => 2.5);
 }
 
 /** Forget knights no longer drawn (call once a frame with the live ids). */
@@ -243,9 +285,12 @@ export function heroPose(w: World, h: Unit): HeroPose {
     m.vy += (dy / dt - m.vy) * k;
   }
   if (!jump && !h.rolling) {
-    const a = sheet.meta.anims.walk;
-    const n = a.dirs.s?.length ?? 4;
-    m.walk += moved * walkPace(a.stride ? a.stride.reduce((s, v) => s + v, 0) : n * 2.5, n, m.speed);
+    // Walk or run by the pace (the run's frames may turn quicker than the walk's), the feet planted.
+    // (The phase carries over from one gait to the other: both start on the same foot.)
+    m.gait = gaitFor(sheet, m.speed, m.gait);
+    const stride = strideOf(sheet, m.gait);
+    const cycle = stride.reduce((s, v) => s + v, 0);
+    m.step += (moved * walkPace(cycle, stride.length, m.speed, m.gait === 'run' ? RUN_MIN_FRAME : WALK_MIN_FRAME)) / cycle;
   }
   const prevX = m.x;
   const prevY = m.y;
@@ -329,6 +374,20 @@ export function heroPose(w: World, h: Unit): HeroPose {
   if (h.stunT > 0 && sheet.has('stun')) return pose('stun', m.dir, loopK('stun', m.dir, now * 1000), { stunned: true });
   // --- skills that take a moment
   if (h.channel?.kind === 'whirlwind') {
+    if (heavySpins(sheet)) {
+      // The Whirlwind: the coil (quick: the blows start at once), then the turn through every view,
+      // looped while it lasts (about three turns a second).
+      if (m.spinAt < 0) {
+        m.spinAt = now;
+        m.spinDir = face(h.aimX || h.dir, h.aimY);
+      }
+      const f = clip('attack_heavy', m.spinDir);
+      const lf = sheet.meta.anims.attack_heavy.loopFrames!;
+      const coil = sum(f, 0, lf[0]) * SPIN_COIL;
+      const u = (now - m.spinAt) * 1000;
+      if (u < coil) return pose('attack_heavy', m.spinDir, f[at(f.slice(0, lf[0]), u, SPIN_COIL)][0]);
+      return pose('attack_heavy', m.spinDir, f[lf[Math.floor((u - coil) / SPIN_FRAME_MS) % lf.length]][0]);
+    }
     const spin: Dir[] = ['s', 'e', 'n', 'w'];
     // A quarter turn every 0.12 s (about two turns a second): fast enough to read as a spin, slow
     // enough not to strobe.
@@ -336,6 +395,11 @@ export function heroPose(w: World, h: Unit): HeroPose {
     const anim = 'attack_slash';
     const f = clip(anim, dir);
     return pose(anim, dir, f[strikeFrame(sheet, anim)][0]);
+  }
+  if (m.spinAt >= 0) {
+    // The Whirlwind is over: its last sweep and the settle follow (unless the knight walks off).
+    m.spinAt = -9;
+    m.spinEnd = now;
   }
   if (h.channel?.kind === 'lunge') {
     const dir = face(h.channel.dx, h.channel.dy);
@@ -371,6 +435,13 @@ export function heroPose(w: World, h: Unit): HeroPose {
     }
     if (now >= m.atk.strikeAt) m.atk = null;
   }
+  // --- the Whirlwind's end: the last sweep across the front, the follow-through and the settle
+  if (!walking && now - m.spinEnd < 0.6 && heavySpins(sheet)) {
+    const f = clip('attack_heavy', m.spinDir);
+    const tail = f.slice(Math.max(...sheet.meta.anims.attack_heavy.loopFrames!) + 1);
+    const u = (now - m.spinEnd) * 1000;
+    if (tail.length && u < sum(tail)) return pose('attack_heavy', m.spinDir, tail[at(tail, u)][0]);
+  }
   // --- a guard (the Guardian's Bulwark after a roll, Iron Skin, Aegis)
   if (h.drT > 0 && h.dr < 1 && !walking && sheet.has('block_hold')) {
     const dir = m.dir;
@@ -388,29 +459,34 @@ export function heroPose(w: World, h: Unit): HeroPose {
       return pose('hurt', m.dir, f[at(f, (now - m.hurtAt) * 1000)][0]);
     }
   }
-  // --- walking: frames stepped by the distance walked, so planted feet stay planted
+  // --- walking (or running): frames stepped by the distance covered, so planted feet stay planted
   if (walking) {
     const dir = sheet.eightWay ? travelDir8(m.vx, m.vy, m.dir) : travelDir(m.vx, m.vy, m.dir);
-    const a = sheet.meta.anims.walk;
-    const f = clip('walk', dir);
-    const stride = a.stride ?? f.map(() => 2.5);
+    const f = clip(m.gait, dir);
+    const stride = strideOf(sheet, m.gait);
     const cycle = stride.reduce((s, v) => s + v, 0);
-    let p = ((m.walk % cycle) + cycle) % cycle;
+    let p = (((m.step % 1) + 1) % 1) * cycle;
     let i = 0;
     while (i < f.length - 1 && p >= stride[i]) {
       p -= stride[i];
       i++;
     }
-    return pose('walk', dir, f[i][0]);
+    return pose(m.gait, dir, f[i][0]);
   }
   const dir = h.moving ? m.dir : viewDir(h.view, h.dir);
   if (now - m.victoryAt < 2.6) return pose('victory', dir, loopK('victory', dir, (now - m.victoryAt) * 1000));
   // --- standing
   const foes = !w.hub && !w.camp && w.mobs.some((e) => !e.dead && e.awake && Math.abs(e.x - h.x) < 110 && Math.abs(e.y - h.y) < 90);
   if (foes) return pose('combat_idle', dir, loopK('combat_idle', dir, now * 1000 + h.uid * 97));
-  if (now > m.blinkAt) {
-    if (now > m.blinkAt + 0.1) m.blinkAt = now + 2.5 + Math.random() * 2.5;
-    else if (sheet.has('blink', dir)) return pose('idle', dir, clip('blink', dir)[0][0]);
+  // A blink now and then, on the breath's rest frame (the blink is that frame with the eyes shut).
+  const f = clip('idle', dir);
+  const total = sum(f);
+  const ms = now * 1000 + h.uid * 131;
+  const i = at(f, ((ms % total) + total) % total);
+  if (i === 0 && now >= m.blinkAt && sheet.has('blink', dir)) {
+    m.blinkUntil = now + 0.1;
+    m.blinkAt = now + 2.5 + Math.random() * 2.5;
   }
-  return pose('idle', dir, loopK('idle', dir, now * 1000 + h.uid * 131));
+  if (i === 0 && now < m.blinkUntil && sheet.has('blink', dir)) return pose('idle', dir, clip('blink', dir)[0][0]);
+  return pose('idle', dir, f[i][0]);
 }

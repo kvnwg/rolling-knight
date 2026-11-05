@@ -9,7 +9,7 @@ import { isDungeonProp } from '../src/render/packs/dungeonProps';
 import { trapPieces } from '../src/render/packs/trapArt';
 import { SHEETS, type SheetName } from '../src/render/pf/assets';
 import { deathFx, deathPose, kitOf, mobPose } from '../src/render/pf/mobAnim';
-import { MONSTER_SHEET, mobPaint, monsterFor, type MonsterId } from '../src/render/pf/mobLook';
+import { DUELIST_FROM, MONSTER_SHEET, mobPaint, monsterFor, type MonsterId } from '../src/render/pf/mobLook';
 import { clipMs, eventFrame } from '../src/render/pf/sheet';
 import { paintTerrainPixels } from '../src/render/terrain';
 import { BIOME_ORDER, BIOMES, biomeForFloor, isBossFloor } from '../src/world/biomes';
@@ -342,8 +342,12 @@ describe('the packs\' monsters', () => {
             const mon = monsterFor(t, elite, false);
             if (t.plan === 'slime') expect(mon).toBe('pk_slime');
             if (t.plan === 'humanoid' && t.behavior === 'chaser' && ['dungeon', 'crypt', 'graveyard'].includes(biome.id)) {
-              expect(['pk_skeleton', 'pk_reaper', 'pk_vampire']).toContain(mon);
-              undead.add(mon!);
+              // (From floor 36 on, an elite among them is the Ashen Duelist.)
+              if (elite && floor >= DUELIST_FROM) expect(mon).toBe('ashen_duelist');
+              else {
+                expect(['pk_skeleton', 'pk_reaper', 'pk_vampire']).toContain(mon);
+                undead.add(mon!);
+              }
             }
             // Every recolor names a material the sheet has.
             const p = mobPaint(t, elite, false);

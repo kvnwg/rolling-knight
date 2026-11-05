@@ -388,6 +388,13 @@ export function floorBoss(biome: Biome, floor: number, seed: number): MobType {
   else if (!moves.includes('charge') && !moves.includes('leap')) {
     moves[spare] = plan === 'golem' || plan === 'slime' || plan === 'pumpkin' || t.features.seed % 2 ? 'leap' : 'charge';
   }
+  // The Ember Depths' boss is a dragon (the Cinderwyrm): it always breathes fire, a fan of it (in
+  // place of a summons, a rain, a second way to come at you, or else its slam).
+  if (biome.id === 'ember' && !moves.includes('fan')) {
+    const closers = moves.filter((m) => m === 'charge' || m === 'leap').length;
+    const swap = ['summon', 'rain', ...(closers > 1 ? ['charge'] : []), 'slam'].find((m) => moves.includes(m as BossMove));
+    if (swap) moves[moves.indexOf(swap as BossMove)] = 'fan';
+  }
   let name: string;
   let title: string;
   if (own) [name, title] = rng.pick(own.names);

@@ -76,18 +76,22 @@ export interface PFMeta {
    * in front of it (-1 for none). Without this the game hangs a cape from the anchors.
    */
   capes?: Array<[number, number] | null>;
+  /** The class wears a cloak in every frame (its own design): the game hangs no cape of its own on it. */
+  cloak?: boolean;
 }
 
 /**
  * The fastest a walk's frames may change (s). PixelForge draws a walk at its own pace (a knight's
- * 10 px stride every 520 ms is about 19 px/s) and the game moves knights at 50 to 64 px/s: stepped by
- * distance alone, the legs would flick every 40 ms. Past this pace the feet slide a little instead.
+ * 12 px cycle every 700 ms is about 17 px/s) and the game moves knights at 50 to 64 px/s: stepped by
+ * distance alone, the legs would flick every 30 ms. Past this pace the feet slide a little instead
+ * (and a knight that quick runs: its run is drawn for 54 px/s, its frames 60 to 80 ms).
  */
 export const WALK_MIN_FRAME = 0.09;
+export const RUN_MIN_FRAME = 0.05;
 
 /** The share of the distance walked to step a cycle of `cyclePx` drawn px over `frames` frames by, at `speed` px/s. */
-export function walkPace(cyclePx: number, frames: number, speed: number): number {
-  return Math.min(1, cyclePx / Math.max(1e-3, speed * frames * WALK_MIN_FRAME));
+export function walkPace(cyclePx: number, frames: number, speed: number, minFrame = WALK_MIN_FRAME): number {
+  return Math.min(1, cyclePx / Math.max(1e-3, speed * frames * minFrame));
 }
 
 /** Material name -> ramp (dark to light) to paint it with instead of its own. */

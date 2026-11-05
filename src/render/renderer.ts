@@ -770,8 +770,8 @@ export class Renderer {
     // --- shots, sparks, leaves and weather. Attack effects (shots, spell and hit bursts) go on the
     // unlit top layer: crisp, never bloomed or glowing (only the setting glows).
     // (Foes' bullets are the effects' danger balls: big, outlined, white-hot hearts; vfx/art.ts bulletSprite.)
-    const warden = (s: Shot) => pf && this.wardenShot(w, s);
-    for (const s of w.shots) if (warden(s)) this.drawRockShard(st, s, sx, sy);
+    const warden = (s: Shot) => pf && !!this.bossShot(w, s);
+    for (const s of w.shots) if (warden(s)) this.drawRockShard(st, s, sx, sy, this.bossShot(w, s)!);
     this.vfx.drawShots(w, ui, cx, cy, this.W, this.H, warden);
     this.spawnFx(w);
     if (!hub) this.weather(biome, dt, cx, cy);
@@ -1190,12 +1190,14 @@ export class Renderer {
     if (!paint) return this.drawMobLegacy(ctx, w, m, sx, sy);
     if (m.dead) return;
     const pose = mobPose(w, m, paint.monster, paint.sheet);
+    if (pose.fx) this.pfFx.push({ name: pose.fx.name, x: m.x + pose.fx.dx, y: m.y + pose.fx.dy, at: w.time, world: w });
     const meta = SHEETS[paint.sheet].meta;
     const [px, py] = meta.pivot;
     const x = sx(m.x);
     const y = sy(m.y);
-    // How the whole body moves on top of the frame: a crouch, a leap's arc, a dash's stretch, a landing's squash.
-    const mo = mobMotion(m, w.time);
+    // How the whole body moves on top of the frame: a crouch, a leap's arc, a dash's stretch, a landing's
+    // squash (one that wakes with a howl or a roar stands up whole, its own frames rising).
+    const mo = pose.steady ? { ...mobMotion(m, w.time), wide: 0, tall: 0, fade: 1 } : mobMotion(m, w.time);
     const flash = pose.flash;
     // The red warning through a wind-up: the body pulses red (a hit's flash wins that frame).
     const look: Paint = mo.warn && !flash ? warnPaint(paint) : paint;
@@ -1631,21 +1633,22 @@ export class Renderer {
     ctx.drawImage(c, x - 3, y - 6);
   }
 
-  /** Was this shot thrown by a boss drawn as the Stone Warden? */
-  private wardenShot(w: World, s: Shot): boolean {
-    if (s.team !== 'mob' || s.kind !== 'bullet') return false;
+  /** What this shot is, if a PixelForge boss threw it: the Stone Warden's shard, the Cinderwyrm's fireball (else null). */
+  private bossShot(w: World, s: Shot): 'fx_rock_shard' | 'fx_fireball' | null {
+    if (s.team !== 'mob' || s.kind !== 'bullet') return null;
     const m = w.bossUnit && w.bossUnit.uid === s.from ? w.bossUnit : null;
-    return !!m && mobPaint(m.type!, !!m.elite, true)?.monster === 'stone_warden';
+    const monster = m ? mobPaint(m.type!, !!m.elite, true)?.monster : undefined;
+    return monster === 'stone_warden' ? 'fx_rock_shard' : monster === 'cinderwyrm' ? 'fx_fireball' : null;
   }
 
-  /** A Stone Warden's shard: PixelForge's spinning stone, turned to its flight (whole quarter turns). */
-  private drawRockShard(ctx: Ctx, s: Shot, sx: (x: number) => number, sy: (y: number) => number): void {
-    const sheet = SHEETS.fx_rock_shard;
+  /** A boss's shot as PixelForge draws it (a spinning stone, a fireball), turned to its flight (whole quarter turns). */
+  private drawRockShard(ctx: Ctx, s: Shot, sx: (x: number) => number, sy: (y: number) => number, name: 'fx_rock_shard' | 'fx_fireball'): void {
+    const sheet = SHEETS[name];
     const dir = facing(s.vx, s.vy);
     const f = sheet.clip('travel', dir);
     const i = Math.floor((this.time * 1000) / f[0][1]) % f.length;
     const [px, py] = sheet.meta.anims.travel.pivots?.[dir] ?? sheet.meta.pivot;
-    ctx.drawImage(frameCanvas('fx_rock_shard', f[i][0], NO_PAINT), sx(s.x) - px, sy(s.y) - py);
+    ctx.drawImage(frameCanvas(name, f[i][0], NO_PAINT), sx(s.x) - px, sy(s.y) - py);
   }
 
   private drawArea(ctx: Ctx, em: Ctx, a: Area, sx: (x: number) => number, sy: (y: number) => number): void {

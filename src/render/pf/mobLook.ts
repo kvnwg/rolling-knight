@@ -9,10 +9,13 @@
  *                    graveyard) the supplied pack's undead: a skeleton with a sword, one with a
  *                    scythe or a robed vampire, by design; skeleton in the desert ruins;
  *                    orc in the tundra and when the design has horns; goblin otherwise (the goblin
- *                    chief as an elite). The farm keeps its scarecrows, casters their robes
+ *                    chief as an elite). From floor 36 on, a chaser's elite is the Ashen Duelist,
+ *                    a tall, quick glaive fighter. The farm keeps its scarecrows, casters their robes
  *   golem            ogre, in the biome's stone
- *   bosses           the Stone Warden in the biome's stone (enraged at half HP); the farm's pig, the
- *                    ram, ghosts, pumpkins and the unmasked demon keep their own art
+ *   bosses           the Ember Depths' is the Cinderwyrm, a big slow dragon in obsidian (its embers at half HP);
+ *                    the rest the Stone Warden, a forest guardian of boulders, an antlered skull and
+ *                    a leafy mane, in each place's stone and leaves (autumn red at half HP); the
+ *                    farm's pig, the ram, ghosts, pumpkins and the unmasked demon keep their own art
  *
  * Everything else (bugs, plants, pumpkins, ghosts, the farm's animals) keeps the game's sprites.
  * Colors come from the mob's design (mobgen.ts gives each type a ramp from its biome, twisted): its
@@ -27,6 +30,7 @@ import type { Recolor } from './sheet';
 
 export type MonsterId =
   | 'slime' | 'bat' | 'wolf' | 'frost_wolf' | 'goblin' | 'goblin_archer' | 'goblin_chief' | 'orc' | 'skeleton' | 'ogre' | 'stone_warden'
+  | 'cinderwyrm' | 'ashen_duelist'
   // The supplied packs' (tools/packs/enemies.py): side views, mirrored for the other facing.
   | 'pk_skeleton' | 'pk_reaper' | 'pk_vampire' | 'pk_slime';
 
@@ -42,11 +46,16 @@ export const MONSTER_SHEET: Record<MonsterId, SheetName> = {
   skeleton: 'skeleton',
   ogre: 'ogre',
   stone_warden: 'stone_warden',
+  cinderwyrm: 'cinderwyrm',
+  ashen_duelist: 'ashen_duelist',
   pk_skeleton: 'pk_skeleton',
   pk_reaper: 'pk_reaper',
   pk_vampire: 'pk_vampire',
   pk_slime: 'pk_slime',
 };
+
+/** The first floor whose humanoid chasers' elites are the Ashen Duelist (the desert ruins on). */
+export const DUELIST_FROM = 36;
 
 /** Biomes whose humanoids are the pack's undead. */
 const UNDEAD_BIOMES: ReadonlySet<string> = new Set(['dungeon', 'crypt', 'graveyard']);
@@ -61,11 +70,19 @@ export function biomeOf(t: MobType): string {
   return t.id.split('-')[0];
 }
 
+/** The floor a mob design was made for (its id is biome-floor-index). */
+export function floorOf(t: MobType): number {
+  return Number(t.id.split('-')[1]) || 0;
+}
+
 /** The monster for a mob design, or null to keep the game's own sprite. */
 export function monsterFor(t: MobType, elite: boolean, boss: boolean): MonsterId | null {
   const biome = biomeOf(t);
   if (t.id.includes('-demon-')) return null;
-  if (boss) return ['pig', 'ram', 'chicken', 'ghost', 'pumpkin', 'bug', 'plant'].includes(t.plan) ? null : 'stone_warden';
+  if (boss) {
+    if (['pig', 'ram', 'chicken', 'ghost', 'pumpkin', 'bug', 'plant'].includes(t.plan)) return null;
+    return biome === 'ember' ? 'cinderwyrm' : 'stone_warden';
+  }
   switch (t.plan) {
     case 'slime':
       return 'pk_slime';
@@ -76,6 +93,7 @@ export function monsterFor(t: MobType, elite: boolean, boss: boolean): MonsterId
     case 'humanoid':
       if (biome === 'farmland' || t.behavior === 'caster') return null;
       if (t.behavior === 'ranged') return 'goblin_archer';
+      if (elite && t.behavior === 'chaser' && floorOf(t) >= DUELIST_FROM) return 'ashen_duelist';
       if (UNDEAD_BIOMES.has(biome)) return undeadFor(t);
       if (biome === 'desert') return 'skeleton';
       if (biome === 'tundra' || t.features.horns) return 'orc';
@@ -137,21 +155,41 @@ const SLIME_HUE: Record<string, [h: number, c: number]> = {
   desert: [72, 0.08], graveyard: [300, 0.07], ember: [36, 0.11], crystal: [292, 0.09], shrine: [350, 0.07],
 };
 
-/** The Stone Warden's stone, moss (or snow, sand, embers...) and eyes, per biome. */
-const WARDEN: Record<string, { stone: readonly string[]; moss: readonly string[]; eye: string }> = {
-  hamlet: { stone: P.granite, moss: P.hide, eye: '#ffe066' },
-  forest: { stone: rampLike(P.granite, 0.02, 150, 4, -0.04), moss: rampLike(P.hide, 0.085, 138, 5, 0.04), eye: '#8affc8' },
-  tundra: { stone: P.frostStone, moss: ramp([0.7, 0.77, 0.83], 0.02, 240, 2), eye: '#7ae0ff' },
-  dungeon: { stone: rampLike(P.granite, 0.035, 330, 4, -0.04), moss: rampLike(P.hide, 0.03, 300, 4, 0.02), eye: '#ff6a3a' },
-  crypt: { stone: P.basalt, moss: rampLike(P.hide, 0.035, 165, 4, 0.05), eye: '#ff3a2a' },
-  swamp: { stone: rampLike(P.granite, 0.025, 115, 4, -0.03), moss: P.bog, eye: '#e8ff4a' },
-  desert: { stone: P.sandstone, moss: rampLike(P.hide, 0.05, 80, 4, 0.12), eye: '#ffb03a' },
-  graveyard: { stone: rampLike(P.basalt, 0.025, 300, 3, 0.02), moss: rampLike(P.hide, 0.025, 290, 3, 0.03), eye: '#b8ff5a' },
-  // Basalt with embers glowing in its cracks and on its shoulders.
-  ember: { stone: P.basalt, moss: ramp([0.56, 0.66, 0.76], 0.14, 38, 14), eye: '#ffb04a' },
-  crystal: { stone: rampLike(P.granite, 0.06, 292, 4, 0.02), moss: rampLike(P.hide, 0.09, 205, 4, 0.12), eye: '#e8f8ff' },
-  shrine: { stone: rampLike(P.granite, 0.04, 170, 4, -0.01), moss: rampLike(P.hide, 0.07, 352, 6, 0.1), eye: '#ffd84a' },
+/** PixelForge's forest guardian as drawn: charcoal boulders, spring leaves, berries; at half HP the leaves go autumn, the berries blood. */
+const LEAF = ['#1b5524', '#397028', '#5c8a30', '#83a342'];
+const AUTUMN = ['#822d22', '#a24628', '#be6436', '#d98346'];
+const BERRY = ['#bf623d', '#d77e49'];
+const BLOOD = ['#933235', '#ad4c42'];
+const CHARCOAL = ['#2a3139', '#3a4049', '#4b5059', '#5d606a'];
+
+/**
+ * The Stone Warden in each place: its boulders in the stone there, its mane in the leaves there (a
+ * spring forest's green, frosted pine in the tundra, dead leaves in the dungeon and the crypt, dry
+ * fronds in the desert, crystal in the grottoes, cherry blossom at the shrine), its berries, and its
+ * eyes in the place's glow.
+ */
+const WARDEN: Record<string, { stone: readonly string[]; leaf: readonly string[]; fruit?: readonly string[]; eye: string }> = {
+  hamlet: { stone: P.granite, leaf: rampLike(LEAF, 0.1, 132, 5, 0.03), eye: '#ffe066' },
+  forest: { stone: CHARCOAL, leaf: LEAF, eye: '#a2d060' },
+  tundra: { stone: P.frostStone, leaf: rampLike(LEAF, 0.035, 205, 3, 0.16), eye: '#7ae0ff' },
+  dungeon: { stone: rampLike(P.granite, 0.035, 330, 4, -0.06), leaf: rampLike(LEAF, 0.045, 62, 5, -0.02), fruit: BLOOD, eye: '#ff6a3a' },
+  crypt: { stone: P.basalt, leaf: rampLike(LEAF, 0.04, 150, 4, 0.02), fruit: rampLike(BERRY, 0.04, 120, 4, 0.02), eye: '#ff3a2a' },
+  swamp: { stone: rampLike(P.granite, 0.025, 115, 4, -0.06), leaf: rampLike(LEAF, 0.075, 118, 4, -0.02), fruit: rampLike(BERRY, 0.11, 95, 4, 0.04), eye: '#e8ff4a' },
+  desert: { stone: P.sandstone, leaf: rampLike(LEAF, 0.07, 88, 5, 0.1), fruit: rampLike(BERRY, 0.09, 40, 4, -0.08), eye: '#ffb03a' },
+  graveyard: { stone: rampLike(P.basalt, 0.025, 300, 3, 0.02), leaf: rampLike(LEAF, 0.045, 300, 3, 0.06), fruit: BLOOD, eye: '#b8ff5a' },
+  // (The Ember Depths have the Cinderwyrm; a warden there would be basalt with leaves of fire.)
+  ember: { stone: P.basalt, leaf: ramp([0.45, 0.56, 0.66, 0.76], 0.14, 34, 14), eye: '#ffb04a' },
+  crystal: { stone: rampLike(P.granite, 0.06, 292, 4, 0.02), leaf: rampLike(LEAF, 0.08, 200, 4, 0.12), fruit: rampLike(BERRY, 0.1, 330, 4, 0.06), eye: '#e8f8ff' },
+  shrine: { stone: rampLike(P.granite, 0.04, 170, 4, -0.03), leaf: rampLike(LEAF, 0.08, 352, 3, 0.2), fruit: rampLike(BERRY, 0.12, 85, 4, 0.06), eye: '#ffd84a' },
 };
+
+/**
+ * The Cinderwyrm: on the lava-lit floors of the Ember Depths it comes in its obsidian scales, ash
+ * wings and gilded horns (PixelForge's cinderwyrm_obsidian), dark against the glow; at half HP it
+ * cracks open into its embers (the Cinderwyrm as drawn: ember scales and wings, pale horns).
+ */
+const WYRM_OBSIDIAN = { scales: ['#2e2e3f', '#3f3d4f', '#514d5f', '#635d6f'], membrane: ['#4c4b5d', '#625d70'], horn: ['#9c703a', '#b58947', '#caa55e'] };
+const WYRM_EMBER = { scales: ['#6f181e', '#8c2e26', '#a64832', '#c06240'], membrane: ['#9f4325', '#b75e30'], horn: ['#7d6f5f', '#9a8d7b', '#b5a996'] };
 
 export interface MobPaint extends Paint {
   monster: MonsterId;
@@ -267,12 +305,27 @@ export function mobPaint(t: MobType, elite: boolean, boss: boolean, enraged = fa
       break;
     }
     case 'stone_warden': {
+      // Enraged, the mane turns autumn and the berries blood, the glow red.
       const look = WARDEN[biome] ?? WARDEN.hamlet;
       r.stone = look.stone;
-      r.hide = enraged ? shiftL(look.moss, -0.07) : look.moss;
+      r.leaf = enraged ? AUTUMN : look.leaf;
+      r.fruit = enraged ? BLOOD : (look.fruit ?? BERRY);
       r.eyes = [enraged ? glowEye(biome === 'ember' ? '#ffd24a' : '#ff5040') : glowEye(look.eye)];
       break;
     }
+    case 'cinderwyrm': {
+      // Obsidian with red eyes; at half HP, its embers with white-hot eyes.
+      const look = enraged ? WYRM_EMBER : WYRM_OBSIDIAN;
+      r.scales = look.scales;
+      r.membrane = look.membrane;
+      r.horn = look.horn;
+      r.eyes = [glowEye(enraged ? '#fff0a0' : '#cd605a')];
+      break;
+    }
+    case 'ashen_duelist':
+      // Its own dark plate and crimson cape; the elites' red glare.
+      r.eyes = [eye];
+      break;
   }
   p = { monster, sheet: MONSTER_SHEET[monster], recolor: r, key };
   cache.set(key, p);

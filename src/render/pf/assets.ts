@@ -6,8 +6,12 @@
  * frame); outside a browser (tests, Node tools) there are no images and pfReady() stays false, so the
  * callers keep their old art.
  */
+import ashenDuelist from '../../assets/pf/ashen_duelist.json';
 import bat from '../../assets/pf/bat.json';
+import cinderwyrm from '../../assets/pf/cinderwyrm.json';
 import fxBoneCrumble from '../../assets/pf/fx_bone_crumble.json';
+import fxFireball from '../../assets/pf/fx_fireball.json';
+import fxHowlRings from '../../assets/pf/fx_howl_rings.json';
 import fxPoofSmoke from '../../assets/pf/fx_poof_smoke.json';
 import fxRockShard from '../../assets/pf/fx_rock_shard.json';
 import fxStatusStun from '../../assets/pf/fx_status_stun.json';
@@ -51,6 +55,8 @@ const METAS = {
   skeleton,
   ogre,
   stone_warden: stoneWarden,
+  cinderwyrm,
+  ashen_duelist: ashenDuelist,
   pk_skeleton: pkSkeleton,
   pk_reaper: pkReaper,
   pk_vampire: pkVampire,
@@ -59,6 +65,8 @@ const METAS = {
   fx_bone_crumble: fxBoneCrumble,
   fx_status_stun: fxStatusStun,
   fx_rock_shard: fxRockShard,
+  fx_fireball: fxFireball,
+  fx_howl_rings: fxHowlRings,
 } as const;
 
 export type SheetName = keyof typeof METAS;
