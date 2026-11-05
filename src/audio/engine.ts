@@ -83,7 +83,7 @@ export function makeRnd(seed: number): () => number {
 const clamp01 = (v: number) => (Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0);
 
 /** A file's bytes. The single-file build inlines files as data: URLs, read here (its page may not fetch them). */
-async function bytesOf(url: string): Promise<ArrayBuffer> {
+export async function bytesOf(url: string): Promise<ArrayBuffer> {
   if (!url.startsWith('data:')) return (await fetch(url)).arrayBuffer();
   const bin = atob(url.slice(url.indexOf(',') + 1));
   const bytes = new Uint8Array(bin.length);
@@ -92,7 +92,7 @@ async function bytesOf(url: string): Promise<ArrayBuffer> {
 }
 
 /** decodeAudioData in its promise form, or its callback form (older Safari). */
-function decode(ctx: BaseAudioContext, bytes: ArrayBuffer): Promise<AudioBuffer> {
+export function decode(ctx: BaseAudioContext, bytes: ArrayBuffer): Promise<AudioBuffer> {
   return new Promise((resolve, reject) => {
     const p = ctx.decodeAudioData(bytes, resolve, reject) as Promise<AudioBuffer> | undefined;
     p?.then(resolve, reject);

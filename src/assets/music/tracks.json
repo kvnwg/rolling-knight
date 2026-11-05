@@ -1,0 +1,59 @@
+{
+  "tavern": {
+    "loopStart": 0.25,
+    "loopEnd": 104.63356,
+    "duration": 104.88356,
+    "bpm": 73
+  },
+  "village": {
+    "loopStart": 0.25,
+    "loopEnd": 81.092109,
+    "duration": 81.342109,
+    "bpm": 95.0
+  },
+  "inn": {
+    "loopStart": 0.25,
+    "loopEnd": 50.881565,
+    "duration": 51.131565,
+    "bpm": null
+  },
+  "celtic": {
+    "loopStart": 0.25,
+    "loopEnd": 80.25,
+    "duration": 80.5,
+    "bpm": 144.0
+  },
+  "angevin": {
+    "loopStart": 0.25,
+    "loopEnd": 48.25,
+    "duration": 48.5,
+    "bpm": 120.0
+  },
+  "snow": {
+    "loopStart": 0.25,
+    "loopEnd": 50.25,
+    "duration": 50.5,
+    "bpm": 96.0
+  },
+  "desert": {
+    "loopStart": 0.25,
+    "loopEnd": 44.901156,
+    "duration": 45.151156,
+    "bpm": 86.0
+  },
+  "emperor": {
+    "loopStart": 0.25,
+    "loopEnd": 48.25,
+    "duration": 48.5,
+    "bpm": 120.0
+  },
+  "axes": {
+    "loopStart": 0.25,
+    "loopEnd": 82.535714,
+    "duration": 82.785714,
+    "bpm": 140.0
+  },
+  "victory": {
+    "duration": 6.4
+  }
+}

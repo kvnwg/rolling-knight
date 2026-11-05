@@ -15,10 +15,40 @@ the raw packs are not in this repository. The in-game credits are in Settings.
 | Pixelify Sans | All UI text | SIL Open Font License, via @fontsource/pixelify-sans. |
 | Bitmap font, pixel helpers | In-world numbers and text | From Dumpster Legend (`src/render/pixel/`). |
 
+## Music
+
+All by Kevin MacLeod. Each track is cut into a seamless loop of whole bars (crossfaded at the loop
+point), normalized to -18 LUFS and re-encoded as AAC by `tools/packs/music.py`, into
+`src/assets/music/`; the victory sting is 6.4 s of its piece, from its third note through its last
+chord. The in-game credit is in Settings (built from `src/audio/tracks.ts`).
+
+| Track | Composer | License | Where it plays | Source |
+| --- | --- | --- | --- | --- |
+| Midnight Tale | Kevin MacLeod (incompetech.com) | CC BY 4.0 | The hub (camp) | https://incompetech.com/music/royalty-free/mp3-royaltyfree/Midnight%20Tale.mp3 |
+| Village Consort | Kevin MacLeod (incompetech.com) | CC BY 4.0 | The hamlet, the shrine | https://incompetech.com/music/royalty-free/mp3-royaltyfree/Village%20Consort.mp3 |
+| Dancing at the Inn | Kevin MacLeod | Public domain (CC0), from FreePD.com (closed in 2025) | The farmland | https://archive.org/download/freepd/misc/Dancing%20at%20the%20Inn.mp3 (FreePD's archive: https://archive.org/details/freepd) |
+| Celtic Impulse | Kevin MacLeod (incompetech.com) | CC BY 4.0 | The forest, the swamp | https://incompetech.com/music/royalty-free/mp3-royaltyfree/Celtic%20Impulse.mp3 |
+| Angevin B | Kevin MacLeod (incompetech.com) | CC BY 4.0 | The graveyard, the crypt | https://incompetech.com/music/royalty-free/mp3-royaltyfree/Angevin%20B.mp3 |
+| The Snow Queen | Kevin MacLeod (incompetech.com) | CC BY 4.0 | The tundra, the crystal grotto | https://incompetech.com/music/royalty-free/mp3-royaltyfree/The%20Snow%20Queen.mp3 |
+| Desert City | Kevin MacLeod (incompetech.com) | CC BY 4.0 | The desert | https://incompetech.com/music/royalty-free/mp3-royaltyfree/Desert%20City.mp3 |
+| Mountain Emperor | Kevin MacLeod (incompetech.com) | CC BY 4.0 | The ember depths | https://incompetech.com/music/royalty-free/mp3-royaltyfree/Mountain%20Emperor.mp3 |
+| Death and Axes | Kevin MacLeod (incompetech.com) | CC BY 4.0 | Boss floors | https://incompetech.com/music/royalty-free/mp3-royaltyfree/Death%20and%20Axes.mp3 |
+| Discovery Hit | Kevin MacLeod (incompetech.com) | CC BY 4.0 | A boss falling (the victory sting) | https://incompetech.com/music/royalty-free/mp3-royaltyfree/Discovery%20Hit.mp3 |
+
+The CC BY 4.0 attribution, as incompetech asks for it: "Midnight Tale", "Village Consort", "Celtic
+Impulse", "Angevin B", "The Snow Queen", "Desert City", "Mountain Emperor", "Death and Axes",
+"Discovery Hit" Kevin MacLeod (incompetech.com). Licensed under Creative Commons: By Attribution 4.0
+License, http://creativecommons.org/licenses/by/4.0/. Changes: cut into loops and a sting,
+crossfaded at the loop points, loudness-normalized and re-encoded. A credit this full belongs
+wherever the game lists its credits (Settings does).
+
+## Made in code
+
 Everything else (the remaining mobs; terrain, walls, water,
 trees and props; folk and their portraits; the UI skin; lighting, weather and the reels) is drawn in
-code for the game, and the music (eight themes and a victory sting) and the synthesized sounds are
-composed in code (`src/audio/songs.ts`, `src/audio/instruments.ts`).
+code for the game, and the synthesized sound effects and the places' sounds under the music (the
+fire, crickets, birds, wind, frogs, drips...) are made in code (`src/audio/sfx.ts`,
+`src/audio/ambience.ts`).
 
 Not used: the MV Icons sheet, the modern clothes pack and the side-view character animation pack.
 

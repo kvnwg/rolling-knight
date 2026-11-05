@@ -1,8 +1,8 @@
 /**
  * Sound effects: Dumpster Legend's sounds (its src/services/audio.ts), synthesized with Web Audio
  * unless a recording of the same name plays in their place (src/assets/sounds, engine.ts), adapted
- * to Rolling Knight's events. Reward sounds sit on the C major pentatonic ladder, the key the music
- * is written around (songs.ts), so wins sound like the song resolving.
+ * to Rolling Knight's events. Reward sounds sit on the C major pentatonic ladder (Dumpster Legend's
+ * Dopamine Playbook: wins sound like a tune resolving), and a jingle waits for the music's next beat.
  *
  * The altar: every spin clacks off, its reels tick past the line (only while the altar is on screen:
  * `setAltarFocus`) and thud down by rarity; luck tokens chime a step higher for each in a chain; a
