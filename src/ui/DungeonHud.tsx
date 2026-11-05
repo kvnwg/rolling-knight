@@ -2,7 +2,7 @@
  * The HUD in the dungeon: the floor, the currencies and luck, the altar's mini roller, the squad (tap
  * to take control), quests, and the pixel action buttons: the special, the dodge roll, Auto and Camp.
  */
-import { CLASSES, knightDef } from '../core/knights';
+import { knightDef } from '../core/knights';
 import { CHALLENGE } from '../core/power';
 import { activeQuests, questGoal } from '../core/quests';
 import type { Npc } from '../world/npcs';
@@ -40,7 +40,6 @@ export function DungeonHud({ game, controls, press, onCamp, onSettings, onLuck, 
   const dodge = me ? Math.max(0, me.dodgeT!) : 0;
   const special = me ? Math.max(0, me.specialT!) : 0;
   const roll = me ? skillSlotState(me) : 'off';
-  const showHints = s.run.floor === 1 && s.rebirths === 0 && s.playTimeMs < 150_000;
   const boss = w?.bossUnit && !w.bossUnit.dead ? w.bossUnit : null;
   const ch = game.difficulty ? CHALLENGE[game.difficulty.challenge] : null;
   const npc = w?.nearNpc() ?? null;
@@ -97,7 +96,8 @@ export function DungeonHud({ game, controls, press, onCamp, onSettings, onLuck, 
         )}
       </div>
 
-      <div className="squad">
+      {/* On a phone the squad sits up under the floor's plate, leaving the bottom left free for the thumb that steers. */}
+      <div className={`squad ${touch ? 'top' : ''}`}>
         {s.squad.map((id, slot) => {
           if (!id || !s.roster[id]) return null;
           const def = knightDef(id);
@@ -189,12 +189,6 @@ export function DungeonHud({ game, controls, press, onCamp, onSettings, onLuck, 
         </div>
       )}
 
-      {showHints && me && (
-        <div className="hint glass outlined">
-          {touch ? 'Drag on the left to move. Your knights attack and roll their skills on their own.' : 'WASD to move · SPACE dodge roll · skills roll on their own (E rolls early) · 1 2 3 switch knight'}
-          <span className="t-muted">{CLASSES[me.cls!].auto.name} fires by itself whenever a foe is in range.</span>
-        </div>
-      )}
     </div>
   );
 }

@@ -867,6 +867,15 @@ select.select {
   flex-direction: column;
   gap: calc(2.5 * var(--px));
 }
+/* Touch screens: up at the top left, under the floor's plate, out of the steering thumb's way. */
+.squad.top {
+  top: calc(30 * var(--px) + env(safe-area-inset-top, 0px));
+  bottom: auto;
+  gap: calc(2 * var(--px));
+}
+.squad.top .member {
+  width: calc(50 * var(--px));
+}
 .member {
   display: grid;
   grid-template-columns: auto 1fr;
