@@ -13,7 +13,7 @@ import { perksOpen } from './core/perks';
 import { floorDifficulty, squadPower, type Difficulty } from './core/power';
 import { Rng } from './core/rng';
 import { rollTick } from './core/roller';
-import { fillSquad, goldMult, killGold, knightStats } from './core/roster';
+import { fillSquad, goldMult, killGold, knightStats, soloBonus, squadSize } from './core/roster';
 import { clearSave, loadGame, saveGame } from './core/save';
 import type { GameState } from './core/state';
 import { CAMP_BIOME, biomeForFloor, isBossFloor, type Biome } from './world/biomes';
@@ -142,7 +142,8 @@ export class Game {
     const seed = (s.run.biomeSeed ^ Math.imul(floor, 2654435761) ^ Math.imul(s.run.deaths + 1, 40503) ^ Math.imul(s.run.visits, 0x2c1b3c6d)) >>> 0;
     const map = generateFloor({ floor, biome, seed, boss, design });
     const mobTypes = floorMobs(biome, floor, seed);
-    this.difficulty = floorDifficulty(floor, squadPower(s));
+    // Built for the knights you bring (par is for three); going short-handed pays more gold.
+    this.difficulty = floorDifficulty(floor, squadPower(s), squadSize(s));
     s.quests ??= [];
     const npcs = placeNpcs(map, floor, biome.id, seed, s.quests);
     this.world = new World({
@@ -156,8 +157,9 @@ export class Game {
       perks: s.perks,
       controlled: s.controlled,
       seed,
-      goldPerKill: killGold(floor) * goldMult(s),
+      goldPerKill: killGold(floor) * goldMult(s) * soloBonus(s),
       difficulty: this.difficulty.value,
+      size: squadSize(s),
       npcs,
     });
     this.questEvent({ type: 'floor', floor });

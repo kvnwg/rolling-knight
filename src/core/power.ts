@@ -88,9 +88,12 @@ export function challengeOf(ratio: number): Challenge {
   return 'trivial';
 }
 
-/** What a floor's foes are built for, given the squad's power when it starts. */
-export function floorDifficulty(floor: number, power: number): Difficulty {
-  const par = floorPar(floor);
+/**
+ * What a floor's foes are built for, given the squad's power when it starts and how many knights it
+ * brings: par is for three, so one knight's par is a third of it (the same fight for each knight).
+ */
+export function floorDifficulty(floor: number, power: number, size = 3): Difficulty {
+  const par = (floorPar(floor) * Math.max(1, Math.min(3, size))) / 3;
   const ratio = power > 0 ? power / par : 1;
   const band = ratio >= 1 ? Math.pow(ratio, B.aboveExp) : Math.pow(ratio, B.belowExp);
   const value = par * Math.max(B.minBand, Math.min(B.maxBand, band));
@@ -115,10 +118,11 @@ export function earlyBoost(floor: number): { hit: number; ttk: number } {
  * A foe's HP and hit at difficulty `d` (in Squad Power), for its type's shape and its tier, on
  * `floor` (the first floors' edge; left out, none).
  */
-export function foeStats(shape: { hp: number; atk: number }, d: number, tier: FoeTier, floor = Infinity): { hp: number; atk: number } {
+export function foeStats(shape: { hp: number; atk: number }, d: number, tier: FoeTier, floor = Infinity, size = 3): { hp: number; atk: number } {
   const k = d / REF_POWER;
+  // The squad's damage at power d, and one of its knights' HP (a squad of `size` shares d between them).
   const dps = REF_DPS * k;
-  const hp = REF_HP * k;
+  const hp = (REF_HP * k * 3) / Math.max(1, Math.min(3, size));
   const e = earlyBoost(floor);
   if (tier === 'boss') return { hp: B.ttk.boss * dps * e.ttk, atk: B.hit.boss * hp * e.hit };
   const sh = shape.hp / REF_FOE.hp;
@@ -131,12 +135,12 @@ export function foeStats(shape: { hp: number; atk: number }, d: number, tier: Fo
  * plain foe, an elite and the boss, and how much of a knight's HP one hit takes (for the balance
  * report and tests).
  */
-export function fightReport(floor: number, power: number) {
-  const d = floorDifficulty(floor, power);
+export function fightReport(floor: number, power: number, size = 3) {
+  const d = floorDifficulty(floor, power, size);
   const squadDps = REF_DPS * (power / REF_POWER);
-  const knightHp = REF_HP * (power / REF_POWER);
+  const knightHp = (REF_HP * (power / REF_POWER) * 3) / size;
   const at = (tier: FoeTier) => {
-    const f = foeStats(REF_FOE, d.value, tier, floor);
+    const f = foeStats(REF_FOE, d.value, tier, floor, size);
     return { ttk: f.hp / squadDps, hit: f.atk / knightHp };
   };
   return { ...d, mob: at('mob'), elite: at('elite'), boss: at('boss') };

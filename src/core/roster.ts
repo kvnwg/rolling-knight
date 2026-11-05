@@ -209,9 +209,9 @@ export function sellKnight(state: GameState, id: string): number {
   return g;
 }
 
-/** True when the squad already holds your three strongest knights (or every knight you have). */
+/** True when the squad already holds your strongest knights, one for every open slot (or every knight you have). */
 export function isBestSquad(state: GameState): boolean {
-  const top = rankedKnights(state).slice(0, 3);
+  const top = rankedKnights(state).slice(0, squadSlots(state));
   return top.every((id) => state.squad.includes(id));
 }
 
@@ -266,30 +266,82 @@ export function rankedKnights(state: GameState): string[] {
     .map((r) => r.id);
 }
 
-/** Empty squad slots take your strongest knights that aren't in the squad. */
+// ------------------------------------------------------------------ squad slots
+
+/** Squad slots open: one to start, one more with each rebirth, up to three. */
+export function squadSlots(state: Pick<GameState, 'rebirths'>): number {
+  return Math.max(1, Math.min(3, 1 + (state.rebirths ?? 0)));
+}
+
+/** Knights in the squad (at least one counts, so an empty squad is built for one). */
+export function squadSize(state: Pick<GameState, 'squad' | 'roster'>): number {
+  return Math.max(1, state.squad.filter((id) => id && state.roster[id]).length);
+}
+
+/**
+ * Going down short-handed pays: gold times 1 + BAL.roster.soloBonus for every open slot left empty
+ * (a lone knight with three slots open earns twice the gold). The floors are built for the knights
+ * you bring, so it's the same fight for each of them, only with nobody to back them up.
+ */
+export function soloBonus(state: Pick<GameState, 'squad' | 'roster' | 'rebirths'>): number {
+  const empty = Math.max(0, squadSlots(state) - squadSize(state));
+  return 1 + BAL.roster.soloBonus * empty;
+}
+
+/** Locked slots hold nobody (an old save, a rebirth's new count); the knight you play is in an open one. */
+export function sanitizeSquad(state: GameState): void {
+  const n = squadSlots(state);
+  while (state.squad.length < 3) state.squad.push(null);
+  for (let i = n; i < state.squad.length; i++) state.squad[i] = null;
+  if (state.controlled >= n || !state.squad[state.controlled]) {
+    const at = state.squad.findIndex(Boolean);
+    state.controlled = at >= 0 && at < n ? at : 0;
+  }
+}
+
+/** Empty open squad slots take your strongest knights that aren't in the squad. */
 export function fillSquad(state: GameState): void {
-  for (let i = 0; i < state.squad.length; i++) {
-    if (state.squad[i]) continue;
+  const n = squadSlots(state);
+  for (let i = 0; i < Math.min(n, state.squad.length); i++) {
+    if (state.squad[i] || state.leftEmpty?.[i]) continue;
     const free = rankedKnights(state).find((id) => !state.squad.includes(id));
     if (free) state.squad[i] = free;
   }
 }
 
-/** Your three strongest knights, keeping the one you control in its slot if it makes the cut. */
+/** Your strongest knights in every open slot, keeping the one you control in its slot if it makes the cut. */
 export function bestSquad(state: GameState): void {
-  const top = rankedKnights(state).slice(0, 3);
+  const n = squadSlots(state);
+  const top = rankedKnights(state).slice(0, n);
   const keep = state.squad[state.controlled];
   const next: Array<string | null> = [null, null, null];
-  if (keep && top.includes(keep)) next[state.controlled] = keep;
+  if (keep && top.includes(keep) && state.controlled < n) next[state.controlled] = keep;
   for (const id of top) {
     if (next.includes(id)) continue;
-    const slot = next.findIndex((x) => x === null);
+    const slot = next.findIndex((x, i) => x === null && i < n);
     if (slot >= 0) next[slot] = id;
   }
   state.squad = next;
+  state.leftEmpty = [false, false, false];
 }
 
+/**
+ * Empties a squad slot on purpose (the hub won't fill it again until you put someone in). The last
+ * knight in the squad stays: somebody has to go down. True if it emptied.
+ */
+export function benchKnight(state: GameState, slot: number): boolean {
+  const id = state.squad[slot];
+  if (!id || state.squad.filter(Boolean).length <= 1) return false;
+  state.squad[slot] = null;
+  (state.leftEmpty ??= [false, false, false])[slot] = true;
+  if (state.controlled === slot) state.controlled = Math.max(0, state.squad.findIndex(Boolean));
+  return true;
+}
+
+/** Puts a knight in an open slot (from elsewhere in the squad: the two swap). A locked slot takes nobody. */
 export function setSquadSlot(state: GameState, slot: number, id: string | null): void {
+  if (slot < 0 || slot >= squadSlots(state)) return;
+  if (id && state.leftEmpty) state.leftEmpty[slot] = false;
   if (id) {
     const other = state.squad.indexOf(id);
     if (other >= 0) state.squad[other] = state.squad[slot];

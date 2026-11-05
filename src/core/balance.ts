@@ -75,6 +75,8 @@ export const BAL = {
      * every tier up costs nearly twice as much to raise (a Legendary about 13x a Common, a Mythic 25x),
      * since its levels add far more (they're a share of far bigger stats). Gold is all it takes.
      */
+    /** Extra gold for every open squad slot left empty (soloBonus in roster.ts). */
+    soloBonus: 0.5,
     goldBase: 40,
     goldGrowth: 1.32,
     rarityGrowth: 1.9,

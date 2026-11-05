@@ -17,7 +17,7 @@ import { CHALLENGE, floorDifficulty, knightRating, squadPower } from '../../core
 import { activeQuests, MAX_ACTIVE_QUESTS, mobNoun, plural, questGoal, rewardText, type Quest } from '../../core/quests';
 import { RARITIES, RARITY_COLOR, RARITY_NAME, RARITY_ODDS, rarityChances, rarityIndex } from '../../core/rarity';
 import { drySpell, reelCount, spinCycle, tokenChance } from '../../core/roller';
-import { bestSquad, canLevel, isBestSquad, levelCost, levelUp, maxedLevel, rankedKnights, rebirthStatMult, reforge, reforgeCost, sellKnight, sellValue, setSquadSlot } from '../../core/roster';
+import { benchKnight, bestSquad, canLevel, isBestSquad, levelCost, levelUp, maxedLevel, rankedKnights, rebirthStatMult, reforge, reforgeCost, sellKnight, sellValue, setSquadSlot, soloBonus, squadSize, squadSlots } from '../../core/roster';
 import type { Game } from '../../game';
 import { biomeForFloor } from '../../world/biomes';
 import type { HubStation } from '../../world/hubWorld';
@@ -34,6 +34,7 @@ import { Icon } from './TinkerShop';
 import { CLASS_ICON } from '../classIcons';
 import { Codex } from '../panels';
 import { coinFly } from '../fx/coinFly';
+import { DragKnight } from './DragKnight';
 
 /** A rarity's color made dark enough to read on paper. */
 function inkOf(c: string): string {
@@ -221,6 +222,9 @@ export function ShrineShop({ game, station, onClose }: { game: Game; station: Hu
     { id: 'luck', art: <Px icon="clover" size="lg" s={1} />, name: 'Luck', icon: 'clover', line: <Delta now={`x${luckNow.toFixed(2)}`} next={`x${luckNext.toFixed(2)}`} />, text: 'Luck on every spin, for good.' },
     { id: 'gold', art: <Px icon="coin" size="lg" s={1} />, name: 'Gold', icon: 'coin', line: <Delta now={`x${goldNow.toFixed(1)}`} next={`x${goldNext.toFixed(1)}`} />, text: 'More gold from everything, for good.' },
     { id: 'stats', art: <Px icon="sword" size="lg" s={1} />, name: 'Power', icon: 'sword', line: <Delta now={`x${rebirthStatMult(st.rebirths).toFixed(1)}`} next={`x${rebirthStatMult(next).toFixed(1)}`} />, text: "Every knight's stats, for good." },
+    ...(squadSlots({ rebirths: next }) > squadSlots(st)
+      ? [{ id: 'slot', art: <Px icon="helm" size="lg" s={1} />, name: 'Squad slot', icon: 'helm' as IconName, line: <Delta now={`${squadSlots(st)}`} next={`${squadSlots({ rebirths: next })}`} />, text: 'One more knight goes down with you.' }]
+      : []),
     ...fresh.map((c) => ({ id: `cls-${c}`, art: <HeroArt id={knightId('rare', c)} s={1} />, name: CLASSES[c].name, icon: 'helm' as IconName, line: <b style={{ color: 'var(--good)' }}>NEW</b>, text: `${CLASSES[c].name} knights start turning up at the altar.` })),
     ...(next === BAL.perks.unlockRebirths ? [{ id: 'perks', art: <Px icon="sigil" size="lg" s={1} />, name: 'Perks', icon: 'sigil' as IconName, line: <b style={{ color: 'var(--good)' }}>OPEN</b>, text: 'Sage Orrin rolls perks for sigils.' }] : []),
   ];
@@ -610,27 +614,38 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
   const floor = st.run.floor;
   const biome = biomeForFloor(floor, st.run.biomeSeed);
   const power = squadPower(st);
-  const diff = floorDifficulty(floor, power);
+  const diff = floorDifficulty(floor, power, squadSize(st));
   const ch = CHALLENGE[diff.challenge];
   const all = rankedKnights(st);
-  // The slot ADD fills: the one you picked, else the first empty one, else the weakest.
-  const empty = st.squad.findIndex((x) => !x);
-  const weakest = st.squad.reduce((w, id, i) => (id && (w < 0 || knightRating(st, id) < knightRating(st, st.squad[w]!)) ? i : w), -1);
-  const target = pick >= 0 ? pick : empty >= 0 ? empty : weakest;
+  // Open slots: one to start, one more with each rebirth. The slot ADD fills: the one you picked, else
+  // the first empty open one, else the weakest.
+  const slots = squadSlots(st);
+  const bonus = soloBonus(st);
+  const empty = st.squad.findIndex((x, i) => !x && i < slots);
+  const weakest = st.squad.reduce((w, id, i) => (id && i < slots && (w < 0 || knightRating(st, id) < knightRating(st, st.squad[w]!)) ? i : w), -1);
+  const target = pick >= 0 && pick < slots ? pick : empty >= 0 ? empty : weakest;
   const refresh = () => {
     game.syncSquad();
     game.syncHub(true);
     game.touch();
     bump((x) => x + 1);
   };
-  const put = (id: string) => {
-    if (target < 0) return;
-    setSquadSlot(st, target, id);
-    if (!st.squad[st.controlled]) st.controlled = target;
+  const putAt = (id: string, slot: number) => {
+    if (slot < 0 || slot >= slots) return;
+    setSquadSlot(st, slot, id);
+    if (!st.squad[st.controlled]) st.controlled = slot;
     uiSound('equip', 2);
     setPick(-1);
     refresh();
   };
+  const put = (id: string) => putAt(id, target);
+  const bench = (slot: number) => {
+    if (!benchKnight(st, slot)) return;
+    uiSound('close');
+    setPick(-1);
+    refresh();
+  };
+  const filled = st.squad.filter(Boolean).length;
   const lead = (slot: number) => {
     st.controlled = slot;
     uiSound('equip', 4);
@@ -716,7 +731,7 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
       <ShopHint>
         {tab === 'squad' ? (
           <>
-            Who goes down? Tap a slot, then <b>ADD</b> a knight to it; <b>LEAD</b> is the one you play. <b>LEVEL UP</b> makes a knight stronger for gold.
+            Who goes down? <b>Drag</b> a knight onto a slot (or tap a slot, then <b>ADD</b>); <b>LEAD</b> is the one you play. Each rebirth opens one more slot.
           </>
         ) : tab === 'reforge' ? (
           <>
@@ -734,12 +749,29 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
       </ShopHint>
       {tab === 'squad' && (
         <div className={s.squadRow}>
-          {st.squad.map((id, slot) => (
-            <div key={slot} className={s.slot} data-on={slot === target || undefined} onClick={() => (uiSound('tap'), setPick(slot === pick ? -1 : slot))} role="button">
+          {[0, 1, 2].map((slot) => {
+            const id = st.squad[slot] ?? null;
+            return slot >= slots ? (
+              <div key={slot} className={s.slot} data-locked title="Opens with a rebirth">
+                <div className={s.slotLock}>
+                  <Px icon="lock" size="md" />
+                  <b>LOCKED</b>
+                  <span>Rebirth {slot} opens it</span>
+                </div>
+              </div>
+            ) : (
+            <div key={slot} className={s.slot} data-on={slot === target || undefined} data-drop-slot={slot} onClick={() => (uiSound('tap'), setPick(slot === pick ? -1 : slot))} role="button">
               {id ? (
                 <>
+                  {filled > 1 && (
+                    <button className={s.slotX} aria-label="Empty this slot" title="Leave this slot empty (going down short-handed pays more gold)" onClick={(e) => (e.stopPropagation(), bench(slot))}>
+                      <i />
+                    </button>
+                  )}
                   <div className={s.slotArt}>
-                    <HeroArt id={id} mutation={st.roster[id]?.mutation ?? null} s={1} />
+                    <DragKnight onDrop={(to) => putAt(id, to)} title="Drag onto another slot to swap">
+                      <HeroArt id={id} mutation={st.roster[id]?.mutation ?? null} s={1} />
+                    </DragKnight>
                     {slot === st.controlled && (
                       <span className={s.slotCrown} title="The knight you play">
                         <Px icon="crown" size="sm" />
@@ -761,11 +793,20 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
               ) : (
                 <div className={s.slotEmpty}>
                   <Px icon="helm" size="lg" s={1} />
-                  <small>Empty: ADD a knight</small>
+                  <small>Drag a knight here</small>
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
+        </div>
+      )}
+      {tab === 'squad' && bonus > 1 && (
+        <div className={s.soloLine} title="Each open slot left empty adds half again to the gold you find">
+          <Px icon="coin" size="xs" />
+          <span>
+            Short-handed: <b>gold ×{bonus.toFixed(1)}</b> on this run
+          </span>
         </div>
       )}
       <ShopBody scrollKey={tab}>
@@ -820,7 +861,11 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
                     key={id}
                     level={`Lv ${rec.level}`}
                     levelRight={<Px icon={CLASS_ICON[def.cls]} size="xs" />}
-                    art={<HeroArt id={id} mutation={rec.mutation} s={1} />}
+                    art={
+                      <DragKnight onDrop={(to) => putAt(id, to)} title="Drag onto a squad slot">
+                        <HeroArt id={id} mutation={rec.mutation} s={1} />
+                      </DragKnight>
+                    }
                     tall
                     tag={rarityTag(id)}
                     name={def.name}

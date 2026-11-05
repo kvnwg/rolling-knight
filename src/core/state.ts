@@ -85,6 +85,11 @@ export interface GameState {
   roster: Record<string, KnightRec>;
   /** Three squad slots (knight ids) and which one you control. */
   squad: Array<string | null>;
+  /**
+   * Squad slots you emptied on purpose (going down short-handed pays more gold): the hub doesn't
+   * fill them again until you put someone in (or BEST SQUAD).
+   */
+  leftEmpty?: boolean[];
   controlled: number;
 
   upgrades: Record<string, number>;

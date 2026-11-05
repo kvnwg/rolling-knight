@@ -7,7 +7,7 @@ import { rollPerk } from '../src/core/perks';
 import { RARITIES, RARITY_ODDS, RARITY_STAT, rarityAtLeast, rarityChances, rollRarity } from '../src/core/rarity';
 import { Rng } from '../src/core/rng';
 import { chainFloor, comboSteps, performSpin, reelCount, rollTokens, spinCycle, tokenMult } from '../src/core/roller';
-import { addKnight, dupeGold, knightPower, levelCost, levelMult, levelUp } from '../src/core/roster';
+import { addKnight, benchKnight, bestSquad, dupeGold, fillSquad, knightPower, levelCost, levelMult, levelUp, sanitizeSquad, setSquadSlot, soloBonus, squadSlots } from '../src/core/roster';
 import { mend } from '../src/core/save';
 import type { GameState } from '../src/core/state';
 
@@ -106,7 +106,8 @@ describe('reels', () => {
       if (Object.keys(s.roster).length >= BAL.tutorial.knights) s.roll.tutorial = 'done';
     }
     expect(Object.keys(s.roster).length).toBeGreaterThanOrEqual(BAL.tutorial.knights);
-    expect(s.squad.filter(Boolean).length).toBe(3);
+    // One slot to start: the first knight takes it.
+    expect(s.squad.filter(Boolean).length).toBe(1);
     // Ordinary low rolls: nothing above Rare at the start's luck.
     for (const r of got) expect(rarityAtLeast(r as never, 'epic'), r).toBe(false);
   });
@@ -228,5 +229,75 @@ describe('checkpoints', () => {
     expect(checkpointFor(10)).toBe(10);
     expect(checkpointFor(9)).toBe(1);
     expect(checkpointFor(1)).toBe(1);
+  });
+});
+
+describe('squad slots', () => {
+  it('open one to start and one more with each rebirth, up to three', () => {
+    expect(squadSlots({ rebirths: 0 })).toBe(1);
+    expect(squadSlots({ rebirths: 1 })).toBe(2);
+    expect(squadSlots({ rebirths: 2 })).toBe(3);
+    expect(squadSlots({ rebirths: 9 })).toBe(3);
+  });
+
+  it('take knights only into open slots (filling, best squad, putting one in), and an old save loses its locked ones', () => {
+    const s = newGame(3);
+    for (const id of [knightId('common', 'guardian'), knightId('rare', 'blade'), knightId('epic', 'ranger')]) addKnight(s, id, null);
+    s.squad = [null, null, null];
+    fillSquad(s);
+    expect(s.squad.filter(Boolean).length).toBe(1);
+    bestSquad(s);
+    expect(s.squad).toEqual([knightId('epic', 'ranger'), null, null]);
+    setSquadSlot(s, 1, knightId('rare', 'blade'));
+    expect(s.squad[1]).toBeNull();
+    // A save from before slots: three knights with no rebirth keep the first.
+    s.squad = [knightId('common', 'guardian'), knightId('rare', 'blade'), knightId('epic', 'ranger')];
+    s.controlled = 2;
+    sanitizeSquad(s);
+    expect(s.squad).toEqual([knightId('common', 'guardian'), null, null]);
+    expect(s.controlled).toBe(0);
+    // Two rebirths: three open.
+    s.rebirths = 2;
+    bestSquad(s);
+    expect(s.squad.filter(Boolean).length).toBe(3);
+  });
+
+  it('stay empty once you empty them (the hub doesn\'t refill them) until you put someone in or pick the best squad', () => {
+    const s = newGame(6);
+    for (const id of [knightId('rare', 'guardian'), knightId('rare', 'blade'), knightId('rare', 'ranger')]) addKnight(s, id, null);
+    s.rebirths = 2;
+    bestSquad(s);
+    expect(s.squad.filter(Boolean).length).toBe(3);
+    s.controlled = 1;
+    expect(benchKnight(s, 1)).toBe(true);
+    expect(benchKnight(s, 2)).toBe(true);
+    // The last one stays: somebody goes down.
+    expect(benchKnight(s, 0)).toBe(false);
+    expect(s.squad.filter(Boolean).length).toBe(1);
+    expect(s.controlled).toBe(0);
+    fillSquad(s);
+    expect(s.squad.filter(Boolean).length).toBe(1);
+    expect(soloBonus(s)).toBeCloseTo(2, 9);
+    setSquadSlot(s, 2, knightId('rare', 'blade'));
+    fillSquad(s);
+    expect(s.squad.filter(Boolean).length).toBe(2);
+    bestSquad(s);
+    expect(s.squad.filter(Boolean).length).toBe(3);
+  });
+
+  it('pay more gold going down short-handed: half again for every open slot left empty', () => {
+    const s = newGame(4);
+    for (const id of [knightId('rare', 'guardian'), knightId('rare', 'blade'), knightId('rare', 'ranger')]) addKnight(s, id, null);
+    s.rebirths = 2;
+    s.squad = [knightId('rare', 'guardian'), null, null];
+    expect(soloBonus(s)).toBeCloseTo(2, 9);
+    s.squad = [knightId('rare', 'guardian'), knightId('rare', 'blade'), null];
+    expect(soloBonus(s)).toBeCloseTo(1.5, 9);
+    s.squad = [knightId('rare', 'guardian'), knightId('rare', 'blade'), knightId('rare', 'ranger')];
+    expect(soloBonus(s)).toBe(1);
+    // No bonus for the one slot a new game has.
+    s.rebirths = 0;
+    s.squad = [knightId('rare', 'guardian'), null, null];
+    expect(soloBonus(s)).toBe(1);
   });
 });

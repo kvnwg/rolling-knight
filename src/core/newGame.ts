@@ -81,6 +81,7 @@ export function rebirth(state: GameState): boolean {
   state.sigils = state.rebirths; // one per rebirth to start each run
   state.roster = {};
   state.squad = [null, null, null];
+  state.leftEmpty = [false, false, false];
   state.controlled = 0;
   if (kept) {
     state.roster[kept.id] = { ...kept };

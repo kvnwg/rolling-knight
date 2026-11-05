@@ -7,7 +7,7 @@ import { newGame } from './newGame';
 import { Rng } from './rng';
 import { KNIGHTS_BY_ID } from './knights';
 import { PERKS_BY_ID } from './perks';
-import { dupeGold } from './roster';
+import { dupeGold, sanitizeSquad } from './roster';
 import { SAVE_VERSION, type GameState, type KnightRec } from './state';
 import { sanitizeUpgrades } from './upgrades';
 
@@ -55,6 +55,7 @@ export function mend(raw: unknown): GameState {
   // Upgrade tiers within each line's range (the map was rebuilt: some lines have fewer tiers now).
   // Combat lines hang off nothing now (they're rolled), so every combat tier a save has stays.
   sanitizeUpgrades(out);
+  sanitizeSquad(out);
   mendPerks(out);
   cashInSpares(out);
   return out;

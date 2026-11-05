@@ -14,7 +14,7 @@ import { sfx } from '../audio/sfx';
 import { knightDef } from '../core/knights';
 import { CHALLENGE, floorDifficulty, knightRating, squadPower } from '../core/power';
 import { RARITY_COLOR, RARITY_NAME } from '../core/rarity';
-import { rankedKnights } from '../core/roster';
+import { rankedKnights, squadSize } from '../core/roster';
 import type { Game } from '../game';
 import { npcFrame } from '../render/art/npcs';
 import { toCanvas } from '../render/art/draw';
@@ -61,7 +61,7 @@ export function HubHud({ game, onTalk, onSettings, onLuck }: { game: Game; onTal
   const portrait = usePortrait(near);
   // Out of the way once you're going down the steps (it sits over them).
   const floor = s.run.floor;
-  const diff = floorDifficulty(floor, squadPower(s));
+  const diff = floorDifficulty(floor, squadPower(s), squadSize(s));
   const ch = CHALLENGE[diff.challenge];
   return (
     <div className="dhud hub-hud">

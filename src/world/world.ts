@@ -78,6 +78,11 @@ export interface WorldOptions {
   goldPerKill: number;
   /** What the foes are built for, in Squad Power (power.ts); par for the floor when not given. */
   difficulty?: number;
+  /**
+   * Knights the floor is built for (1 to 3; the squad's when not given): foes hit as hard as that
+   * many knights' HP says, and a smaller squad meets thinner packs (half of them for one knight).
+   */
+  size?: number;
   /** The camp (home screen): no mobs, the squad stands round the fire. */
   camp?: boolean;
   /** The hub: no mobs; you walk your knight among the keepers' stations. */
@@ -150,6 +155,8 @@ export class World {
   luck = 1;
   /** What this floor's foes are built for, in Squad Power (see power.ts). */
   difficulty: number;
+  /** Knights the floor is built for (1 to 3): see WorldOptions.size. */
+  size = 3;
   /** The last 5 seconds, a snapshot every 0.1 s (for Rewind). */
   private history: Snapshot[] = [];
   private historyT = 0;
@@ -217,6 +224,11 @@ export class World {
       return;
     }
     this.difficulty = o.difficulty ?? floorPar(o.floor);
+    this.size = Math.max(1, Math.min(3, Math.round(o.size ?? 3)));
+    // A smaller squad meets thinner packs: (1 + size) / 4 of the floor's foes (bosses always come).
+    // (Their own random stream: the floor's stays as it was.)
+    const thin = new Rng(Rng.hashSeed((o.seed ^ 0x7417) >>> 0));
+    const keepShare = (1 + this.size) / 4;
     this.traps = makeTraps(o.map);
     // Coins lying on the floor are real gold: they sit where they lie until the squad picks them up.
     for (const p of o.map.props) {
@@ -225,6 +237,7 @@ export class World {
     }
     o.map.props = o.map.props.filter((p) => p.kind !== 'coins');
     for (const s of o.map.spawns) {
+      if (!s.boss && keepShare < 1 && thin.next() >= keepShare) continue;
       const t = s.boss ? o.bossType! : this.rng.pick(o.mobTypes);
       const m = this.makeMob(t, s.x, s.y, s.elite, s.boss);
       m.room = s.room;
@@ -304,7 +317,7 @@ export class World {
 
   /** A foe of type `t`, built for this floor's difficulty (its HP and hit come from power.ts's targets). */
   makeMob(t: MobType, x: number, y: number, elite: boolean, boss: boolean): Unit {
-    const st = foeStats(t, this.difficulty, boss ? 'boss' : elite ? 'elite' : 'mob', this.floor);
+    const st = foeStats(t, this.difficulty, boss ? 'boss' : elite ? 'elite' : 'mob', this.floor, this.size);
     const maxHp = st.hp;
     return {
       uid: uid(),

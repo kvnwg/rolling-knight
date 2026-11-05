@@ -831,6 +831,105 @@
   font-weight: 700;
   white-space: nowrap;
 }
+/* A slot you can't use yet: one more opens with each rebirth. */
+.slot[data-locked] {
+  border-image-source: var(--sk-pa-card-dim);
+  cursor: default;
+  justify-content: center;
+}
+.slotLock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(1.5 * var(--px));
+  width: 100%;
+  min-height: calc(30 * var(--px));
+  font-size: calc(3.8 * var(--px));
+  line-height: 1.15;
+  text-align: center;
+  color: var(--mid);
+  opacity: 0.85;
+}
+.slotLock b {
+  font-size: calc(4.2 * var(--px));
+  color: var(--dark);
+}
+/* Dragging a knight: the open slots wait for it, the one under it lights up. */
+:global(body[data-drag-knight]) .slot[data-drop-slot] {
+  outline: var(--px) dashed #e8a92a;
+}
+.slot[data-drop-hover] {
+  outline: calc(1.5 * var(--px)) solid #ffcf4a !important;
+  border-image-source: var(--sk-pa-card-gold);
+  transform: translateY(calc(-1 * var(--px)));
+}
+.drag {
+  display: grid;
+  place-items: end center;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: grab;
+}
+.dragGhost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 9999;
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+  filter: drop-shadow(0 calc(2 * var(--px)) 0 rgba(26, 19, 38, 0.45)) brightness(1.08);
+  opacity: 0.95;
+}
+/* Empty this slot on purpose: a small x in its corner. */
+.slotX {
+  position: absolute;
+  top: calc(1 * var(--px));
+  right: calc(1 * var(--px));
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: calc(7 * var(--px));
+  height: calc(7 * var(--px));
+  padding: 0;
+  border: 0 solid transparent;
+  border-image: var(--sk-pa-inset) 3 fill / calc(2 * var(--px)) stretch;
+  background: none;
+  cursor: pointer;
+}
+.slotX:active {
+  transform: translateY(var(--px));
+}
+.slotX i {
+  display: block;
+  width: calc(4 * var(--px));
+  height: calc(4 * var(--px));
+  background: #8a2a1e;
+  clip-path: polygon(0 0, 33.3% 0, 50% 25%, 66.7% 0, 100% 0, 100% 33.3%, 75% 50%, 100% 66.7%, 100% 100%, 66.7% 100%, 50% 75%, 33.3% 100%, 0 100%, 0 66.7%, 25% 50%, 0 33.3%);
+}
+.slotEmpty small {
+  white-space: normal;
+  text-align: center;
+  line-height: 1.15;
+}
+.soloLine {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(1.5 * var(--px));
+  margin: calc(-0.5 * var(--px)) calc(1 * var(--px)) 0;
+  padding: calc(0.8 * var(--px)) calc(2 * var(--px));
+  font-size: calc(3.9 * var(--px));
+  color: var(--mid);
+  border: 0 solid transparent;
+  border-image: var(--sk-pa-inset) 3 fill / calc(3 * var(--px)) stretch;
+}
+.soloLine b {
+  color: #9a5a00;
+}
 .slotArt {
   position: relative;
   display: grid;
