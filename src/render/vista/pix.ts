@@ -34,10 +34,6 @@ export function mix(a: RGB, b: RGB, t: number): RGB {
   return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 }
 
-export function mul(a: RGB, k: number): RGB {
-  return [a[0] * k, a[1] * k, a[2] * k];
-}
-
 export function css(c: RGB, a = 1): string {
   return `rgba(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])},${a})`;
 }
@@ -62,10 +58,6 @@ export function sample(stops: Stops, t: number): RGB {
 }
 
 export const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v);
-export const smooth = (e0: number, e1: number, x: number): number => {
-  const t = clamp((x - e0) / (e1 - e0), 0, 1);
-  return t * t * (3 - 2 * t);
-};
 
 // ------------------------------------------------------------------ random
 
@@ -81,16 +73,24 @@ export function rng(seed: number): () => number {
   };
 }
 
-/** Deterministic 0..1 from integers. */
-export function h01(...n: number[]): number {
+/** Deterministic 0..1 from three integers (no allocation: it runs per pixel). */
+export function h01(a: number, b: number, c: number): number {
   let h = 0x811c9dc5;
-  for (const v of n) {
-    h ^= v | 0;
-    h = Math.imul(h, 0x01000193);
-    h ^= h >>> 13;
-    h = Math.imul(h, 0x5bd1e995);
-    h ^= h >>> 15;
-  }
+  h ^= a | 0;
+  h = Math.imul(h, 0x01000193);
+  h ^= h >>> 13;
+  h = Math.imul(h, 0x5bd1e995);
+  h ^= h >>> 15;
+  h ^= b | 0;
+  h = Math.imul(h, 0x01000193);
+  h ^= h >>> 13;
+  h = Math.imul(h, 0x5bd1e995);
+  h ^= h >>> 15;
+  h ^= c | 0;
+  h = Math.imul(h, 0x01000193);
+  h ^= h >>> 13;
+  h = Math.imul(h, 0x5bd1e995);
+  h ^= h >>> 15;
   return (h >>> 0) / 4294967296;
 }
 
@@ -180,10 +180,6 @@ export class Pix {
   rgb(x: number, y: number): RGB {
     const i = (clamp(y, 0, this.h - 1) * this.w + clamp(x, 0, this.w - 1)) * 4;
     return [this.d[i], this.d[i + 1], this.d[i + 2]];
-  }
-
-  rect(x: number, y: number, w: number, h: number, c: RGB): void {
-    for (let yy = Math.floor(y); yy < y + h; yy++) for (let xx = Math.floor(x); xx < x + w; xx++) this.set(xx, yy, c);
   }
 
   /** Copies the opaque pixels of `src` with its top left at (dx, dy). */

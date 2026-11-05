@@ -73,6 +73,7 @@ export function App() {
   const [wide, setWide] = useState(false);
   const revealRef = useRef(reveals);
   revealRef.current = reveals;
+  const csPick = useRef<string | null>(null);
   const choosing = !picked && !game.inDungeon && Object.keys(game.state.roster).length > 0 && reveals.length === 0 && station === null;
   const sheetOpen = detail !== null || settings || luck || station !== null || choosing;
   const sheetRef = useRef(sheetOpen);
@@ -278,7 +279,7 @@ export function App() {
   return (
     <>
       <canvas ref={canvasRef} className="game" data-play="1" />
-      {choosing && <VistaCanvas game={game} wide={wide} />}
+      {choosing && <VistaCanvas game={game} wide={wide} pick={csPick} />}
       {inDungeon ? (
         <DungeonHud
           game={game}
@@ -298,7 +299,7 @@ export function App() {
           <i style={{ left: `calc(50% + ${ctl.controls.stick.x - ctl.controls.stick.ox}px)`, top: `calc(50% + ${ctl.controls.stick.y - ctl.controls.stick.oy}px)` }} />
         </div>
       )}
-      {choosing && <CharacterSelect game={game} onPick={() => setPicked(true)} />}
+      {choosing && <CharacterSelect game={game} onSelect={(id) => (csPick.current = id)} onPick={() => setPicked(true)} />}
       {station && !inDungeon && <StationSheet game={game} station={station} onOpen={setDetail} onClose={() => setStation(null)} />}
       {talking && inDungeon && <DialogBox game={game} npc={talking} onClose={() => setTalking(null)} />}
       <div className="toasts">

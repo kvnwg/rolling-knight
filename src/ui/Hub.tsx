@@ -285,10 +285,13 @@ function GatePanel({ game, onClose }: { game: Game; onClose: () => void }) {
 
 // ------------------------------------------------------------------ who you play as
 
-export function CharacterSelect({ game, onPick }: { game: Game; onPick: () => void }) {
+export function CharacterSelect({ game, onPick, onSelect }: { game: Game; onPick: () => void; onSelect?: (id: string) => void }) {
   const s = game.state;
   const ids = rankedKnights(s).slice(0, 12);
   const [sel, setSel] = useState(s.squad[s.controlled] ?? ids[0] ?? null);
+  useEffect(() => {
+    if (sel) onSelect?.(sel);
+  }, [sel, onSelect]);
   if (!sel) return null;
   const def = knightDef(sel);
   const pick = () => {

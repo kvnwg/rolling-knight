@@ -1,13 +1,15 @@
 /**
- * The vista's land, painted once per layout at art resolution: far mountains in alpenglow, the
- * horizon hills, the castle on its hill with a village on the shore, the lake's reflection, the near
- * forests stepping down into mist, and the camp's meadow on its cliff. Also the out-of-focus framing
- * pines and the foreground grass (blurred by the caller).
+ * The vista's land, painted once per layout at art resolution: far mountains in alpenglow and the
+ * horizon hills; the castle on its crag with a village on the shore; the lake's reflection; the near
+ * shore's forests; the valley below the camp, rows of pines stepping down into mist with a river
+ * winding through them; and the camp's ledge (grass, wildflowers, boulders) with the rock under it.
+ * Also the out-of-focus framing (pines at the sides of wide screens, ferns and grass in the lower
+ * corners), which the caller blurs.
  *
- * Everything is placed around the campfire (the layout's focus) and the visible window around it, so
- * the composition holds on a tall phone with a menu below and on a wide screen with a panel at the
- * side. The sun sits low and behind the scene, so every silhouette is backlit: violet shadow sides
- * with a coral rim on the edges that face the sun.
+ * Everything is placed around the campfire (the layout's focus) and the part of the screen the menus
+ * leave visible, so the picture holds on a tall phone with a menu below and on a wide screen with a
+ * panel at the side. The sun sits low behind the scene, so every silhouette is backlit: violet shadow
+ * sides with a coral rim on the edges that face the sun.
  */
 import { blurPlane, clamp, fbm1, h01, hex, mix, noise1, noise2, Pix, rng, type RGB } from './pix';
 import { skyAt } from './sky';
@@ -748,8 +750,13 @@ function meadow(p: Pix, L: Layout, G: Ground): void {
   for (const [tx, th] of riseTrees) bigPine(p, tx, G.backAt(tx) + 3, th, hex('#1a1230'), hex('#ff9a74'), L.sunX, L.seed + Math.round(tx));
   // The ground: cool grass, sky-lit toward the back edge, warm where the fire reaches.
   const top = Math.floor(Math.min(G.cornerY, G.backAt(0), G.backAt(L.fx - 64)) - 2);
+  let lip = 0;
+  for (let x = 0; x < L.W; x++) lip = Math.max(lip, G.frontAt(x));
+  const bottom = Math.min(L.H, Math.ceil(lip) + 2);
   const patch = noise2(L.seed + 54);
-  for (let y = Math.max(0, top); y < L.H; y++) {
+  const green = hex('#2a4a40');
+  const heather = hex('#3a2a4c');
+  for (let y = Math.max(0, top); y < bottom; y++) {
     for (let x = 0; x < L.W; x++) {
       if (!G.inMeadow(x, y)) continue;
       const back = x <= L.cornerX ? G.backAt(x) : G.cornerY;
@@ -759,8 +766,8 @@ function meadow(p: Pix, L: Layout, G: Ground): void {
       let c = GRASS[gi];
       // Patches: some greener, some heathery violet.
       const ph = patch(x * 0.03, y * 0.05);
-      if (ph > 0.3) c = mix(c, hex('#2a4a40'), 0.22);
-      else if (ph < -0.35) c = mix(c, hex('#3a2a4c'), 0.25);
+      if (ph > 0.3) c = mix(c, green, 0.22);
+      else if (ph < -0.35) c = mix(c, heather, 0.25);
       const f = fireLight(L, x, y);
       if (f > 0.04) {
         const q = Math.min(GRASS_FIRE.length - 1, Math.floor(f * GRASS_FIRE.length * 1.05));
@@ -772,7 +779,7 @@ function meadow(p: Pix, L: Layout, G: Ground): void {
   // Grass tufts in clumps (where the clump noise allows), larger toward the viewer.
   const cell = 7;
   const clump = noise2(L.seed + 55);
-  for (let gy = Math.max(0, top); gy < L.H; gy += cell * 0.6) {
+  for (let gy = Math.max(0, top); gy < bottom; gy += cell * 0.6) {
     const near = clamp((gy - L.backY) / Math.max(40, L.H - L.backY), 0, 1);
     const cw = cell * (1 + near * 1.6);
     for (let gx = -cw * r(); gx < L.W; gx += cw) {
@@ -816,7 +823,7 @@ function meadow(p: Pix, L: Layout, G: Ground): void {
   const clusters = Math.round(L.W * 0.09);
   for (let i = 0; i < clusters; i++) {
     const cx = r() * L.W;
-    const cy = L.backY + 4 + Math.pow(r(), 1.2) * (L.H - L.backY);
+    const cy = L.backY + 4 + Math.pow(r(), 1.2) * (bottom - L.backY);
     const fdx = (cx - L.fx) / 56;
     const fdy = (cy - L.fy) / 18;
     if (fdx * fdx + fdy * fdy < 1) continue;
@@ -950,17 +957,19 @@ export function bigPine(p: Pix, cx: number, by: number, th: number, body: RGB, r
   const r = rng(seed);
   const side = Math.sign(sunX - cx) || 1;
   const tip = Math.round(by - th);
-  const body2 = mix(body, hex('#3a2850'), 0.3);
-  const rows = new Map<number, Array<[number, number]>>();
-  const add = (y: number, a: number, b: number) => {
-    const list = rows.get(y) ?? [];
-    list.push([Math.round(a), Math.round(b)]);
-    rows.set(y, list);
+  // The silhouette, painted into a mask over the pine's box first.
+  const x0 = Math.floor(cx - maxHW - 3);
+  const bw = Math.ceil(maxHW * 2 + 7);
+  const bh = Math.ceil(by + 3 - tip);
+  const m = new Uint8Array(bw * bh);
+  const span = (y: number, a: number, b: number) => {
+    const yy = y - tip;
+    if (yy < 0 || yy >= bh) return;
+    for (let x = Math.max(0, Math.round(a) - x0); x <= Math.min(bw - 1, Math.round(b) - x0); x++) m[yy * bw + x] = 1;
   };
   // The trunk line, then tiers: each a bough spreading from the trunk, its tips drooping.
-  for (let y = tip; y <= by + 1; y++) add(y, cx, cx);
+  for (let y = tip; y <= by + 1; y++) span(y, cx, cx);
   let y = tip + 1;
-  let tierN = 0;
   while (y < by - 1) {
     const u = (y - tip) / th;
     const tierH = Math.max(3, Math.round(th * (0.07 + r() * 0.05) * (0.7 + u * 0.6)));
@@ -969,31 +978,31 @@ export function bigPine(p: Pix, cx: number, by: number, th: number, body: RGB, r
     for (let j = 0; j < tierH; j++) {
       const v = (j + 1) / tierH;
       // The bough widens down its tier; the outer tips hang lower.
-      const a = cx - wL * Math.pow(v, 0.7);
-      const b = cx + wR * Math.pow(v, 0.7);
-      add(y + j, a, b);
+      span(y + j, cx - wL * Math.pow(v, 0.7), cx + wR * Math.pow(v, 0.7));
     }
-    // Drooping tips below the tier's widest row.
     const droop = Math.max(1, Math.round(tierH * 0.45));
     for (let j = 1; j <= droop; j++) {
-      add(y + tierH - 1 + j, cx - wL + j * 0.6, cx - wL + 1 + j * 0.3);
-      add(y + tierH - 1 + j, cx + wR - 1 - j * 0.3, cx + wR - j * 0.6);
+      span(y + tierH - 1 + j, cx - wL + j * 0.6, cx - wL + 1 + j * 0.3);
+      span(y + tierH - 1 + j, cx + wR - 1 - j * 0.3, cx + wR - j * 0.6);
     }
     y += Math.max(2, Math.round(tierH * (0.62 + r() * 0.2)));
-    tierN++;
   }
-  void tierN;
-  const has = (xx: number, yy: number) => (rows.get(yy) ?? []).some(([a, b]) => xx >= a && xx <= b);
-  for (const [yy, list] of rows) {
-    for (const [a, b] of list) {
-      for (let x = a; x <= b; x++) {
-        const sunEdge = !has(x + side, yy);
-        const topEdge = !has(x, yy - 1);
-        let c = (x - cx) * side > 0 ? body2 : body;
-        if (sunEdge && topEdge) c = mix(body, rim, 0.85);
-        else if (sunEdge || topEdge) c = mix(body, rim, (x - cx) * side > 0 ? 0.55 : 0.25);
-        p.set(x, yy, c);
-      }
+  const has = (xx: number, yy: number) => xx >= 0 && yy >= 0 && xx < bw && yy < bh && m[yy * bw + xx] === 1;
+  const body2 = mix(body, hex('#3a2850'), 0.3);
+  const rimHi = mix(body, rim, 0.85);
+  const rimMid = mix(body, rim, 0.55);
+  const rimLo = mix(body, rim, 0.25);
+  for (let yy = 0; yy < bh; yy++) {
+    for (let xx = 0; xx < bw; xx++) {
+      if (!m[yy * bw + xx]) continue;
+      const wx = xx + x0;
+      const sunEdge = !has(xx + side, yy);
+      const topEdge = !has(xx, yy - 1);
+      const lit = (wx - cx) * side > 0;
+      let c = lit ? body2 : body;
+      if (sunEdge && topEdge) c = rimHi;
+      else if (sunEdge || topEdge) c = lit ? rimMid : rimLo;
+      p.set(wx, yy + tip, c);
     }
   }
 }
@@ -1038,7 +1047,7 @@ export function paintFront(L: Layout): FrontPiece[] {
     if (r() < 0.45) frond(ferns, bx, fh + 2, len, ang, 0.9 + r() * 0.8, body, rim, L.sunX, r);
     else blade(ferns, bx, fh + 2, len * 1.1, ang * 0.4 - Math.PI * 0.3, body, rim, r);
   }
-  out.push({ pix: ferns, x: -6, y: L.H - fh, sigma: 2.6 });
+  out.push({ pix: ferns, x: -6, y: L.H - fh, sigma: 1.9 });
   const rfw = Math.round(fw * 0.7);
   const rferns = new Pix(rfw, Math.round(fh * 0.8));
   for (let i = 0; i < 16; i++) {
@@ -1049,7 +1058,7 @@ export function paintFront(L: Layout): FrontPiece[] {
     if (r() < 0.45) frond(rferns, bx, rferns.h + 2, len, ang, 0.9 + r() * 0.8, body, rim, L.sunX - (L.W - rfw), r);
     else blade(rferns, bx, rferns.h + 2, len * 1.1, -Math.PI / 2 - (ang + Math.PI / 2) * 0.4 + Math.PI * 0.3 - Math.PI * 0.6, body, rim, r);
   }
-  out.push({ pix: rferns, x: L.W - rfw + 6, y: L.H - rferns.h, sigma: 2.6 });
+  out.push({ pix: rferns, x: L.W - rfw + 6, y: L.H - rferns.h, sigma: 1.9 });
   return out;
 }
 
@@ -1073,8 +1082,8 @@ function frond(p: Pix, x0: number, y0: number, len: number, ang: number, curl: n
       for (let j = 1; j < leaf; j++) {
         const lx = x + Math.cos(la) * j;
         const ly = y + Math.sin(la) * j + j * j * 0.02;
-        const lit = j > leaf - 2 && (sunX - lx) * Math.cos(la) > 0;
-        p.set(lx, ly, lit ? mix(body, rim, 0.55) : body);
+        const lit = j > leaf - 3 && (sunX - lx) * Math.cos(la) > -leaf;
+        p.set(lx, ly, lit ? mix(body, rim, j > leaf - 2 ? 0.8 : 0.5) : body);
       }
     }
   }
@@ -1091,8 +1100,8 @@ function blade(p: Pix, x0: number, y0: number, len: number, ang: number, body: R
     x += Math.cos(a);
     y += Math.sin(a);
     const w = Math.max(1, Math.round((1 - i / len) * 3));
-    const tip = i > len - 4;
-    for (let k = 0; k < w; k++) p.set(x + k, y, tip ? mix(body, rim, 0.6) : body);
+    const tip = i > len - 6;
+    for (let k = 0; k < w; k++) p.set(x + k, y, tip ? mix(body, rim, i > len - 3 ? 0.85 : 0.5) : k === w - 1 && w > 1 ? mix(body, rim, 0.2) : body);
   }
 }
 

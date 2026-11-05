@@ -1790,7 +1790,8 @@ body,
   gap: calc(4 * var(--px));
 }
 
-/* Who you play as: the knight big in a pool of its rarity's light, the roster below. */
+/* Who you play as: the knight big in a pool of its rarity's light, the roster below. The camp vista
+   shows above the panel on a tall screen and to its left on a wide one. */
 .char-select {
   position: fixed;
   inset: 0;
@@ -1798,10 +1799,23 @@ body,
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: calc(4 * var(--px));
-  padding: calc(8 * var(--px)) calc(4 * var(--px));
-  background: radial-gradient(ellipse at 50% 45%, rgba(20, 10, 6, 0.1), rgba(10, 5, 3, 0.75) 70%);
+  justify-content: flex-end;
+  gap: calc(3 * var(--px));
+  padding: calc(8 * var(--px)) calc(4 * var(--px)) calc(12 * var(--px) + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to bottom, rgba(10, 5, 3, 0.35), rgba(10, 5, 3, 0) 14%, rgba(10, 5, 3, 0) 48%, rgba(10, 5, 3, 0.5) 66%, rgba(10, 5, 3, 0.78));
+}
+.char-select .cs-title {
+  margin-bottom: auto;
+}
+@media (min-aspect-ratio: 1/1) {
+  .char-select {
+    justify-content: center;
+    padding: calc(8 * var(--px)) 3vw calc(8 * var(--px)) 54vw;
+    background: linear-gradient(to right, rgba(10, 5, 3, 0) 40%, rgba(10, 5, 3, 0.55) 60%, rgba(10, 5, 3, 0.8));
+  }
+  .char-select .cs-title {
+    margin-bottom: calc(4 * var(--px));
+  }
 }
 .cs-title {
   display: flex;

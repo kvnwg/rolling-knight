@@ -15,6 +15,7 @@
  *
  * No DOM at import time: canvases are made on the first draw.
  */
+import { KNIGHTS_BY_ID } from '../core/knights';
 import type { MutationId } from '../core/state';
 import type { View } from './art/knights';
 import { FIRE_H, FIRE_W, fireFrames, fireFront, knightSprite, paintCamp, type KnightSprite } from './vista/camp';
@@ -50,9 +51,12 @@ interface Drifter {
 }
 
 interface Mist {
+  /** A tiling strip, painted at half resolution (it is soft). */
   c: Canvas;
-  y: number;
+  /** Its width and height in art pixels. */
+  w: number;
   h: number;
+  y: number;
   speed: number;
   alpha: number;
 }
@@ -127,7 +131,11 @@ export class Vista {
     // Canvases are made lazily on the first draw (no DOM at import time).
   }
 
-  draw(ctx: Ctx, w: number, h: number, t: number, opts: { heroes: Array<{ id: string; mutation: MutationId | null }>; focusX: number; focusY: number; reduceMotion?: boolean }): void {
+  /**
+   * Draws a frame onto `ctx` (w x h device pixels; the whole canvas is covered). `t` is seconds and
+   * drives every animation; the scene's heart (the campfire) sits at (focusX, focusY) of the screen.
+   */
+  draw(ctx: Ctx, w: number, h: number, t: number, opts: VistaOptions): void {
     w = Math.max(1, Math.round(w));
     h = Math.max(1, Math.round(h));
     const S = this.ensure(w, h, opts.focusX, opts.focusY, !!opts.reduceMotion);
@@ -176,7 +184,7 @@ export class Vista {
    * size and focus have held still for a moment (a rotation, a window drag or a menu transition costs
    * one rebuild, not one per frame), then the new layout fades in over the old.
    */
-  private ensure(w: number, h: number, fx: number, fy: number, instant: boolean): Built {
+  private ensure(w: number, h: number, fx: number, fy: number, noFade: boolean): Built {
     const key = `${w}x${h}|${Math.round(fx * 200)}|${Math.round(fy * 200)}`;
     if (!this.built) {
       this.key = key;
@@ -192,12 +200,12 @@ export class Vista {
       this.pendingKey = key;
       this.pendingAt = tNow;
     }
-    if (instant || tNow - this.pendingAt >= SETTLE_MS) {
+    if (tNow - this.pendingAt >= SETTLE_MS) {
       const old = this.built;
       this.key = key;
       this.pendingKey = '';
       this.built = build(makeLayout(w, h, fx, fy));
-      if (!instant) {
+      if (!noFade) {
         this.prev = old;
         this.fadeAt = now();
       }
@@ -281,6 +289,7 @@ export class Vista {
 
     // Fireflies, then the out-of-focus foreground and the vignette.
     this.flies(g, S, t);
+    g.imageSmoothingEnabled = true;
     for (const f of S.fronts) g.drawImage(f.c, f.x * p, f.y * p, f.w * p, f.h * p);
     g.drawImage(S.vignette, 0, 0, L.w, L.h);
     g.restore();
@@ -430,13 +439,14 @@ export class Vista {
 
   private mist(g: Ctx, L: Layout, m: Mist, t: number): void {
     const p = L.p;
-    const w = m.c.width;
+    const w = m.w;
     const ox = (((t * m.speed) % w) + w) % w;
     g.imageSmoothingEnabled = true;
     g.globalAlpha = m.alpha;
-    g.drawImage(m.c, (ox - w) * p, m.y * p, w * p, m.h * p);
-    g.drawImage(m.c, ox * p, m.y * p, w * p, m.h * p);
-    if ((ox + w) * p < L.w) g.drawImage(m.c, (ox + w) * p, m.y * p, w * p, m.h * p);
+    // Overlap the tiles by a hair so no seam shows between them.
+    g.drawImage(m.c, (ox - w) * p, m.y * p, w * p + 1, m.h * p);
+    g.drawImage(m.c, ox * p, m.y * p, w * p + 1, m.h * p);
+    if ((ox + w) * p < L.w) g.drawImage(m.c, (ox + w) * p, m.y * p, w * p + 1, m.h * p);
     g.globalAlpha = 1;
   }
 
@@ -453,7 +463,7 @@ export class Vista {
 
     // Shadows, cast away from the fire.
     // One knight stands behind the fire; two face each other across it; three make the full ring.
-    const valid = heroes.filter((hero) => this.knight(hero.id, hero.mutation, SLOTS[0], 0, t, 1) !== null).slice(0, SLOTS.length);
+    const valid = heroes.filter((hero) => KNIGHTS_BY_ID.has(hero.id)).slice(0, SLOTS.length);
     const order = valid.length === 2 ? [1, 2] : [0, 1, 2];
     const placed = valid.map((hero, i) => ({ hero, slot: SLOTS[order[i]] }));
     for (const { slot } of placed) {
@@ -636,6 +646,9 @@ function bloomOf(src: Pix, sigma: number, pad: number, threshold: number): Canva
   return b.toCanvas();
 }
 
+/** The flames don't depend on the layout: painted once. */
+let fireCache: Canvas[] | null = null;
+
 function build(L: Layout): Built {
   const { p, W, H, w, h } = L;
   const r = rng(L.seed + 100);
@@ -779,22 +792,33 @@ function build(L: Layout): Built {
 
   // --- Out-of-focus framing.
   const fronts = paintFront(L).map((f) => {
-    const pad = Math.ceil(f.sigma * 3);
+    // Blurred at half resolution (it is out of focus anyway), drawn back up at full size.
+    const pad = Math.ceil(f.sigma * 3) * 2;
     const b = padPix(f.pix, pad);
-    blurRGBA(b.d, b.w, b.h, f.sigma);
-    return { c: b.toCanvas(), x: f.x - pad, y: f.y - pad, w: b.w, h: b.h };
+    const hb = half(b);
+    blurRGBA(hb.d, hb.w, hb.h, f.sigma / 2);
+    return { c: hb.toCanvas(), x: f.x - pad, y: f.y - pad, w: hb.w * 2, h: hb.h * 2 };
   });
 
-  // --- Mist drifting over the far shore and over the near forest.
-  const mists: Mist[] = [];
+  // --- Mist drifting over the far shore, over the near forest and down in the valley.
+  const mist = (h0: number, color: string, seed: number, density: number, y: number, speed: number, alpha: number): Mist => {
+    const mw = Math.ceil(W / 2);
+    const mh = Math.max(4, Math.round(h0 / 2));
+    return { c: mistStrip(mw, mh, hex(color), seed, density).toCanvas(), w: mw * 2, h: mh * 2, y, speed, alpha };
+  };
   const mh1 = Math.round(clamp((L.lakeBot - L.hy) * 0.5, 8, 24));
-  mists.push({ c: mistStrip(W, mh1, hex('#ffc8a6'), L.seed + 91, 0.8).toCanvas(), y: L.shoreY - mh1 * 0.22, h: mh1, speed: 0.9, alpha: 0.3 });
   const mh2 = Math.round(clamp((L.backY - L.lakeBot) * 0.8, 10, 36));
-  mists.push({ c: mistStrip(W, mh2, hex('#b884b4'), L.seed + 92, 1.2).toCanvas(), y: L.lakeBot - mh2 * 0.25, h: mh2, speed: -1.4, alpha: 0.32 });
+  const mists: Mist[] = [
+    mist(mh1, '#ffc8a6', L.seed + 91, 0.8, L.shoreY - mh1 * 0.22, 0.9, 0.3),
+    mist(mh2, '#b884b4', L.seed + 92, 1.2, L.lakeBot - mh2 * 0.25, -1.4, 0.32),
+  ];
   const mh3 = Math.round(clamp(H * 0.08, 18, 50));
+  const lip = G.frontAt(L.fx);
   const lowMists: Mist[] = [
-    { c: mistStrip(W, mh3, hex('#c88ab8'), L.seed + 93, 0.45).toCanvas(), y: G.frontAt(L.fx) + 34, h: mh3, speed: 1.1, alpha: 0.38 },
-    { c: mistStrip(W, Math.round(mh3 * 1.3), hex('#a070b0'), L.seed + 94, 0.4).toCanvas(), y: G.frontAt(L.fx) + 34 + mh3 * 1.5, h: Math.round(mh3 * 1.3), speed: -0.7, alpha: 0.28 },
+    mist(mh3, '#c88ab8', L.seed + 93, 0.45, lip + 34, 1.1, 0.38),
+    mist(mh3 * 1.3, '#a070b0', L.seed + 94, 0.4, lip + 34 + mh3 * 1.5, -0.7, 0.28),
+    // Haze pooling on the valley floor, so the nearest silhouettes have something to stand against.
+    mist(mh3 * 2.2, '#8a5aa6', L.seed + 95, 0.7, H - mh3 * 2.6, 0.5, 0.32),
   ];
 
   // --- Light shafts from the sun (low res, blurred).
@@ -873,7 +897,9 @@ function build(L: Layout): Built {
   const rp = riverPath(L);
   for (let i = 0; i < 40; i++) {
     const [cx, y, hw] = rp[Math.floor(Math.pow(r(), 0.8) * (rp.length - 1))];
-    if (G.inMeadow(Math.round(cx), y) || y > L.H * 0.97) continue;
+    // Not where the ledge or the rock under it hides the water.
+    const underLedge = cx <= L.cornerX + 40 && y < G.frontAt(cx) + 64;
+    if (G.inMeadow(Math.round(cx), y) || underLedge || y > L.H * 0.97) continue;
     glints.push({ x: cx + (r() - 0.5) * hw * 1.4, y, len: 1 + Math.floor(r() * (1 + hw * 0.3)), s: 1 + r() * 2, ph: r() * 6.28, b: 0.5 });
   }
   const flies: Built['flies'] = [];
@@ -906,7 +932,7 @@ function build(L: Layout): Built {
     stars,
     glints,
     flies,
-    fire: fireFrames().map((f) => f.toCanvas()),
+    fire: (fireCache ??= fireFrames().map((f) => f.toCanvas())),
     fireFront: { c: ffr.pix.toCanvas(), x: ffr.x, y: ffr.y, w: ffr.pix.w, h: ffr.pix.h },
   };
 }

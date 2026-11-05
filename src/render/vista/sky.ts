@@ -1,11 +1,13 @@
 /**
  * The vista's sky: the sunset gradient, pixel cumulus and streaky stratus.
  *
- * Cumulus are built like real ones: a heap of spheres (a flat base, a lumpy body, puffs whose tops
- * trace the cloud's silhouette). Each pixel takes the normal of the sphere nearest the viewer, is lit
- * by the low sun (from its side and from below, as at sunset) with soft self-shadowing (a short march
- * toward the light through the cloud's own mask), then is quantized into clean tone bands and cleaned
- * of stray pixels. The result reads as big pixel-art shapes with lilac shadows and coral-gold lining.
+ * A cumulus is a heap of spheres in stacked rows (lobes tracing its silhouette, a middle row, a row
+ * along a flat base; lower rows nearer the viewer, so each upper puff peeks over the one in front).
+ * The sun is low and off to one side, below the cloud, as at sunset. Shading is done the way a pixel
+ * artist would: bands are offset copies of the silhouette (how far a pixel lies inside the cloud from
+ * its sunlit edge), each lobe adds a lit crescent toward the sun, a line of shadow marks where a
+ * nearer lobe overlaps a farther one, and the sunlit edge gets a gold lining. Tones are then cleaned
+ * of stray pixels. The result: big readable shapes, lilac in shadow, coral and gold where lit.
  */
 import { clamp, hex, mix, Pix, rng, sample, type RGB, type Stops } from './pix';
 
@@ -200,16 +202,40 @@ export function cumulus(o: CloudOpts): Pix {
   const tone = new Int8Array(N).fill(-1);
   const bandW = Math.max(2, H * 0.09);
   const reach = bandW * tones;
+  // Distance to the sunlit edge, measured toward the sun: swept from the sun's side so each pixel
+  // reads the neighbor one step toward the light, already done.
+  const dist = new Float32Array(N);
+  const stepX = Math.abs(sx) > Math.abs(sy) ? Math.sign(sx) : 0;
+  const stepY = stepX === 0 ? Math.sign(sy) : 0;
+  const fx = sx - stepX;
+  const fy = sy - stepY;
+  const ys = sy > 0 ? H - 1 : 0;
+  const ye = sy > 0 ? -1 : H;
+  const yd = sy > 0 ? -1 : 1;
+  const xs = sx > 0 ? W - 1 : 0;
+  const xe = sx > 0 ? -1 : W;
+  const xd = sx > 0 ? -1 : 1;
+  for (let y = ys; y !== ye; y += yd) {
+    for (let xx = xs; xx !== xe; xx += xd) {
+      const i = y * W + xx;
+      if (!m[i]) continue;
+      // The pixel one unit toward the sun: mostly along the main axis, partly across it.
+      const ax = xx + stepX;
+      const ay = y + stepY;
+      const bx = Math.round(xx + sx);
+      const by = Math.round(y + sy);
+      const da = at(ax, ay) ? dist[ay * W + ax] + 1 : 0;
+      const db = at(bx, by) ? dist[by * W + bx] + 1 : 0;
+      const k = Math.min(1, Math.hypot(fx, fy));
+      dist[i] = da * (1 - k) + db * k;
+    }
+  }
   for (let y = 0; y < H; y++) {
     for (let xx = 0; xx < W; xx++) {
       const i = y * W + xx;
       if (!m[i]) continue;
       // Bands are offset copies of the silhouette: distance into the cloud from its sunlit edge.
-      let depth = 0;
-      for (let d = 1; d <= reach; d += 1) {
-        if (!at(Math.round(xx + sx * d), Math.round(y + sy * d))) break;
-        depth = d;
-      }
+      const depth = Math.min(reach, dist[i]);
       // Each lobe has its own base tone (higher lobes sit deeper in shadow), so tone changes follow lobe outlines.
       const b = own[i] >= 0 ? balls[own[i]] : null;
       const lobeTone = !b || b.z < -H * 0.5 ? 2 : b.y < H * 0.2 ? 2 : 3;
