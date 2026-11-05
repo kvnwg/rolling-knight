@@ -806,6 +806,23 @@ export function paintMini(n: number): AltarArt {
   for (let y = top + 6; y + 3 <= bot - 6; y += 5) runes.push(carveRune(p, W - 4, y, g3(k++), 0));
   for (let x = W - 9; x >= 6; x -= 5) runes.push(carveRune(p, x, bot - 4, g3(k++), 0));
   for (let y = bot - 9; y >= top + 6; y -= 5) runes.push(carveRune(p, 1, y, g3(k++), 0));
+  // Brass caps on the frame's corners, with an iron rivet.
+  for (const [sx, sy] of [
+    [0, 0],
+    [1, 0],
+    [0, 1],
+    [1, 1],
+  ]) {
+    const x0 = sx ? W - 4 : 0;
+    const y0 = sy ? bot - 4 : top;
+    for (let j = 0; j < 4; j++) {
+      for (let i = 0; i < 4; i++) {
+        const edge = (sx ? i === 3 : i === 0) || (sy ? j === 3 : j === 0);
+        p.set(x0 + i, y0 + j, edge ? C.ink : j < 2 ? C.br4 : C.br2, edge ? 3 : 7, edge ? M.ink : M.brass);
+      }
+    }
+    p.set(x0 + (sx ? 1 : 2), y0 + (sy ? 1 : 2), C.ir5, 8, M.iron);
+  }
   // The windows: a dark rim (lit in the find's color) round each hole.
   const rims: number[][] = [];
   const holes: Rect[] = [];

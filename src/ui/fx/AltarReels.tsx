@@ -699,8 +699,12 @@ function BigReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
   layoutRef.current = L;
   const altarArt = useMemo(() => (geo?.altar ? paintBig(geo.altar.W, geo.altar.win, geo.altar.holes, geo.altar.payY) : null), [geo]);
   const altarRef = useRef<Altar | null>(null);
+  const artRef = useRef(altarArt);
+  artRef.current = altarArt;
   const canvasRef = (el: HTMLCanvasElement | null) => {
-    if (el && altarRef.current?.canvasEl !== el) altarRef.current = new Altar(el);
+    if (!el || altarRef.current?.canvasEl === el) return;
+    altarRef.current = new Altar(el);
+    if (artRef.current) altarRef.current.setArt(artRef.current);
   };
   useLayoutEffect(() => {
     if (altarArt && altarRef.current) altarRef.current.setArt(altarArt);
@@ -1192,8 +1196,12 @@ function MiniReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
   // The shrine round the windows (altarArt.ts paints it, altar.ts lights it).
   const shrine = useMemo(() => (altarOn ? { lay: miniLayout(n), art: paintMini(n) } : null), [n, altarOn]);
   const altarRef = useRef<Altar | null>(null);
+  const shrineRef = useRef(shrine);
+  shrineRef.current = shrine;
   const canvasRef = (el: HTMLCanvasElement | null) => {
-    if (el && altarRef.current?.canvasEl !== el) altarRef.current = new Altar(el);
+    if (!el || altarRef.current?.canvasEl === el) return;
+    altarRef.current = new Altar(el);
+    if (shrineRef.current) altarRef.current.setArt(shrineRef.current.art);
   };
   useLayoutEffect(() => {
     if (shrine && altarRef.current) altarRef.current.setArt(shrine.art);

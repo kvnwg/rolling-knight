@@ -87,7 +87,7 @@ export function DungeonHud({ game, controls, press, onCamp, onSettings, onLuck, 
       )}
 
       <div className="mini-roller" onClick={onAltar}>
-        <div className="frame plate">
+        <div className="frame">
           <AltarReels game={game} variant="mini" />
         </div>
         {pity !== null && pity <= 15 && (

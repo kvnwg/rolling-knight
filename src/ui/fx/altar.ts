@@ -411,7 +411,6 @@ export class Altar {
     const calm = sig.calm;
     const W = a.W;
     const H = a.H;
-    const n = W * H;
     const big = a.kind === 'big';
 
     // ---------------------------------------------------------------- the state, eased
@@ -493,7 +492,7 @@ export class Altar {
     // The magic circle on the floor (behind the plinth: only where nothing is painted).
     const sg = a.sigil;
     if (sg) {
-      const v0 = Math.min(1.5, 0.62 + 0.38 * this.activity + 0.75 * this.build + (flash ? 0.3 : 0));
+      const v0 = Math.min(1.5, 0.82 + 0.3 * this.activity + 0.6 * this.build + (flash ? 0.3 : 0));
       const sr = sigilCol[0];
       const sgc = sigilCol[1];
       const sb = sigilCol[2];
@@ -643,7 +642,6 @@ export class Altar {
     }
     this.listN = 0;
     this.offCtx.putImageData(img, 0, 0);
-    void n;
 
     // ---------------------------------------------------------------- compose with the soft glows
     const g = this.ctx;
@@ -678,7 +676,7 @@ export class Altar {
       g.save();
       g.translate(sg.x, sg.y);
       g.scale(1, sg.ry / sg.rx);
-      this.halo(0, 0, sg.rx * 1.1, sigilCol, 0.04 + 0.06 * this.activity + 0.14 * this.build);
+      this.halo(0, 0, sg.rx * 1.1, sigilCol, 0.06 * this.activity + 0.14 * this.build);
       g.restore();
     }
     g.globalCompositeOperation = 'source-over';
@@ -774,7 +772,7 @@ export class Altar {
     };
     const flameI = (big ? 1.5 : 1.0) * (1 + 0.15 * this.activity + 0.35 * this.build);
     this.fields.flames.forEach((f, k) => apply(f, this.tint, flameI * flick[k]));
-    apply(this.fields.orb, orbCol, 0.45 + 1.1 * this.fill + 0.5 * this.surge + 0.8 * this.orbFlash);
+    apply(this.fields.orb, orbCol, 0.6 + 1.05 * this.fill + 0.5 * this.surge + 0.8 * this.orbFlash);
     if (big) apply(this.fields.sigil, sigilCol, 0.5 + 0.4 * this.activity + 0.8 * this.build);
     a.runes.forEach((r, k) => apply(this.fields.runes[k], runeCol, levels[r.order] * (big ? 0.5 : 0.35)));
     this.fields.gems.forEach((f) => apply(f, gemCol, gemI));

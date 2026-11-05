@@ -180,9 +180,7 @@ export function SummonPanel({ game, onOpen }: { game: Game; onOpen: (id: string)
   return (
     <>
       <Section title="Summoning Altar" sub="free, forever">
-        <div className="plate" style={{ padding: 'calc(1 * var(--px))' }}>
-          <AltarReels game={game} variant="big" />
-        </div>
+        <AltarReels game={game} variant="big" />
         <div className="row" style={{ justifyContent: 'center' }}>
           <span className="pill outlined">
             <Px icon="reel" size="sm" /> {reelCount(s)} reel{reelCount(s) > 1 ? 's' : ''}
