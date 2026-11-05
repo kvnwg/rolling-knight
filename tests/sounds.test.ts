@@ -335,7 +335,7 @@ describe('the fight, heard', () => {
 
   it('plays each class’s attacks, hits by foe, deaths, foes’ attacks and every part of a skill roll', () => {
     const w = world(['rare-blade', 'rare-ranger', 'rare-arcanist']);
-    w.auto = true;
+    w.bot = true;
     const heard: Array<{ cue: FightCue; x?: number; y?: number }> = [];
     const obs = new FightObserver((cue, o) => heard.push({ cue, x: o.x, y: o.y }));
     stops.push(onSkillRoll((e) => obs.skill(e)));

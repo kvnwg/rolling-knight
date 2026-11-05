@@ -45,7 +45,7 @@ export const PERKS: PerkDef[] = [
   // Command
   { id: 'tagTeam', tree: 'command', name: 'Tag Team', rarity: 'common', icon: 'swap', short: 'Switch in: +30% damage for 4 s', text: 'The knight you switch to hits 30% harder for 4 seconds (at most once every 10 s).' },
   { id: 'loneWolf', tree: 'command', name: 'Lone Wolf', rarity: 'uncommon', icon: 'wolf', short: 'Fight alone: x3 HP, x2.5 damage', text: 'Your other two knights stay at camp. The one you control gets ×3 HP, ×2.5 damage and 30% faster specials.' },
-  { id: 'hiveMind', tree: 'command', name: 'Hive Mind', rarity: 'uncommon', icon: 'eye', short: 'The squad dodges with you', text: 'When you dodge, your whole squad dodges with you. Allies\' specials recharge twice as fast.' },
+  { id: 'hiveMind', tree: 'command', name: 'Hive Mind', rarity: 'uncommon', icon: 'eye', short: 'The squad dodges with you', text: 'When you dodge, your whole squad dodges with you. Allies\' skill rolls spin twice as fast.' },
   { id: 'warBanner', tree: 'command', name: 'War Banner', rarity: 'rare', icon: 'banner', short: 'Your hits speed up the squad', text: 'Each hit by the knight you control gives the squad +4% attack speed for 3 s, stacking to +40%.' },
   { id: 'heirloom', tree: 'command', name: 'Heirloom', rarity: 'epic', icon: 'crown', short: 'Keep your knight through rebirth', text: 'Your controlled knight survives your next rebirth with its levels.' },
   // Rigged Reels

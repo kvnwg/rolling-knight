@@ -179,9 +179,9 @@ describe('the squad in a fight', () => {
     return new World({ map, biome, floor, boss: false, mobTypes: floorMobs(biome, floor, 99), bossType: null, squad: squad(ids), perks: [], controlled: 0, seed: 99, goldPerKill: 3 });
   }
 
-  it('clears an early floor on its own (Auto) and opens the portal', () => {
+  it('clears an early floor on its own (the dev bot) and opens the portal', () => {
     const w = world([knightId('legendary', 'guardian'), knightId('legendary', 'ranger'), knightId('legendary', 'cleric')]);
-    w.auto = true;
+    w.bot = true;
     for (let t = 0; t < 240 && !w.exited; t += 1 / 30) w.update(1 / 30);
     expect(w.cleared).toBe(true);
     expect(w.exited).toBe(true);
@@ -242,7 +242,7 @@ describe('the squad in a fight', () => {
   it('your knight attacks only while you hold the attack, toward your aim', () => {
     const w = world([knightId('rare', 'ranger')]);
     const h = w.heroes[0];
-    // (Its skill rolls kept out of it: this is about the attack.)
+    // (Its skill rolls held: in a fight they chain, and this is about its attacks.)
     h.specialT = 99;
     const m = w.mobs.find((x) => !x.dead)!;
     // The mob steps up close in the open start room.
@@ -309,7 +309,7 @@ describe('the squad in a fight', () => {
 describe('the game', () => {
   it('rolls a squad at camp, then heads into floor 1 and keeps going', () => {
     const g = new Game(true);
-    g.setAuto(true);
+    g.bot = true;
     // At camp the altar rolls and the squad fills itself, but no floor starts until you set out.
     for (let t = 0; t < 30; t += 1 / 30) g.tick(1 / 30);
     // A new game has one squad slot (each rebirth opens another).

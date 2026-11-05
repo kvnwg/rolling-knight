@@ -1,10 +1,13 @@
 /**
- * The knights' kits. Every knight of a class has the same auto attack (it fires by itself whenever
- * a foe is in range) and the same dodge roll, and rolls for its skills: the skill button starts a
- * quick spin (ROLL_TIME, the knight keeps moving and fighting) that lands on a random skill from the
- * knight's list (src/core/skillbook.ts: six per class, a signature as the jackpot) and fires it
- * right there, at the knight or its foe. Then the cooldown starts. The result is decided when the
- * spin starts, like the altar's; luck leans it toward the rarer skills.
+ * The knights' kits. Every knight of a class has the same attack (along the aim of the knight you
+ * steer; squadmates, and yours on Auto attack, at a foe in reach by themselves) and the same dash
+ * (dash.ts), and rolls for its skills: a spin (ROLL_TIME, the
+ * knight keeps moving and fighting) lands on a random skill from the knight's list
+ * (src/core/skillbook.ts: six per class, a signature as the jackpot) and fires it right there, at
+ * the knight or its foe. There's no cooldown: in a fight it goes roll, fire, roll, fire, the next
+ * spin starting as soon as the skill has finished firing (the spin is the only wait; the skill button
+ * starts one any time it's free). The result is decided when the spin starts, like the altar's; luck
+ * leans it toward the rarer skills.
  *
  * Every skill always goes off: one with no foe in reach fires where the knight is heading.
  * Rarer skills are bigger: commons are one hit or one buff, rares are the old class specials, epics
@@ -13,7 +16,10 @@
  */
 import { RARITY_COLOR } from '../core/rarity';
 import { SKILLS, TIER_NAME, TIER_RARITY, rollSkill, tierStep, type SkillDef, type SkillId } from '../core/skillbook';
+import { HOLD_Y, aimAt, autoTarget, facingOf, inputAim, steerAim } from './aim';
 import { dist, lineOfSight, moveUnit, norm, type Shot, type Unit } from './entities';
+import { DASHES, endDash, rangerPlan, startDash, tickDash } from './dash';
+import { isMeleeClass, startSwing, tickSwing } from './melee';
 import { uid, type World } from './world';
 
 /**
@@ -42,12 +48,32 @@ export function rollTime(h: Pick<Unit, 'rollTimeMult'>): number {
   return ROLL_TIME * (typeof m === 'number' && Number.isFinite(m) ? Math.max(0.1, Math.min(1, m)) : 1);
 }
 
+/** A knight is in a fight while an awake foe stands this close (about a screen): its rolls chain. */
+export const FIGHT_RANGE = 150;
+
+/**
+ * Is knight h's last skill still on its way or firing (slamming down onto the screen, its later
+ * beats, a whirlwind or a lunge, a skill's leap)?
+ */
+export function skillFiring(h: Unit): boolean {
+  return !!h.skillSlam || !!h.skillQueue?.length || !!h.channel || (!!h.rolling && h.rolling.land === undefined);
+}
+
+/** Is knight h in a fight (an awake foe close by)? */
+export function inFight(w: World, h: Unit): boolean {
+  if (w.hub || w.camp) return false;
+  for (const m of w.mobs) if (!m.dead && m.awake && dist(m.x, m.y, h.x, h.y) < FIGHT_RANGE) return true;
+  return false;
+}
+
 /** Movement, the auto attack, skill rolls and any running dodge or skill, every frame. */
 export function heroTick(w: World, h: Unit, dt: number, mx: number, my: number): void {
   tickSkills(w, h, dt);
+  tickSwing(w, h, dt);
   if (h.dodgeT! > 0) h.dodgeT! -= dt;
-  const allyBoost = h.slot !== w.controlled && w.perks.has('hiveMind') ? 2 : 1;
-  if (h.specialT! > 0) h.specialT! -= dt * allyBoost;
+  // (A hold on its rolls: nothing in the game sets one now, but tests and tools do.)
+  if (h.specialT! > 0) h.specialT! -= dt;
+  if (h.aiming) h.aiming = Math.max(0, h.aiming - dt);
   // --- a dodge (or a skill's leap) in progress moves the knight on its own
   if (h.rolling) {
     const r = h.rolling;
@@ -61,10 +87,28 @@ export function heroTick(w: World, h: Unit, dt: number, mx: number, my: number):
       }
     }
     h.moving = true;
+    // The class's dash at work (a skill's leap is only a leap).
+    if (r.land !== undefined) tickDash(w, h, dt);
     if (r.t <= 0) {
+      if (r.land !== undefined) endDash(w, h, r);
       h.rolling = undefined;
+      // A dodge ends on its feet: the landing, where it can be hit again (a skill's leap just lands).
+      if (r.land && r.land > 0) h.landing = { dx: r.dx, dy: r.dy, t: r.land, dur: r.land, speed: r.speed, kind: r.kind, of: r.dur + r.land };
       if (h.cls === 'guardian') guard(h, 0.5, 1);
     }
+    return;
+  }
+  // --- the landing: sliding to a stop, no steering and no attacking yet
+  if (h.landing) {
+    const l = h.landing;
+    l.t -= dt;
+    const p = Math.min(1, 1 - l.t / l.dur);
+    if (l.kind !== 'blink') {
+      const sp = l.speed * (1 - 0.7 * p);
+      moveUnit(w.map, h, l.dx * sp * dt, l.dy * sp * dt);
+    }
+    h.moving = true;
+    if (l.t <= 0) h.landing = undefined;
     return;
   }
   // --- a channeled skill
@@ -112,32 +156,67 @@ export function heroTick(w: World, h: Unit, dt: number, mx: number, my: number):
     h.moving = false;
   }
   // --- attacks: the squad's fire by themselves at the nearest foe in range; the knight you steer
-  // attacks only while you hold the attack (the mouse, J or K, the Attack button), toward your aim
+  // attacks while you hold the attack (the mouse, J or K, the Attack button), exactly along its aim
+  // (aim.ts), at its class's rate, at full speed on its feet, turned to face where it aims; with Auto
+  // attack on it also aims and attacks by itself whenever a foe is in reach (you still move and dodge)
   if (h.atkT! > 0) h.atkT! -= dt * (1 + w.banner * 0.04) * (h.skillBuff?.atkSpd ?? 1);
-  if (h.atkT! <= 0 && h.stunT <= 0 && h.channel?.kind !== 'whirlwind') {
-    const reach = h.range! + (h.cls === 'guardian' || h.cls === 'blade' || h.cls === 'lancer' ? 6 : 0);
-    if (h.slot === w.controlled && !w.auto) {
-      if (w.input.attack) {
-        playerAttack(w, h, reach);
-        h.atkT = h.atkCd!;
+  const ready = h.atkT! <= 0 && h.stunT <= 0 && h.channel?.kind !== 'whirlwind';
+  if (h.slot === w.controlled && !w.bot) {
+    let aim: [number, number] | null = null;
+    if (w.input.attack) aim = steerAim(w, h, mx, my);
+    else if (w.auto) {
+      const t = autoTarget(w, h, mx, my, fireReach(h));
+      if (t) aim = aimAt(h, t);
+    } else h.aimLock = null;
+    if (aim) {
+      faceAlong(h, aim[0], aim[1], true);
+      h.aiming = AIM_HOLD;
+      if (ready) {
+        attack(w, h, aim[0], aim[1]);
+        h.atkT = h.atkCd! * STEER_CD;
       }
-    } else {
-      const t = w.nearestEnemy(h, reach, true);
-      if (t) {
-        autoAttack(w, h, t);
-        h.atkT = h.atkCd!;
-      }
+    }
+  } else if (ready) {
+    const t = w.nearestEnemy(h, fireReach(h), true);
+    if (t) {
+      const [ax, ay] = aimAt(h, t);
+      attack(w, h, ax, ay);
+      h.atkT = h.atkCd!;
     }
   }
 }
 
-function face(h: Unit, x: number, y: number): void {
-  const [nx, ny] = norm(x - h.x, y - h.y);
+/** How far a knight's attack reaches a foe's edge: its range, and a step more for a melee swing. */
+function fireReach(h: Unit): number {
+  return h.range! + (isMeleeClass(h.cls) ? 6 : 0);
+}
+
+/** Seconds the knight you steer keeps facing its aim after the attack is let go. */
+const AIM_HOLD = 0.25;
+/**
+ * The knight you steer attacks this much more often than the class's rate (its cooldown times this):
+ * aiming by hand misses now and then where the squad's AI never does, and your knight is the one
+ * that carries the fight.
+ */
+export const STEER_CD = 0.85;
+
+/** Turns knight h to face along (ax, ay) (`always`: its view too, even while it walks). */
+function faceAlong(h: Unit, ax: number, ay: number, always = false): void {
+  const [nx, ny] = norm(ax, ay);
   if (!nx && !ny) return;
   h.aimX = nx;
   h.aimY = ny;
   if (Math.abs(nx) > 0.15) h.dir = nx > 0 ? 1 : -1;
-  if (!h.moving) h.view = Math.abs(ny) > Math.abs(nx) * 1.2 ? (ny < 0 ? 'up' : 'down') : 'side';
+  if (always || !h.moving) h.view = Math.abs(ny) > Math.abs(nx) * 1.2 ? (ny < 0 ? 'up' : 'down') : 'side';
+}
+
+function face(h: Unit, x: number, y: number): void {
+  faceAlong(h, x - h.x, y - h.y);
+}
+
+/** Is h the knight you steer, attacking right now? Its skills' shots and dashes go where it aims. */
+function aimingNow(w: World, h: Unit): boolean {
+  return h.slot === w.controlled && !w.bot && (h.aiming ?? 0) > 0;
 }
 
 function crit(w: World): boolean {
@@ -145,104 +224,49 @@ function crit(w: World): boolean {
 }
 
 /**
- * Your knight's attack, when you click or tap: toward where you aim (the mouse), else the nearest foe a
- * little past reach, else straight ahead; it swings (or shoots) even with nothing there.
+ * One attack exactly along (ax, ay), a unit vector (the aim, or the way to an AI's foe): the melee
+ * classes swing a live hitbox that way (melee.ts: it cuts foes' shots too), even at the air; the
+ * ranged ones shoot along it.
  */
-function playerAttack(w: World, h: Unit, reach: number): void {
-  const ax = w.input.aimX;
-  const ay = w.input.aimY;
-  let tx: number;
-  let ty: number;
-  let t: Unit | null;
-  if (ax !== null && ax !== undefined && ay !== null && ay !== undefined) {
-    tx = ax;
-    ty = ay;
-    t = foeToward(w, h, tx - h.x, ty - h.y, reach);
-  } else {
-    t = w.nearestEnemy(h, reach * 1.4, true);
-    tx = t ? t.x : h.x + (h.aimX || h.dir) * 30;
-    ty = t ? t.y : h.y + h.aimY * 30;
-  }
-  attack(w, h, tx, ty, t);
-}
-
-/** The foe in reach closest to the line from h along (dx, dy) (within about 70 degrees of it). */
-function foeToward(w: World, h: Unit, dx: number, dy: number, reach: number): Unit | null {
-  const [nx, ny] = norm(dx, dy);
-  let best: Unit | null = null;
-  let bestScore = Infinity;
-  for (const e of w.enemiesIn('hero', h.x, h.y, reach + 4)) {
-    const [ex, ey] = norm(e.x - h.x, e.y - h.y);
-    const along = ex * nx + ey * ny;
-    if (along < 0.34) continue;
-    const score = dist(e.x, e.y, h.x, h.y) * (2 - along);
-    if (score < bestScore) {
-      bestScore = score;
-      best = e;
-    }
-  }
-  return best;
-}
-
-function autoAttack(w: World, h: Unit, t: Unit): void {
-  attack(w, h, t.x, t.y, t);
-}
-
-/** One attack toward (tx, ty): at `t` if there's a foe to hit (melee classes swing at the air otherwise). */
-function attack(w: World, h: Unit, tx: number, ty: number, t: Unit | null): void {
-  face(h, tx, ty);
-  h.swingT = h.swingDur = h.cls === 'ranger' || h.cls === 'cleric' || h.cls === 'arcanist' ? 0.22 : 0.26;
+function attack(w: World, h: Unit, ax: number, ay: number): void {
+  faceAlong(h, ax, ay);
+  const ranged = !isMeleeClass(h.cls);
+  h.swingT = h.swingDur = ranged ? 0.22 : 0.26;
   const c = crit(w);
   const dmg = h.atk * (c ? 1.6 : 1);
   switch (h.cls) {
     case 'guardian':
-      if (!t) break;
-      w.damage(t, dmg, h, { crit: c, knock: 12 });
-      w.fx.push({ kind: 'hit', x: t.x, y: t.y - 6, color: '#d8e0f0' });
+    case 'blade':
+    case 'lancer':
+      startSwing(w, h, ax, ay, dmg, c);
       break;
-    case 'blade': {
-      // A wide cleave: everything in front.
-      for (const e of w.enemiesIn('hero', h.x + h.aimX * 10, h.y + h.aimY * 10 - 4, 16)) {
-        const [ex, ey] = norm(e.x - h.x, e.y - h.y);
-        if (ex * h.aimX + ey * h.aimY < -0.2 && dist(e.x, e.y, h.x, h.y) > 8) continue;
-        w.damage(e, dmg, h, { crit: c, knock: 6 });
-      }
-      break;
-    }
-    case 'lancer': {
-      // A long thrust through everything in a line.
-      for (const e of w.livingMobs()) {
-        const rx = e.x - h.x;
-        const ry = e.y - h.y;
-        const along = rx * h.aimX + ry * h.aimY;
-        const across = Math.abs(rx * h.aimY - ry * h.aimX);
-        if (along > -4 && along < h.range! + 8 && across < 7 + e.r) w.damage(e, dmg, h, { crit: c, knock: 5, kx: h.aimX, ky: h.aimY });
-      }
-      break;
-    }
     case 'ranger':
-      shoot(w, h, tx, ty, { kind: 'arrow', speed: 210, dmg, color: '#f0e0b0', r: 2 });
+      shoot(w, h, ax, ay, { kind: 'arrow', speed: SHOT_SPEED.ranger, dmg, color: '#f0e0b0', r: 2 });
       break;
     case 'cleric':
-      shoot(w, h, tx, ty, { kind: 'orb', speed: 120, dmg, color: '#fff0a0', r: 3, heal: h.atk * 0.5 });
+      shoot(w, h, ax, ay, { kind: 'orb', speed: SHOT_SPEED.cleric, dmg, color: '#fff0a0', r: 3, heal: h.atk * 0.5 });
       break;
     case 'arcanist':
-      shoot(w, h, tx, ty, { kind: 'bolt', speed: 150, dmg, color: '#b08aff', r: 3, homing: 6, splash: 16 });
+      // A light homing is the bolt's own (it still flies where it's aimed, and bends a little).
+      shoot(w, h, ax, ay, { kind: 'bolt', speed: SHOT_SPEED.arcanist, dmg, color: '#b08aff', r: 3, homing: 2.2, splash: 16 });
       break;
   }
 }
 
-function shoot(w: World, h: Unit, tx: number, ty: number, o: { kind: 'arrow' | 'orb' | 'bolt'; speed: number; dmg: number; color: string; r: number; heal?: number; homing?: number; splash?: number }): void {
-  const sx = h.x + h.dir * 4;
-  const sy = h.y - 10;
-  const [nx, ny] = norm(tx - sx, ty - 6 - sy);
+/** How fast each ranged class's shot flies (px/s): all well past the foes' (65 to 85 px/s). */
+export const SHOT_SPEED = { ranger: 250, cleric: 170, arcanist: 185 } as const;
+/** How far ahead of its hands a shot leaves (px). */
+const MUZZLE = 5;
+
+/** A shot from knight h's hands exactly along (dx, dy), a unit vector. */
+function shoot(w: World, h: Unit, dx: number, dy: number, o: { kind: 'arrow' | 'orb' | 'bolt'; speed: number; dmg: number; color: string; r: number; heal?: number; homing?: number; splash?: number }): void {
   w.shots.push({
     uid: uid(),
     team: 'hero',
-    x: sx,
-    y: sy,
-    vx: nx * o.speed,
-    vy: ny * o.speed,
+    x: h.x + dx * MUZZLE,
+    y: h.y - HOLD_Y + dy * MUZZLE,
+    vx: dx * o.speed,
+    vy: dy * o.speed,
     r: o.r,
     dmg: o.dmg,
     life: 1.4,
@@ -255,41 +279,47 @@ function shoot(w: World, h: Unit, tx: number, ty: number, o: { kind: 'arrow' | '
   });
 }
 
-/** The dodge: a roll (each class its own), untouchable while it lasts. */
+/** The share of a dodge roll that's untouchable (the rest is the landing, where it can be hit). */
+export const ROLL_SAFE = 0.8;
+
+/**
+ * The dodge: each class's dash (dash.ts: a Shield Bash, a Power Shot or a snare, a Shadowstep, a
+ * Blessed Step, a Blink, a Spear Lunge) toward where you're moving (standing still: toward your aim;
+ * a squadmate dashes the way its AI says), untouchable for most of it (ROLL_SAFE), then a short
+ * landing; no attacking until it's over.
+ */
 export function heroDodge(w: World, h: Unit, mx: number, my: number, fromHive = false): boolean {
-  if (h.downed || h.rolling || h.dodgeT! > 0 || h.stunT > 0 || h.channel?.kind === 'lunge') return false;
+  if (h.downed || h.rolling || h.landing || h.dodgeT! > 0 || h.stunT > 0 || h.channel?.kind === 'lunge') return false;
   let [dx, dy] = norm(mx, my);
   if (!dx && !dy) {
-    // No direction held: roll away from the nearest foe (or the way the knight faces).
-    const e = w.nearestEnemy(h, 120, false);
-    if (e) [dx, dy] = norm(h.x - e.x, h.y - e.y);
-    else [dx, dy] = [h.dir, 0];
+    if (h.slot === w.controlled && !w.bot) {
+      // Standing still: toward the aim (the mouse, the drag, else the way the knight faces).
+      [dx, dy] = inputAim(w, h) ?? facingOf(h);
+    } else {
+      // No direction given: away from the nearest foe (or the way the knight faces).
+      const e = w.nearestEnemy(h, 120, false);
+      if (e) [dx, dy] = norm(h.x - e.x, h.y - e.y);
+      else [dx, dy] = [h.dir, 0];
+    }
   }
   h.dodgeT = h.dodgeCd!;
   if (Math.abs(dx) > 0.2) h.dir = dx > 0 ? 1 : -1;
-  const kinds: Record<string, { kind: 'roll' | 'blink' | 'vault' | 'flip'; dur: number; dist: number }> = {
-    guardian: { kind: 'roll', dur: 0.26, dist: 40 },
-    blade: { kind: 'roll', dur: 0.3, dist: 58 },
-    ranger: { kind: 'flip', dur: 0.36, dist: 78 },
-    cleric: { kind: 'roll', dur: 0.3, dist: 54 },
-    arcanist: { kind: 'blink', dur: 0.2, dist: 60 },
-    lancer: { kind: 'vault', dur: 0.36, dist: 70 },
-  };
-  const k = kinds[h.cls!];
-  h.rolling = { dx, dy, t: k.dur, dur: k.dur, speed: k.dist / k.dur, kind: k.kind, hit: new Set() };
-  h.invuln = Math.max(h.invuln, k.dur + 0.05);
+  // Each class's dash (dash.ts): how it rolls, how long and how far (the Ranger's, which way it goes).
+  const k = DASHES[h.cls!];
+  const plan = h.cls === 'ranger' ? rangerPlan(w, h, dx, dy) : { kind: k.kind, shot: null };
+  // A roll cancels a swing (no attacking in a roll).
+  h.swing = undefined;
+  h.shove = undefined;
+  const x0 = h.x;
+  const y0 = h.y;
+  // Untouchable in the air (most of the roll), then the landing, where it can be hit again.
+  const air = k.dur * ROLL_SAFE;
+  h.rolling = { dx, dy, t: air, dur: air, speed: k.dist / k.dur, kind: plan.kind, hit: new Set(), land: k.dur - air, shot: plan.shot };
+  h.invuln = Math.max(h.invuln, air + 0.02);
   // Anything that misses the knight because of this roll makes it a perfect roll (world.ts evades).
-  h.dodge = { until: w.time + k.dur + 0.05, perfect: false };
+  h.dodge = { until: w.time + air + 0.02, perfect: false };
   w.fx.push({ kind: 'dust', x: h.x, y: h.y });
-  if (k.kind === 'blink') {
-    // Blink: jump straight there (as far as the floor allows).
-    w.fx.push({ kind: 'spark', x: h.x, y: h.y - 8, color: '#b08aff' });
-    for (let s = 0; s < 12; s++) moveUnit(w.map, h, (dx * k.dist) / 12, (dy * k.dist) / 12);
-    w.fx.push({ kind: 'spark', x: h.x, y: h.y - 8, color: '#b08aff' });
-  }
-  if (h.cls === 'cleric') {
-    w.areas.push({ uid: uid(), team: 'hero', x: h.x, y: h.y, r: 18, delay: 0, dur: 2, tick: 0.5, tickT: 0.5, dmg: 0, heal: 0.02, kind: 'glow', from: h.uid, color: '#fff0a0', t: 0 });
-  }
+  startDash(w, h, dx, dy, x0, y0);
   if (w.perks.has('kamikaze')) {
     w.areas.push({ uid: uid(), team: 'hero', x: h.x, y: h.y, r: 30, delay: 0.8, dur: 0, tick: 1, tickT: 0, dmg: h.atk * 3, kind: 'bomb', from: h.uid, color: '#ff8a3a', t: 0 });
   }
@@ -304,8 +334,8 @@ export function heroDodge(w: World, h: Unit, mx: number, my: number, fromHive = 
 
 /**
  * The skill button (E, the SPECIAL slot, the AI, Tag Team): starts a skill roll. `free` (Tag Team)
- * rolls even on cooldown and starts no cooldown after. False if no roll started (cooling down,
- * already rolling, stunned, fallen).
+ * rolls even while the last skill is still firing. False if no roll started (already rolling, the
+ * last skill still firing, stunned, fallen).
  */
 export function heroSpecial(w: World, h: Unit, free: boolean): boolean {
   return startSkillRoll(w, h, { free });
@@ -314,12 +344,14 @@ export function heroSpecial(w: World, h: Unit, free: boolean): boolean {
 /** Starts a skill roll; `skill` decides where it lands (otherwise it's rolled, at the world's luck). */
 export function startSkillRoll(w: World, h: Unit, o: { free?: boolean; skill?: SkillId } = {}): boolean {
   if (h.downed || h.skillRoll || h.skillSlam || !h.knightId) return false;
-  if (!o.free && ((h.specialT ?? 0) > 0 || h.stunT > 0)) return false;
+  if (!o.free && (h.stunT > 0 || skillFiring(h) || (h.specialT ?? 0) > 0)) return false;
   const luck = rollLuck(w);
   const forced = o.skill ?? h.skillRig;
   h.skillRig = undefined;
   const skill = forced ? SKILLS[forced] : rollSkill(h.knightId, luck, w.rng);
-  h.skillRoll = { skill: skill.id, t: 0, dur: rollTime(h), free: !!o.free, luck, seed: w.rng.int(1, 0x3fffffff) };
+  // Hive Mind: your squadmates' rolls spin twice as fast.
+  const hive = h.slot !== w.controlled && w.perks.has('hiveMind') ? 0.5 : 1;
+  h.skillRoll = { skill: skill.id, t: 0, dur: rollTime(h) * hive, free: !!o.free, luck, seed: w.rng.int(1, 0x3fffffff) };
   w.fx.push({ kind: 'spark', x: h.x, y: h.y - 16, color: '#ffe27a' });
   for (const fn of listeners) fn({ phase: 'start', world: w, hero: h, skill, free: !!o.free, luck });
   return true;
@@ -362,7 +394,10 @@ export function onSkillRoll(fn: (e: SkillRollEvent) => void): () => void {
   };
 }
 
-/** Rolls spinning, beats still to come and boosts, every frame (before anything else in heroTick). */
+/**
+ * Rolls spinning, beats still to come and boosts, every frame (before anything else in heroTick); in
+ * a fight, the next roll as soon as the last skill is done.
+ */
 function tickSkills(w: World, h: Unit, dt: number): void {
   // heroTick only runs for standing knights: a knight that fell loses its spinning roll, its
   // skill's beats still to come and its boost.
@@ -392,6 +427,8 @@ function tickSkills(w: World, h: Unit, dt: number): void {
     if (b.t <= 0) h.skillBuff = undefined;
     else if (Math.floor((b.t + dt) / 0.4) !== Math.floor(b.t / 0.4)) w.fx.push({ kind: 'spark', x: h.x, y: h.y - 8, color: b.color });
   }
+  // No cooldown: in a fight, once its skill has finished firing, the next roll starts straight away.
+  if (!h.skillRoll && !h.downed && inFight(w, h)) startSkillRoll(w, h);
 }
 
 function dropSkills(h: Unit): void {
@@ -421,13 +458,12 @@ function land(w: World, h: Unit, r: NonNullable<Unit['skillSlam']>): void {
     w.hitStop = Math.max(w.hitStop, step >= 5 ? 0.12 : 0.09);
   }
   castSkill(w, h, skill.id);
-  // No cooldown: in a fight the next roll starts as soon as this one fires (roll, fire, roll, fire).
-  h.specialT = 0;
+  // No cooldown: in a fight the next roll starts as soon as this skill is done firing (tickSkills).
   h.lastSkill = { skill: skill.id, at: w.time, n: (h.lastSkill?.n ?? 0) + 1, free: r.free };
   for (const fn of listeners) fn({ phase: 'land', world: w, hero: h, skill, free: r.free, luck: r.luck });
 }
 
-/** Fires a skill on the spot, with no roll and no cooldown (a roll calls it as it lands). */
+/** Fires a skill on the spot, with no roll (a roll calls it as it lands). */
 export function castSkill(w: World, h: Unit, id: SkillId): void {
   const sk = SKILLS[id];
   h.swingT = h.swingDur = 0.35;
@@ -1010,11 +1046,13 @@ function foeFor(w: World, h: Unit, reach: number): Unit | null {
 
 /** Which way a skill goes: at its foe, else where the player steers, else where the knight faces. */
 function heading(w: World, h: Unit, t: Unit | null): [number, number] {
+  // The knight you steer, attacking: where you aim.
+  if (aimingNow(w, h)) return facingOf(h);
   if (t) {
     const [x, y] = norm(t.x - h.x, t.y - h.y);
     if (x || y) return [x, y];
   }
-  if (h.slot === w.controlled && !w.auto) {
+  if (h.slot === w.controlled && !w.bot) {
     const [x, y] = norm(w.input.mx, w.input.my);
     if (x || y) return [x, y];
   }
@@ -1034,10 +1072,9 @@ function spotFor(w: World, h: Unit, reach: number, r: number): { x: number; y: n
 
 /** Faces the foe (or the heading) and gives the direction a shot leaves the knight's hands in. */
 function aimShot(w: World, h: Unit, t: Unit | null): [number, number] {
-  if (t) {
+  if (t && !aimingNow(w, h)) {
     face(h, t.x, t.y);
-    const [x, y] = norm(t.x - (h.x + h.dir * 4), t.y - 6 - (h.y - 10));
-    if (x || y) return [x, y];
+    return aimAt(h, t);
   }
   const d = heading(w, h, null);
   face(h, h.x + d[0], h.y + d[1]);
@@ -1109,8 +1146,8 @@ function fire(w: World, h: Unit, dx: number, dy: number, o: { kind: Shot['kind']
   w.shots.push({
     uid: uid(),
     team: 'hero',
-    x: o.x ?? h.x + h.dir * 4,
-    y: o.y ?? h.y - 10,
+    x: o.x ?? h.x + dx * MUZZLE,
+    y: o.y ?? h.y - HOLD_Y + dy * MUZZLE,
     vx: dx * o.speed,
     vy: dy * o.speed,
     r: o.r,

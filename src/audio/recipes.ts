@@ -156,10 +156,58 @@ export const RECIPES: Record<FightCue, Recipe> = {
     whoosh(v, 0.16, vary(v, 520, 0.1), vary(v, 2900, 0.1), 0.22, { q: 1.4, attack: 0.05 });
     hiss(v, 0.05, { type: 'lowpass', f: 900, gain: 0.1, dt: 0.2 });
   },
-  knight_blink: (v) => {
+  // --- each class's dash
+  dash_bash: (v) => {
+    whoosh(v, 0.2, vary(v, 260, 0.08), vary(v, 1400, 0.08), 0.26, { q: 1, attack: 0.04 });
+    hiss(v, 0.16, { type: 'bandpass', f: 2600, to: 1500, q: 3, gain: 0.08, dt: 0.02 });
+    metal(v, vary(v, 520, 0.05), 0.18, 0.025, { dt: 0.03 }, [1, 2.6]);
+    thump(v, 120, 60, 0.12, 0.12, { dt: 0.01, grit: false });
+  },
+  dash_bash_hit: (v) => {
+    metal(v, vary(v, 700, 0.06), 0.24, 0.05, {}, [1, 2.4, 3.9]);
+    thump(v, vary(v, 170, 0.06), 60, 0.16, 0.24, { sweep: 0.05 });
+    hiss(v, 0.05, { type: 'lowpass', f: 1500, to: 400, gain: 0.14 });
+  },
+  dash_shot: (v) => {
+    pluck(v, vary(v, 98, 0.04), 0.3, 0.12, { bright: 2400 });
+    hiss(v, 0.03, { type: 'highpass', f: 3000, gain: 0.12 });
+    whoosh(v, 0.22, vary(v, 900, 0.06), vary(v, 5200, 0.06), 0.16, { dt: 0.02, q: 2.2, attack: 0.03 });
+    tone(v, 1500, 0.2, { to: 2900, gain: 0.025, dt: 0.03, type: 'triangle' });
+  },
+  dash_snare: (v) => {
+    whoosh(v, 0.16, vary(v, 600, 0.1), vary(v, 2600, 0.1), 0.18, { q: 1.4, attack: 0.05 });
+    clicks(v, 2, 0.14, 0.05, { f: 2400, gain: 0.12, q: 4, spread: 0.2 });
+    metal(v, vary(v, 1300, 0.05), 0.08, 0.02, { dt: 0.16 }, [1, 2.7]);
+  },
+  snare_snap: (v) => {
+    clicks(v, 3, 0, 0.03, { f: 3200, gain: 0.2, q: 5, spread: 0.25 });
+    metal(v, vary(v, 980, 0.05), 0.2, 0.05, { dt: 0.005 }, [1, 2.5, 4.1]);
+    thump(v, 210, 90, 0.08, 0.12, { dt: 0.005 });
+    tone(v, 140, 0.22, { type: 'sawtooth', to: 120, gain: 0.02, dt: 0.06, lp: 600 });
+  },
+  dash_shadow: (v) => {
+    whoosh(v, 0.2, vary(v, 380, 0.1), vary(v, 1700, 0.1), 0.2, { q: 0.9, attack: 0.07 });
+    hiss(v, 0.18, { type: 'lowpass', f: 700, to: 260, gain: 0.08, attack: 0.03 });
+    tone(v, 180, 0.18, { to: 90, gain: 0.025, type: 'triangle' });
+  },
+  dash_bless: (v) => {
+    whoosh(v, 0.16, vary(v, 500, 0.08), vary(v, 2400, 0.08), 0.16, { q: 1.3, attack: 0.05 });
+    bell(v, midi(84), 0.45, 0.035, { dt: 0.08 });
+    bell(v, midi(91), 0.4, 0.025, { dt: 0.14 });
+    hiss(v, 0.3, { type: 'highpass', f: 6000, gain: 0.03, dt: 0.08, attack: 0.05 });
+  },
+  dash_blink: (v) => {
     tone(v, 320, 0.09, { to: 2600, gain: 0.06 });
     hiss(v, 0.1, { type: 'highpass', f: 2200, to: 8000, gain: 0.12, attack: 0.02 });
     bell(v, midi(100), 0.22, 0.03, { dt: 0.06 });
+    // The burst where it left.
+    thump(v, 260, 110, 0.1, 0.1, { grit: false });
+    hiss(v, 0.12, { type: 'bandpass', f: 1800, to: 600, q: 1.5, gain: 0.08, dt: 0.01 });
+  },
+  dash_lunge: (v) => {
+    whoosh(v, 0.18, vary(v, 700, 0.08), vary(v, 4200, 0.08), 0.24, { q: 1.8, attack: 0.03 });
+    tone(v, vary(v, 600, 0.05), 0.12, { to: 1600, gain: 0.03, type: 'triangle', dt: 0.02 });
+    clicks(v, 2, 0.05, 0.04, { f: 1800, gain: 0.08, q: 3, spread: 0.3 });
   },
   perfect_roll: (v) => {
     // Level 1: the knight you steer (the zip and three bells); less: a squadmate's (one soft bell).
@@ -717,7 +765,7 @@ export const RECIPES: Record<FightCue, Recipe> = {
  */
 export const TRIM: Partial<Record<FightCue, number>> = {
   hit_flesh: 1.1, hit_slime: 1.1, hit_bone: 2.6, hit_stone: 0.94, hit_shell: 1.6, hit_wood: 1.9, hit_ghost: 1.1, crit: 0.85, lucky_hit: 1.6,
-  knight_hurt: 0.85, knight_block: 1.3, knight_down: 0.7, knight_dodge: 0.66, knight_blink: 1.5, revive: 1.4, heal: 1.3, atk_sword: 0.75,
+  knight_hurt: 0.85, knight_block: 1.3, knight_down: 0.7, knight_dodge: 0.66, dash_blink: 1.5, revive: 1.4, heal: 1.3, atk_sword: 0.75,
   atk_spear: 0.88, atk_bow: 1.5, arrow_thunk: 1.3, atk_arcane: 2.4, arcane_pop: 1.2, atk_holy: 1.2, boom_small: 0.69, boom_big: 0.59,
   boom_bomb: 0.77, boom_meteor: 0.58, boom_slam: 0.6, shockwave: 0.83, zap: 1.8, death_flesh: 0.5, death_slime: 0.96, death_bone: 1.9,
   death_stone: 0.34, death_shell: 1.8, death_wood: 1.8, death_ghost: 1.3, kill_chime: 1.6, mob_bite: 1.4, mob_swipe: 0.71, mob_shot: 0.56,

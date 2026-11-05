@@ -1,9 +1,12 @@
 /**
- * Controls. Keyboard: WASD or arrows to move, the left mouse button (held) or J/K to attack toward the
- * mouse, Space or Shift to dodge roll, E or Q to roll your skill early, 1/2/3 to take control of a squad
- * member, T to toggle Auto. Touch: a joystick that appears wherever the left half of the screen is
- * touched (anywhere, when `stickAnywhere` says so: at the hub, where there are no fight buttons on the
- * right), and the buttons the HUD draws (they call press(), and hold() for the attack button).
+ * Controls, twin-stick like Enter the Gungeon. Keyboard and mouse: WASD or arrows to move, the mouse
+ * to aim (anywhere, all the way round; the game draws a crosshair at it), the left button (held) or
+ * J/K to attack where it points, Space or Shift to dodge roll, E or Q to roll your skill, 1/2/3 to
+ * take control of a squad member, T to toggle Auto attack. Touch: a joystick that appears wherever the
+ * left half of the screen is touched (anywhere, when `stickAnywhere` says so: at the hub, where there
+ * are no fight buttons on the right), and the buttons the HUD draws (they call press(); the Attack
+ * button calls hold(): held, it auto-aims; its finger dragged off it like a right stick, it aims that
+ * way, the drag measured from where that finger went down).
  */
 export interface Controls {
   mx: number;
@@ -14,14 +17,40 @@ export interface Controls {
   attack: boolean;
   /** Where the mouse points (screen px), to aim at; null on touch (the attack aims itself). */
   aim: { x: number; y: number } | null;
+  /** The mouse is over the play area (not a button): the crosshair shows. */
+  overPlay: boolean;
+  /** Touch: the way the Attack button is dragged (a unit vector), or null (held still: auto-aim). */
+  aimDir: { x: number; y: number } | null;
   switchTo: number | null;
   toggleAuto: boolean;
   /** The touch joystick, for the HUD to draw (screen pixels). */
   stick: { active: boolean; ox: number; oy: number; x: number; y: number };
+  /** The Attack button's aim stick while it's dragged, for the HUD to draw (screen pixels). */
+  aimStick: { active: boolean; ox: number; oy: number; x: number; y: number };
 }
 
-export function createControls(onKey?: (key: string) => void, stickAnywhere?: () => boolean): { controls: Controls; dispose: () => void; press: (what: 'dodge' | 'special') => void; hold: (on: boolean) => void } {
-  const c: Controls = { mx: 0, my: 0, dodge: false, special: false, attack: false, aim: null, switchTo: null, toggleAuto: false, stick: { active: false, ox: 0, oy: 0, x: 0, y: 0 } };
+/** How far (CSS px) the Attack button must be dragged before the drag aims (less: auto-aim). */
+export const AIM_DEAD = 14;
+/** The aim stick's reach on screen (CSS px). */
+const AIM_RADIUS = 46;
+
+export interface ControlsApi {
+  controls: Controls;
+  dispose: () => void;
+  press: (what: 'dodge' | 'special') => void;
+  /**
+   * The touch Attack button pressed or let go. `at`: where its finger went down and which it is
+   * (otherwise the last finger to touch down: the press that reached the button).
+   */
+  hold: (on: boolean, at?: { x: number; y: number; id?: number }) => void;
+}
+
+export function createControls(onKey?: (key: string) => void, stickAnywhere?: () => boolean): ControlsApi {
+  const c: Controls = {
+    mx: 0, my: 0, dodge: false, special: false, attack: false, aim: null, overPlay: false, aimDir: null, switchTo: null, toggleAuto: false,
+    stick: { active: false, ox: 0, oy: 0, x: 0, y: 0 },
+    aimStick: { active: false, ox: 0, oy: 0, x: 0, y: 0 },
+  };
   const keys = new Set<string>();
   let mouseAttack = false;
   let touchAttack = false;
@@ -57,14 +86,48 @@ export function createControls(onKey?: (key: string) => void, stickAnywhere?: ()
     update();
     attackNow();
   };
+  // The touch Attack button: its finger, and where it went down (the aim stick's middle).
+  let aimId: number | null = null;
+  /** The last finger to touch down anywhere (seen first, on the way in, before any button keeps it). */
+  let lastPress: { x: number; y: number; id: number } | null = null;
+  const press = (e: PointerEvent) => {
+    if (e.pointerType !== 'mouse') lastPress = { x: e.clientX, y: e.clientY, id: e.pointerId };
+  };
+  /** The Attack button's finger at (x, y): past the dead zone the drag aims; back inside it, auto-aim. */
+  const dragTo = (x: number, y: number) => {
+    if (!touchAttack) return;
+    const s = c.aimStick;
+    const dx = x - s.ox;
+    const dy = y - s.oy;
+    const l = Math.hypot(dx, dy);
+    if (l < AIM_DEAD) {
+      c.aimDir = null;
+      s.active = false;
+      s.x = s.ox;
+      s.y = s.oy;
+      return;
+    }
+    const k = l > AIM_RADIUS ? AIM_RADIUS / l : 1;
+    s.active = true;
+    s.x = s.ox + dx * k;
+    s.y = s.oy + dy * k;
+    c.aimDir = { x: dx / l, y: dy / l };
+  };
+  const letGo = () => {
+    touchAttack = false;
+    aimId = null;
+    c.aimDir = null;
+    c.aimStick.active = false;
+    attackNow();
+  };
   const blur = () => {
     keys.clear();
     mouseAttack = false;
-    touchAttack = false;
+    letGo();
     update();
     attackNow();
   };
-  // The mouse: hold the left button on the play area to attack toward the pointer.
+  // The mouse: it aims wherever it is; hold the left button on the play area to attack there.
   const mouseDown = (e: PointerEvent) => {
     if (e.pointerType !== 'mouse' || e.button !== 0) return;
     if (!(e.target as HTMLElement).dataset?.play) return;
@@ -73,12 +136,19 @@ export function createControls(onKey?: (key: string) => void, stickAnywhere?: ()
     attackNow();
   };
   const mouseMove = (e: PointerEvent) => {
-    if (e.pointerType === 'mouse') c.aim = { x: e.clientX, y: e.clientY };
+    if (e.pointerType !== 'mouse') return;
+    c.aim = { x: e.clientX, y: e.clientY };
+    c.overPlay = !!(e.target as HTMLElement | null)?.dataset?.play;
   };
   const mouseUp = (e: PointerEvent) => {
+    if (e.pointerId === aimId) letGo();
     if (e.pointerType !== 'mouse' || e.button !== 0) return;
     mouseAttack = false;
     attackNow();
+  };
+  const mouseOut = (e: PointerEvent) => {
+    // Off the window: no crosshair.
+    if (e.pointerType === 'mouse' && !e.relatedTarget) c.overPlay = false;
   };
   // Touch joystick on the left half of the play area.
   let touchId: number | null = null;
@@ -92,6 +162,7 @@ export function createControls(onKey?: (key: string) => void, stickAnywhere?: ()
     c.stick = { active: true, ox: e.clientX, oy: e.clientY, x: e.clientX, y: e.clientY };
   };
   const move = (e: PointerEvent) => {
+    if (e.pointerId === aimId) dragTo(e.clientX, e.clientY);
     if (e.pointerId !== touchId) return;
     const dx = e.clientX - c.stick.ox;
     const dy = e.clientY - c.stick.oy;
@@ -104,6 +175,7 @@ export function createControls(onKey?: (key: string) => void, stickAnywhere?: ()
     c.my = l > 6 ? (dy / l) * mag : 0;
   };
   const end = (e: PointerEvent) => {
+    if (e.pointerId === aimId && e.type === 'pointercancel') letGo();
     if (e.pointerId !== touchId) return;
     touchId = null;
     c.stick.active = false;
@@ -115,30 +187,46 @@ export function createControls(onKey?: (key: string) => void, stickAnywhere?: ()
   window.addEventListener('keyup', up);
   window.addEventListener('blur', blur);
   window.addEventListener('pointerdown', start);
+  window.addEventListener('pointerdown', press, true);
   window.addEventListener('pointermove', move);
   window.addEventListener('pointerup', end);
   window.addEventListener('pointercancel', end);
   window.addEventListener('pointerdown', mouseDown);
   window.addEventListener('pointermove', mouseMove);
   window.addEventListener('pointerup', mouseUp);
+  window.addEventListener('pointerout', mouseOut);
   return {
     controls: c,
     press: (what) => {
       c[what] = true;
     },
-    hold: (on) => {
-      touchAttack = on;
-      if (on) c.aim = null;
+    hold: (on, at) => {
+      if (!on) {
+        letGo();
+        return;
+      }
+      touchAttack = true;
+      c.aim = null;
+      c.aimDir = null;
+      // Where the finger went down is the aim stick's middle (the press seen on its way in, when the
+      // button doesn't say).
+      const p = at ?? lastPress;
+      aimId = p?.id ?? null;
+      const x = p?.x ?? 0;
+      const y = p?.y ?? 0;
+      c.aimStick = { active: false, ox: x, oy: y, x, y };
       attackNow();
     },
     dispose: () => {
       window.removeEventListener('pointerdown', mouseDown);
       window.removeEventListener('pointermove', mouseMove);
       window.removeEventListener('pointerup', mouseUp);
+      window.removeEventListener('pointerout', mouseOut);
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
       window.removeEventListener('blur', blur);
       window.removeEventListener('pointerdown', start);
+      window.removeEventListener('pointerdown', press, true);
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', end);
       window.removeEventListener('pointercancel', end);

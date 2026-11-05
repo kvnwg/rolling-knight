@@ -68,6 +68,17 @@ export function materialOf(t: MobType, boss = false): Material {
 export const hitCue = (m: Material): FightCue => `hit_${m}`;
 export const deathCue = (m: Material): FightCue => `death_${m}`;
 
+/** Each class's dash (world/dash.ts); the Ranger's by which way it went (at a foe: its Power Shot sounds later). */
+const DASH: Record<string, FightCue> = { guardian: 'dash_bash', blade: 'dash_shadow', cleric: 'dash_bless', arcanist: 'dash_blink', lancer: 'dash_lunge' };
+
+function dashCue(h: Unit): FightCue {
+  if (h.cls === 'ranger') return h.rolling?.kind === 'flip' ? 'dash_snare' : 'knight_dodge';
+  return (h.cls && DASH[h.cls]) || 'knight_dodge';
+}
+
+/** The marks a dash leaves (Fx `src`), heard as they happen. */
+const DASH_MARK: Readonly<Partial<Record<string, FightCue>>> = { bash: 'dash_bash_hit', shot: 'dash_shot', snare: 'snare_snap' };
+
 const ATTACK: Record<string, FightCue> = {
   guardian: 'atk_shield',
   blade: 'atk_sword',
@@ -275,6 +286,12 @@ export class FightObserver {
       case 'hit':
       case 'crit':
         return this.hit(w, f);
+      case 'spark': {
+        // A dash's mark: a foe bashed aside, the Power Shot loosed, a snare snapping shut.
+        const cue = f.src ? DASH_MARK[f.src] : undefined;
+        if (cue) this.add(cue, f);
+        return;
+      }
       case 'blast':
         if (f.src === 'meteor') return this.add('boom_meteor', f, { level: clamp01((size - 1.5) / 3) });
         if (f.src === 'bomb') return this.add('boom_bomb', f, { level: clamp01((size - 1) / 2) });
@@ -346,8 +363,8 @@ export class FightObserver {
     if (h.downed) return;
     // An attack: its cooldown starts again (a skill's swing doesn't touch it).
     if ((h.atkT ?? 0) > was.atkT + 1e-6 && h.cls && ATTACK[h.cls]) this.add(ATTACK[h.cls], h, { prio: mine ? 1 : 0, gain: mine ? 1 : 0.6 });
-    // A dodge: its cooldown starts again.
-    if ((h.dodgeT ?? 0) > was.dodgeT + 1e-6) this.add(h.rolling?.kind === 'blink' ? 'knight_blink' : 'knight_dodge', h, { gain: mine ? 1 : 0.6 });
+    // A dash (each class its own: world/dash.ts): its cooldown starts again.
+    if ((h.dodgeT ?? 0) > was.dodgeT + 1e-6) this.add(dashCue(h), h, { gain: mine ? 1 : 0.6 });
   }
 
   private mob(w: World, m: Unit): void {

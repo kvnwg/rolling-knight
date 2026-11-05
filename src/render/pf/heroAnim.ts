@@ -3,8 +3,9 @@
  * sim). The world's state is the script:
  *
  *   downed            death (once, holding the slump); on a revive the death plays backward (it stands up)
- *   rolling           the class's dodge: roll, backflip (Ranger), vault (Lancer), dodge with a blink fade
- *                     (Arcanist), stretched to the dodge's length, facing its way (backflips face away)
+ *   rolling, landing  the class's dodge: roll, backflip (Ranger), vault (Lancer), dodge with a blink fade
+ *                     (Arcanist), stretched over the roll and its landing, facing its way (backflips
+ *                     face away)
  *   stunT             stun
  *   channel           Whirlwind plays the heavy attack's spin (its coil, the turn through every view
  *                     looped while it lasts, then the last sweep and the settle); a lunge holds the
@@ -23,7 +24,9 @@
  *   foes awake near   combat_idle; otherwise idle (a breath), blinking now and then on its rest frame
  *
  * Facing comes from the aim (attacks), the dodge, or the travel vector's dominant axis, with a little
- * hysteresis so a diagonal walk doesn't flicker between views.
+ * hysteresis so a diagonal walk doesn't flicker between views. While the knight you steer attacks
+ * (h.aiming) it faces its aim whichever way it walks, as in a twin-stick shooter, and a blow struck on
+ * the move plays quick so the stride shows between blows.
  */
 import { CLASSES, type ClassId } from '../../core/knights';
 import type { SkillId } from '../../core/skillbook';
@@ -178,11 +181,16 @@ export function gaitFor(sheet: PFSheet, speed: number, cur: 'walk' | 'run'): 'wa
 
 /** The dodge animation for a roll kind, and whether it faces away from the way it moves. */
 export function dodgeAnim(kind: NonNullable<Unit['rolling']>['kind'], sheet: PFSheet): { anim: string; away: boolean } {
-  const pref: Record<string, Array<[string, boolean]>> = {
+  const pref: Record<NonNullable<Unit['rolling']>['kind'], Array<[string, boolean]>> = {
     roll: [['roll', false], ['vault', false], ['backflip', true], ['dodge', true]],
     flip: [['backflip', true], ['roll', false], ['vault', false], ['dodge', true]],
     vault: [['vault', false], ['roll', false], ['backflip', true], ['dodge', true]],
     blink: [['dodge', true], ['roll', false], ['backflip', true], ['vault', false]],
+    // The Guardian's Shield Bash: shield up, charging; the Blade's Shadowstep: its roll; the Lancer's
+    // lunge: the thrust, held (heroPose holds these two rather than playing them through).
+    bash: [['block_hold', false], ['roll', false], ['dodge', true]],
+    shadow: [['roll', false], ['dodge', true], ['vault', false], ['backflip', true]],
+    lunge: [['attack_slash', false], ['vault', false], ['roll', false]],
   };
   const hit = pref[kind].find(([a]) => sheet.has(a)) ?? ['idle', false];
   return { anim: hit[0], away: hit[1] };
@@ -231,6 +239,9 @@ function attackCycle(w: World, h: Unit): number {
   const rate = (1 + w.banner * 0.04) * (h.skillBuff?.atkSpd ?? 1);
   return (h.atkCd ?? CLASSES[h.cls!].atkCd) / rate;
 }
+
+/** An attack started on the move plays at most at this scale (quick), so the walk shows between blows. */
+const MOVING_SCALE = 0.55;
 
 /** The scale that fits a whole attack in `cycle` seconds (never under 0.45). */
 function fitScale(sheet: PFSheet, anim: string, cycle: number): number {
@@ -284,7 +295,7 @@ export function heroPose(w: World, h: Unit): HeroPose {
     m.vx += (dx / dt - m.vx) * k;
     m.vy += (dy / dt - m.vy) * k;
   }
-  if (!jump && !h.rolling) {
+  if (!jump && !h.rolling && !h.landing) {
     // Walk or run by the pace (the run's frames may turn quicker than the walk's), the feet planted.
     // (The phase carries over from one gait to the other: both start on the same foot.)
     m.gait = gaitFor(sheet, m.speed, m.gait);
@@ -313,10 +324,12 @@ export function heroPose(w: World, h: Unit): HeroPose {
     m.rollAt = now;
     m.rollFrom = [prevX, prevY];
   }
-  m.roll = h.rolling ?? null;
+  m.roll = h.rolling ?? (h.landing ? m.roll : null);
   if (w.cleared && !m.cleared && !w.hub && !w.camp) m.victoryAt = now;
   m.cleared = w.cleared;
   const aimDir = face(h.aimX, h.aimY);
+  // The knight you steer, attacking: it faces where it aims, walking or standing (twin-stick).
+  const aiming = (h.aiming ?? 0) > 0;
   if (h.swingT > m.swingT + 1e-4) {
     // A swing: the sim dealt the hit (or loosed the shot) this tick.
     const skill = m.skill && Math.abs(m.skillAt - now) < 0.05 ? m.skill : null;
@@ -324,11 +337,14 @@ export function heroPose(w: World, h: Unit): HeroPose {
     if (!skill) m.swings++;
     const cycle = skill ? Math.max(0.5, h.swingDur * 2) : attackCycle(w, h);
     const keep = m.atk?.predicted && m.atk.anim === anim && Math.abs(m.atk.strikeAt - now) < 0.25;
+    // On the move the blow is quick, so the stride shows between blows (the feet don't skate).
+    const onFoot = h.moving && m.speed > 5;
+    const fit = fitScale(sheet, anim, cycle);
     m.atk = {
       anim,
       dir: aimDir,
       strikeAt: now,
-      scale: keep ? m.atk!.scale : fitScale(sheet, anim, cycle),
+      scale: keep ? m.atk!.scale : onFoot && !skill ? Math.min(fit, MOVING_SCALE) : fit,
       predicted: false,
       plain: anim === 'victory' || anim === 'block_enter',
     };
@@ -354,13 +370,19 @@ export function heroPose(w: World, h: Unit): HeroPose {
     const i = f.length - 1 - Math.min(f.length - 2, Math.floor(((now - m.upAt) / 0.42) * (f.length - 1)));
     return pose('death', m.dir, f[i][0]);
   }
-  // --- a dodge (or a skill's leap)
-  if (h.rolling) {
-    const r = h.rolling;
+  // --- a dodge (or a skill's leap), through to its landing
+  const r = h.rolling ?? h.landing;
+  if (r) {
     const { anim, away } = dodgeAnim(r.kind, sheet);
     const dir = away ? face(-r.dx, -r.dy) : face(r.dx, r.dy);
     const f = clip(anim, dir);
-    const p = Math.min(0.999, Math.max(0, 1 - r.t / r.dur));
+    // How far through the whole roll: the untouchable part, then the landing.
+    const whole = h.rolling ? h.rolling.dur + (h.rolling.land ?? 0) : h.landing!.of;
+    const done = h.rolling ? h.rolling.dur - h.rolling.t : h.landing!.of - h.landing!.t;
+    const p = Math.min(0.999, Math.max(0, done / Math.max(1e-6, whole)));
+    // The shield charge holds the guard up; the lunge holds the thrust at full stretch.
+    if (anim === 'block_hold') return pose(anim, dir, loopK(anim, dir, now * 1000));
+    if (anim === 'attack_slash') return pose(anim, dir, f[strikeFrame(sheet, anim)][0]);
     const k = f[at(f, p * sum(f))][0];
     if (r.kind === 'blink') {
       const g0 = f[0][0];
@@ -416,11 +438,17 @@ export function heroPose(w: World, h: Unit): HeroPose {
     const scale = fitScale(sheet, anim, attackCycle(w, h));
     const wind = (sum(clip(anim, 's'), 0, strikeFrame(sheet, anim)) * scale) / 1000;
     if (toFire <= wind) {
-      const reach = h.range! + (h.cls === 'guardian' || h.cls === 'blade' || h.cls === 'lancer' ? 6 : 0);
-      const t = w.nearestEnemy(h, reach, true);
-      if (t) m.atk = { anim, dir: face(t.x - h.x, t.y - h.y), strikeAt: now + toFire, scale, predicted: true };
+      if (h.slot === w.controlled && !w.bot && !w.auto) {
+        // The knight you steer attacks only while you hold it (Auto attack off): wind up toward the aim, then.
+        if (aiming) m.atk = { anim, dir: aimDir, strikeAt: now + toFire, scale, predicted: true };
+      } else {
+        const reach = h.range! + (h.cls === 'guardian' || h.cls === 'blade' || h.cls === 'lancer' ? 6 : 0);
+        const t = w.nearestEnemy(h, reach, true);
+        if (t) m.atk = { anim, dir: face(t.x - h.x, t.y - h.y), strikeAt: now + toFire, scale, predicted: true };
+      }
     }
   }
+  if (m.atk?.predicted && aiming) m.atk.dir = aimDir;
   if (m.atk?.predicted) {
     // Keep the strike on the sim's clock (buffs change it); give up if the attack never comes.
     const rate = (1 + w.banner * 0.04) * (h.skillBuff?.atkSpd ?? 1);
@@ -460,8 +488,9 @@ export function heroPose(w: World, h: Unit): HeroPose {
     }
   }
   // --- walking (or running): frames stepped by the distance covered, so planted feet stay planted
+  // (facing the aim while attacking, whichever way the feet go)
   if (walking) {
-    const dir = sheet.eightWay ? travelDir8(m.vx, m.vy, m.dir) : travelDir(m.vx, m.vy, m.dir);
+    const dir = aiming ? aimDir : sheet.eightWay ? travelDir8(m.vx, m.vy, m.dir) : travelDir(m.vx, m.vy, m.dir);
     const f = clip(m.gait, dir);
     const stride = strideOf(sheet, m.gait);
     const cycle = stride.reduce((s, v) => s + v, 0);
@@ -473,7 +502,7 @@ export function heroPose(w: World, h: Unit): HeroPose {
     }
     return pose(m.gait, dir, f[i][0]);
   }
-  const dir = h.moving ? m.dir : viewDir(h.view, h.dir);
+  const dir = aiming ? aimDir : h.moving ? m.dir : viewDir(h.view, h.dir);
   if (now - m.victoryAt < 2.6) return pose('victory', dir, loopK('victory', dir, (now - m.victoryAt) * 1000));
   // --- standing
   const foes = !w.hub && !w.camp && w.mobs.some((e) => !e.dead && e.awake && Math.abs(e.x - h.x) < 110 && Math.abs(e.y - h.y) < 90);

@@ -323,7 +323,10 @@ export function skillsFor(knightId: string): SkillDef[] {
   return list;
 }
 
-/** Seconds a knight waits between skill rolls: its class's (a signature no longer brings its own). */
+/**
+ * The class's old skill cooldown (s), kept as a stat: skill rolls no longer wait for it (in a fight
+ * they chain, the next starting as the last skill is done: world/skills.ts).
+ */
 export function skillRollCd(knightId: string): number {
   return CLASSES[knightDef(knightId).cls].specialCd;
 }

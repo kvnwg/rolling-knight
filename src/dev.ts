@@ -3,7 +3,7 @@
  *   ?fresh            a new game (the save is left alone until it's overwritten)
  *   ?floor=16         start on that floor with a ready squad (tutorial skipped)
  *   ?squad=legendary  the squad's rarity for ?floor (default epic)
- *   ?auto             the knight you control plays itself
+ *   ?auto             the knight you control plays itself (the dev bot: it moves, dodges and fights)
  *   ?gold=1e6         some gold
  *   ?camp             stay at camp (the home screen) after ?floor's setup
  *   ?sky=rain         every floor's weather (clear, overcast, rain)
@@ -55,7 +55,7 @@ export function devGame(): Game {
   if (isDesign(design)) s.run.designDeck = [design, ...s.run.designDeck.filter((d) => d !== design)];
   if (q.has('camp')) game.inDungeon = false;
   if (q.has('gold')) s.gold = Number(q.get('gold'));
-  if (q.has('auto')) s.settings.autoPlay = true;
+  if (q.has('auto')) game.bot = true;
   (window as unknown as { __game: Game }).__game = game;
   return game;
 }

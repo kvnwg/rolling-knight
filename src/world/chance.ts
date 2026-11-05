@@ -157,7 +157,8 @@ export function onHeroHurt(w: World, hero: Unit, amount: number, from: Unit | nu
     if (w.rng.chance(p)) {
       from.stunT = Math.max(from.stunT, from.boss ? CHANCE.butterfingers.daze * 0.5 : CHANCE.butterfingers.daze);
       from.windT = 0;
-      from.rush = undefined;
+      // (A dash or a leap it's in ends where it stands: its own move code drops it, dazed. Not cleared
+      // here, mid-hit, under the dash that is still running: that one ends it a moment later itself.)
       from.move = undefined;
       say(w, c, from, 'FUMBLE!', COLORS.fumble);
       w.fx.push({ kind: 'spark', x: from.x, y: from.y - 10, color: '#e8e0c8' });

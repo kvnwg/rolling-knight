@@ -441,7 +441,7 @@ describe('Quick Roll', () => {
     expect(quick.dur).toBeCloseTo(ROLL_TIME * 0.4, 9);
     expect(quick.took).toBeLessThan(ROLL_TIME * 0.4 + 0.02);
     expect(quick.took).toBeLessThan(plain.took - 0.3);
-    // No cooldown starts as it lands: the next roll can start straight away.
+    // No cooldown starts as it lands (the next roll waits only for the skill to finish firing).
     expect(plain.left).toBe(0);
     expect(quick.left).toBe(0);
     // A unit without the field spins for ROLL_TIME.
@@ -653,6 +653,26 @@ describe('the chance hooks in a fight', () => {
     // Only foes fumble.
     w.rng = fixedRng([0]);
     expect(onHeroHurt(w, h, 25, null)).toBe(25);
+  });
+
+  it('Butterfingers: a foe that fumbles in the middle of its dash just stops, dazed', () => {
+    const w = world();
+    onFloorStart(w, game({ butterfingers: 5 }));
+    const h = w.heroes[0];
+    const m = firstMob(w);
+    for (const o of w.heroes) o.invuln = 0;
+    // A dash that runs into the knight this frame.
+    m.awake = true;
+    m.x = h.x - 6;
+    m.y = h.y;
+    m.rush = { kind: 'dash', move: 'dash', name: 'charge', x0: m.x, y0: m.y, x1: m.x + 60, y1: m.y, t: 0, dur: 0.4, height: 0, dmg: 1, knock: 0, r: 8, through: false, recover: 0.5, big: false, hit: new Set() };
+    w.rng = fixedRng([0]);
+    const hp = h.hp;
+    expect(() => w.update(1 / 60)).not.toThrow();
+    expect(h.hp).toBe(hp);
+    expect(m.stunT).toBeGreaterThan(0);
+    expect(m.rush).toBeUndefined();
+    expect(() => w.update(1 / 60)).not.toThrow();
   });
 
   it('Second Wind: shrugs off one killing blow a floor per knight, leaving it on its feet', () => {

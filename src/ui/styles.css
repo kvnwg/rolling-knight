@@ -1610,6 +1610,17 @@ select.select {
   transform: translate(-50%, -50%);
   clip-path: polygon(25% 0, 75% 0, 100% 25%, 100% 75%, 75% 100%, 25% 100%, 0 75%, 0 25%);
 }
+/* The Attack button dragged like a right stick: it aims that way. */
+.stick.aim {
+  background: rgba(60, 14, 10, 0.35);
+}
+.stick.aim i {
+  background: rgba(255, 216, 120, 0.7);
+}
+/* In a fight the mouse aims: the game draws its own crosshair, so the pointer hides over the play area. */
+canvas.game.aiming {
+  cursor: none;
+}
 
 .hint {
   position: absolute;

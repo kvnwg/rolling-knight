@@ -301,6 +301,15 @@ const HUB_FOCUS_Y = 0.55;
 /** PixelForge FX are drawn in their own colors. */
 const NO_PAINT = { recolor: {}, key: 'fx' } as const;
 
+/** How long the red flash lasts when the knight you steer is hit (s). */
+const HURT_FLASH = 0.2;
+/** The Shadowstep's afterimages: one every this many seconds of its dash, each lasting this long. */
+const SHADOW_EVERY = 0.035;
+const SHADOW_LIFE = 0.2;
+/** The aim's marks: the crosshair and the auto-aim's brackets, gold on an ink rim. */
+const AIM_INK = '#140c14';
+const AIM_GOLD = '#ffd84a';
+
 /**
  * The most light a PixelForge character takes (1 = its own colors). Lanterns and glows still light
  * the ground round it; past this they would only bleach its muted palette.
@@ -379,6 +388,17 @@ export class Renderer {
   private perfects: Array<{ uid: number; x: number; y: number; at: number; world: World; big: boolean }> = [];
   /** This frame's tells over mobs' heads (drawn with the HUD, after the numbers). */
   private tells: Array<{ x: number; y: number; a: number }> = [];
+  /** Where the mouse is over the fight (CSS px; App sets it each frame): the crosshair, and the view leans to it. */
+  cursor: { x: number; y: number } | null = null;
+  /** Seconds left of the red flash (the knight you steer was hit) and of the crosshair's kick (it attacked). */
+  private hurtFlashT = 0;
+  private kickT = 0;
+  /** The knight you steer as last seen: its grace (a fresh one is a hit) and its swing (a fresh one, an attack). */
+  private seen = { uid: -1, grace: 0, swingT: 0 };
+  /** How far above its feet each mob drawn this frame reaches (the auto-aim's brackets fit round it). */
+  private mobTop = new Map<number, number>();
+  /** The Shadowstep's afterimages, by knight: silhouettes where it was drawn a moment ago (world time). */
+  private heroTrails = new Map<number, { world: World; snaps: Array<{ x: number; y: number; ox: number; oy: number; c: HTMLCanvasElement; at: number }> }>();
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -519,6 +539,15 @@ export class Renderer {
     this.prepareFloor(w);
     const biome = w.biome;
     const lead = w.leader();
+    // The knight you steer (none while the dev bot plays it), and where it aims: the mouse, else
+    // (touch or Auto attack, attacking) the foe the auto-aim is on, or the way it's dragged.
+    const me = w.hub || w.camp || w.bot ? null : (w.heroes.find((h) => h.slot === w.controlled && !h.downed) ?? null);
+    let aimPt: { x: number; y: number } | null = null;
+    if (me && this.cursor) aimPt = this.screenToWorld(this.cursor.x, this.cursor.y);
+    else if (me && (me.aiming ?? 0) > 0) {
+      const lock = this.lockOf(w, me);
+      aimPt = lock ? { x: lock.x, y: lock.y } : { x: me.x + me.aimX * 60, y: me.y + me.aimY * 60 };
+    }
     this.camera.update({
       dt,
       map: w.map,
@@ -534,7 +563,18 @@ export class Renderer {
       foes: w.mobs,
       rewinding: !!w.rewind,
       calm: game.state.settings.reduceMotion,
+      aim: aimPt,
     });
+    // A fresh grace is a hit on your knight (a red flash); a fresh swing, an attack (the crosshair kicks).
+    if (me) {
+      if (me.uid !== this.seen.uid) this.seen = { uid: me.uid, grace: me.graceT ?? 0, swingT: me.swingT };
+      if ((me.graceT ?? 0) > this.seen.grace + 0.05) this.hurtFlashT = HURT_FLASH;
+      if (me.swingT > this.seen.swingT + 1e-4) this.kickT = 0.08;
+      this.seen.grace = me.graceT ?? 0;
+      this.seen.swingT = me.swingT;
+    }
+    this.hurtFlashT = Math.max(0, this.hurtFlashT - dt);
+    this.kickT = Math.max(0, this.kickT - dt);
     this.camX = this.camera.x;
     this.camY = this.camera.y;
     // Shake: a smooth rumble (two detuned waves), not a fresh random jolt every frame.
@@ -596,6 +636,7 @@ export class Renderer {
     // --- PixelForge: knight poses for this frame, and mobs that just died start their deaths
     const pf = pfReady();
     this.heroPoses.clear();
+    this.mobTop.clear();
     if (pf) {
       for (const h of w.heroes) this.heroPoses.set(h.uid, heroPose(w, h));
       pruneHeroes(new Set(w.heroes.map((h) => h.uid)));
@@ -797,7 +838,87 @@ export class Renderer {
 
     // --- the HUD layer: health bars, numbers, pointers (never lit or graded)
     this.drawOverlay(ui, w, sx, sy);
+    // The aim: the auto-aim's brackets on its foe, the red flash of a hit, the crosshair at the mouse.
+    if (me) this.drawAimMarker(ui, w, me, sx, sy);
+    if (this.hurtFlashT > 0) this.drawHurtFlash(ui);
+    if (me && this.cursor && aimPt) this.drawCrosshair(ui, w.mobs.some((m) => !m.dead && Math.hypot(m.x - aimPt!.x, m.y - 7 - aimPt!.y) < m.r + 5));
     this.present(game, w, lights, lead ? (sy(lead.y) - 6 - this.sub.y) / this.vh : 0.5);
+  }
+
+  /** The foe the auto-aim of knight h is locked on (alive), or null. */
+  private lockOf(w: World, h: Unit): Unit | null {
+    if (h.aimLock == null) return null;
+    for (const m of w.mobs) if (m.uid === h.aimLock && !m.dead) return m;
+    return null;
+  }
+
+  /**
+   * The touch auto-aim's target marker: corner brackets round the foe it's locked on (while the knight
+   * you steer attacks), breathing in and out a pixel.
+   */
+  private drawAimMarker(ctx: Ctx, w: World, me: Unit, sx: (x: number) => number, sy: (y: number) => number): void {
+    if (!((me.aiming ?? 0) > 0)) return;
+    const m = this.lockOf(w, me);
+    if (!m) return;
+    const breathe = Math.floor(this.time * 4) % 2;
+    const hw = Math.round(m.r + (m.boss ? 8 : 4)) + breathe;
+    const up = this.mobTop.get(m.uid) ?? Math.round(m.r * 2.4 + 9);
+    const x0 = sx(m.x) - hw;
+    const x1 = sx(m.x) + hw;
+    const y0 = sy(m.y) - up - 2 - breathe;
+    const y1 = sy(m.y) + 3 + breathe;
+    const arm = m.boss ? 5 : 3;
+    const corners: Array<[number, number, 1 | -1, 1 | -1]> = [[x0, y0, 1, 1], [x1, y0, -1, 1], [x0, y1, 1, -1], [x1, y1, -1, -1]];
+    for (const pass of [0, 1]) {
+      ctx.fillStyle = pass === 0 ? AIM_INK : AIM_GOLD;
+      const o = pass === 0 ? 1 : 0;
+      for (const [x, y, dx, dy] of corners) {
+        // One arm across and one down from each corner (the ink a pixel round them).
+        ctx.fillRect(Math.min(x, x + dx * (arm - 1)) - o, y - o, arm + o * 2, 1 + o * 2);
+        ctx.fillRect(x - o, Math.min(y, y + dy * (arm - 1)) - o, 1 + o * 2, arm + o * 2);
+      }
+    }
+  }
+
+  /** Your knight was hit: the screen flashes red, in stepped shades, a red frame round it. */
+  private drawHurtFlash(ctx: Ctx): void {
+    const t = this.hurtFlashT / HURT_FLASH;
+    ctx.fillStyle = '#ff2a2a';
+    ctx.globalAlpha = t > 0.66 ? 0.2 : t > 0.33 ? 0.11 : 0.05;
+    ctx.fillRect(0, 0, this.LW, this.LH);
+    ctx.globalAlpha = t > 0.5 ? 0.7 : 0.4;
+    const b = 2;
+    ctx.fillRect(0, 0, this.LW, b);
+    ctx.fillRect(0, this.LH - b, this.LW, b);
+    ctx.fillRect(0, b, b, this.LH - b * 2);
+    ctx.fillRect(this.LW - b, b, b, this.LH - b * 2);
+    ctx.globalAlpha = 1;
+  }
+
+  /**
+   * The crosshair at the mouse, on the art grid: a dot and four ticks with an ink rim, crisp on any
+   * floor; the ticks kick out a pixel as you attack, and turn gold over a foe.
+   */
+  private drawCrosshair(ctx: Ctx, hot: boolean): void {
+    const c = this.cursor!;
+    const dpr = Math.min(3, window.devicePixelRatio || 1);
+    // The art pixel under the pointer (the layers slide by the camera's sub-pixel in the last pass).
+    const x = Math.floor((c.x * dpr) / this.P + this.sub.x);
+    const y = Math.floor((c.y * dpr) / this.P + this.sub.y);
+    const from = 4 + (this.kickT > 0 ? 1 : 0);
+    const len = 3;
+    const ticks: Array<[number, number, number, number]> = [
+      [x + from, y, len, 1],
+      [x - from - len + 1, y, len, 1],
+      [x, y + from, 1, len],
+      [x, y - from - len + 1, 1, len],
+    ];
+    ctx.fillStyle = AIM_INK;
+    ctx.fillRect(x - 1, y - 1, 3, 3);
+    for (const [tx, ty, tw, th] of ticks) ctx.fillRect(tx - 1, ty - 1, tw + 2, th + 2);
+    ctx.fillStyle = hot ? AIM_GOLD : '#ffffff';
+    ctx.fillRect(x, y, 1, 1);
+    for (const [tx, ty, tw, th] of ticks) ctx.fillRect(tx, ty, tw, th);
   }
 
   /** A tree with its crown shifted by `dx` pixels, more toward the top (wind). */
@@ -1017,8 +1138,11 @@ export class Renderer {
     if (!pose) return this.drawHeroLegacy(ctx, w, h, sx, sy);
     const paint = knightPaint(h.knightId!, h.mutation ?? null, paintStep(h.rarity!, this.time));
     const [px, py] = SHEETS[paint.sheet].meta.pivot;
-    const x = sx(h.x) - px;
-    const y = sy(h.y) - py;
+    const [kx, ky] = recoil(h);
+    const x = sx(h.x) - px + kx;
+    const y = sy(h.y) - py + ky;
+    // Just hit (the knight you steer): it blinks while it's untouchable.
+    const blink = (h.graceT ?? 0) > 0 && Math.floor(this.time / 0.07) % 2 === 1 ? 0.3 : 1;
     if (cut) {
       ctx.drawImage(frameCanvas(paint.sheet, pose.k, paint, false, pose.anim, pose.dir), x, y);
       return;
@@ -1037,11 +1161,13 @@ export class Renderer {
       ctx.globalAlpha = pose.ghost.alpha;
       ctx.drawImage(frameCanvas(paint.sheet, pose.ghost.k, paint, true, pose.ghost.anim, pose.ghost.dir), sx(pose.ghost.x) - px, sy(pose.ghost.y) - py);
     }
-    ctx.globalAlpha = pose.alpha;
+    // The Blade's Shadowstep leaves afterimages behind it: dark silhouettes, fading by steps.
+    this.shadowTrail(ctx, w, h, pose, paint, sx, sy, px, py);
+    ctx.globalAlpha = pose.alpha * blink;
     ctx.drawImage(frameCanvas(paint.sheet, pose.k, paint, pose.flash, pose.anim, pose.dir), x, y);
     ctx.globalAlpha = 1;
     const cap = this.layers.cap.x;
-    cap.globalAlpha = pose.alpha;
+    cap.globalAlpha = pose.alpha * blink;
     cap.drawImage(frameMask(paint.sheet, pose.k, paint, pose.flash, pose.anim, pose.dir), x, y);
     cap.globalAlpha = 1;
     // The halo glows (drawn on the light-emitting layer).
@@ -1062,6 +1188,41 @@ export class Renderer {
         ctx.fillRect(sx(h.x) + Math.round(Math.cos(ang) * r), sy(h.y) - 8 + Math.round(Math.sin(ang) * r), 1, 1);
       }
     }
+  }
+
+  /**
+   * The Shadowstep's afterimages (world/dash.ts): while a Blade dashes, where it was drawn a few
+   * frames back stays behind as a dark silhouette (Kevin's in ink), each fainter by steps, gone in a
+   * moment. On the world's clock, so a hit-stop holds them too.
+   */
+  private shadowTrail(ctx: Ctx, w: World, h: Unit, pose: HeroPose, paint: ReturnType<typeof knightPaint>, sx: (x: number) => number, sy: (y: number) => number, px: number, py: number): void {
+    const dashing = h.rolling?.kind === 'shadow' || h.landing?.kind === 'shadow';
+    let trail = this.heroTrails.get(h.uid);
+    if (dashing) {
+      if (!trail || trail.world !== w) {
+        trail = { world: w, snaps: [] };
+        this.heroTrails.set(h.uid, trail);
+      }
+      const last = trail.snaps[trail.snaps.length - 1];
+      if (!last || w.time - last.at >= SHADOW_EVERY) {
+        const tint = h.rarity === ('absolute' as typeof h.rarity) ? '#141418' : '#4a2f7a';
+        const c = this.cached(`kshadow|${paint.sheet}|${pose.k}|${paint.key}|${pose.anim}|${pose.dir}|${tint}`, () => toCanvas(splitBuf(pfFrameBuf(paint.sheet, pose.k, paint, false, pose.anim, pose.dir), 'body', tint)));
+        trail.snaps.push({ x: h.x, y: h.y, ox: px, oy: py, c, at: w.time });
+        if (trail.snaps.length > 6) trail.snaps.shift();
+      }
+    }
+    if (!trail) return;
+    trail.snaps = trail.snaps.filter((s) => w.time - s.at < SHADOW_LIFE && w.time >= s.at);
+    if (!trail.snaps.length) {
+      this.heroTrails.delete(h.uid);
+      return;
+    }
+    for (const s of trail.snaps) {
+      const age = (w.time - s.at) / SHADOW_LIFE;
+      ctx.globalAlpha = age < 0.34 ? 0.55 : age < 0.67 ? 0.35 : 0.18;
+      ctx.drawImage(s.c, sx(s.x) - s.ox, sy(s.y) - s.oy);
+    }
+    ctx.globalAlpha = 1;
   }
 
   /** PixelForge's stun stars circling over a head whose top row is at (x, y). */
@@ -1255,6 +1416,7 @@ export class Renderer {
       cap.drawImage(olMask, x + mo.jitter - og.ox, y - mo.lift - og.oy, og.w, og.h);
     }
     const top = y - mo.lift - geo.oy + Math.round(meta.tops[pose.k][0] * (geo.h / meta.cell));
+    this.mobTop.set(m.uid, y - top);
     if (pose.stunned) this.stunStars(this.layers.emit.x, x, top - 3);
     // Asleep: a little "z".
     if (!m.awake && Math.floor(this.time * 1.5 + m.uid) % 3 === 0) {
@@ -1593,6 +1755,7 @@ export class Renderer {
       ctx.drawImage(ol, sx(m.x) + mo.jitter - og.ox, hy - mo.lift - og.oy, og.w, og.h);
     }
     const top = hy - mo.lift - geo.oy;
+    this.mobTop.set(m.uid, sy(m.y) - top);
     // Asleep: a little "z".
     if (!m.awake && Math.floor(this.time * 1.5 + m.uid) % 3 === 0) {
       const z = this.textCanvas('Z', { face: 'small', fill: '#d8e0ff', ink: '#1a1326' });
@@ -1710,6 +1873,8 @@ export class Renderer {
       }
       return;
     }
+    if (a.kind === 'snare') return this.drawSnare(ctx, x, y, a);
+    if (a.kind === 'bless') return this.drawBless(ctx, x, y, a);
     if (a.kind === 'sanctuary' || a.kind === 'glow') {
       this.ring(ctx, x, y, a.r, '#fff0a0', 0.6 + 0.2 * Math.sin(this.time * 5));
     } else if (a.kind === 'fire') {
@@ -1726,6 +1891,74 @@ export class Renderer {
         ctx.fillStyle = '#e8e0c8';
         ctx.fillRect(px, py - 6, 1, 5);
       }
+    }
+  }
+
+  /**
+   * A Ranger's snare (world/dash.ts), lying open: an iron ring with its teeth turned in, a trip plate
+   * in the middle and a rope off to the side; a tooth glints now and then. Crisp, on the ground.
+   */
+  private drawSnare(ctx: Ctx, x: number, y: number, a: Area): void {
+    const rx = Math.round(a.r);
+    const ry = Math.max(2, Math.round(a.r * 0.55));
+    // Its last second: it flickers out.
+    if (a.dur < 1 && Math.floor(this.time * 12) % 2) return;
+    ctx.fillStyle = '#7a5a34';
+    for (let i = 1; i <= 4; i++) ctx.fillRect(x + rx + i, y + 1 + (i >> 1), 1, 1);
+    const n = Math.max(16, rx * 4);
+    for (let i = 0; i < n; i++) {
+      const ang = (i / n) * Math.PI * 2;
+      const px = x + Math.round(Math.cos(ang) * rx);
+      const py = y + Math.round(Math.sin(ang) * ry);
+      ctx.fillStyle = '#1e161c';
+      ctx.fillRect(px, py + 1, 1, 1);
+      ctx.fillStyle = i % 2 ? '#5a5260' : '#8a8294';
+      ctx.fillRect(px, py, 1, 1);
+    }
+    const glint = Math.floor(this.time * 3 + a.uid) % 10;
+    for (let i = 0; i < 8; i++) {
+      const ang = (i / 8) * Math.PI * 2 + Math.PI / 8;
+      const tx = x + Math.round(Math.cos(ang) * (rx - 2));
+      const ty = y + Math.round(Math.sin(ang) * (ry - 1));
+      ctx.fillStyle = i === glint ? '#ffffff' : '#d8d0c0';
+      ctx.fillRect(tx, ty, 1, 1);
+    }
+    ctx.fillStyle = '#2a2026';
+    ctx.fillRect(x - 2, y - 1, 5, 3);
+    ctx.fillStyle = '#a08a5a';
+    ctx.fillRect(x - 1, y - 1, 3, 2);
+  }
+
+  /**
+   * A Cleric's Blessed Step (world/dash.ts): a holy circle on the ground, its rim turning, small
+   * crosses of light rising inside it; it thins out as it ends. Crisp: it lights nothing.
+   */
+  private drawBless(ctx: Ctx, x: number, y: number, a: Area): void {
+    const rx = Math.round(a.r);
+    const ry = Math.max(2, Math.round(a.r * 0.6));
+    const ending = a.dur < 0.5;
+    const n = Math.max(24, rx * 4);
+    const turn = Math.floor(this.time * 18);
+    for (let i = 0; i < n; i++) {
+      if ((i + turn) % 4 === 0 || (ending && i % 2)) continue;
+      const ang = (i / n) * Math.PI * 2;
+      ctx.fillStyle = (i + turn) % 4 === 1 ? '#ffffff' : '#fff2b8';
+      ctx.fillRect(x + Math.round(Math.cos(ang) * rx), y + Math.round(Math.sin(ang) * ry), 1, 1);
+      if (i % 3 === 0) {
+        ctx.fillStyle = '#e8c870';
+        ctx.fillRect(x + Math.round(Math.cos(ang) * (rx - 3)), y + Math.round(Math.sin(ang) * (ry - 2)), 1, 1);
+      }
+    }
+    // Crosses of light rising from inside, each on its own beat.
+    for (let k = 0; k < 4; k++) {
+      const u = (this.time * 0.9 + k * 0.25 + (a.uid % 7) * 0.13) % 1;
+      if (ending && k % 2) continue;
+      const ang = k * 1.9 + (a.uid % 5);
+      const cx = x + Math.round(Math.cos(ang) * rx * 0.55);
+      const cy = y + Math.round(Math.sin(ang) * ry * 0.55) - Math.round(u * 10);
+      ctx.fillStyle = u < 0.6 ? '#ffffff' : '#fff2b8';
+      ctx.fillRect(cx, cy - 1, 1, 3);
+      ctx.fillRect(cx - 1, cy, 3, 1);
     }
   }
 
@@ -2268,6 +2501,12 @@ export class Renderer {
       ctx.fillRect(ex + Math.round(Math.cos(ang) * 3), ey + Math.round(Math.sin(ang) * 3), 1, 1);
     }
   }
+}
+
+/** A ranged knight's shot kicks it back a pixel against its aim, for a moment as it leaves (px). */
+function recoil(h: Unit): [number, number] {
+  if ((h.cls !== 'ranger' && h.cls !== 'cleric' && h.cls !== 'arcanist') || h.swingT <= 0 || h.swingDur - h.swingT > 0.07) return [0, 0];
+  return [-Math.round(h.aimX), -Math.round(h.aimY)];
 }
 
 type Grade = Pick<PostParams, 'haze' | 'hazeAmount' | 'rays' | 'rayColor' | 'shadowTint' | 'highlightTint' | 'saturation' | 'contrast' | 'vignette' | 'bloom'>;
