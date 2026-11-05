@@ -86,7 +86,7 @@ export function HubHud({ game, onTalk, onSettings, onLuck }: { game: Game; onTal
         }}
         title="The altar: tap to watch it roll"
       >
-        <div className="frame plate">
+        <div className="frame">
           <AltarReels game={game} variant="mini" />
         </div>
       </button>
@@ -119,7 +119,7 @@ export function HubHud({ game, onTalk, onSettings, onLuck }: { game: Game; onTal
         s.playTimeMs < 240_000 && (
           <div className="hint plate outlined">
             {touch ? 'Drag to walk. Walk up to a keeper to talk.' : 'WASD to walk. Walk up to a keeper and press E.'}
-            <span className="t-muted">The gate to the dungeon is up the north path.</span>
+            <span className="t-muted">The steps down to the dungeon are at the foot of the square.</span>
           </div>
         )
       )}

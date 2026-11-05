@@ -32,7 +32,8 @@ export function VistaCanvas({ game, wide, pick }: { game: Game; wide: boolean; p
       const ids = [first, ...s.squad.filter((id) => id !== first)].filter((id): id is string => !!id && !!s.roster[id]);
       const heroes: VistaHero[] = ids.slice(0, 3).map((id) => ({ id, mutation: s.roster[id]?.mutation ?? null }));
       const tall = h > w;
-      vista.draw(ctx, w, h, (now - start) / 1000, {
+      // (A frame's timestamp can come a hair before `start`: never hand the scene a negative clock.)
+      vista.draw(ctx, w, h, Math.max(0, (now - start) / 1000), {
         heroes,
         focusX: tall ? 0.5 : 0.3,
         focusY: tall ? 0.3 : 0.5,

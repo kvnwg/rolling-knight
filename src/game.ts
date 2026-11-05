@@ -19,7 +19,7 @@ import { CAMP_BIOME, biomeForFloor, isBossFloor, type Biome } from './world/biom
 import { campMap, generateFloor, type FloorMap } from './world/mapgen';
 import { floorBoss, floorMobs } from './world/mobgen';
 import { World, type HeroSpec } from './world/world';
-import { placeholderHub } from './world/hubWorld';
+import { hubLayout } from './world/hubWorld';
 import { applyDialogAction, dialogFor, placeNpcs, type DialogChoice, type DialogNode, type Npc } from './world/npcs';
 import { questEvent, type Quest, type QuestEvent, type QuestReward } from './core/quests';
 
@@ -235,7 +235,7 @@ export class Game {
     const key = `${id}|${id ? s.roster[id]?.mutation ?? '' : ''}`;
     if (!force && this.hub && key === this.hubKey) return;
     this.hubKey = key;
-    const layout = placeholderHub();
+    const layout = hubLayout();
     const specs = this.squadSpecs();
     const controlled = specs.find((sp) => sp.knightId === id)?.slot ?? 0;
     const was = this.hub?.leader();

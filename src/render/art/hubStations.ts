@@ -8,8 +8,8 @@
  * warm string lights swagged between them.
  */
 import { renderText } from '../pixel/font';
-import { box, barrel, candle, CANVAS, GREEN, lanternBox, pot, TERRA, awning } from './hubStalls';
-import { GOLD, h2, hline, IRON, Layer, LEAF, oval, PLANK, planks, poly, rk, sagCurve, scales, sphere, STONE, timber, TIMBER, vline, vnoise, blocks, type Ramp } from './hubKit';
+import { awning, barrel, box, candle, GREEN, lanternBox, pot, TERRA } from './hubStalls';
+import { blocks, GOLD, h2, hline, IRON, Layer, LEAF, oval, PLANK, rk, sagCurve, scales, STONE, timber, TIMBER, vline, vnoise, type Ramp } from './hubKit';
 import { ROOF } from './hubShop';
 import type { HubOut } from './hubScene';
 
@@ -118,7 +118,7 @@ export function smithy(out: HubOut): void {
       A.px(x, y, rk(['#1e140e', '#2e2016', '#45301e', '#5e4228', '#7a5834'], 3.6 - t * 2.6 - ((x + 1) % 3 === 0 ? 0.7 : 0)));
     }
   }
-  oval(A, ax, ay - 8, 5.6, 2, (x, y, nx, ny) => rk(['#6a4a2a', '#8a6838', '#a8844c', '#c4a068'], 2.4 - ny - nx * 0.3));
+  oval(A, ax, ay - 8, 5.6, 2, (_x, _y, nx, ny) => rk(['#6a4a2a', '#8a6838', '#a8844c', '#c4a068'], 2.4 - ny - nx * 0.3));
   A.rect(ax - 3, ay - 12, 7, 3, (x, y) => rk(IRON, 3.4 - (x - ax) * 0.3 + (y === ay - 12 ? 0.6 : 0)));
   A.rect(ax - 6, ay - 16, 13, 4, (x, y) => rk(IRON, y === ay - 16 ? 6 : y === ay - 15 ? 4.6 : 3 - (x - ax) * 0.15));
   hline(A, ax - 10, ax - 7, ay - 15, IRON[4]);
@@ -194,7 +194,7 @@ export function scrapStall(out: HubOut): void {
   const sgx = x1 - 1;
   const sgy = 288;
   for (let y = sgy; y < sgy + 11; y++) for (let x = sgx; x < sgx + 11; x++) L.px(x, y, rk(PLANK, y === sgy ? 6 : x === sgx ? 5 : x === sgx + 10 || y === sgy + 10 ? 2 : 3.8));
-  oval(L, sgx + 4, sgy + 6, 2.6, 2.6, (x, y, nx, ny) => rk(GOLD, 4.6 - ny * 1.5 - nx * 0.6));
+  oval(L, sgx + 4, sgy + 6, 2.6, 2.6, (_x, _y, nx, ny) => rk(GOLD, 4.6 - ny * 1.5 - nx * 0.6));
   for (let t = 0; t < 5; t++) L.px(sgx + 6 + (t > 2 ? 1 : 0), sgy + 2 + t, IRON[6 - (t > 2 ? 1 : 0)]);
   // A lantern on a hook under the awning.
   lanternBox(L, x0 + 10, 288);
@@ -230,7 +230,7 @@ function junk(L: Layer, kind: string, x: number, sy: number, seed: number): numb
   switch (kind) {
     case 'gear': {
       const r = 2.5 + h2(seed, 1, 1) * 1.5;
-      oval(L, x + r, sy - r - 0.5, r + 0.8, r + 0.8, (px, py, nx, ny) => {
+      oval(L, x + r, sy - r - 0.5, r + 0.8, r + 0.8, (_px, _py, nx, ny) => {
         const a = Math.atan2(ny, nx);
         const d = Math.hypot(nx, ny);
         if (d > 0.82 && Math.cos(a * 8) < 0.2) return null;
@@ -271,7 +271,7 @@ function junk(L: Layer, kind: string, x: number, sy: number, seed: number): numb
       return 6;
     }
     case 'pan': {
-      oval(L, x + 3, sy + 3, 3.2, 3.2, (px, py, nx, ny) => (Math.hypot(nx, ny) < 0.6 ? '#2a2630' : rk(steel, 4 - ny * 1.4)));
+      oval(L, x + 3, sy + 3, 3.2, 3.2, (_px, _py, nx, ny) => (Math.hypot(nx, ny) < 0.6 ? '#2a2630' : rk(steel, 4 - ny * 1.4)));
       vline(L, x + 3, sy - 5, sy - 1, rk(PLANK, 3));
       return 7;
     }
@@ -328,7 +328,7 @@ export function sageCorner(out: HubOut): void {
   const F = new Layer(46, 462, 18, 22);
   const fx = 54;
   const fy = 482;
-  oval(F, fx, fy - 9, 5, 2.2, (x, y, nx, ny) => rk(IRON, 4 - ny * 1.6));
+  oval(F, fx, fy - 9, 5, 2.2, (_x, _y, _nx, ny) => rk(IRON, 4 - ny * 1.6));
   for (const [x0, x1] of [[fx - 3, fx - 4], [fx + 3, fx + 4], [fx, fx]] as const) {
     for (let t = 0; t < 7; t++) F.px(Math.round(x0 + (x1 - x0) * (t / 6)), fy - 7 + t, IRON[2]);
   }
@@ -415,8 +415,8 @@ export function shrine(out: HubOut): void {
   // Pillars either side.
   for (const px of [cx - 22, cx + 17]) {
     for (let y = base - 58; y < base - 14; y++) for (let x = px; x < px + 5; x++) L.px(x, y, rk(STONE, x === px ? 6 : x === px + 4 ? 2.4 : 4.4 + (y % 7 === 0 ? -1 : 0)));
-    L.rect(px - 1, base - 60, 7, 3, (x, y) => rk(STONE, y === base - 60 ? 6.4 : 4));
-    L.rect(px - 1, base - 16, 7, 2, (x, y) => rk(STONE, y === base - 16 ? 6 : 3.4));
+    L.rect(px - 1, base - 60, 7, 3, (_x, y) => rk(STONE, y === base - 60 ? 6.4 : 4));
+    L.rect(px - 1, base - 16, 7, 2, (_x, y) => rk(STONE, y === base - 16 ? 6 : 3.4));
   }
   // The roof: a small gable of shingles.
   const ay = base - 80;
@@ -504,7 +504,7 @@ export function gate(out: HubOut): void {
   // The beam and the sign: drawn with the posts' sort line so it sits over whoever walks under.
   const B = new Layer(x0 - 10, base - 66, x1 - x0 + 21, 30);
   timber(B, x0 - 8, base - 58, x1 - x0 + 17, 5, 91);
-  for (const ex of [x0 - 9, x1 + 8]) B.rect(ex, base - 59, 2, 7, (x, y) => rk(TIMBER, y === base - 59 ? 5 : 3));
+  for (const ex of [x0 - 9, x1 + 8]) B.rect(ex, base - 59, 2, 7, (_x, y) => rk(TIMBER, y === base - 59 ? 5 : 3));
   const name = renderText('DUNGEON', { face: 'small', fill: ['#d8c8ff', '#b8a0ff', '#9a7aff', '#8a6af0', '#7a5ae0'], ink: null });
   const sx = 240 - Math.floor(name.w / 2) - 4;
   const sy = base - 50;
@@ -518,20 +518,26 @@ export function gate(out: HubOut): void {
   }
   B.outlineTinted(0.75);
   out.piece(B, 'gateBeam', base + 1, null);
-  // The portal's glow rising from the bottom steps: a violet haze over the last treads, runes.
-  const P = new Layer(196, 596, 88, 44);
-  for (let y = 600; y < 640; y++) {
-    for (let x = 200; x < 280; x++) {
-      const t = (y - 600) / 40;
-      const edge = Math.min(x - 200, 279 - x) / 40;
-      const a = Math.max(0, t * t * 0.75 * Math.min(1, edge * 3) + (vnoise(x, y, 7, 4, 3) - 0.5) * 0.2 * t);
-      if (a > 0.04) P.halo(x, y, t > 0.7 ? '#d8b8ff' : '#9a6aff', a);
+  // The portal's glow rising from the bottom steps: a violet haze over the last treads, runes. Four
+  // frames of the haze drifting up.
+  const portalFrame = (k: number): Layer => {
+    const P = new Layer(196, 596, 88, 44);
+    for (let y = 600; y < 640; y++) {
+      for (let x = 200; x < 280; x++) {
+        const t = (y - 600) / 40;
+        const edge = Math.min(x - 200, 279 - x) / 40;
+        const a = Math.max(0, t * t * 0.75 * Math.min(1, edge * 3) + (vnoise(x, y + k * 3, 7, 4, 3) - 0.5) * 0.24 * t);
+        if (a > 0.04) P.halo(x, y, t > 0.7 ? '#d8b8ff' : '#9a6aff', a);
+      }
     }
-  }
-  for (const [rx, ry] of [[214, 626], [240, 630], [266, 626], [226, 614], [254, 614]] as const) {
-    for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [-1, 0], [0, -1]] as const) P.gl(rx + dx, ry + dy, dx || dy ? '#b890ff' : '#f0e0ff');
-  }
-  out.glowOf(P, 'portal', 640);
+    for (const [rx, ry, ph] of [[214, 626, 0], [240, 630, 1], [266, 626, 2], [226, 614, 3], [254, 614, 1]] as const) {
+      if ((k + ph) % 4 === 3) continue;
+      for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [-1, 0], [0, -1]] as const) P.gl(rx + dx, ry + dy, dx || dy ? '#b890ff' : '#f0e0ff');
+    }
+    return P;
+  };
+  const P = portalFrame(0);
+  out.glowOf(P, 'portal', 640, [0, 1, 2, 3].map((k) => portalFrame(k).glow), 5);
   out.lights.push({ x: 240, y: 648, r: 112, color: '#8a5aff', intensity: 0.85, flicker: 0.15 });
   out.lights.push({ x: 240, y: 612, r: 50, color: '#b890ff', intensity: 0.5 });
   out.motes.push({ x: 240, y: 616, rx: 36, ry: 18, kind: 'mote', color: '#c8a8ff', count: 10 });
@@ -576,6 +582,7 @@ export function lightString(out: HubOut, a: [number, number], b: [number, number
     if (i % 5 !== 2 || i < 3 || i > wire.length - 4) return;
     const c = cols[Math.floor(h2(x, y, 3) * cols.length)];
     L.px(x, y + 1, '#3a2a20');
+    if (h2(x, y, 9) < 0.3) L.twinkles.push({ x, y: y + 3, r: 3, period: 4, on: 3, phase: Math.floor(h2(x, y, 10) * 4) });
     L.gl(x, y + 2, c);
     L.gl(x + 1, y + 2, c);
     L.gl(x, y + 3, '#fff6d8');
@@ -604,7 +611,7 @@ export function crateStack(out: HubOut, x: number, y: number, id: string): void 
 /** A black cat curled up asleep (on a step, a sill). */
 export function cat(out: HubOut, x: number, y: number): void {
   const L = new Layer(x - 6, y - 7, 13, 8);
-  oval(L, x, y - 2.5, 4.6, 2.6, (xx, yy, nx, ny) => rk(['#0e0c12', '#1c1824', '#2c2636', '#3e364a'], 1.6 - ny * 1.2 - nx * 0.4));
+  oval(L, x, y - 2.5, 4.6, 2.6, (_xx, _yy, nx, ny) => rk(['#0e0c12', '#1c1824', '#2c2636', '#3e364a'], 1.6 - ny * 1.2 - nx * 0.4));
   L.px(x - 4, y - 5, '#1c1824');
   L.px(x - 3, y - 6, '#2c2636');
   L.px(x - 5, y - 6, '#1c1824');
@@ -614,8 +621,63 @@ export function cat(out: HubOut, x: number, y: number): void {
   out.piece(L, 'cat', y, null);
 }
 
-void CANVAS;
-void planks;
-void poly;
-void sphere;
-void IRON;
+
+/** An empty park bench facing us: a slatted back, a lit seat, iron legs. */
+export function bench(out: HubOut, x: number, y: number, id: string): void {
+  const L = new Layer(x - 18, y - 22, 37, 24);
+  for (let yy = y - 20; yy < y - 11; yy++) {
+    for (let xx = x - 15; xx <= x + 15; xx++) {
+      const slat = (yy - (y - 20)) % 3;
+      L.px(xx, yy, slat === 2 ? rk(PLANK, 1.5) : rk(PLANK, slat === 0 ? 5.6 : 4 + (h2(xx, yy, 7) - 0.5) * 0.6));
+    }
+  }
+  for (const px of [x - 15, x + 14]) for (let yy = y - 21; yy < y - 6; yy++) L.px(px, yy, IRON[px < x ? 4 : 2]);
+  box(L, x - 16, y - 8, 33, 3, 2, PLANK, 91);
+  for (const px of [x - 14, x + 13]) {
+    for (let yy = y - 3; yy <= y; yy++) L.px(px, yy, IRON[px < x ? 4 : 2]);
+    L.px(px - 1, y, IRON[3]);
+    L.px(px + 1, y, IRON[1]);
+  }
+  L.outlineTinted(0.75);
+  out.piece(L, id, y);
+  out.shadows.push({ kind: 'oval', x: x + 4, y: y + 1, rx: 17, ry: 2.5, strength: 0.4 });
+}
+
+/** A barrel standing on the paving. */
+export function barrelPiece(out: HubOut, x: number, y: number, id: string, seed = 5): void {
+  const L = new Layer(x - 7, y - 16, 14, 18);
+  barrel(L, x - 4, y, seed);
+  L.outlineTinted(0.75);
+  out.piece(L, id, y);
+  out.shadows.push({ kind: 'oval', x: x + 3, y: y + 1, rx: 6, ry: 2, strength: 0.42 });
+}
+
+/** A big clay pot with a fan of leaves (by doors, on corners). */
+export function pottedPalm(out: HubOut, x: number, y: number, id: string, seed: number): void {
+  const L = new Layer(x - 16, y - 30, 33, 32);
+  pot(L, x - 4, y - 8, 9, 8, TERRA);
+  for (let i = 0; i < 6; i++) {
+    const a = -Math.PI / 2 + (i - 2.5) * 0.42 + (h2(i, 1, seed) - 0.5) * 0.2;
+    leafFan(L, x, y - 8, a, 11 + h2(i, 2, seed) * 5, seed + i);
+  }
+  L.outlineTinted(0.75);
+  out.piece(L, id, y);
+  out.shadows.push({ kind: 'oval', x: x + 3, y: y + 1, rx: 7, ry: 2, strength: 0.42 });
+}
+
+function leafFan(L: Layer, x: number, y: number, a: number, len: number, seed: number): void {
+  // A long arching palm frond: a rib and short leaflets.
+  for (let t = 0; t <= len; t++) {
+    const u = t / len;
+    const px = Math.round(x + Math.cos(a) * t);
+    const py = Math.round(y + Math.sin(a) * t + u * u * len * 0.35);
+    L.px(px, py, rk(LEAF, 3.5 + (1 - u) * 1.5));
+    if (t > 2 && t % 2 === 0) {
+      const l = Math.max(1, Math.round((1 - u) * 3));
+      for (let k = 1; k <= l; k++) {
+        L.px(px - k, py + 1, rk(LEAF, 5.5 - k * 0.4 + (h2(t, k, seed) - 0.5)));
+        L.px(px + k, py + 1, rk(LEAF, 4 - k * 0.4));
+      }
+    }
+  }
+}

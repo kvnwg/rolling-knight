@@ -4,7 +4,7 @@
  * the square's edges, bushes, and a front layer of huge glossy leaves over the bottom corners. Every
  * leaf is split light and dark along its midrib with a lime rim where it catches the light.
  */
-import { clump, h2, Layer, LEAF, leaf, rk, tuft, type Ramp } from './hubKit';
+import { clump, h2, Layer, LEAF, leaf, rk, type Ramp } from './hubKit';
 import type { HubOut } from './hubScene';
 
 const BARK: Ramp = ['#140c08', '#22160e', '#342216', '#48301e', '#5e4028', '#765236'];
@@ -156,7 +156,8 @@ function plant(out: HubOut, id: string, x: number, y: number, kind: Kind, size: 
       tree(L, x, y, { seed, r: size, tone, trunk: 16 });
       break;
   }
-  out.piece(L, id, y);
+  const fw = kind === 'tree' ? 6 : size * 0.35;
+  out.piece(L, id, y, { x0: x - fw, y0: y - 6, x1: x + fw, y1: y });
   if (kind === 'tree' || kind === 'bush') out.shadows.push({ kind: 'oval', x: x + 4, y: y + 1, rx: size * 0.6, ry: 3, strength: 0.4 });
 }
 
@@ -250,4 +251,41 @@ export function frontLeaves(out: HubOut): void {
     leaf(L, x, y, a, len, len * 0.5, { tone, seed: 900 + i, notch: i % 3 === 1, droop: 0.08 });
   });
   out.front(L, 'frontLeaves');
+}
+
+/**
+ * Fireflies resting in the leaves (each a glowing dot with a soft halo), and the spots where the
+ * renderer should set more of them drifting.
+ */
+export function fireflies(out: HubOut): void {
+  const spots: Array<[number, number]> = [];
+  for (let i = 0; i < 26; i++) {
+    const side = i % 2 ? 1 : -1;
+    const y = 120 + h2(i, 1, 61) * 470;
+    const x = side < 0 ? 6 + h2(i, 2, 61) * 34 : 474 - h2(i, 2, 61) * 34;
+    spots.push([Math.round(x), Math.round(y)]);
+  }
+  for (let i = 0; i < 10; i++) spots.push([Math.round(20 + h2(i, 3, 62) * 440), Math.round(10 + h2(i, 4, 62) * 70)]);
+  for (let i = 0; i < 8; i++) {
+    const side = i % 2 ? 1 : -1;
+    spots.push([Math.round(side < 0 ? 30 + h2(i, 5, 63) * 140 : 450 - h2(i, 5, 63) * 140), Math.round(560 + h2(i, 6, 63) * 70)]);
+  }
+  const L = new Layer(0, 0, 480, 640);
+  for (const [x, y] of spots) {
+    const c = h2(x, y, 64) < 0.5 ? '#e8ff8a' : '#c8ff6a';
+    L.gl(x, y, '#fbffd8');
+    L.twinkles.push({ x, y, r: 2, period: 6, on: 4, phase: Math.floor(h2(x, y, 65) * 6) });
+    for (const [dx, dy, a] of [[1, 0, 0.55], [-1, 0, 0.55], [0, 1, 0.55], [0, -1, 0.55], [1, 1, 0.25], [-1, 1, 0.25], [1, -1, 0.25], [-1, -1, 0.25], [2, 0, 0.15], [-2, 0, 0.15], [0, 2, 0.15], [0, -2, 0.15]] as const) L.halo(x + dx, y + dy, c, a);
+    out.lights.push({ x, y, r: 12, color: '#c8ff7a', intensity: 0.35 });
+  }
+  // Their glow sorts in front of the leaves they rest on.
+  out.glowOf(L, 'fireflies', 1000);
+  out.motes.push(
+    { x: 26, y: 340, rx: 26, ry: 200, kind: 'firefly', color: '#d8ff7a', count: 7 },
+    { x: 454, y: 340, rx: 26, ry: 200, kind: 'firefly', color: '#d8ff7a', count: 7 },
+    { x: 100, y: 590, rx: 90, ry: 40, kind: 'firefly', color: '#d8ff7a', count: 6 },
+    { x: 380, y: 590, rx: 90, ry: 40, kind: 'firefly', color: '#d8ff7a', count: 6 },
+    { x: 240, y: 50, rx: 220, ry: 40, kind: 'firefly', color: '#e8ff9a', count: 6 },
+    { x: 240, y: 230, rx: 90, ry: 40, kind: 'mote', color: '#ffe0a0', count: 8 },
+  );
 }

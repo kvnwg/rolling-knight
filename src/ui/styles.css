@@ -1042,6 +1042,10 @@ select.select {
 .mini-roller .frame canvas {
   display: block;
 }
+/* The altar reads its art pixel from here (App sets --mini-u: smaller on phones). */
+.mini-roller .frame {
+  --u: var(--mini-u, var(--px));
+}
 .mini-roller .note {
   font-size: calc(3.8 * var(--px));
   padding: calc(0.5 * var(--px)) calc(2 * var(--px));

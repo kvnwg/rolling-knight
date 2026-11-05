@@ -7,9 +7,23 @@
  * priestess at the rebirth shrine, the notice board, and the warden at the top of the wooden steps
  * down to the dungeon (a portal glow at the bottom). Lush leaves frame it all.
  *
- * Everything is fixed and deterministic, painted once on first use (hubScene() caches it). Positions
- * are hub pixels (the same as world pixels; TILE = 16): the art covers HUB_W x HUB_H, and the
- * collision grid covers the same area with everything outside the square marked as wall.
+ * Everything is fixed and deterministic, painted once on first use (hubScene() caches it; about half a
+ * second, so call it early). Positions are hub pixels (the same as world pixels; TILE = 16): the art
+ * covers HUB_W x HUB_H, and the collision grid covers the same area with everything outside the
+ * square marked as wall.
+ *
+ * Drawing it (what tools/hubPreview.ts does, in the shader pipeline's terms):
+ *  - ground: the whole buffer to the ground layer (shadows are baked in);
+ *  - stand layer, y-sorted with the walking characters: every sprite at (x - ax, y - ay); every
+ *    keeper and extra with keeperFrame(def, pose, view, frame, tool) from render/art/hubNpcs.ts
+ *    (side frames face right: flip for dir -1), drawn at (x - ax, y - ay) like the sprites;
+ *  - emit layer: every glow at (x, y), in the same sorted pass at its `sort` line, cycling `frames`
+ *    at `fps` when given; a character drawn after a glow (lower down, in front) should clear the
+ *    glow under its own pixels (destination-out), or a window shines through whoever stands before it;
+ *  - fore: over everything on the stand layer, after the sorted pass (it is lit like the rest);
+ *  - light: the ambient color plus every light (flicker 0..1 for fire), in the usual light map;
+ *  - motes: particle spawners (fireflies in the leaves, motes in the shop light, forge sparks);
+ *  - grade: suggested post params; bg fills anything past the art's edges.
  */
 import type { PixelBuf } from '../render/pixel/buf';
 import type { View } from './entities';
@@ -169,7 +183,10 @@ function buildMap(art: HubArt, spawn: { x: number; y: number }, keepers: Array<{
       for (const f of art.feet) {
         const ox = Math.min(f.x1, (tx + 1) * TILE) - Math.max(f.x0, tx * TILE);
         const oy = Math.min(f.y1, (ty + 1) * TILE) - Math.max(f.y0, ty * TILE);
-        if ((ox > 0 && oy > 0 && ox * oy >= 48) || (cx >= f.x0 && cx <= f.x1 && cy >= f.y0 && cy <= f.y1)) {
+        // A thin thing (a lamp post, a barrel) blocks the tile it stands in.
+        const small = (f.x1 - f.x0) * (f.y1 - f.y0) < 96;
+        const foot = small && Math.floor((f.x0 + f.x1) / 2 / TILE) === tx && Math.floor((f.y1 - 1) / TILE) === ty;
+        if (foot || (ox > 0 && oy > 0 && ox * oy >= 48) || (cx >= f.x0 && cx <= f.x1 && cy >= f.y0 && cy <= f.y1)) {
           blocked = true;
           break;
         }

@@ -21,7 +21,7 @@ import { DungeonHud } from './DungeonHud';
 import { fmt, secs } from './format';
 import { CharacterSelect, HubHud, StationSheet } from './Hub';
 import { HeroDetail, LuckSheet, SettingsSheet } from './panels';
-import { placeholderHub, type HubStation } from '../world/hubWorld';
+import { hubLayout, type HubStation } from '../world/hubWorld';
 import type { Npc } from '../world/npcs';
 import { DialogBox } from './Dialog';
 import { Reveal, type RevealItem } from './fx/Reveal';
@@ -83,7 +83,7 @@ export function App() {
   // A brand-new game opens at the altar, so you watch your first knights roll in.
   useEffect(() => {
     if (Object.keys(game.state.roster).length === 0 && !game.inDungeon) {
-      const altar = placeholderHub().stations.find((x) => x.id === 'altar');
+      const altar = hubLayout().stations.find((x) => x.id === 'altar');
       if (altar) setStation(altar);
     }
   }, [game]);
@@ -94,6 +94,9 @@ export function App() {
       document.documentElement.style.setProperty('--px', `${uiPx()}px`);
       // The reveal and reel effects measure in --u (the same art pixel).
       document.documentElement.style.setProperty('--u', `${uiPx()}px`);
+      // The corner altar: smaller on a narrow screen, where it would cover the view.
+      const narrow = window.innerWidth < 600;
+      document.documentElement.style.setProperty('--mini-u', `${narrow ? Math.max(1.5, uiPx() * 0.6) : uiPx()}px`);
       setWide(window.innerWidth >= 900 && window.innerWidth > window.innerHeight);
     };
     set();
@@ -181,7 +184,7 @@ export function App() {
     let wasIn = !game.inDungeon;
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
-      const dt = Math.min(0.1, (now - last) / 1000);
+      const dt = Math.max(0, Math.min(0.1, (now - last) / 1000));
       last = now;
       const c = ctl.controls;
       const w = game.inDungeon ? game.world : game.hub;

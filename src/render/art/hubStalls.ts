@@ -195,7 +195,7 @@ export function barrel(L: Layer, x: number, y: number, seed: number): void {
 }
 
 function roundDisplay(L: Layer, cx: number, cy: number, r: number): void {
-  oval(L, cx, cy, r + 1.5, r + 1.5, (x, y, nx, ny) => rk(GOLD, 3.4 - ny * 1.6 - nx * 0.6 - (Math.hypot(nx, ny) > 0.9 ? 1.4 : 0)));
+  oval(L, cx, cy, r + 1.5, r + 1.5, (_x, _y, nx, ny) => rk(GOLD, 3.4 - ny * 1.6 - nx * 0.6 - (Math.hypot(nx, ny) > 0.9 ? 1.4 : 0)));
   oval(L, cx, cy, r - 0.5, r - 0.5, (x, y, nx, ny) => {
     const d = Math.hypot(nx, ny);
     L.gl(x, y, rk(['#c06a22', '#e08a32', '#f4a844', '#ffc25c', '#ffd57a', '#ffe7a4', '#fff6d6'], 5.2 - d * 3 - ny * 0.5));
@@ -276,7 +276,7 @@ function shelfItem(L: Layer, kind: string, x: number, sy: number, seed: number):
 
 function keg(L: Layer, x: number, y: number): void {
   // A small barrel on its side on a cradle, a brass tap at the front.
-  oval(L, x + 5, y - 5, 6, 5, (xx, yy, nx, ny) => {
+  oval(L, x + 5, y - 5, 6, 5, (xx, _yy, nx, ny) => {
     const ring = Math.abs(nx) > 0.55 && Math.abs(nx) < 0.72;
     if (ring) return rk(IRON, 4 - ny * 1.5);
     return rk(PLANK, 4.4 - ny * 1.8 - Math.abs(nx) * 0.8 + ((xx + 1) % 3 === 0 ? -0.6 : 0));
@@ -300,7 +300,7 @@ function bread(L: Layer, x: number, y: number): void {
 }
 
 function cheeseWheel(L: Layer, x: number, y: number): void {
-  oval(L, x + 3, y - 3, 3.5, 2.6, (xx, yy, nx, ny) => (ny < -0.2 ? '#ffe68a' : nx > 0.4 ? '#c8902a' : '#f0c040'));
+  oval(L, x + 3, y - 3, 3.5, 2.6, (_xx, _yy, nx, ny) => (ny < -0.2 ? '#ffe68a' : nx > 0.4 ? '#c8902a' : '#f0c040'));
   L.px(x + 4, y - 2, '#fff8c8');
 }
 
@@ -443,7 +443,7 @@ function oddment(L: Layer, kind: string, x: number, sy: number): number {
       return 7;
     case 'gears':
       for (const [cx, r] of [[x + 2, 2.6], [x + 6, 1.8]] as const) {
-        oval(L, cx, sy - r - 0.5, r, r, (xx, yy, nx, ny) => (Math.hypot(nx, ny) < 0.4 ? '#2a2a34' : rk(GOLD, 4 - ny * 1.4 - nx * 0.5)));
+        oval(L, cx, sy - r - 0.5, r, r, (_xx, _yy, nx, ny) => (Math.hypot(nx, ny) < 0.4 ? '#2a2a34' : rk(GOLD, 4 - ny * 1.4 - nx * 0.5)));
       }
       return 8;
     case 'coil':
@@ -579,7 +579,7 @@ export function stumpTable(out: HubOut, x: number, y: number): void {
 export function stool(out: HubOut, x: number, y: number, id: string): void {
   const L = new Layer(x - 6, y - 8, 13, 10);
   for (let yy = y - 4; yy <= y; yy++) for (let xx = x - 4; xx <= x + 4; xx++) L.px(xx, yy, rk(['#1e140e', '#2e2016', '#45301e', '#5e4228'], 3 - (xx - x + 4) * 0.3 - ((xx + 1) % 3 === 0 ? 0.6 : 0)));
-  oval(L, x, y - 5, 4.6, 1.8, (xx, yy, nx, ny) => rk(['#6a4a2a', '#8a6838', '#a8844c', '#c4a068'], 2.6 - ny - nx * 0.4));
+  oval(L, x, y - 5, 4.6, 1.8, (_xx, _yy, nx, ny) => rk(['#6a4a2a', '#8a6838', '#a8844c', '#c4a068'], 2.6 - ny - nx * 0.4));
   L.outlineTinted(0.75);
   out.piece(L, id, y - 1);
   out.shadows.push({ kind: 'oval', x: x + 2, y: y + 1, rx: 6, ry: 2, strength: 0.4 });
@@ -593,7 +593,7 @@ export function chair(out: HubOut, x: number, y: number, id: string): void {
   for (const sy of [y - 19, y - 15]) hline(L, x - 5, x + 4, sy, rk(PLANK, 5));
   for (const sy of [y - 18, y - 14]) hline(L, x - 4, x + 3, sy, rk(PLANK, 3));
   // Seat and front legs.
-  L.rect(x - 6, y - 7, 12, 2, (xx, yy) => rk(PLANK, yy === y - 7 ? 6 : 4));
+  L.rect(x - 6, y - 7, 12, 2, (_xx, yy) => rk(PLANK, yy === y - 7 ? 6 : 4));
   hline(L, x - 6, x + 5, y - 5, rk(PLANK, 2));
   for (const px of [x - 6, x + 5]) for (let yy = y - 4; yy <= y; yy++) L.px(px, yy, rk(PLANK, px < x ? 4.5 : 2));
   L.outlineTinted(0.75);

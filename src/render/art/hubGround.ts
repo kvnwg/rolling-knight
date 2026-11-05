@@ -6,8 +6,8 @@
  * wooden steps at the bottom going down toward the viewer (and the dungeon). Contact shadows under
  * everything that stands are baked in, so the standing sprites sit on the ground.
  */
-import { blank, type PixelBuf } from '../pixel/buf';
-import { mixHex, setRGB } from './draw';
+import type { PixelBuf } from '../pixel/buf';
+import { mixHex } from './draw';
 import { h2, Layer, LEAF, PLANK, planks, rk, rkd, TIMBER, vnoise, type Ramp } from './hubKit';
 
 /** Flagstone, dark to light. */
@@ -104,21 +104,25 @@ class Flags {
   private rowY: number[] = [];
   private cuts: number[][] = [];
   constructor(private s: number, w: number, h: number) {
+    // Columns of a coarse grid every 24 px; each row cuts its slabs on that grid most of the time
+    // (so joints line up down the square), merging two cells into a long slab or splitting one now
+    // and then, and nudging a joint a few pixels off the grid.
     let y = -6;
     let r = 0;
     while (y < h + 24) {
       this.rowY.push(y);
       const cut: number[] = [];
-      let x = -6 * Math.floor(h2(r, 0, s) * 5) - 3;
+      const shift = h2(r, 0, s) < 0.35 ? 12 : 0;
+      let x = -24 - shift;
       let i = 0;
-      while (x < w + 40) {
-        cut.push(x);
+      while (x < w + 48) {
+        cut.push(x + (h2(r, i, s + 8) < 0.3 ? (h2(r, i, s + 9) < 0.5 ? -3 : 3) : 0));
         const pick = h2(r, i, s + 5);
-        x += pick < 0.12 ? 12 : pick < 0.45 ? 24 : pick < 0.8 ? 30 : 36;
+        x += pick < 0.12 ? 12 : pick < 0.78 ? 24 : 36;
         i++;
       }
       this.cuts.push(cut);
-      y += 15 + Math.floor(h2(r, 1, s) * 7);
+      y += 18 + Math.floor(h2(r, 1, s) * 5);
       r++;
     }
   }
@@ -386,32 +390,31 @@ function stairs(L: Layer, st: GroundSpec['steps'], s: number): void {
 
 function shadow(L: Layer, sh: ShadowSpec): void {
   if (sh.kind === 'oval') {
-    for (let y = Math.floor(sh.y - sh.ry); y <= Math.ceil(sh.y + sh.ry); y++) {
-      for (let x = Math.floor(sh.x - sh.rx); x <= Math.ceil(sh.x + sh.rx); x++) {
-        const nx = (x + 0.5 - sh.x) / sh.rx;
-        const ny = (y + 0.5 - sh.y) / sh.ry;
+    // Cast toward the lower right (the light is up and to the left): a darker core, a softer rim, a
+    // faint outer ring.
+    const cx = sh.x + 2;
+    const cy = sh.y + 1;
+    const rx = sh.rx + 1;
+    const ry = sh.ry + 0.5;
+    for (let y = Math.floor(cy - ry * 1.4); y <= Math.ceil(cy + ry * 1.4); y++) {
+      for (let x = Math.floor(cx - rx * 1.35); x <= Math.ceil(cx + rx * 1.35); x++) {
+        const nx = (x + 0.5 - cx) / rx;
+        const ny = (y + 0.5 - cy) / ry;
         const d = nx * nx + ny * ny;
-        if (d > 1) continue;
-        // Two steps: a soft rim and a darker core.
-        const f = d < 0.45 ? sh.strength : sh.strength * 0.55;
+        if (d > 1.8) continue;
+        const f = d < 0.4 ? sh.strength * 1.1 : d < 1 ? sh.strength * 0.65 : sh.strength * 0.25;
         L.tint(x, y, '#0a0610', f);
       }
     }
   } else {
-    // A band under a wall, fading down over `ry` px.
-    for (let y = Math.floor(sh.y); y < sh.y + sh.ry; y++) {
-      for (let x = Math.floor(sh.x - sh.rx); x <= Math.ceil(sh.x + sh.rx); x++) {
+    // A band under a wall, fading down over `ry` px, reaching a little further on the right.
+    for (let y = Math.floor(sh.y); y < sh.y + sh.ry + 2; y++) {
+      for (let x = Math.floor(sh.x - sh.rx + 2); x <= Math.ceil(sh.x + sh.rx + 4); x++) {
         const t = (y - sh.y) / sh.ry;
-        const f = sh.strength * (t < 0.34 ? 1 : t < 0.67 ? 0.6 : 0.3);
+        const right = x > sh.x + sh.rx ? 0.6 : 1;
+        const f = sh.strength * right * (t < 0.34 ? 1 : t < 0.67 ? 0.6 : t < 1 ? 0.32 : 0.15);
         L.tint(x, y, '#0a0610', f);
       }
     }
   }
-}
-
-/** A tiny check that the module paints without a DOM (used by the preview tool). */
-export function groundSwatch(): PixelBuf {
-  const b = blank(8, 8);
-  FLAG.forEach((c, i) => setRGB(b, i, 0, c));
-  return b;
 }

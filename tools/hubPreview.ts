@@ -5,10 +5,14 @@
  * past white), the emissive layer over it, bloom on the brightest parts, a filmic shoulder, the grade
  * and a vignette. Writes the whole hub and a phone-sized and a desktop-sized view, at 3x:
  *
- *   npx tsx tools/hubPreview.ts [out.png] [--raw] [--x=240 --y=420]
+ *   npx tsx tools/hubPreview.ts [out.png] [--raw] [--grid] [--kx=240 --ky=420] [--ambient=#544a6a]
+ *
+ * --raw also writes the unlit albedo (and albedo + glow); --grid writes the collision grid over the
+ * albedo (red: blocked, dark: wall) with each station's keeper (yellow) and talk spot (cyan).
  */
 import { blank, rgb, type PixelBuf } from '../src/render/pixel/buf';
 import { hubScene, type HubScene } from '../src/world/hub';
+import { BLOCKED, FLOOR, TILE } from '../src/world/mapgen';
 import { keeperFrame } from '../src/render/art/hubNpcs';
 import { knightFrame, knightLook, weaponArt } from '../src/render/art/knights';
 import { flipX } from '../src/render/pixel/buf';
@@ -130,6 +134,45 @@ for (const d of list) d.draw();
 for (const f of scene.fore) draw(img, f.buf, f.x, f.y);
 void flipX;
 
+if (args.includes('--grid')) {
+  const g = blank(W, H);
+  g.px.set(img.px);
+  for (let ty = 0; ty < scene.map.h; ty++) {
+    for (let tx = 0; tx < scene.map.w; tx++) {
+      const t = scene.map.tiles[ty * scene.map.w + tx];
+      for (let y = ty * TILE; y < ty * TILE + TILE; y++) {
+        for (let x = tx * TILE; x < tx * TILE + TILE; x++) {
+          const i = (y * W + x) * 4;
+          const edge = x % TILE === 0 || y % TILE === 0;
+          if (t === BLOCKED) {
+            g.px[i] = g.px[i] * 0.5 + 120;
+            g.px[i + 1] *= 0.5;
+            g.px[i + 2] *= 0.5;
+          } else if (t !== FLOOR) {
+            for (let c = 0; c < 3; c++) g.px[i + c] *= 0.35;
+          } else if (edge) {
+            for (let c = 0; c < 3; c++) g.px[i + c] = g.px[i + c] * 0.7 + 60;
+          }
+        }
+      }
+    }
+  }
+  const dot = (x: number, y: number, c: [number, number, number]) => {
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const i = ((y + dy) * W + x + dx) * 4;
+      g.px[i] = c[0];
+      g.px[i + 1] = c[1];
+      g.px[i + 2] = c[2];
+    }
+  };
+  for (const st of scene.stations) {
+    dot(st.x, st.y, [255, 230, 60]);
+    dot(st.talk.x, st.talk.y, [60, 230, 255]);
+  }
+  dot(scene.spawn.x, scene.spawn.y, [255, 255, 255]);
+  writePng(out.replace(/\.png$/, '_grid.png'), g, S);
+}
+
 if (raw) {
   writePng(out.replace(/\.png$/, '_raw.png'), img, S);
   const e2 = blank(W, H);
@@ -145,7 +188,8 @@ const SH = H * S;
 const lightR = new Float32Array(SW * SH);
 const lightG = new Float32Array(SW * SH);
 const lightB = new Float32Array(SW * SH);
-const [ar, ag, ab] = rgb(scene.ambient.color);
+const ambientArg = args.find((a) => a.startsWith('--ambient='))?.split('=')[1];
+const [ar, ag, ab] = rgb(ambientArg ?? scene.ambient.color);
 lightR.fill(ar / 255 / 2);
 lightG.fill(ag / 255 / 2);
 lightB.fill(ab / 255 / 2);

@@ -77,6 +77,11 @@ export class Layer {
   readonly buf: PixelBuf;
   readonly glow: PixelBuf;
   readonly lights: LightSpec[] = [];
+  /**
+   * Glowing spots that blink (bulbs, fireflies): their glow pixels within `r` dim in some animation
+   * frames. `period` frames per cycle, lit for `on` of them, starting at `phase`.
+   */
+  readonly twinkles: Array<{ x: number; y: number; r: number; period: number; on: number; phase: number }> = [];
   readonly x0: number;
   readonly y0: number;
   readonly w: number;
@@ -625,8 +630,17 @@ export function leaf(L: Layer, x0: number, y0: number, ang: number, len: number,
   by0 = Math.floor(by0 - pad);
   bx1 = Math.ceil(bx1 + pad);
   by1 = Math.ceil(by1 + pad);
-  // Map each pixel to (t along, v across, + on the leaf's left of its direction).
-  const mask = new Map<number, [number, number]>();
+  // Map each pixel to (t along, v across, + on the leaf's left of its direction). The nearest point
+  // on the (gently curved) rib is found near the pixel's projection on the chord.
+  const MW = bx1 - bx0 + 1;
+  const MH = by1 - by0 + 1;
+  const inM = new Uint8Array(MW * MH);
+  const mT = new Float32Array(MW * MH);
+  const mV = new Float32Array(MW * MH);
+  const [ex, ey] = rib[N];
+  const chx = ex - x0;
+  const chy = ey - y0;
+  const ch2 = chx * chx + chy * chy || 1;
   for (let y = by0; y <= by1; y++) {
     for (let x = bx0; x <= bx1; x++) {
       const px = x + 0.5;
@@ -634,41 +648,53 @@ export function leaf(L: Layer, x0: number, y0: number, ang: number, len: number,
       let best = 1e9;
       let bt = 0;
       let bv = 0;
-      for (let i = 0; i < N; i++) {
-        const [ax, ay] = rib[i];
-        const [cx, cy] = rib[i + 1];
-        const dx = cx - ax;
-        const dy = cy - ay;
+      const t0 = Math.max(0, Math.min(1, ((px - x0) * chx + (py - y0) * chy) / ch2));
+      const i0 = Math.max(0, Math.floor(t0 * N) - 5);
+      const i1 = Math.min(N, Math.floor(t0 * N) + 6);
+      for (let i = i0; i < i1; i++) {
+        const ax = rib[i][0];
+        const ay = rib[i][1];
+        const dx = rib[i + 1][0] - ax;
+        const dy = rib[i + 1][1] - ay;
         const l2 = dx * dx + dy * dy || 1;
         let u = ((px - ax) * dx + (py - ay) * dy) / l2;
-        u = Math.max(0, Math.min(1, u));
-        const qx = ax + dx * u;
-        const qy = ay + dy * u;
-        const d = Math.hypot(px - qx, py - qy);
-        if (d < best) {
-          best = d;
+        u = u < 0 ? 0 : u > 1 ? 1 : u;
+        const qx = ax + dx * u - px;
+        const qy = ay + dy * u - py;
+        const d2 = qx * qx + qy * qy;
+        if (d2 < best) {
+          best = d2;
           bt = (i + u) / N;
-          bv = Math.sign(dx * (py - ay) - dy * (px - ax)) * d;
+          bv = dx * (py - ay) - dy * (px - ax) > 0 ? 1 : -1;
         }
       }
+      bv *= Math.sqrt(best);
       let hw = halfW(bt);
       if (o.notch && bt > 0.22 && bt < 0.86) {
         const f = bt * 6 + (bv > 0 ? 0.5 : 0);
         const fr = f - Math.floor(f);
         if (fr > 0.4 && fr < 0.6 && Math.abs(bv) > hw * 0.4) hw = 0;
       }
-      if (Math.abs(bv) <= hw + 0.15 && hw > 0.3) mask.set(y * 8192 + x, [bt, bv / Math.max(0.6, hw)]);
+      if (Math.abs(bv) <= hw + 0.15 && hw > 0.3) {
+        const j = (y - by0) * MW + (x - bx0);
+        inM[j] = 1;
+        mT[j] = bt;
+        mV[j] = bv / Math.max(0.6, hw);
+      }
     }
   }
-  const has = (x: number, y: number) => mask.has(y * 8192 + x);
+  const has = (x: number, y: number) => x >= bx0 && y >= by0 && x <= bx1 && y <= by1 && inM[(y - by0) * MW + (x - bx0)] === 1;
   // The lit half: the side whose outward normal points up-left.
   const nx = -sa;
   const ny = ca;
   const plusLit = nx * -0.55 + ny * -0.85 > 0;
   const base = 1.6 + o.tone * 4;
-  for (const [key, [t, v]] of mask) {
-    const y = Math.floor(key / 8192);
-    const x = key - y * 8192;
+  for (let j = 0; j < inM.length; j++) {
+    if (!inM[j]) continue;
+    const x = bx0 + (j % MW);
+    const y = by0 + Math.floor(j / MW);
+    const t = mT[j];
+    const v = mV[j];
     const lit = (v > 0) === plusLit;
     const av = Math.abs(v);
     let k = base + (lit ? 2 : -0.3) - (t > 0.8 ? (t - 0.8) * 3 : 0);
@@ -689,13 +715,14 @@ export function leaf(L: Layer, x0: number, y0: number, ang: number, len: number,
     L.px(x, y, c);
   }
   // The outline, in the leaf's own darkest green (only on pixels not already painted, except under it).
-  for (const key of mask.keys()) {
-    const y = Math.floor(key / 8192);
-    const x = key - y * 8192;
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
-      if (has(x + dx, y + dy)) continue;
-      if (!L.a(x + dx, y + dy) || dy === 1) L.px(x + dx, y + dy, ink);
-    }
+  for (let j = 0; j < inM.length; j++) {
+    if (!inM[j]) continue;
+    const x = bx0 + (j % MW);
+    const y = by0 + Math.floor(j / MW);
+    if (!has(x + 1, y) && !L.a(x + 1, y)) L.px(x + 1, y, ink);
+    if (!has(x - 1, y) && !L.a(x - 1, y)) L.px(x - 1, y, ink);
+    if (!has(x, y - 1) && !L.a(x, y - 1)) L.px(x, y - 1, ink);
+    if (!has(x, y + 1)) L.px(x, y + 1, ink);
   }
 }
 
@@ -717,7 +744,12 @@ export function clump(L: Layer, cx: number, cy: number, rx: number, ry: number, 
   }
   lobes.push([cx - rx * 0.1, cy - ry * 0.15, Math.min(rx, ry) * 0.62]);
   lobes.sort((p, q) => p[1] + p[2] * 0.3 - (q[1] + q[2] * 0.3));
-  const owner = new Map<number, number>();
+  const ox0 = Math.floor(cx - rx * 1.4) - 2;
+  const oy0 = Math.floor(cy - ry * 1.4) - 2;
+  const OW = Math.ceil(rx * 2.8) + 5;
+  const OH = Math.ceil(ry * 2.8) + 5;
+  const owner = new Int16Array(OW * OH).fill(-1);
+  const own = (x: number, y: number) => (x < ox0 || y < oy0 || x >= ox0 + OW || y >= oy0 + OH ? -1 : owner[(y - oy0) * OW + (x - ox0)]);
   lobes.forEach(([lx, ly, lr], li) => {
     for (let y = Math.floor(ly - lr * 0.9); y <= Math.ceil(ly + lr * 0.9); y++) {
       for (let x = Math.floor(lx - lr); x <= Math.ceil(lx + lr); x++) {
@@ -726,7 +758,7 @@ export function clump(L: Layer, cx: number, cy: number, rx: number, ry: number, 
         const d = nx * nx + ny * ny;
         // A ragged edge: leaves poking out.
         if (d > 1 + (h2(x, y, o.seed + li) - 0.5) * 0.35) continue;
-        owner.set(y * 8192 + x, li);
+        if (x >= ox0 && y >= oy0 && x < ox0 + OW && y < oy0 + OH) owner[(y - oy0) * OW + (x - ox0)] = li;
         const lit = -nx * 0.5 - ny * 0.85;
         let k = 1.2 + o.tone * 3.6 + lit * 2.1;
         // Leaf strokes: little 2-3 px dashes a step lighter or darker.
@@ -740,24 +772,27 @@ export function clump(L: Layer, cx: number, cy: number, rx: number, ry: number, 
     }
   });
   // Dark lines where a front lobe overlaps one behind it, and bright tips on the lit tops.
-  for (const [key, li] of owner) {
-    const y = Math.floor(key / 8192);
-    const x = key - y * 8192;
-    const up = owner.get((y - 1) * 8192 + x);
-    if (up !== undefined && up !== li && lobes[up][1] < lobes[li][1]) L.px(x, y - 1, rk(r, 0.6 + o.tone));
-    if (up === undefined && h2(x, y, o.seed + 3) < 0.55) {
+  for (let j = 0; j < owner.length; j++) {
+    const li = owner[j];
+    if (li < 0) continue;
+    const x = ox0 + (j % OW);
+    const y = oy0 + Math.floor(j / OW);
+    const up = own(x, y - 1);
+    if (up >= 0 && up !== li && lobes[up][1] < lobes[li][1]) L.px(x, y - 1, rk(r, 0.6 + o.tone));
+    if (up < 0 && h2(x, y, o.seed + 3) < 0.55) {
       const [lx, ly, lr] = lobes[li];
       if (x < lx + lr * 0.3 && y < ly) L.px(x, y, rk(r, 3.4 + o.tone * 4.4));
     }
   }
   const ink = o.ink ?? r[0];
-  for (const key of owner.keys()) {
-    const y = Math.floor(key / 8192);
-    const x = key - y * 8192;
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
-      if (owner.has((y + dy) * 8192 + x + dx)) continue;
-      if (!L.a(x + dx, y + dy) || dy === 1) L.px(x + dx, y + dy, ink);
-    }
+  for (let j = 0; j < owner.length; j++) {
+    if (owner[j] < 0) continue;
+    const x = ox0 + (j % OW);
+    const y = oy0 + Math.floor(j / OW);
+    if (own(x + 1, y) < 0 && !L.a(x + 1, y)) L.px(x + 1, y, ink);
+    if (own(x - 1, y) < 0 && !L.a(x - 1, y)) L.px(x - 1, y, ink);
+    if (own(x, y - 1) < 0 && !L.a(x, y - 1)) L.px(x, y - 1, ink);
+    if (own(x, y + 1) < 0) L.px(x, y + 1, ink);
   }
 }
 

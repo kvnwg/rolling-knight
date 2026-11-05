@@ -6,7 +6,7 @@
  * globe lanterns hanging either side and the name in gold over it, flower boxes, a stone footing.
  */
 import { renderText } from '../pixel/font';
-import { h2, hline, INK, IRON, Layer, leaf, oval, PLANK, planks, poly, rk, sagCurve, scales, timber, TIMBER, vline, vnoise, type Ramp } from './hubKit';
+import { h2, hline, INK, IRON, Layer, oval, PLANK, planks, poly, rk, sagCurve, scales, timber, TIMBER, vline, vnoise, type Ramp } from './hubKit';
 import type { HubOut } from './hubScene';
 
 export const ROOF: Ramp = ['#140909', '#220e0c', '#331510', '#461d14', '#5a271a', '#703320', '#884029', '#a25234', '#bc6a44'];
@@ -43,6 +43,7 @@ export function stringLights(L: Layer, x0: number, y0: number, x1: number, y1: n
     L.px(x, y + 1, '#2a2020');
     L.gl(x, y + 2, c);
     L.gl(x, y + 3, mixBulb(c));
+    if (h2(x, y, seed + 5) < 0.3) L.twinkles.push({ x, y: y + 3, r: 2, period: 4, on: 3, phase: Math.floor(h2(x, y, seed + 6) * 4) });
     for (const [dx, dy, a] of [[-1, 2, 0.45], [1, 2, 0.45], [-1, 3, 0.5], [1, 3, 0.5], [0, 4, 0.55], [-1, 4, 0.22], [1, 4, 0.22], [0, 5, 0.25], [-2, 3, 0.18], [2, 3, 0.18]] as const) L.halo(x + dx, y + dy, c, a);
   });
 }
@@ -55,7 +56,7 @@ function mixBulb(c: string): string {
 }
 
 /** A round glass globe lantern hanging from a bracket at (x, y) (the bracket's end). */
-export function globeLantern(L: Layer, x: number, y: number, r: number, color = '#ffc870'): void {
+export function globeLantern(L: Layer, x: number, y: number, r: number): void {
   // Chain, brass cap, the glowing globe, a brass foot.
   vline(L, x, y, y + 2, (yy) => (yy % 2 ? IRON[3] : IRON[2]));
   hline(L, x - 1, x + 1, y + 3, '#8a5a1a');
@@ -69,8 +70,11 @@ export function globeLantern(L: Layer, x: number, y: number, r: number, color = 
     L.gl(px, py, rk(glass, k));
     return null;
   });
-  void color;
-  // A glint on the glass (top left) and the brass band round it.
+  // A soft glow round the glass, a glint on it (top left), the brass band round it.
+  for (let a = 0; a < 24; a++) {
+    const ang = (a / 24) * Math.PI * 2;
+    for (const [d, al] of [[r + 1.5, 0.5], [r + 2.5, 0.22]] as const) L.halo(Math.round(x + Math.cos(ang) * d - 0.5), Math.round(cy + Math.sin(ang) * d - 0.5), '#ffb850', al);
+  }
   L.gl(x - Math.round(r * 0.45), cy - Math.round(r * 0.5), '#ffffff');
   hline(L, x - 1, x + 1, cy + r + 1, '#8a5a1a');
   L.px(x, cy + r + 2, '#5e3812');
@@ -289,11 +293,14 @@ export function paintShop(out: HubOut): void {
   // Globe lanterns on brackets either side of the door.
   for (const [px, dir] of [[S.door.x0 - 3, -1], [S.door.x1 + 2, 1]] as const) {
     const ex = px + dir * 7;
-    hline(L, px, ex, wy0 + 13, (x) => (x === ex ? IRON[4] : IRON[2]));
-    hline(L, px, ex, wy0 + 12, INK);
-    L.px(px + dir, wy0 + 14, IRON[1]);
-    L.px(px + dir * 2, wy0 + 15, IRON[1]);
-    globeLantern(L, ex, wy0 + 14, 3);
+    // A curled iron bracket.
+    hline(L, px, ex, wy0 + 13, (x) => (x === ex ? IRON[4] : IRON[3]));
+    hline(L, px, ex - dir, wy0 + 12, INK);
+    L.px(px + dir, wy0 + 14, IRON[2]);
+    L.px(px + dir * 2, wy0 + 15, IRON[2]);
+    L.px(px + dir * 3, wy0 + 15, IRON[1]);
+    L.px(ex + dir, wy0 + 12, IRON[3]);
+    globeLantern(L, ex, wy0 + 14, 4);
     L.light(ex, wy0 + 24, 56, '#ffb050', 0.5, 0.25);
   }
 
@@ -503,7 +510,7 @@ function item(L: Layer, kind: string, x: number, sy: number, seed: number): numb
   return 3;
 }
 
-/** A planter under a window: a box of boards with flowers and leaves spilling over. */
+/** A planter under a window: a box of boards heaped with leaves and flowers spilling over the rim. */
 function flowerBox(L: Layer, x: number, y: number, w: number, seed: number): void {
   planks(L, x, y + 2, w, 5, { dir: 'h', board: 3, seed, base: 3.6, joint: 19 });
   hline(L, x, x + w - 1, y + 7, INK);
@@ -511,23 +518,29 @@ function flowerBox(L: Layer, x: number, y: number, w: number, seed: number): voi
     L.px(x - 1, yy, INK);
     L.px(x + w, yy, INK);
   }
-  // Soil, then leaves and flowers.
-  hline(L, x, x + w - 1, y + 2, '#2a1a12');
-  const flowers = ['#ff5a6a', '#ff8ab8', '#fff0e0', '#ffb04a', '#c86aff'];
-  for (let i = 0; i < w; i += 2) {
-    const fx = x + i;
-    const tall = 1 + Math.floor(h2(i, 1, seed) * 3);
-    for (let t = 0; t < tall; t++) L.px(fx, y + 2 - t, rk(['#0f2a14', '#17401a', '#215a20', '#2f7626', '#43922c', '#62ae34'], 2 + t + h2(i, t, seed)));
-    if (h2(i, 2, seed) < 0.55) {
-      const c = flowers[Math.floor(h2(i, 3, seed) * flowers.length)];
-      L.px(fx, y + 1 - tall, c);
-      if (h2(i, 4, seed) < 0.5) L.px(fx + 1, y + 2 - tall, c);
-    }
+  const greens = ['#0f2a14', '#17401a', '#215a20', '#2f7626', '#43922c', '#62ae34', '#8ccb3e'];
+  // A mound of leaves: little lens shapes, darker underneath, lit on top.
+  for (let i = 0; i < w; i++) {
+    const tall = 2 + Math.floor(h2(i, 1, seed) * 3) + (i % 5 === 2 ? 1 : 0);
+    for (let t = 0; t < tall; t++) L.px(x + i, y + 2 - t, rk(greens, 1.5 + t * 1.1 + (h2(i, t, seed) - 0.5) * 1.2));
+    L.px(x + i, y + 3, rk(greens, 2 + h2(i, 9, seed)));
   }
-  // A trailing vine over the front.
-  for (let i = 3; i < w; i += 7) {
-    const len = 2 + Math.floor(h2(i, 5, seed) * 3);
-    for (let t = 0; t < len; t++) L.px(x + i + (t > 1 ? 1 : 0), y + 3 + t, rk(['#17401a', '#215a20', '#2f7626', '#43922c'], 3 - t * 0.6));
+  // Flowers: little round heads of four petals with a bright eye.
+  const flowers = [['#c8304a', '#ff5a6a', '#ffd0d8'], ['#d0507a', '#ff8ab8', '#fff0f4'], ['#c87a20', '#ffb04a', '#fff0c0'], ['#8a4ad0', '#c08aff', '#f0e0ff'], ['#d8d0c0', '#ffffff', '#ffe080']];
+  for (let i = 1; i < w - 1; i += 3 + Math.floor(h2(i, 2, seed) * 2)) {
+    const f = flowers[Math.floor(h2(i, 3, seed) * flowers.length)];
+    const fy = y - 1 - Math.floor(h2(i, 4, seed) * 3);
+    const fx = x + i;
+    L.px(fx, fy - 1, f[1]);
+    L.px(fx - 1, fy, f[1]);
+    L.px(fx + 1, fy, f[0]);
+    L.px(fx, fy + 1, f[0]);
+    L.px(fx, fy, f[2]);
+  }
+  // Trailing ivy over the front of the box.
+  for (let i = 2; i < w; i += 5 + Math.floor(h2(i, 5, seed) * 3)) {
+    const len = 2 + Math.floor(h2(i, 6, seed) * 4);
+    for (let t = 0; t < len; t++) L.px(x + i + (t > 2 ? 1 : 0), y + 3 + t, rk(greens, 4.5 - t * 0.6 + (t % 2 ? -0.8 : 0)));
   }
 }
 

@@ -9,8 +9,8 @@ import { paintHubGround, type GroundSpec, type ShadowSpec } from './hubGround';
 import { vnoise, type Layer } from './hubKit';
 import { paintShop } from './hubShop';
 import { HUB_CAST } from './hubNpcs';
-import { canopy, edgeGreens, frontLeaves } from './hubFoliage';
-import { cat, gate, lampPost, lightString, noticeBoard, sageCorner, scrapStall, shrine, smithy } from './hubStations';
+import { canopy, edgeGreens, fireflies, frontLeaves } from './hubFoliage';
+import { barrelPiece, bench, cat, crateStack, gate, lampPost, lightString, noticeBoard, pottedPalm, sageCorner, scrapStall, shrine, smithy } from './hubStations';
 import { chair, chalkboard, flowerBench, outfitterShelves, planter, pottedBush, stool, stumpTable, tavernStall } from './hubStalls';
 
 /** Where a piece stands on the ground (blocks walking), hub pixels. */
@@ -74,9 +74,34 @@ export class HubOut {
     for (const l of L.lights) this.lights.push({ ...l });
   }
 
-  glowOf(L: Layer, id: string, sort: number): void {
+  glowOf(L: Layer, id: string, sort: number, frames?: PixelBuf[], fps?: number): void {
     const gb = bounds(L.glow);
-    if (gb.w > 0) this.emissive.push({ id: `${id}:glow`, x: L.x0 + gb.x, y: L.y0 + gb.y, buf: crop(L.glow, gb.x, gb.y, gb.w, gb.h), sort });
+    if (gb.w <= 0) return;
+    const buf = crop(L.glow, gb.x, gb.y, gb.w, gb.h);
+    let fr = frames?.map((f) => crop(f, gb.x, gb.y, gb.w, gb.h));
+    if (!fr && L.twinkles.length) {
+      // Blinking bulbs and fireflies: one frame per step of the longest cycle.
+      const n = Math.max(...L.twinkles.map((t) => t.period));
+      fr = [];
+      for (let k = 0; k < n; k++) {
+        const f = crop(L.glow, gb.x, gb.y, gb.w, gb.h);
+        for (const t of L.twinkles) {
+          if ((k + t.phase) % t.period < t.on) continue;
+          for (let y = t.y - t.r; y <= t.y + t.r; y++) {
+            for (let x = t.x - t.r; x <= t.x + t.r; x++) {
+              const lx = x - L.x0 - gb.x;
+              const ly = y - L.y0 - gb.y;
+              if (lx < 0 || ly < 0 || lx >= gb.w || ly >= gb.h) continue;
+              const i = (ly * gb.w + lx) * 4 + 3;
+              f.px[i] = Math.round(f.px[i] * 0.3);
+            }
+          }
+        }
+        fr.push(f);
+      }
+      fps ??= 3;
+    }
+    this.emissive.push({ id: `${id}:glow`, x: L.x0 + gb.x, y: L.y0 + gb.y, buf, sort, ...(fr ? { frames: fr, fps: fps ?? 6 } : {}) });
   }
 
   /** Foreground leaves (drawn over everything). */
@@ -103,7 +128,7 @@ function edgesAt(y: number): [number, number] {
   return [l, r];
 }
 
-const PAVE_TOP = 92;
+const PAVE_TOP = 138;
 const PAVE_BOTTOM = 553;
 
 function paved(x: number, y: number): boolean {
@@ -138,7 +163,7 @@ const STATIONS: HubStation[] = [
   {
     id: 'squad', name: 'Quartermaster Hilde', job: 'Your squad: pick three and who leads',
     greeting: 'Three to a squad, dear. Pick who fights and who leads, and I\'ll see them fed and shod.',
-    x: 100, y: 224, dir: 1, view: 'down', def: HUB_CAST.squad, pose: 'sit', tool: undefined, talk: { x: 124, y: 238 },
+    x: 100, y: 224, dir: 1, view: 'down', def: HUB_CAST.squad, pose: 'sit', tool: undefined, talk: { x: 116, y: 238 },
     sign: 'The chalkboard menu by the tavern stall, three little helmets chalked on it.',
   },
   {
@@ -229,6 +254,17 @@ export function buildHub(): HubArt {
   const tops = lamps.map(([x, y], i) => lampPost(out, x, y, `lamp${i}`));
   lightString(out, tops[0], tops[1], 10, 300, 'string0');
   lightString(out, tops[2], tops[3], 10, 420, 'string1');
+  lampPost(out, 404, 198, 'lampTinker', 30);
+  lampPost(out, 70, 206, 'lampTavern', 30);
+  planter(out, 188, 372, 18, 83, ['#ff8ab0', '#ffffff', '#ffd0e0']);
+  planter(out, 274, 372, 18, 84, ['#b07aff', '#ffffff', '#ffd84a']);
+  fireflies(out);
+  bench(out, 112, 400, 'benchL');
+  pottedPalm(out, 62, 392, 'palmL', 11);
+  crateStack(out, 424, 384, 'cratesR');
+  barrelPiece(out, 402, 392, 'barrelR', 7);
+  barrelPiece(out, 330, 186, 'barrelShop', 9);
+  pottedPalm(out, 152, 186, 'palmShop', 12);
   const lights: HubLight[] = out.lights;
   // Placeholder lights while the pieces are built.
 
@@ -238,7 +274,7 @@ export function buildHub(): HubArt {
     emissive: out.emissive,
     fore: out.fore,
     lights,
-    ambient: '#4c4874',
+    ambient: '#544a6a',
     motes: out.motes,
     stations: STATIONS,
     extras: [{ def: HUB_CAST.traveller, x: 98, y: 254, dir: 1, view: 'up', pose: 'sit', tool: 'cup' }],

@@ -259,7 +259,7 @@ export function keeperFrame(def: NpcDef, pose: KeeperPose, view: View, frame: nu
   const f = bodyFrame(view, frame);
   const handR: [number, number] = [OX + f.handR[0], OY + f.handR[1]];
   let buf: PixelBuf;
-  let ax = NPC_ANCHOR.x;
+  const ax = NPC_ANCHOR.x;
   let ay = NPC_ANCHOR.y;
   let drop = 0;
   if (pose === 'stand') {

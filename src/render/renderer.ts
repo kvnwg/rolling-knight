@@ -26,6 +26,7 @@ import { renderText, type TextStyle } from './pixel/font';
 import { paintTerrain, type Terrain } from './terrain';
 import { Rain } from './rain';
 import { Ambient } from './ambient';
+import { HubPaint } from './hubPaint';
 import type { Sky } from '../world/sky';
 import { npcFrame, questMarker } from './art/npcs';
 import { npcMarker } from '../world/npcs';
@@ -110,6 +111,8 @@ export class Renderer {
   private rain = new Rain();
   /** Life over the floor: fireflies, butterflies, mist, waterfalls. */
   private ambient: Ambient | null = null;
+  /** The painted hub, built the first time it's shown. */
+  private hubPaint: HubPaint | null = null;
   /** The view's whole-pixel top-left in world pixels, this frame. */
   private origin = { x: 0, y: 0 };
   private flashT = 0;
@@ -275,10 +278,14 @@ export class Renderer {
     const shader = !!this.post;
 
     // --- ground (blurred by depth in the shader; on the canvas path, here)
-    g.fillStyle = biome.solid.top[0];
-    g.fillRect(0, 0, this.LW, this.LH);
-    g.drawImage(this.terrain!.canvas, cx, cy, this.LW, this.LH, 0, 0, this.LW, this.LH);
-    this.drawLiquidShimmer(g, w, cx, cy);
+    const hub = w.hub ? (this.hubPaint ??= new HubPaint()) : null;
+    if (hub) hub.drawGround(g, cx, cy, this.LW, this.LH);
+    else {
+      g.fillStyle = biome.solid.top[0];
+      g.fillRect(0, 0, this.LW, this.LH);
+      g.drawImage(this.terrain!.canvas, cx, cy, this.LW, this.LH, 0, 0, this.LW, this.LH);
+      this.drawLiquidShimmer(g, w, cx, cy);
+    }
     if (w.sky.rain > 0) {
       this.rain.update(dt, w.map, w.sky.rain, cx, cy, this.LW, this.LH);
       this.rain.drawGround(g, cx, cy);
@@ -352,7 +359,18 @@ export class Renderer {
     }
     for (const h of w.heroes) {
       if (!visible(h.x, h.y)) continue;
-      list.push({ y: h.y, draw: () => this.drawHero(st, w, h, sx, sy) });
+      list.push({
+        y: h.y,
+        draw: () => {
+          this.drawHero(st, w, h, sx, sy);
+          if (hub) {
+            // Walking in front of a lit window covers it.
+            em.globalCompositeOperation = 'destination-out';
+            this.drawHero(em, w, h, sx, sy);
+            em.globalCompositeOperation = 'source-over';
+          }
+        },
+      });
     }
     for (const p of w.pickups) {
       list.push({ y: p.y, draw: () => this.drawPickup(em, p.kind, sx(p.x), sy(p.y - p.z)) });
@@ -364,7 +382,8 @@ export class Renderer {
       list.push({
         y: k.y,
         draw: () => {
-          if (k.def) {
+          if (hub && k.def) hub.drawFigure(st, em, k, sx(k.x), sy(k.y), this.time);
+          else if (k.def) {
             const f = npcFrame(k.def, 'idle', k.view, Math.floor(this.time * 4 + k.x));
             const c = this.cached(`npc|${k.def.id}|${k.view}|${k.dir}|${Math.floor(this.time * 4 + k.x) % 8}`, () => toCanvas(k.dir < 0 && k.view === 'side' ? flipX(f.buf) : f.buf));
             const ax = k.dir < 0 && k.view === 'side' ? f.buf.w - 1 - f.ax : f.ax;
@@ -397,15 +416,20 @@ export class Renderer {
         },
       });
     }
+    if (hub) list.push(...hub.items(st, em, cx, cy, this.LW, this.LH, this.time));
     list.sort((a, b) => a.y - b.y);
     for (const d of list) d.draw();
-    this.ambient?.drawAir(em, cx, cy, this.LW, this.LH, this.time);
+    if (hub) {
+      hub.drawFore(st, em, cx, cy, this.LW, this.LH);
+      hub.updateMotes(dt);
+      hub.drawMotes(em, cx, cy, this.LW, this.LH, this.time);
+    } else this.ambient?.drawAir(em, cx, cy, this.LW, this.LH, this.time);
 
     // --- shots, sparks, leaves and weather
     for (const s of w.shots) this.drawShot(s.kind === 'arrow' ? st : em, s, sx, sy);
     this.spawnFx(w);
-    this.weather(biome, dt, cx, cy);
-    if (outdoors) this.dropLeaves(biome, cx, cy, dt);
+    if (!hub) this.weather(biome, dt, cx, cy);
+    if (outdoors && !hub) this.dropLeaves(biome, cx, cy, dt);
     this.updateParticles(st, em, dt, sx, sy);
     if (w.sky.rain > 0) this.rain.drawAir(st, cx, cy);
     this.advanceFx(dt);
@@ -575,8 +599,10 @@ export class Renderer {
       // The light map, smooth and at half strength (the shader doubles it, so lights can over-brighten).
       const L = this.layers.light.x;
       const sky = w?.sky ?? null;
-      this.light.drawMap(L, biome ? ambientOf(biome, sky) : '#000000', lights);
-      const grade = biome ? gradeOf(biome, sky) : DEFAULT_GRADE;
+      // The hub brings its own night and its own grade.
+      const hubLook = w?.hub && this.hubPaint ? this.hubPaint.scene : null;
+      this.light.drawMap(L, hubLook ? hubLook.ambient.color : biome ? ambientOf(biome, sky) : '#000000', lights);
+      const grade: Grade = hubLook ? { ...hubLook.grade, rays: 0, rayColor: [1, 0.85, 0.6] } : biome ? gradeOf(biome, sky) : DEFAULT_GRADE;
       this.post.render(
         { ground: this.scene, stand: this.layers.stand.c, emit: this.layers.emit.c, light: this.layers.light.c, ui: this.layers.ui.c },
         {
@@ -985,6 +1011,7 @@ export class Renderer {
 
   private collectLights(w: World, biome: Biome, cx: number, cy: number, sx: (x: number) => number, sy: (y: number) => number): Light[] {
     const out: Light[] = [];
+    if (w.hub && this.hubPaint) out.push(...this.hubPaint.lights(cx, cy, this.W, this.H, this.time));
     const flick = (seed: number) => 0.85 + 0.15 * Math.sin(this.time * 9 + seed) * Math.sin(this.time * 13.7 + seed * 2);
     // Lamps and fires hardly show in broad daylight; under cloud a little more; at night in full.
     const [lr, lg, lb] = rgb(ambientOf(biome, w.sky));

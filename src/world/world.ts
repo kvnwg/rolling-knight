@@ -639,7 +639,8 @@ export class World {
     let best: HubStation | null = null;
     let bd = TALK_RANGE;
     for (const s of this.stations) {
-      const d = dist(h.x, h.y, s.x, s.y);
+      // From the keeper, or from the spot in front of their counter.
+      const d = Math.min(dist(h.x, h.y, s.x, s.y), s.talk ? dist(h.x, h.y, s.talk.x, s.talk.y) + 6 : Infinity);
       if (d < bd) {
         bd = d;
         best = s;
