@@ -803,7 +803,7 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
         </div>
       )}
       {tab === 'squad' && bonus > 1 && (
-        <div className={s.soloLine} title="Each open slot left empty adds half again to the gold you find">
+        <div className={s.soloLine} data-tut="solo" title="Each open slot left empty adds half again to the gold you find">
           <Px icon="coin" size="xs" />
           <span>
             Short-handed: <b>gold ×{bonus.toFixed(1)}</b> on this run
@@ -860,6 +860,7 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
                 return (
                   <OfferCard
                     key={id}
+                    cardId={id}
                     level={`Lv ${rec.level}`}
                     levelRight={<ClassTag cls={def.cls} short />}
                     art={
@@ -953,7 +954,7 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
             <small>{best ? 'all set' : 'swap in stronger'}</small>
           </span>
         </button>
-        <button className={`btn ${s.bigBtn}`} disabled={!st.squad.some(Boolean)} onClick={() => (uiSound('embark'), onClose(), game.enterDungeon())}>
+        <button className={`btn ${s.bigBtn}`} data-tut="descend" disabled={!st.squad.some(Boolean)} onClick={() => (uiSound('embark'), onClose(), game.enterDungeon())}>
           <Px icon="swords" size="md" />
           {game.world ? 'CONTINUE' : 'DESCEND'}
         </button>

@@ -3,6 +3,7 @@ import { BAL } from './balance';
 import { shuffleDeck } from './deck';
 import { Rng } from './rng';
 import { SAVE_VERSION, type GameState } from './state';
+import { freshTutorial } from './tutorial';
 
 export function newGame(seed = Date.now()): GameState {
   const s = Rng.hashSeed(seed);
@@ -44,7 +45,8 @@ export function newGame(seed = Date.now()): GameState {
     records: { bestOneIn: 0, bestName: null, bestFloorEver: 1, kills: 0, spins: 0 },
     stats: { killsThisRun: 0, goldPerMinute: 0, goldWindow: [] },
     settings: { sfx: 0.7, music: 0.5, autoPlay: false, reduceMotion: false, showDamage: true, tiltShift: true },
-    seen: { tutorialHints: [], perksIntro: false },
+    // A new game walks you through it (core/tutorial.ts).
+    seen: { tutorialHints: [], perksIntro: false, tutorial: freshTutorial() },
     quests: [],
   };
 }

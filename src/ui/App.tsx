@@ -31,6 +31,7 @@ import { setFxSound } from './fx/fxSound';
 import type { SoundName } from '../audio/sfx';
 import { uiSound } from './sound';
 import { VistaCanvas } from './VistaCanvas';
+import { Tutorial } from './Tutorial';
 
 export interface Toast {
   id: number;
@@ -85,6 +86,8 @@ export function App() {
   const revealRef = useRef(reveals);
   revealRef.current = reveals;
   const csPick = useRef<string | null>(null);
+  // (The tutorial points at spots in the world: it needs the camera.)
+  const rendRef = useRef<Renderer | null>(null);
   const choosing = !picked && !game.inDungeon && Object.keys(game.state.roster).length > 0 && reveals.length === 0 && station === null;
   const sheetOpen = detail !== null || settings || luck || station !== null || choosing;
   const sheetRef = useRef(sheetOpen);
@@ -210,6 +213,7 @@ export function App() {
   useEffect(() => {
     const canvas = canvasRef.current!;
     const r = new Renderer(canvas);
+    rendRef.current = r;
     (window as unknown as { __renderer: Renderer }).__renderer = r;
     const onResize = () => r.resize();
     window.addEventListener('resize', onResize);
@@ -399,6 +403,14 @@ export function App() {
           {banner.sub && <span className="sub glass outlined">{banner.sub}</span>}
         </div>
       )}
+      <Tutorial
+        game={game}
+        renderer={rendRef}
+        controls={ctl.controls}
+        station={station && !inDungeon ? station.id : null}
+        choosing={choosing}
+        blocked={detail !== null || settings || luck || talking !== null || reveals.length > 0 || offline !== null}
+      />
       {detail && <HeroDetail game={game} id={detail} onClose={() => setDetail(null)} />}
       {settings && <SettingsSheet game={game} onClose={() => setSettings(false)} />}
       {luck && <LuckSheet game={game} onClose={() => setLuck(false)} />}

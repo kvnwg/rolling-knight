@@ -10,9 +10,13 @@
  *   ?design=maze      the next floor's design (world/designs.ts), then the deck as usual
  *   ?bench=common,rare  extra knights on the bench (not in the squad), one per rarity listed
  *   ?rebirths=2       that many rebirths (squad slots: one more per rebirth); ?floor sets enough for its classes
+ *   ?tut=attack       the tutorial from that step on (core/tutorial.ts; ?tut alone: from the top;
+ *                     ?tut=tips: every step done, the one-off tips to come); without it, ?floor's
+ *                     ready squad skips the tutorial
  * The game is also on window.__game.
  */
 import { isDesign } from './core/deck';
+import { TUT_STEPS } from './core/tutorial';
 import { CLASSES, knightId, type ClassId } from './core/knights';
 import { RARITIES, type Rarity } from './core/rarity';
 import { checkpointFor } from './core/newGame';
@@ -53,6 +57,15 @@ export function devGame(): Game {
   }
   const design = q.get('design');
   if (isDesign(design)) s.run.designDeck = [design, ...s.run.designDeck.filter((d) => d !== design)];
+  // A ready-made squad has seen it all; ?tut plays the tutorial anyway (from the step it names).
+  const tut = s.seen.tutorial;
+  if (floor > 0 && !q.has('tut')) tut.skipped = true;
+  if (q.has('tut')) {
+    const from = q.get('tut') === 'tips' ? TUT_STEPS.length : TUT_STEPS.indexOf(q.get('tut') as (typeof TUT_STEPS)[number]);
+    tut.done = from > 0 ? TUT_STEPS.slice(0, from) : [];
+    tut.tips = [];
+    tut.skipped = false;
+  }
   if (q.has('camp')) game.inDungeon = false;
   if (q.has('gold')) s.gold = Number(q.get('gold'));
   if (q.has('auto')) game.bot = true;

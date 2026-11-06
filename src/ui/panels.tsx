@@ -16,6 +16,7 @@ import { KnightTile, knightFit, rarityOdds } from './KnightCard';
 import { Px } from './px';
 import { SkillTable } from './SkillRoll';
 import { skillRollLuck } from '../core/chance';
+import { restartTutorial, tutorialOn } from '../core/tutorial';
 
 export { Section } from './common';
 
@@ -197,6 +198,15 @@ export function SettingsSheet({ game, onClose }: { game: Game; onClose: () => vo
         {toggle('Auto battle', 'Your knight fights and goes down by itself (steer or attack to take over)', s.settings.autoPlay, (v) => game.setAuto(v))}
         {toggle('Tilt-shift', 'The distance goes soft, like a miniature', s.settings.tiltShift, (v) => (s.settings.tiltShift = v))}
         {toggle('Reduce motion', 'No screen shake, calmer reveals', s.settings.reduceMotion, (v) => (s.settings.reduceMotion = v))}
+        <div className="glass setting outlined">
+          <span>
+            Tutorial
+            <small>{tutorialOn(s.seen.tutorial) ? 'On: one step at a time, as things come up' : 'Walks you through the game, one step at a time'}</small>
+          </span>
+          <button className="btn small" onClick={() => (restartTutorial(s.seen.tutorial), game.save(), game.touch(), onClose())}>
+            {tutorialOn(s.seen.tutorial) ? 'RESTART' : 'REPLAY'}
+          </button>
+        </div>
           </>
         )}
         {tab === 'controls' && (

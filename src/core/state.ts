@@ -5,6 +5,7 @@
 import type { ClassId } from './knights';
 import type { Quest } from './quests';
 import type { Rarity } from './rarity';
+import type { TutorialSave } from './tutorial';
 
 export type MutationId = 'gilded' | 'shadow' | 'radiant' | 'void';
 export const MUTATIONS: MutationId[] = ['gilded', 'shadow', 'radiant', 'void'];
@@ -153,7 +154,12 @@ export interface GameState {
     /** Tilt-shift: the ground far past your knight goes soft, like a miniature. */
     tiltShift: boolean;
   };
-  seen: { tutorialHints: string[]; perksIntro: boolean };
+  seen: {
+    tutorialHints: string[];
+    perksIntro: boolean;
+    /** The first-boot tutorial (core/tutorial.ts): its steps done, its tips shown, or skipped. */
+    tutorial: TutorialSave;
+  };
   /** NPC jobs taken (three active at most; see core/quests.ts). */
   quests: Quest[];
 }

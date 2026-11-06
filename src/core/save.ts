@@ -9,6 +9,7 @@ import { KNIGHTS_BY_ID } from './knights';
 import { PERKS_BY_ID } from './perks';
 import { dupeGold, sanitizeSquad } from './roster';
 import { SAVE_VERSION, type GameState, type KnightRec } from './state';
+import { mendTutorial } from './tutorial';
 import { sanitizeUpgrades } from './upgrades';
 
 export const SAVE_KEY = 'rolling-knight-save';
@@ -47,6 +48,8 @@ export function mend(raw: unknown): GameState {
   for (const k of ['gold', 'hourglasses', 'sigils', 'playTimeMs', 'rebirths'] as const) {
     if (!Number.isFinite(out[k]) || out[k] < 0) out[k] = 0;
   }
+  // The tutorial: the save's own, cleaned; a save from before it gets none if it has any progress.
+  out.seen.tutorial = mendTutorial((s.seen as { tutorial?: unknown } | undefined)?.tutorial, out);
   // A spin in progress is replayed from scratch rather than resumed mid-animation.
   if (out.roll.current && !out.roll.current.landed) out.roll.current = null;
   out.roll.timer = 0;
