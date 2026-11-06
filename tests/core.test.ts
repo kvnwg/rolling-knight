@@ -106,8 +106,8 @@ describe('reels', () => {
       if (Object.keys(s.roster).length >= BAL.tutorial.knights) s.roll.tutorial = 'done';
     }
     expect(Object.keys(s.roster).length).toBeGreaterThanOrEqual(BAL.tutorial.knights);
-    // One slot to start: the first knight takes it.
-    expect(s.squad.filter(Boolean).length).toBe(1);
+    // Three slots from the start: the first three knights fill them.
+    expect(s.squad.filter(Boolean).length).toBe(3);
     // Ordinary low rolls: nothing above Rare at the start's luck.
     for (const r of got) expect(rarityAtLeast(r as never, 'epic'), r).toBe(false);
   });
@@ -233,33 +233,28 @@ describe('checkpoints', () => {
 });
 
 describe('squad slots', () => {
-  it('open one to start and one more with each rebirth, up to three', () => {
-    expect(squadSlots({ rebirths: 0 })).toBe(1);
-    expect(squadSlots({ rebirths: 1 })).toBe(2);
-    expect(squadSlots({ rebirths: 2 })).toBe(3);
+  it('are all three open from the start', () => {
+    expect(squadSlots({ rebirths: 0 })).toBe(3);
     expect(squadSlots({ rebirths: 9 })).toBe(3);
   });
 
-  it('take knights only into open slots (filling, best squad, putting one in), and an old save loses its locked ones', () => {
+  it("take a whole squad of three on a new game (filling, best squad, putting one in), and keep a save's three", () => {
     const s = newGame(3);
     for (const id of [knightId('common', 'guardian'), knightId('rare', 'blade'), knightId('epic', 'ranger')]) addKnight(s, id, null);
     s.squad = [null, null, null];
     fillSquad(s);
-    expect(s.squad.filter(Boolean).length).toBe(1);
+    expect(s.squad.filter(Boolean).length).toBe(3);
     bestSquad(s);
-    expect(s.squad).toEqual([knightId('epic', 'ranger'), null, null]);
+    expect(s.squad[0]).toBe(knightId('epic', 'ranger'));
+    expect(s.squad.filter(Boolean).length).toBe(3);
     setSquadSlot(s, 1, knightId('rare', 'blade'));
-    expect(s.squad[1]).toBeNull();
-    // A save from before slots: three knights with no rebirth keep the first.
+    expect(s.squad[1]).toBe(knightId('rare', 'blade'));
+    // A save's three knights stay, the one played too.
     s.squad = [knightId('common', 'guardian'), knightId('rare', 'blade'), knightId('epic', 'ranger')];
     s.controlled = 2;
     sanitizeSquad(s);
-    expect(s.squad).toEqual([knightId('common', 'guardian'), null, null]);
-    expect(s.controlled).toBe(0);
-    // Two rebirths: three open.
-    s.rebirths = 2;
-    bestSquad(s);
-    expect(s.squad.filter(Boolean).length).toBe(3);
+    expect(s.squad).toEqual([knightId('common', 'guardian'), knightId('rare', 'blade'), knightId('epic', 'ranger')]);
+    expect(s.controlled).toBe(2);
   });
 
   it('stay empty once you empty them (the hub doesn\'t refill them) until you put someone in or pick the best squad', () => {
@@ -295,9 +290,9 @@ describe('squad slots', () => {
     expect(soloBonus(s)).toBeCloseTo(1.5, 9);
     s.squad = [knightId('rare', 'guardian'), knightId('rare', 'blade'), knightId('rare', 'ranger')];
     expect(soloBonus(s)).toBe(1);
-    // No bonus for the one slot a new game has.
+    // A new game has all three slots, so going down alone pays double there too.
     s.rebirths = 0;
     s.squad = [knightId('rare', 'guardian'), null, null];
-    expect(soloBonus(s)).toBe(1);
+    expect(soloBonus(s)).toBeCloseTo(2, 9);
   });
 });

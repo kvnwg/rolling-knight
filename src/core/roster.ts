@@ -269,9 +269,9 @@ export function rankedKnights(state: GameState): string[] {
 
 // ------------------------------------------------------------------ squad slots
 
-/** Squad slots open: one to start, one more with each rebirth, up to three. */
-export function squadSlots(state: Pick<GameState, 'rebirths'>): number {
-  return Math.max(1, Math.min(3, 1 + (state.rebirths ?? 0)));
+/** Squad slots open: all three from the start (going down short-handed pays more: soloBonus). */
+export function squadSlots(_state: Pick<GameState, 'rebirths'>): number {
+  return 3;
 }
 
 /** Knights in the squad (at least one counts, so an empty squad is built for one). */

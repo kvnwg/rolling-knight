@@ -19,7 +19,7 @@
  * their own (walking down the steps without asking the warden) is done as they pass it.
  *
  * After that, a single one-off tip the first time each later thing comes up: a merchant on a floor,
- * the first checkpoint, rebirth (a new squad slot), going down short-handed, auto battle.
+ * the first checkpoint, rebirth (stronger for good), going down short-handed, auto battle.
  *
  * One line at a time, and none while something else has the screen. A new game gets it; a save from
  * before it with any progress behind it (knights, gold, floors) never does (core/save.ts). Skipping
@@ -323,7 +323,7 @@ function tipView(tip: TutTipId): TutView {
     case 'checkpoint':
       return line('tip:checkpoint', "Checkpoint! If you fall, you'll come back here.", ui('floor'), true);
     case 'rebirth':
-      return line('tip:rebirth', '[Rebirth] here for a second squad slot!', world('shrine'), true);
+      return line('tip:rebirth', '[Rebirth] here: start over stronger, for good!', world('shrine'), true);
     case 'solo':
       return line('tip:solo', 'Fewer knights, more gold!', ui('solo'), true);
     case 'auto':

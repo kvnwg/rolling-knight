@@ -312,15 +312,15 @@ describe('the game', () => {
     g.bot = true;
     // At camp the altar rolls and the squad fills itself, but no floor starts until you set out.
     for (let t = 0; t < 30; t += 1 / 30) g.tick(1 / 30);
-    // A new game has one squad slot (each rebirth opens another).
-    expect(g.state.squad.filter(Boolean).length).toBe(1);
+    // A new game has all three squad slots, filled as the knights roll in.
+    expect(g.state.squad.filter(Boolean).length).toBe(3);
     expect(g.inDungeon).toBe(false);
     expect(g.state.records.spins).toBeGreaterThanOrEqual(4);
     g.enterDungeon();
     for (let t = 0; t < 10; t += 1 / 30) g.tick(1 / 30);
     expect(g.inDungeon).toBe(true);
     expect(g.world).not.toBeNull();
-    expect(g.world!.heroes.length).toBe(1);
+    expect(g.world!.heroes.length).toBe(3);
     g.leaveDungeon();
     expect(g.inDungeon).toBe(false);
   });

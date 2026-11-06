@@ -40,8 +40,6 @@ export function devGame(): Game {
     s.run.checkpoint = checkpointFor(floor);
     s.run.bosses = Math.floor((floor - 1) / 5);
     const classes: ClassId[] = (q.get('classes')?.split(',') as ClassId[]) ?? ['guardian', 'ranger', 'cleric'];
-    // Enough rebirths for every class asked for to have a slot.
-    s.rebirths = Math.max(s.rebirths, Math.min(3, classes.length) - 1);
     classes.slice(0, 3).forEach((c) => addKnight(s, knightId(rarity, c), null));
     s.squad = [0, 1, 2].map((i) => (classes[i] ? knightId(rarity, classes[i]) : null));
     for (const id of s.squad) if (id && s.roster[id]) s.roster[id].level = Math.max(1, Math.floor(floor * 0.8));

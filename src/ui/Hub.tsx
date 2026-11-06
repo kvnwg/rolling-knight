@@ -199,7 +199,7 @@ export function CharacterSelect({ game, onPick, onSelect }: { game: Game; onPick
     <div className="char-select">
       <div className="cs-title">
         <Chunky text="CHOOSE YOUR KNIGHT" size={11} grad="gold" />
-        <span className="lead outlined">The knight you play. Every rebirth opens a slot for one more to follow.</span>
+        <span className="lead outlined">The other two in your squad follow you into the dark.</span>
       </div>
       <div className="cs-stage">
         <div className="cs-light" style={{ ['--rc' as string]: RARITY_COLOR[def.rarity] }} />

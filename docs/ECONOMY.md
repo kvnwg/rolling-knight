@@ -39,21 +39,23 @@ playing.
 
 ## Now
 
-Three seeds, 6 hours of play, 8 hours away after every hour, rebirthing a minute after the push:
+Three seeds, 6 hours of play, all three squad slots open from the start, 8 hours away after every
+hour, rebirthing a minute after the push:
 
 | run | rebirth floor | length (min) | luck tab owned | combat tab owned |
 | --- | --- | --- | --- | --- |
-| 0 | 15 | 11 to 14 | 6 to 8% | 12 to 16% |
-| 1 | 25 | 24 to 32 | 19 to 30% | 28 to 40% |
-| 2 | 35 | 34 to 38 | 37 to 41% | 44 to 49% |
-| 3 | 45 | 51 to 74 | 63 to 70% | 62 to 69% |
-| 4 | 55 | 83 to 101 | 53 to 75% | 58 to 70% |
+| 0 | 15 | 13 to 16 | 8 to 9% | 16% |
+| 1 | 25 | 20 to 24 | 20 to 38% | 31 to 47% |
+| 2 | 35 | 32 to 37 | 34 to 52% | 42 to 57% |
+| 3 | 45 | 59 to 79 | 42 to 68% | 48 to 68% |
+| 4 | 55 | 65 to 154 | 62 to 89% | 60 to 85% |
+| 5 | 65 | 92 to 105 | 76 to 86% | 74 to 81% |
 
 "Owned" means the share of the tab's tiers bought by the time of the rebirth.
 
 - Runs get longer as they go deeper. Nothing is maxed by the time a rebirth opens; maxing a tab
   means staying and farming well past it.
-- A night away pays about an hour of play, about two when the altar rolls something big.
+- A night away pays about an hour of play, under two when the altar rolls something big.
 - Purchases come every half minute to a minute and a half.
 
 The bot plays every fight perfectly, so a person takes longer.
