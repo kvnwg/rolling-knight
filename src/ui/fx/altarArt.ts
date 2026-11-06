@@ -739,11 +739,13 @@ export interface MiniCell {
 
 /** Window size and grid for `n` reels in the mini shrine (all within about 70 x 64 art px). */
 export function miniGrid(n: number): { w: number; h: number; cols: number; rows: number; gap: number } {
+  // Every window is tall enough for a whole knight (helmet, hat or plume to boots); narrow ones
+  // crop a long weapon at the sides instead.
   if (n <= 1) return { w: 34, h: 25, cols: 1, rows: 1, gap: 1 };
-  if (n === 2) return { w: 26, h: 22, cols: 2, rows: 1, gap: 1 };
-  if (n === 3) return { w: 18, h: 20, cols: 3, rows: 1, gap: 1 };
-  if (n === 4) return { w: 24, h: 18, cols: 2, rows: 2, gap: 1 };
-  return { w: 18, h: 17, cols: 3, rows: 2, gap: 1 };
+  if (n === 2) return { w: 26, h: 25, cols: 2, rows: 1, gap: 1 };
+  if (n === 3) return { w: 20, h: 25, cols: 3, rows: 1, gap: 1 };
+  if (n === 4) return { w: 24, h: 24, cols: 2, rows: 2, gap: 1 };
+  return { w: 20, h: 24, cols: 3, rows: 2, gap: 1 };
 }
 
 /** The windows (canvas px) and the shrine's size for `n` reels. */

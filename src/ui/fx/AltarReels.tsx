@@ -1160,7 +1160,7 @@ function TokenFx({ f, L, calm, from, to }: { f: Fx; L: Layout; calm: boolean; fr
 // ------------------------------------------------------------------ the mini roller
 
 /** One window per reel: 32 x 23 art pixels (a knight and a one-pixel rim), two to a row. */
-const MINI = { winW: 32, winH: 23, gap: 2, pad: 2 } as const;
+const MINI = { winW: 32, winH: 24, gap: 2, pad: 2 } as const;
 const miniCols = (n: number) => Math.min(n, 2);
 const miniSpan = (k: number, size: number) => 2 * MINI.pad + k * size + (k - 1) * MINI.gap;
 
@@ -1241,8 +1241,9 @@ function MiniReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
     const timers: Array<ReturnType<typeof setTimeout>> = [];
     // The windows' size (art px): the shrine's cells, or the plain windows' inside.
     const cells = altarOn ? miniLayout(n).cells : Array.from({ length: n }, () => ({ w: MINI.winW, h: MINI.winH }));
-    // Windows too small for a whole knight (two reels and up) show head and shoulders instead.
-    const bust = cells[0].h < 24 || cells[0].w < 24;
+    // Whole knights (the windows are tall enough for one; a narrow window crops a long weapon at
+    // its sides). Only a window too short for a whole knight would show head and shoulders.
+    const bust = cells[0].h < 24;
     const pic = (id: string, mutation: MutationId | null) => (bust ? knightFaceUrl(id, mutation) : knightUrl(id, mutation));
     /** Sizes and centers a window's picture from its own pixels (any picture size: knights, faces, tokens). */
     const place = (i: number) => {
