@@ -20,6 +20,7 @@ import { HOLD_Y, aimAt, autoTarget, facingOf, inputAim, steerAim } from './aim';
 import { dist, lineOfSight, moveUnit, norm, type Shot, type Unit } from './entities';
 import { DASHES, endDash, rangerPlan, startDash, tickDash } from './dash';
 import { isMeleeClass, startSwing, tickSwing } from './melee';
+import { SLAM_BEATS, crossed } from './slam';
 import { uid, type World } from './world';
 
 /**
@@ -30,10 +31,11 @@ export const ROLL_TIME = 1.8;
 
 /**
  * Seconds from a roll landing to its skill casting, by tier step (Common .. the jackpot). Legendary
- * and the jackpot pop out of the reel, grow on their way to the middle of the screen and cast as they
- * slam down; anything less casts the moment the reel stops.
+ * and the jackpot pop out of the reel, fly up over the knight, slam onto the screen and drop into the
+ * knight's raised weapon, casting as they arrive (slam.ts has the beats; the knight stands its ground
+ * and powers up meanwhile, untouchable); anything less casts the moment the reel stops.
  */
-export const SLAM_TIME = [0, 0, 0, 0, 0.84, 1] as const;
+export const SLAM_TIME = [0, 0, 0, 0, 1.1, 1.3] as const;
 
 /** Does a skill of this tier slam onto the screen before it casts? (Legendary and the jackpot.) */
 export function slams(tier: SkillDef['tier']): boolean {
@@ -138,6 +140,12 @@ export function heroTick(w: World, h: Unit, dt: number, mx: number, my: number):
       h.moving = true;
       return;
     }
+  }
+  // --- a Legendary slamming down: the knight stands its ground and powers up until it casts (no
+  // walking, no attacking; untouchable meanwhile: reveal)
+  if (h.skillSlam) {
+    h.moving = false;
+    return;
   }
   // --- walking
   const len = Math.hypot(mx, my);
@@ -289,7 +297,8 @@ export const ROLL_SAFE = 0.8;
  * landing; no attacking until it's over.
  */
 export function heroDodge(w: World, h: Unit, mx: number, my: number, fromHive = false): boolean {
-  if (h.downed || h.rolling || h.landing || h.dodgeT! > 0 || h.stunT > 0 || h.channel?.kind === 'lunge') return false;
+  // (Not while a Legendary slams down: the knight is powering up, and untouchable anyway.)
+  if (h.downed || h.rolling || h.landing || h.dodgeT! > 0 || h.stunT > 0 || h.channel?.kind === 'lunge' || h.skillSlam) return false;
   let [dx, dy] = norm(mx, my);
   if (!dx && !dy) {
     if (h.slot === w.controlled && !w.bot) {
@@ -419,6 +428,7 @@ function tickSkills(w: World, h: Unit, dt: number): void {
   const sl = h.skillSlam;
   if (sl) {
     sl.t += dt;
+    slamBeats(w, h, sl, dt);
     if (sl.t >= sl.dur) land(w, h, sl);
   }
   const b = h.skillBuff;
@@ -444,35 +454,66 @@ function reveal(w: World, h: Unit, r: NonNullable<Unit['skillRoll']>): void {
   const skill = SKILLS[r.skill];
   const slam = { skill: r.skill, t: 0, dur: SLAM_TIME[Math.min(SLAM_TIME.length - 1, tierStep(skill.tier))], free: r.free, luck: r.luck };
   for (const fn of listeners) fn({ phase: 'reveal', world: w, hero: h, skill, free: r.free, luck: r.luck });
-  if (slam.dur > 0) h.skillSlam = slam;
-  else land(w, h, slam);
+  if (slam.dur > 0) {
+    // The knight turns to its foes (a bow is raised their way) and powers up where it stands,
+    // untouchable, until the skill casts.
+    const foe = w.nearestEnemy(h, FIGHT_RANGE, true);
+    const face: 1 | -1 = foe ? (foe.x >= h.x ? 1 : -1) : h.dir < 0 ? -1 : 1;
+    h.dir = face;
+    // (Its aim goes that way too: the pose it casts in turns to its foes, as the Ranger's bow already has.)
+    h.aimX = face;
+    h.aimY = 0;
+    h.skillSlam = { ...slam, face };
+    h.invuln = Math.max(h.invuln, slam.dur + 0.05);
+  } else land(w, h, slam);
+}
+
+/** A slam's moments in the world (slam.ts): the knight landing as its icon is stamped, a spell's aim. */
+function slamBeats(w: World, h: Unit, sl: NonNullable<Unit['skillSlam']>, dt: number): void {
+  if (crossed(sl.t, dt, sl.dur, SLAM_BEATS.slam)) {
+    // Down from its spring as the icon is stamped on the screen: a ring of dust thrown out round its
+    // feet (your own knight's shakes the screen).
+    w.fx.push({ kind: 'land', x: h.x, y: h.y, size: 1.2 });
+    if (h.slot === w.controlled) w.shakeIt(3, 0.18);
+  }
+  // The icon sets off for where the spell starts: Meteor Storm's falls as its first meteor, so the
+  // storm's thickest crowd is picked now.
+  if (sl.skill === 'meteorStorm' && crossed(sl.t, dt, sl.dur, SLAM_BEATS.hold)) sl.at = stormSpots(w, h, 1, false)[0];
 }
 
 function land(w: World, h: Unit, r: NonNullable<Unit['skillSlam']>): void {
   h.skillSlam = undefined;
   const skill = SKILLS[r.skill];
   if (h.slot === w.controlled && r.dur > 0) {
-    // Your Legendary slams onto the screen: the world feels it.
+    // Your Legendary's icon hits home and the skill goes off: the world feels it.
     const step = tierStep(skill.tier);
     w.shakeIt(step >= 5 ? 6 : 4.5, 0.36 + (step - 4) * 0.05);
     w.hitStop = Math.max(w.hitStop, step >= 5 ? 0.12 : 0.09);
   }
-  castSkill(w, h, skill.id);
+  castSkill(w, h, skill.id, r.at, r.dur > 0);
   // No cooldown: in a fight the next roll starts as soon as this skill is done firing (tickSkills).
   h.lastSkill = { skill: skill.id, at: w.time, n: (h.lastSkill?.n ?? 0) + 1, free: r.free };
   for (const fn of listeners) fn({ phase: 'land', world: w, hero: h, skill, free: r.free, luck: r.luck });
 }
 
-/** Fires a skill on the spot, with no roll (a roll calls it as it lands). */
-export function castSkill(w: World, h: Unit, id: SkillId): void {
+/**
+ * Fires a skill on the spot, with no roll (a roll calls it as it lands). `at`: where a slam sent its
+ * icon to start the spell (Meteor Storm's first meteor lands there at once); `slammed`: it slammed
+ * down first (its icon went into the knight's weapon, which the renderer flares).
+ */
+export function castSkill(w: World, h: Unit, id: SkillId, at?: { x: number; y: number }, slammed = false): void {
   const sk = SKILLS[id];
   h.swingT = h.swingDur = 0.35;
-  announce(w, h, sk);
-  effect(w, h, sk);
+  announce(w, h, sk, slammed);
+  effect(w, h, sk, at);
 }
 
-/** The skill's name over the knight in its color; Epic and up say their tier, Legendary and up flash the screen. */
-function announce(w: World, h: Unit, sk: SkillDef): void {
+/**
+ * The skill's name over the knight in its color; Epic and up say their tier, Legendary and up flash the
+ * screen. A skill that slammed down marks its bursts as the slam's (src 'slam'): the renderer keeps
+ * their flash and motes but plays no pack burst over the knight, where the slam's icon just went off.
+ */
+function announce(w: World, h: Unit, sk: SkillDef, slammed = false): void {
   const step = tierStep(sk.tier);
   // (Rewind calls itself out; your own Legendary's name is stamped on the screen as it slams down.)
   // (Not shown, a name still takes its jitter's draw: the world's random stream stays as it was.)
@@ -482,16 +523,42 @@ function announce(w: World, h: Unit, sk: SkillDef): void {
   if (step < 3) return;
   const tc = RARITY_COLOR[TIER_RARITY[sk.tier]];
   say(h.x, h.y - 40, TIER_NAME[sk.tier].toUpperCase(), tc);
-  w.fx.push({ kind: 'levelup', x: h.x, y: h.y, color: tc });
+  const src = slammed ? ({ src: 'slam' } as const) : {};
+  w.fx.push({ kind: 'levelup', x: h.x, y: h.y, color: tc, ...src });
   if (step < 4) return;
   // The renderer's portal burst carries the only full-screen flash: the rarest skills borrow it.
-  w.fx.push({ kind: 'portal', x: h.x, y: h.y });
+  w.fx.push({ kind: 'portal', x: h.x, y: h.y, ...src });
   w.hitStop = Math.max(w.hitStop, 0.08);
 }
 
 // ================================================================== the skills
 
-function effect(w: World, h: Unit, sk: SkillDef): void {
+/**
+ * Where Meteor Storm's meteors fall: on the foes it can see in reach, the thickest crowds first
+ * (scattered a little: `jitter`), else round the knight.
+ */
+function stormSpots(w: World, h: Unit, count: number, jitter: boolean): Array<{ x: number; y: number }> {
+  const n = SKILLS.meteorStorm.n;
+  const foes = w
+    .livingMobs()
+    .filter((e) => dist(e.x, e.y, h.x, h.y) <= n.reach && (e.awake || lineOfSight(w.map, h.x, h.y - 4, e.x, e.y - 4)))
+    .map((e) => ({ e, crowd: w.enemiesIn('hero', e.x, e.y, n.r).length + (e.boss ? 3 : 0) }))
+    .sort((p, q) => q.crowd - p.crowd);
+  const out: Array<{ x: number; y: number }> = [];
+  for (let k = 0; k < count; k++) {
+    const f = foes.length ? foes[k % foes.length].e : null;
+    const ang = w.rng.float(0, Math.PI * 2);
+    if (f && !jitter) out.push({ x: f.x, y: f.y });
+    else {
+      const x = f ? f.x + w.rng.float(-8, 8) : h.x + Math.cos(ang) * w.rng.float(20, 70);
+      const y = f ? f.y + w.rng.float(-6, 6) : h.y + Math.sin(ang) * w.rng.float(14, 50);
+      out.push({ x, y });
+    }
+  }
+  return out;
+}
+
+function effect(w: World, h: Unit, sk: SkillDef, at?: { x: number; y: number }): void {
   const a = h.atk;
   const c = sk.color;
   switch (sk.id) {
@@ -916,20 +983,16 @@ function effect(w: World, h: Unit, sk: SkillDef): void {
       break;
     }
     case 'meteorStorm': {
-      // Meteors on the thickest groups first, one after another.
+      // Meteors on the thickest groups first, one after another. Slammed down, the first is the
+      // icon itself, falling as the storm casts: it lands where the icon was headed at once, and the
+      // rest come down behind it (the next already falling).
       const n = SKILLS.meteorStorm.n;
-      const foes = w
-        .livingMobs()
-        .filter((e) => dist(e.x, e.y, h.x, h.y) <= n.reach && (e.awake || lineOfSight(w.map, h.x, h.y - 4, e.x, e.y - 4)))
-        .map((e) => ({ e, crowd: w.enemiesIn('hero', e.x, e.y, n.r).length + (e.boss ? 3 : 0) }))
-        .sort((p, q) => q.crowd - p.crowd);
-      for (let k = 0; k < n.meteors; k++) {
-        const f = foes.length ? foes[k % foes.length].e : null;
-        const ang = w.rng.float(0, Math.PI * 2);
-        const x = f ? f.x + w.rng.float(-8, 8) : h.x + Math.cos(ang) * w.rng.float(20, 70);
-        const y = f ? f.y + w.rng.float(-6, 6) : h.y + Math.sin(ang) * w.rng.float(14, 50);
-        w.areas.push({ uid: uid(), team: 'hero', x, y, r: n.r, delay: 0.9 + k * n.every, dur: 0, tick: 1, tickT: 0, dmg: a * n.dmg, kind: 'meteor', from: h.uid, color: '#ff8a3a', t: 0 });
-      }
+      const spots = stormSpots(w, h, n.meteors, true);
+      if (at) spots[0] = at;
+      spots.forEach((s, k) => {
+        const delay = at ? (k === 0 ? 0.01 : 0.5 + (k - 1) * n.every) : 0.9 + k * n.every;
+        w.areas.push({ uid: uid(), team: 'hero', x: s.x, y: s.y, r: n.r, delay, dur: 0, tick: 1, tickT: 0, dmg: a * n.dmg, kind: 'meteor', from: h.uid, color: '#ff8a3a', t: 0 });
+      });
       w.shakeIt(3, 0.4);
       break;
     }
@@ -1016,7 +1079,8 @@ function effect(w: World, h: Unit, sk: SkillDef): void {
     // ------------------------------------------------------------ signatures
     case 'rewind': {
       const n = SKILLS.rewind.n;
-      if (!w.startRewind()) {
+      // (Your own Aeon's REWIND! is stamped on the screen as it slams down: the world doesn't say it again.)
+      if (!w.startRewind(!(h.slot === w.controlled && slams(sk.tier)))) {
         // Time won't turn back just now (it only just did): it stops instead.
         for (const e of w.enemiesIn('hero', h.x, h.y, n.stopR)) stun(w, e, n.stop);
         for (const o of w.livingHeroes()) o.invuln = Math.max(o.invuln, 1);

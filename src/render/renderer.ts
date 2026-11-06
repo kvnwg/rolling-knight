@@ -47,6 +47,8 @@ import { mobPaint, type MobPaint } from './pf/mobLook';
 import { facing, type Dir } from './pf/sheet';
 import { Vfx } from './vfx/vfx';
 import { Spells } from './spells';
+import { CastFx } from './castFx';
+import { screenView } from './view';
 import { boulderAt, isStill, mobMotion, type MobMotion } from './mobMotion';
 import { BOMB_R, BOSS_SLAM_R, SLAM_R, lobRadius, lungeOf } from '../world/ai';
 import { blank, rot90, type PixelBuf } from './pixel/buf';
@@ -278,6 +280,8 @@ interface Particle {
   size: number;
   kind: 'spark' | 'dust' | 'ember' | 'snow' | 'firefly' | 'leaf' | 'mote' | 'coin' | 'ring' | 'petal' | 'ash' | 'spore' | 'rain';
   glow?: boolean;
+  /** Glows but lights nothing round it (a slammed Legendary's motes: crisp on the dark, not a haze). */
+  unlit?: boolean;
 }
 
 interface FxSprite {
@@ -383,6 +387,8 @@ export class Renderer {
   private vfx = new Vfx();
   /** The skills with art of their own: meteors, the Singularity's vortex, Titan's Wrath's rocks... (spells.ts). */
   private spells = new Spells();
+  /** A Legendary's cast round its caster: the dark and its pool of light, the power-up's glow, the flare (castFx.ts). */
+  private castFx = new CastFx();
   /** Body boxes of PixelForge frames (for squash and stretch), by sheet and frame. */
   private boxes = new Map<string, Box>();
   /**
@@ -602,6 +608,8 @@ export class Renderer {
     this.sub.y = fy - cy;
     this.origin.x = cx;
     this.origin.y = cy;
+    // Where the world is on the page this frame, for the HUD's overlays (the spell slam's icon).
+    game.view = screenView(fx, fy, this.P, Math.min(3, window.devicePixelRatio || 1));
     const sx = (x: number) => Math.round(x) - cx;
     const sy = (y: number) => Math.round(y) - cy;
     const visible = (x: number, y: number, m = 40) => x > cx - m && x < cx + this.W + m && y > cy - m && y < cy + this.H + m * 2;
@@ -636,6 +644,10 @@ export class Renderer {
     }
     if (!shader && game.state.settings.tiltShift && lead) this.tiltShift(g, sy(lead.y) - 6, w.biome.layout === 'rooms' ? 0.5 : 1);
     this.spells.update(w);
+    // A Legendary casting: the world goes dark round its caster (first on the HUD layer: whatever is
+    // drawn there after it, the spells' bright effects and the bars, stays bright).
+    this.castFx.update(w, game.state.settings.reduceMotion, dt);
+    this.castFx.drawDark(ui, cx, cy, this.LW, this.LH);
     for (const a of w.areas) this.drawArea(g, ui, a, sx, sy);
     // Lunges' tells on the ground: a dash's lane, a leap's landing ring.
     for (const m of w.mobs) if (!m.dead && visible(m.x, m.y, 160)) this.drawTell(g, m, sx, sy);
@@ -645,7 +657,7 @@ export class Renderer {
     this.heroPoses.clear();
     this.mobTop.clear();
     if (pf) {
-      for (const h of w.heroes) this.heroPoses.set(h.uid, heroPose(w, h));
+      for (const h of w.heroes) this.heroPoses.set(h.uid, heroPose(w, h, game.state.settings.reduceMotion));
       pruneHeroes(new Set(w.heroes.map((h) => h.uid)));
       for (const m of w.mobs) {
         if (!m.dead || this.corpses.some((c) => c.uid === m.uid)) continue;
@@ -845,9 +857,11 @@ export class Renderer {
     this.drawFx(st, sx, sy, false);
     this.drawFx(ui, sx, sy, true);
     this.spells.drawTop(w, ui, sx, sy);
+    this.castFx.drawTop(ui, em, cx, cy);
 
     // --- light (the setting's: effects light nothing)
     const lights = this.collectLights(w, biome, cx, cy, sx, sy);
+    this.castFx.addLights(lights, cx, cy, ambientOf(biome, w.sky));
     if (outdoors && w.sky.kind === 'clear') this.sunFlecks(lights, w, cx, cy);
     this.flashT = Math.max(0, this.flashT - dt);
 
@@ -1154,8 +1168,9 @@ export class Renderer {
     const paint = knightPaint(h.knightId!, h.mutation ?? null, paintStep(h.rarity!, this.time));
     const [px, py] = SHEETS[paint.sheet].meta.pivot;
     const [kx, ky] = recoil(h);
-    const x = sx(h.x) - px + kx;
-    const y = sy(h.y) - py + ky;
+    const [nx, ny] = pose.nudge ?? [0, 0];
+    const x = sx(h.x) - px + kx + nx;
+    const y = sy(h.y) - py + ky + ny;
     // Just hit (the knight you steer): it blinks while it's untouchable.
     const blink = (h.graceT ?? 0) > 0 && Math.floor(this.time / 0.07) % 2 === 1 ? 0.3 : 1;
     if (cut) {
@@ -1178,6 +1193,8 @@ export class Renderer {
     }
     // The Blade's Phantom Dash leaves afterimages behind it: dark silhouettes, fading by steps.
     this.shadowTrail(ctx, w, h, pose, paint, sx, sy, px, py);
+    // Powering up for a Legendary: a glow round the knight in its tier's light.
+    if (h.skillSlam) this.castFx.drawAura(this.layers.emit.x, h, paint.sheet, pose.k, paint, pose.anim, pose.dir, x, y);
     ctx.globalAlpha = pose.alpha * blink;
     ctx.drawImage(frameCanvas(paint.sheet, pose.k, paint, pose.flash, pose.anim, pose.dir), x, y);
     ctx.globalAlpha = 1;
@@ -2212,7 +2229,7 @@ export class Renderer {
       const k = ph.active ? 1 : ph.frame >= 7 ? 0.35 : 0.25;
       out.push({ x: sx(tr.x), y: sy(tr.y) - (ph.active ? 18 : 4), r: ph.active ? 70 : 30, color: biome.light.fire, intensity: 0.9 * k, bloom: ph.active });
     }
-    for (const p of this.particles) if (p.glow) out.push({ x: sx(p.x), y: sy(p.y - p.z), r: p.kind === 'firefly' ? 8 : 6, color: p.color, intensity: Math.min(1, p.life / p.max + 0.2) * 0.7 });
+    for (const p of this.particles) if (p.glow && !p.unlit) out.push({ x: sx(p.x), y: sy(p.y - p.z), r: p.kind === 'firefly' ? 8 : 6, color: p.color, intensity: Math.min(1, p.life / p.max + 0.2) * 0.7 });
     return out;
   }
 
@@ -2298,13 +2315,16 @@ export class Renderer {
         this.particles.push({ ...this.p('ring', f.x, f.y, col, 0.4), size: 20 });
         this.particles.push({ ...this.p('ring', f.x, f.y, '#ffffff', 0.25), size: 10 });
         break;
+      // (A skill that slammed down: its stamp flashed the screen and the cast is the flare where its
+      // icon landed. Its motes rise crisp and light nothing, and there's no flash: under the dark round
+      // the caster either would only haze it over or white it out.)
       case 'levelup':
       case 'revive':
-        add(16, (i) => ({ ...this.p('mote', f.x + Math.cos(i) * 8, f.y + Math.sin(i) * 4, f.color ?? '#ffe27a', 1), vz: 22 + Math.random() * 10 }));
+        add(16, (i) => ({ ...this.p('mote', f.x + Math.cos(i) * 8, f.y + Math.sin(i) * 4, f.color ?? '#ffe27a', 1), vz: 22 + Math.random() * 10, unlit: f.src === 'slam' }));
         break;
       case 'portal':
-        this.flashT = 0.35;
-        add(28, (i) => ({ ...this.p('mote', f.x + Math.cos(i) * 12, f.y - 10 + Math.sin(i) * 14, i % 3 ? '#ffd27a' : '#fff3bc', 1.5), vz: 26 + Math.random() * 20 }));
+        if (f.src !== 'slam') this.flashT = 0.35;
+        add(28, (i) => ({ ...this.p('mote', f.x + Math.cos(i) * 12, f.y - 10 + Math.sin(i) * 14, i % 3 ? '#ffd27a' : '#fff3bc', 1.5), vz: 26 + Math.random() * 20, unlit: f.src === 'slam' }));
         break;
       case 'land': {
         // A lunge comes down: a ring of dust thrown out along the ground, and a shock ring for a big one.
@@ -2368,12 +2388,13 @@ export class Renderer {
         this.fx('shock', f.x, f.y);
         this.fx('lightning', f.x, f.y - 8);
         break;
+      // (A skill that slammed down went off from where its icon landed, flared there: no burst over the knight.)
       case 'levelup':
-        this.fx('heal', f.x, f.y - 10);
+        if (f.src !== 'slam') this.fx('heal', f.x, f.y - 10);
         break;
       case 'revive':
       case 'portal':
-        this.fx('sparkle', f.x, f.y - 8);
+        if (f.src !== 'slam') this.fx('sparkle', f.x, f.y - 8);
         break;
       default:
         break;

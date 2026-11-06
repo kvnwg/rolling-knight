@@ -279,6 +279,8 @@ export function App() {
         r.render(game, game.paused ? 0 : skipDt, game.inDungeon ? game.world : game.hub);
         skipDt = 0;
       }
+      // What's drawn over the canvas in step with it (the spell slam), from this very frame.
+      game.frameDrawn();
       hudT += dt;
       if (hudT > 0.1) {
         hudT = 0;

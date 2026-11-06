@@ -690,12 +690,17 @@ export class World {
     };
   }
 
-  /** Rewind (Aeon, the Mythic Arcanist): time runs backwards to 4 seconds ago, for the squad. */
-  startRewind(): boolean {
+  /**
+   * Rewind (Aeon, the Mythic Arcanist): time runs backwards to 4 seconds ago, for the squad. `say`:
+   * REWIND! over the leader (not when the HUD has stamped it on the screen; its jitter is still drawn,
+   * so the world's random stream stays as it was).
+   */
+  startRewind(say = true): boolean {
     if (this.rewind || this.history.length < 5) return false;
     const back = Math.min(this.history.length, 40);
     this.rewind = { frames: [this.snapshot(), ...this.history.slice(-back).reverse()], t: 0, dur: 0.8 };
-    this.text(this.leader()?.x ?? 0, (this.leader()?.y ?? 0) - 30, 'REWIND!', '#9ad8ff', true);
+    if (say) this.text(this.leader()?.x ?? 0, (this.leader()?.y ?? 0) - 30, 'REWIND!', '#9ad8ff', true);
+    else this.rng.float(-3, 3);
     return true;
   }
 
@@ -996,12 +1001,13 @@ function tickStatus(w: World, u: Unit, dt: number): void {
 /**
  * Units push each other apart a little (heroes and mobs alike; not a knight mid-roll or a mob mid-dash
  * or mid-leap). The knight in the lead shoulders its squadmates aside and they barely push it back:
- * turning back through a corridor, it's never pinned by the squad trailing it.
+ * turning back through a corridor, it's never pinned by the squad trailing it. A knight powering up
+ * for its Legendary (its slam) stands its ground: whatever crowds it is pushed off instead.
  */
 function separate(w: World): void {
   const all = [...w.heroes.filter((h) => !h.downed && !h.rolling), ...w.mobs.filter((m) => !m.dead && !m.rush)];
   const lead = w.leader();
-  const give = (u: Unit, other: Unit) => (u.boss ? 0.1 : u === lead && other.team === 'hero' ? 0.15 : 1);
+  const give = (u: Unit, other: Unit) => (u.skillSlam ? 0 : u.boss ? 0.1 : u === lead && other.team === 'hero' ? 0.15 : 1);
   for (let i = 0; i < all.length; i++) {
     for (let j = i + 1; j < all.length; j++) {
       const a = all[i];

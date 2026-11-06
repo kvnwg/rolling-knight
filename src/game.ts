@@ -29,6 +29,7 @@ import { applyDialogAction, dialogFor, placeNpcs, type DialogChoice, type Dialog
 import { questEvent, type Quest, type QuestEvent, type QuestReward } from './core/quests';
 import { onFloorStart } from './world/chance';
 import { skillRollLuck } from './core/chance';
+import type { ScreenView } from './render/view';
 
 export type Listener = (e: CoreEvent) => void;
 
@@ -54,6 +55,13 @@ export class Game {
   /** Seconds of the floor's fade in or out (the renderer draws it). */
   fade = 1;
   fadeDir: -1 | 1 = -1;
+  /**
+   * The world as the canvas showed it last frame (the renderer sets it): where a world point is on the
+   * page, for the HUD's overlays (render/view.ts toScreen). Null before the first frame.
+   */
+  view: ScreenView | null = null;
+  /** What runs once a frame has been drawn (onFrame). */
+  private framed = new Set<() => void>();
   private pendingFloor: number | null = null;
   /** Walking down the hub's steps: the fade out has begun, the dungeon comes when it's black. */
   private descending = false;
@@ -97,6 +105,21 @@ export class Game {
   on(fn: Listener): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
+  }
+
+  /**
+   * Runs `fn` each time a frame has been drawn (the world moved, the canvas shows it and `view` says
+   * where): for what's drawn over the canvas in the page and must keep in step with it, frame for
+   * frame (the spell slam's icon going into a knight's weapon). Returns the way to stop.
+   */
+  onFrame(fn: () => void): () => void {
+    this.framed.add(fn);
+    return () => this.framed.delete(fn);
+  }
+
+  /** A frame has been drawn (App's loop, right after the renderer). */
+  frameDrawn(): void {
+    for (const fn of this.framed) fn();
   }
 
   emit = (e: CoreEvent): void => {

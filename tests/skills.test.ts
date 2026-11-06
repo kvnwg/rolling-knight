@@ -371,9 +371,9 @@ describe('a skill roll', () => {
       const got = listen();
       rigSkill(h, id);
       expect(startSkillRoll(w, h), id).toBe(true);
-      // (Just this one: no roll chained after it.)
+      // (Just this one: no roll chained after it.) Up to its landing, its shout still up.
       h.specialT = 99;
-      for (let t = 0; t < CAST_TIME + DT; t += DT) w.update(DT);
+      for (let t = 0; t < CAST_TIME + DT && !h.lastSkill; t += DT) w.update(DT);
       expect(got.filter((e) => e.phase === 'land').map((e) => e.skill.id), id).toEqual([id]);
       expect(h.lastSkill?.skill).toBe(id);
       // The shout over the knight; your own Legendary's name is stamped on the screen as it slams down
@@ -506,8 +506,11 @@ describe('allies', () => {
   it('includes your knight, Auto attack or not, and Tag Team makes the knight switched to hit harder for a while', () => {
     const w = world([knightId('rare', 'arcanist'), knightId('rare', 'cleric')], ['tagTeam']);
     const [mage, cleric] = w.heroes;
-    // (A fight that lasts.)
-    for (const m of fightAt(w, 4, 50)) m.hp = m.maxHp = 1e9;
+    // (A fight that lasts: foes that don't fall or hurt anyone, so both knights are still up to switch to.)
+    for (const m of fightAt(w, 4, 50)) {
+      m.hp = m.maxHp = 1e9;
+      m.atk = 0;
+    }
     run(w, 3);
     expect(mage.lastSkill?.n ?? 0).toBeGreaterThanOrEqual(1);
     w.auto = true;
