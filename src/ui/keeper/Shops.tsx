@@ -8,7 +8,7 @@
  *  - Oracle Vesper: the altar's reels, your latest summons and the odds;
  *  - Warden Tobb: who goes down (your squad and who leads), levelling and reforging them, the way down.
  */
-import { Fragment, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { BAL } from '../../core/balance';
 import { CLASSES, KNIGHTS, knightDef, knightId, unlockedClasses } from '../../core/knights';
 import { canRebirth, rebirthFloor } from '../../core/newGame';
@@ -606,8 +606,26 @@ function rarityTag(id: string) {
  * for gold, and ADD TO SQUAD to put it in the slot you picked; REFORGE (a roll for a better
  * mutation) on its own tab; DESCEND at the foot. Everything to do with your knights happens here.
  */
+/** A touch screen: knights are picked up by holding them (a swipe scrolls). */
+const TOUCH_UI = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+
+/** A phone, or any screen too short to show the counter's slots and a list of knights at once. */
+const COMPACT = '(max-width: 599px), (max-height: 800px)';
+function useCompactScreen(): boolean {
+  const [on, setOn] = useState(() => typeof window !== 'undefined' && !!window.matchMedia?.(COMPACT).matches);
+  useEffect(() => {
+    const m = window.matchMedia?.(COMPACT);
+    if (!m) return;
+    const f = () => setOn(m.matches);
+    m.addEventListener('change', f);
+    return () => m.removeEventListener('change', f);
+  }, []);
+  return on;
+}
+
 export function WardenShop({ game, station, onClose, onOpen }: { game: Game; station: HubStation; onClose: () => void; onOpen: (id: string) => void }) {
   useGameTick(game);
+  const compact = useCompactScreen();
   const st = game.state;
   const [tab, setTabState] = useState(wardenMemory.tab);
   const [pick, setPickState] = useState(wardenMemory.slot);
@@ -699,62 +717,10 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
     refresh();
     return true;
   };
-  const best = isBestSquad(st);
-  const putBest = () => {
-    bestSquad(st);
-    if (!st.squad[st.controlled]) st.controlled = Math.max(0, st.squad.findIndex(Boolean));
-    uiSound('equip', 3);
-    setPick(-1);
-    refresh();
-  };
-  return (
-    <KeeperScreen
-      game={game}
-      station={station}
-      tabs={[
-        { id: 'squad', label: 'SQUAD', icon: 'helm10', badge: st.squad.filter((id) => id && canLevel(st, id)).length },
-        { id: 'reforge', label: 'REFORGE', icon: 'gem' },
-        { id: 'sell', label: 'SELL', icon: 'coin' },
-      ]}
-      tab={tab}
-      onTab={setTab}
-      onClose={onClose}
-    >
-      <ShopTop
-        purse={<Purse amount={st.gold - owed} />}
-        title={
-          <span className={s.chips}>
-            <Stat icon="stairs" label="Floor" title={`Floor ${floor}, ${biome.name}`}>
-              {floor}
-            </Stat>
-            <Stat icon="sword" label="Power" title={`Your squad's power; floor ${floor} wants about ${fmt(diff.par)}`}>
-              {fmt(power)}
-            </Stat>
-            <span className="dchip" style={{ ['--cc' as string]: ch.color, ['--seal' as string]: `var(--sk-seal-${diff.challenge})`, color: '#2b170c', textShadow: 'none' } as CSSProperties} title={ch.text}>
-              {ch.name.toUpperCase()}
-            </span>
-          </span>
-        }
-      />
-      <ShopHint>
-        {tab === 'squad' ? (
-          <>
-            <b>Drag</b> a knight onto a slot (or tap a slot, then <b>ADD</b>). <b>LEAD</b> is the one you play.
-          </>
-        ) : tab === 'reforge' ? (
-          <>
-            <b>Reforge</b> rolls for a <b>mutation</b> (a big power boost) for gold. A better one replaces the old; a worse one changes nothing.
-          </>
-        ) : sold ? (
-          <b className={s.goodLine}>
-            <Px icon="coin" size="xs" /> {sold}
-          </b>
-        ) : (
-          <>
-            <b>Sell</b> knights you don't need for gold (weakest first). Knights in your squad stay; Rare and up ask twice.
-          </>
-        )}
-      </ShopHint>
+  // On a phone (or any short screen) the squad's slots scroll with the knights below them, so the
+  // list gets the whole screen; on a big one they stay put over the list (for dragging onto them).
+  const squadBlock = (
+    <>
       {tab === 'squad' && (
         <div className={s.squadRow}>
           {[0, 1, 2].map((slot) => {
@@ -818,7 +784,75 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
           </span>
         </div>
       )}
+    </>
+  );
+  const best = isBestSquad(st);
+  const putBest = () => {
+    bestSquad(st);
+    if (!st.squad[st.controlled]) st.controlled = Math.max(0, st.squad.findIndex(Boolean));
+    uiSound('equip', 3);
+    setPick(-1);
+    refresh();
+  };
+  return (
+    <KeeperScreen
+      game={game}
+      station={station}
+      tabs={[
+        { id: 'squad', label: 'SQUAD', icon: 'helm10', badge: st.squad.filter((id) => id && canLevel(st, id)).length },
+        { id: 'reforge', label: 'REFORGE', icon: 'gem' },
+        { id: 'sell', label: 'SELL', icon: 'coin' },
+      ]}
+      tab={tab}
+      onTab={setTab}
+      onClose={onClose}
+    >
+      <ShopTop
+        purse={<Purse amount={st.gold - owed} />}
+        title={
+          <span className={s.chips}>
+            <Stat icon="stairs" label="Floor" title={`Floor ${floor}, ${biome.name}`}>
+              {floor}
+            </Stat>
+            <Stat icon="sword" label="Power" title={`Your squad's power; floor ${floor} wants about ${fmt(diff.par)}`}>
+              {fmt(power)}
+            </Stat>
+            <span className="dchip" style={{ ['--cc' as string]: ch.color, ['--seal' as string]: `var(--sk-seal-${diff.challenge})`, color: '#2b170c', textShadow: 'none' } as CSSProperties} title={ch.text}>
+              {ch.name.toUpperCase()}
+            </span>
+          </span>
+        }
+      />
+      <ShopHint>
+        {tab === 'squad' ? (
+          <>
+            {TOUCH_UI ? (
+              <>
+                <b>Hold</b> a knight, then drag it onto a slot (or tap <b>ADD TO SQUAD</b>). <b>LEAD</b> is the one you play.
+              </>
+            ) : (
+              <>
+                <b>Drag</b> a knight onto a slot (or tap a slot, then <b>ADD</b>). <b>LEAD</b> is the one you play.
+              </>
+            )}
+          </>
+        ) : tab === 'reforge' ? (
+          <>
+            <b>Reforge</b> rolls for a <b>mutation</b> (a big power boost) for gold. A better one replaces the old; a worse one changes nothing.
+          </>
+        ) : sold ? (
+          <b className={s.goodLine}>
+            <Px icon="coin" size="xs" /> {sold}
+          </b>
+        ) : (
+          <>
+            <b>Sell</b> knights you don't need for gold (weakest first). Knights in your squad stay; Rare and up ask twice.
+          </>
+        )}
+      </ShopHint>
+      {!compact && squadBlock}
       <ShopBody scrollKey={tab}>
+        {compact && squadBlock}
         {all.length === 0 ? (
           <div className={s.empty}>
             <Px icon="helm" size="lg" s={1} />
@@ -872,7 +906,7 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
                     level={`Lv ${rec.level}`}
                     levelRight={<ClassTag cls={def.cls} short />}
                     art={
-                      <DragKnight onDrop={(to) => putAt(id, to)} title="Drag onto a squad slot">
+                      <DragKnight onDrop={(to) => putAt(id, to)} title={TOUCH_UI ? 'Hold, then drag onto a squad slot' : 'Drag onto a squad slot'}>
                         <HeroArt id={id} mutation={rec.mutation} s={1} />
                       </DragKnight>
                     }

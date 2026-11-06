@@ -1,6 +1,7 @@
 /**
- * A knight's picture you can pick up and drop on a squad slot (the Warden's screen). Press on the
- * picture and move: a copy lifts off under your finger or cursor, the slot under it lights up, and
+ * A knight's picture you can pick up and drop on a squad slot (the Warden's screen). With a mouse,
+ * press on the picture and move; on a touch screen, press and hold it a moment (a swipe over it
+ * scrolls the list as anywhere else): a copy lifts off under your finger or cursor, the slot under it lights up, and
  * letting go over a slot puts the knight there. Letting go anywhere else does nothing, except for a
  * knight picked up out of a squad slot (`onDropOut`): dropped away from the slots, it leaves the
  * squad; the copy fades while it's away from the slots to say so. A press that doesn't move stays a
@@ -16,8 +17,16 @@ import { useEffect, useRef, type PointerEvent, type ReactNode } from 'react';
 import { uiSound } from '../sound';
 import s from './keeper.module.css';
 
+/** On a touch screen a drag starts once the finger has held still this long (ms); moving sooner scrolls. */
+const HOLD_MS = 280;
+/** How far a held finger may wander (px) before it counts as a scroll instead. */
+const HOLD_SLOP = 10;
+
 interface Drag {
   id: number;
+  /** A touch waiting out its hold (not lifted yet). */
+  waiting: boolean;
+  holdTimer: number;
   x: number;
   y: number;
   ghost: HTMLElement | null;
@@ -74,12 +83,22 @@ export function DragKnight({ onDrop, onDropOut, children, title }: { onDrop: (sl
     else cb.current.onDropOut?.();
   };
 
-  const move = (e: { clientX: number; clientY: number; pointerId: number }) => {
+  const lift = (d: Drag, x: number, y: number) => {
+    d.waiting = false;
+    move({ clientX: x, clientY: y, pointerId: d.id }, true);
+  };
+
+  const move = (e: { clientX: number; clientY: number; pointerId: number }, force = false) => {
     const d = drag.current;
     const el = ref.current;
     if (!d || !el || e.pointerId !== d.id) return;
+    if (d.waiting) {
+      // A touch still holding: moving now is a scroll (the list's own), not a drag.
+      if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > HOLD_SLOP) end(true);
+      return;
+    }
     if (!d.ghost) {
-      if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < 7) return;
+      if (!force && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 7) return;
       // Lift a copy of the picture.
       sweep();
       const g = el.cloneNode(true) as HTMLElement;
@@ -92,6 +111,11 @@ export function DragKnight({ onDrop, onDropOut, children, title }: { onDrop: (sl
       d.ghost = g;
       document.body.dataset.dragKnight = '';
       uiSound('tap');
+      try {
+        navigator.vibrate?.(12);
+      } catch {
+        /* no buzz */
+      }
     }
     d.ghost.style.transform = `translate(${Math.round(e.clientX - d.w / 2)}px, ${Math.round(e.clientY - d.h * 0.7)}px) scale(1.12)`;
     const hit = document.elementFromPoint(e.clientX, e.clientY);
@@ -112,7 +136,12 @@ export function DragKnight({ onDrop, onDropOut, children, title }: { onDrop: (sl
     if (active) return;
     const r = ref.current?.getBoundingClientRect();
     const id = e.pointerId;
+    const touchHold = e.pointerType === 'touch';
     const onMove = (ev: globalThis.PointerEvent) => move(ev);
+    // Once a held touch has lifted the knight, the page mustn't scroll under the drag.
+    const noScroll = (ev: TouchEvent) => {
+      if (drag.current && !drag.current.waiting) ev.preventDefault();
+    };
     const onUp = (ev: globalThis.PointerEvent) => ev.pointerId === id && end(false);
     const onCancel = (ev: globalThis.PointerEvent) => ev.pointerId === id && end(true);
     const onBlur = () => end(true);
@@ -126,17 +155,27 @@ export function DragKnight({ onDrop, onDropOut, children, title }: { onDrop: (sl
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', onCancel);
     window.addEventListener('blur', onBlur);
+    window.addEventListener('touchmove', noScroll, { passive: false });
     el?.addEventListener('lostpointercapture', onLost);
     const stop = () => {
+      window.clearTimeout(d.holdTimer);
+      window.removeEventListener('touchmove', noScroll);
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onCancel);
       window.removeEventListener('blur', onBlur);
       el?.removeEventListener('lostpointercapture', onLost);
     };
-    const d: Drag = { id, x: e.clientX, y: e.clientY, ghost: null, over: null, w: r?.width ?? 40, h: r?.height ?? 40, stop };
+    const d: Drag = { id, waiting: touchHold, holdTimer: 0, x: e.clientX, y: e.clientY, ghost: null, over: null, w: r?.width ?? 40, h: r?.height ?? 40, stop };
     drag.current = d;
     active = d;
+    if (touchHold) {
+      // Hold still a moment to pick it up (a swipe scrolls the list instead).
+      const x = e.clientX;
+      const y = e.clientY;
+      d.holdTimer = window.setTimeout(() => drag.current === d && d.waiting && lift(d, x, y), HOLD_MS);
+      return;
+    }
     try {
       el?.setPointerCapture(id);
     } catch {
