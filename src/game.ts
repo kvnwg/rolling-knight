@@ -7,7 +7,7 @@ import { drawDesign } from './core/deck';
 import type { CoreEvent } from './core/events';
 import { knightDef } from './core/knights';
 import { currentLuck } from './core/luck';
-import { checkpointFor, newGame, rebirth as doRebirth } from './core/newGame';
+import { canRebirth, checkpointFor, newGame, rebirth as doRebirth } from './core/newGame';
 import { runOffline, type OfflineReport } from './core/offline';
 import { perksOpen } from './core/perks';
 import { floorDifficulty, squadPower, type Difficulty } from './core/power';
@@ -29,6 +29,7 @@ import { applyDialogAction, dialogFor, placeNpcs, type DialogChoice, type Dialog
 import { questEvent, type Quest, type QuestEvent, type QuestReward } from './core/quests';
 import { onFloorStart } from './world/chance';
 import { skillRollLuck } from './core/chance';
+import type { ScreenView } from './render/view';
 
 export type Listener = (e: CoreEvent) => void;
 
@@ -54,6 +55,13 @@ export class Game {
   /** Seconds of the floor's fade in or out (the renderer draws it). */
   fade = 1;
   fadeDir: -1 | 1 = -1;
+  /**
+   * The world as the canvas showed it last frame (the renderer sets it): where a world point is on the
+   * page, for the HUD's overlays (render/view.ts toScreen). Null before the first frame.
+   */
+  view: ScreenView | null = null;
+  /** What runs once a frame has been drawn (onFrame). */
+  private framed = new Set<() => void>();
   private pendingFloor: number | null = null;
   /** Walking down the hub's steps: the fade out has begun, the dungeon comes when it's black. */
   private descending = false;
@@ -97,6 +105,21 @@ export class Game {
   on(fn: Listener): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
+  }
+
+  /**
+   * Runs `fn` each time a frame has been drawn (the world moved, the canvas shows it and `view` says
+   * where): for what's drawn over the canvas in the page and must keep in step with it, frame for
+   * frame (the spell slam's icon going into a knight's weapon). Returns the way to stop.
+   */
+  onFrame(fn: () => void): () => void {
+    this.framed.add(fn);
+    return () => this.framed.delete(fn);
+  }
+
+  /** A frame has been drawn (App's loop, right after the renderer). */
+  frameDrawn(): void {
+    for (const fn of this.framed) fn();
   }
 
   emit = (e: CoreEvent): void => {
@@ -147,6 +170,11 @@ export class Game {
       this.emit({ type: 'checkpoint', floor });
     }
     s.records.bestFloorEver = Math.max(s.records.bestFloorEver, floor);
+    // The run just made it to the floor a rebirth needs: tell the player, once, right away.
+    if (canRebirth(s) && !s.run.rebirthTold) {
+      s.run.rebirthTold = true;
+      this.emit({ type: 'rebirthReady', next: s.rebirths + 1 });
+    }
     const biome = biomeForFloor(floor, s.run.biomeSeed);
     this.biome = biome;
     const boss = isBossFloor(floor);
@@ -501,6 +529,13 @@ export class Game {
     const first = s.stats.goldWindow[0];
     const mins = (now - first[0]) / 60_000;
     if (mins > 1) s.stats.goldPerMinute = Math.max(0, (s.gold - first[1]) / mins);
+    // The fights' own rate (what keeps coming while you're away): picked-up gold only, spending aside.
+    const win = (s.stats.combatWindow ??= []);
+    win.push([now, s.stats.combatGold ?? 0]);
+    s.stats.combatWindow = win.filter(([t]) => t >= now - 10 * 60_000);
+    const c0 = s.stats.combatWindow[0];
+    const cm = (now - c0[0]) / 60_000;
+    if (cm > 1) s.stats.combatPerMinute = Math.max(0, ((s.stats.combatGold ?? 0) - c0[1]) / cm);
   }
 
   private goToFloor(floor: number, healAll: boolean): void {
@@ -521,7 +556,10 @@ export class Game {
 
   private collect(kind: 'gold' | 'potion' | 'hourglass', amount: number): void {
     const s = this.state;
-    if (kind === 'gold') s.gold += amount;
+    if (kind === 'gold') {
+      s.gold += amount;
+      s.stats.combatGold = (s.stats.combatGold ?? 0) + amount;
+    }
     else if (kind === 'hourglass') s.hourglasses += amount;
     else {
       const now = Date.now();

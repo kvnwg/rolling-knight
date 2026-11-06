@@ -344,7 +344,7 @@ describe('effects', () => {
     expect(fx.hpPct).toBe(144);
     expect(fx.goldPct).toBe(120);
     expect(fx.speedPct).toBe(30);
-    expect(fx.offlineEff).toBeCloseTo(2, 9);
+    expect(fx.offlineEff).toBeCloseTo(5 * BAL.offline.perTier, 9);
     expect(fx.potionSeconds).toBe(80);
     expect(fx.turboPower).toBe(2);
     s.upgrades.excalibur = 1;

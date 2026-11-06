@@ -29,6 +29,7 @@ import { Px, type IconName } from './px';
 import { KNIGHT_PIC_H, KNIGHT_PIC_W } from './sprites';
 import { uiSound } from './sound';
 import { TopBar } from './TopBar';
+import { RebirthPill } from './RebirthPill';
 
 const touch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
@@ -82,6 +83,13 @@ export function HubHud({ game, onTalk, onSettings, onLuck }: { game: Game; onTal
             </span>
           </div>
         }
+      />
+      <RebirthPill
+        game={game}
+        onGo={() => {
+          const shrine = game.hub?.stations.find((x) => x.id === 'rebirth');
+          if (shrine) onTalk(shrine);
+        }}
       />
       <button
         className="mini-roller"

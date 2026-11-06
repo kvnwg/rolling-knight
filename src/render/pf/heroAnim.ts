@@ -6,6 +6,8 @@
  *   rolling, landing  the class's dodge: roll, backflip (Ranger), vault (Lancer), dodge with a blink fade
  *                     (Arcanist), stretched over the roll and its landing, facing its way (backflips
  *                     face away)
+ *   skillSlam         a Legendary's power-up as it slams down (castPose.ts): the victory pose's crouch,
+ *                     its spring with the weapon raised, its landing, then held high until the cast
  *   stunT             stun
  *   channel           Whirlwind plays the heavy attack's spin (its coil, the turn through every view
  *                     looped while it lasts, then the last sweep and the settle); a lunge holds the
@@ -33,6 +35,7 @@ import type { SkillId } from '../../core/skillbook';
 import type { Unit, View } from '../../world/entities';
 import type { World } from '../../world/world';
 import { SHEETS } from './assets';
+import { castFrame, castPose } from './castPose';
 import { KNIGHT_SHEET, knightSheet } from './knightLook';
 import { eventFrame, facing, facing8, RUN_MIN_FRAME, WALK_MIN_FRAME, walkPace, type Dir, type FrameRef, type PFSheet } from './sheet';
 
@@ -49,6 +52,8 @@ export interface HeroPose {
   ghost: { x: number; y: number; k: number; alpha: number; anim: string; dir: Dir } | null;
   /** Stun stars over the head. */
   stunned: boolean;
+  /** Code motion on top of the frame (px): a Legendary's power-up rises and trembles (castPose.ts). */
+  nudge?: [number, number];
 }
 
 interface Attack {
@@ -271,9 +276,13 @@ export function pruneHeroes(live: ReadonlySet<number>): void {
   for (const id of mems.keys()) if (!live.has(id)) mems.delete(id);
 }
 
-/** The pose for knight `h` now (call once per drawn frame; it remembers what it saw). */
-export function heroPose(w: World, h: Unit): HeroPose {
-  const sheet = SHEETS[h.knightId ? knightSheet(h.knightId) : KNIGHT_SHEET[h.cls!]];
+/**
+ * The pose for knight `h` now (call once per drawn frame; it remembers what it saw). `calm` (reduce
+ * motion): a Legendary's power-up without its rise and tremble.
+ */
+export function heroPose(w: World, h: Unit, calm = false): HeroPose {
+  const sheetName = h.knightId ? knightSheet(h.knightId) : KNIGHT_SHEET[h.cls!];
+  const sheet = SHEETS[sheetName];
   // Sheets that draw the diagonals face eight ways; the rest face the dominant axis.
   const face = (dx: number, dy: number): Dir => (sheet.eightWay ? facing8(dx, dy) : facing(dx, dy));
   let m = mems.get(h.uid);
@@ -392,6 +401,11 @@ export function heroPose(w: World, h: Unit): HeroPose {
       });
     }
     return pose(anim, dir, k);
+  }
+  // --- a Legendary slamming down: the power-up, crouch, spring, land and hold, to the slam's beats
+  if (h.skillSlam && sheet.has('victory')) {
+    const p = castPose(sheetName, h.skillSlam, calm);
+    return pose('victory', p.dir, castFrame(sheetName, p), { nudge: [p.dx, p.dy] });
   }
   if (h.stunT > 0 && sheet.has('stun')) return pose('stun', m.dir, loopK('stun', m.dir, now * 1000), { stunned: true });
   // --- skills that take a moment

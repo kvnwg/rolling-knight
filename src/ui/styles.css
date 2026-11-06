@@ -1531,6 +1531,14 @@ select.select {
   font-size: calc(3.8 * var(--fpx, var(--px)));
   padding: calc(0.5 * var(--px)) calc(2 * var(--px));
 }
+/* A desktop: the altar stands centered over the skill reel, as wide as it (whatever its reel count). */
+@media (min-width: 900px) and (orientation: landscape) {
+  .dhud .mini-roller {
+    right: calc(5 * var(--px) + env(safe-area-inset-right, 0px));
+    width: calc(46 * var(--px));
+    align-items: center;
+  }
+}
 
 /* The left column: on a desktop the squad sits at the bottom left and the jobs at the top left (the
    column is see-through to layout); on a phone the squad's cards and the jobs under them are one
@@ -3411,6 +3419,103 @@ body,
   .member.plate .shine::before,
   .member.plate.live[data-state='low'] .live-bar > i.fill,
   .member.plate.live[data-state='low'] .portrait {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------------------------ the push to rebirth */
+/* REBIRTH READY: a gold plate at the top middle, pulsing, until the run is reborn (RebirthPill). */
+.rebirth-pill {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  top: calc(3 * var(--px) + env(safe-area-inset-top, 0px));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: calc(2 * var(--px));
+  max-width: min(calc(170 * var(--px)), 46vw);
+  min-height: 0;
+  padding: calc(1.5 * var(--px)) calc(5 * var(--px)) calc(3 * var(--px)) calc(2 * var(--px));
+  cursor: pointer;
+  overflow: hidden;
+  animation: rebirthPulse 1.3s steps(6) infinite;
+  pointer-events: auto;
+}
+.rebirth-pill:hover {
+  filter: brightness(1.08);
+}
+.rebirth-pill:active {
+  transform: translateX(-50%) translateY(var(--px));
+}
+.rebirth-pill .rp-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: calc(11 * var(--px));
+  height: calc(11 * var(--px));
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #4a2a6a 0%, #1a1326 75%);
+  box-shadow: 0 0 0 calc(0.5 * var(--px)) #1a1326, 0 0 0 var(--px) #c8902a;
+  animation: rebirthSpin 2.6s steps(12) infinite;
+}
+.rebirth-pill .rp-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  line-height: 1.05;
+  text-align: left;
+}
+.rebirth-pill .rp-text b {
+  font-size: calc(6 * var(--fpx, var(--px)));
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.rebirth-pill .rp-text small {
+  font-size: calc(3.8 * var(--fpx, var(--px)));
+  opacity: 0.9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.rebirth-pill .rp-shine {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 0 40%, rgba(255, 255, 220, 0.7) 45% 49%, transparent 54%);
+  background-size: 260% 100%;
+  animation: rebirthShine 2.4s steps(16) infinite;
+}
+@keyframes rebirthPulse {
+  0%, 100% { filter: drop-shadow(0 var(--px) 0 #1a1326) drop-shadow(0 0 0 rgba(255, 216, 74, 0)); }
+  50% { filter: drop-shadow(0 var(--px) 0 #1a1326) drop-shadow(0 0 calc(4 * var(--px)) rgba(255, 216, 74, 0.95)); }
+}
+@keyframes rebirthSpin {
+  to { transform: rotate(360deg); }
+}
+@keyframes rebirthShine {
+  0% { background-position: 130% 0; }
+  60%, 100% { background-position: -30% 0; }
+}
+/* On a phone the plate is narrow: just the call, the line goes. */
+@media (max-width: 599px) {
+  .rebirth-pill {
+    top: calc(26 * var(--px) + env(safe-area-inset-top, 0px));
+  }
+  .rebirth-pill .rp-text small {
+    display: none;
+  }
+}
+/* A boss's bar sits at the top middle: the plate goes under it. */
+.dhud.has-boss .rebirth-pill {
+  top: calc(46 * var(--px) + env(safe-area-inset-top, 0px));
+}
+@media (prefers-reduced-motion: reduce) {
+  .rebirth-pill,
+  .rebirth-pill .rp-icon,
+  .rebirth-pill .rp-shine {
     animation: none;
   }
 }

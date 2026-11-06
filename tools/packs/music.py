@@ -1,5 +1,5 @@
 """
-The music: seamless loops cut from recorded tracks by Kevin MacLeod, into src/assets/music/ (an .m4a
+The music: seamless loops cut from recorded tracks by Kevin MacLeod, into src/assets/music/ (an .mp3
 per track and tracks.json with each loop's points), from the downloaded originals (not in the
 repository: CREDITS.md says where each one came from).
 
@@ -15,9 +15,9 @@ side is the loop's own continuation: the whole file is periodic, so the loop poi
 whatever priming silence a decoder leaves at the front. The report's "seam" checks that on the
 encoded file (the decoded audio around the two loop points, alike up to the codec's noise).
 
-Each loop is normalized to -18 LUFS (EBU R128, measured by ffmpeg) and encoded as AAC-LC stereo in
-M4A (iOS Safari, Chrome, Firefox and Android all decode it): 64 kbps, or 56 for the mellow pieces
-with next to nothing above 8 kHz. The victory sting is the end of an orchestral fanfare (from its
+Each loop is normalized to -18 LUFS (EBU R128, measured by ffmpeg) and encoded as MP3 (stereo,
+44.1 kHz; MP3 because the artifact's public sharing only takes MP3 or WAV audio): 80 kbps cut at
+15.5 kHz, or 64 kbps cut at 12 kHz for the mellow pieces with next to nothing above 8 kHz. The victory sting is the end of an orchestral fanfare (from its
 third note, through the pause, to its giant last chord, faded as it rings), at -16 LUFS.
 """
 import json
@@ -34,7 +34,7 @@ SR = 44100
 MARGIN = 0.25
 TARGET_LUFS = -18.0
 STING_LUFS = -16.0
-BITRATE = '64k'
+BITRATE = '80k'
 
 INC = 'https://incompetech.com/music/royalty-free/mp3-royaltyfree/'
 FREEPD = 'https://archive.org/download/freepd/'
@@ -44,9 +44,9 @@ FREEPD = 'https://archive.org/download/freepd/'
 # (s), bitrate if not BITRATE.
 TRACKS = {
     'tavern': dict(src='Midnight Tale.mp3', title='Midnight Tale', url=INC + 'Midnight%20Tale.mp3', license='CC BY 4.0',
-                   a=7.025, samples=4603315, bpm=73, xfade=1.5, kbps='56k'),
+                   a=7.025, samples=4603315, bpm=73, xfade=1.5, kbps='64k'),
     'village': dict(src='Village Consort.mp3', title='Village Consort', url=INC + 'Village%20Consort.mp3', license='CC BY 4.0',
-                    a=77.049, bars=32, bpm=95, bpb=4, xfade=1.5, kbps='56k'),
+                    a=77.049, bars=32, bpm=95, bpb=4, xfade=1.5, kbps='64k'),
     'inn': dict(src='Dancing at the Inn.mp3', title='Dancing at the Inn', url=FREEPD + 'misc/Dancing%20at%20the%20Inn.mp3', license='Public domain (FreePD)',
                 a=31.533, samples=2232852, xfade=1.0),
     'celtic': dict(src='Celtic Impulse.mp3', title='Celtic Impulse', url=INC + 'Celtic%20Impulse.mp3', license='CC BY 4.0',
@@ -54,7 +54,7 @@ TRACKS = {
     'angevin': dict(src='Angevin B.mp3', title='Angevin B', url=INC + 'Angevin%20B.mp3', license='CC BY 4.0',
                     a=64.004, bars=24, bpm=120, bpb=4, xfade=1.5),
     'snow': dict(src='The Snow Queen.mp3', title='The Snow Queen', url=INC + 'The%20Snow%20Queen.mp3', license='CC BY 4.0',
-                 a=37.504, bars=20, bpm=96, bpb=4, xfade=1.5, kbps='56k'),
+                 a=37.504, bars=20, bpm=96, bpb=4, xfade=1.5, kbps='64k'),
     'desert': dict(src='Desert City.mp3', title='Desert City', url=INC + 'Desert%20City.mp3', license='CC BY 4.0',
                    a=11.155, bars=16, bpm=86, bpb=4, xfade=1.0),
     'emperor': dict(src='Mountain Emperor.mp3', title='Mountain Emperor', url=INC + 'Mountain%20Emperor.mp3', license='CC BY 4.0',
@@ -122,9 +122,10 @@ def build_loop(x, a, L, xfade):
 
 def encode(wav, out, gain_db, title, kbps):
     subprocess.run([
-        'ffmpeg', '-v', 'error', '-y', '-i', wav, '-af', f'volume={gain_db:.2f}dB', '-c:a', 'aac', '-b:a', kbps,
+        'ffmpeg', '-v', 'error', '-y', '-i', wav, '-af', f'volume={gain_db:.2f}dB', '-c:a', 'libmp3lame', '-b:a', kbps,
+        '-cutoff', '15500' if kbps == BITRATE else '12000', '-ar', '44100', '-ac', '2',
         '-map_metadata', '-1', '-metadata', f'title={title}', '-metadata', 'artist=Kevin MacLeod',
-        '-fflags', '+bitexact', '-flags:a', '+bitexact', '-movflags', '+faststart', out,
+        '-fflags', '+bitexact', '-flags:a', '+bitexact', out,
     ], check=True)
 
 
@@ -167,7 +168,7 @@ def main():
         peak = float(np.abs(y).max())
         write_wav(wav, y / max(1.0, peak))
         lufs, _ = loudness(wav)
-        out = os.path.join(out_dir, tid + '.m4a')
+        out = os.path.join(out_dir, tid + '.mp3')
         kbps = t.get('kbps', BITRATE)
         encode(wav, out, TARGET_LUFS - lufs, t['title'], kbps)
         # Check the result: its loudness, that the decoded file is periodic across the loop points, and the wrap.
@@ -202,7 +203,7 @@ def main():
         peak = float(np.abs(y).max())
         write_wav(wav, y / max(1.0, peak))
         lufs, _ = loudness(wav)
-        out = os.path.join(out_dir, sid + '.m4a')
+        out = os.path.join(out_dir, sid + '.mp3')
         encode(wav, out, STING_LUFS - lufs, s['title'], BITRATE)
         got, tp = loudness(out)
         size = os.path.getsize(out)

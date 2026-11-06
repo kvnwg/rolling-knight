@@ -35,6 +35,8 @@ export type CoreEvent =
   | { type: 'bought'; item: import('./runItems').RunItemId; price: number }
   | { type: 'wipe'; floor: number; back: number }
   | { type: 'rebirth'; count: number }
+  /** This run just reached the floor a rebirth needs (once a run). */
+  | { type: 'rebirthReady'; next: number }
   /** A knight's dodge roll made something miss it (once per roll); `mine`: the knight you control. */
   | { type: 'perfectRoll'; mine: boolean }
   /** A knight's swing cut a foe's shot out of the air, at (x, y) on the floor (`reflect`: sent back; `mine`: your knight's). */

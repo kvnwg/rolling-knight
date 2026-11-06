@@ -24,7 +24,7 @@ the raw packs are not in this repository. The in-game credits are in Settings.
 ## Music
 
 All by Kevin MacLeod. Each track is cut into a seamless loop of whole bars (crossfaded at the loop
-point), normalized to -18 LUFS and re-encoded as AAC by `tools/packs/music.py`, into
+point), normalized to -18 LUFS and re-encoded as MP3 by `tools/packs/music.py`, into
 `src/assets/music/`; the victory sting is 6.4 s of its piece, from its third note through its last
 chord. The in-game credit is in Settings (built from `src/audio/tracks.ts`).
 

@@ -20,6 +20,7 @@ import { RARITY_COLOR, rarityIndex } from '../core/rarity';
 import { SKILLS, TIER_NAME, TIER_RARITY, fmtChance, skillOdds, skillsFor, tierStep, type SkillDef, type SkillIcon, type SkillId, type SkillTier } from '../core/skillbook';
 import type { Game } from '../game';
 import type { Unit } from '../world/entities';
+import { SLAM_BEATS } from '../world/slam';
 import { Chunky, type Grad } from './fx/Chunky';
 import { sparklePic } from './fx/pixelArt';
 import { RAINBOW, raysUrl } from './fx/rays';
@@ -357,9 +358,10 @@ export function SkillRoll({
         if (!sawSlam) land(h.lastSkill.skill, calm);
         sawSlam = false;
       }
-      // While it slams, its icon has left the reel (the big reel's: the slam flies it to the middle).
+      // While it slams, its icon has left the reel (the big reel's: the slam pops it out and flies it
+      // up over the knight; it's gone from here halfway through the pop, the flying one over it).
       if (rootRef.current) {
-        const out = !!h.skillSlam && !popOnRef.current && h.skillSlam.t / h.skillSlam.dur > 0.12;
+        const out = !!h.skillSlam && !popOnRef.current && h.skillSlam.t / h.skillSlam.dur > SLAM_BEATS.pop / 2;
         if (out) rootRef.current.dataset.slam = '';
         else delete rootRef.current.dataset.slam;
       }

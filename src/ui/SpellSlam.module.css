@@ -1,7 +1,8 @@
 /*
- * The spell slam (SpellSlam.tsx): an icon flying from the big reel to the middle of the screen, and
- * its landing. Everything is on one layer over the HUD that never takes a tap. Pixel art scales with
- * hard edges; glows are hard-edged drop shadows in the tier's light (--tc).
+ * The spell slam (SpellSlam.tsx): an icon flying from the big reel up over your knight, its stamp
+ * (the flash, the shockwave ring, the name), and its dive into the spell. Everything is on one layer
+ * over the HUD that never takes a tap. Pixel art scales with hard edges, in whole device pixels; glows
+ * are hard-edged drop shadows in the tier's light (--tc).
  */
 .root {
   position: fixed;
@@ -12,7 +13,8 @@
 }
 .icon,
 .trail,
-.rays {
+.rays,
+.ring {
   position: absolute;
   left: 0;
   top: 0;
@@ -27,6 +29,11 @@
   filter: drop-shadow(0 0 0 #000) drop-shadow(calc(var(--glow) * 2px) 0 0 var(--tc, #fff)) drop-shadow(calc(var(--glow) * -2px) 0 0 var(--tc, #fff))
     drop-shadow(0 calc(var(--glow) * 2px) 0 var(--tc, #fff)) drop-shadow(0 calc(var(--glow) * -2px) 0 var(--tc, #fff));
 }
+/* Landed in its spot, about to go off: white-hot in a rim of the tier's light. */
+.icon[data-hot] {
+  filter: brightness(0) invert(1) drop-shadow(2px 0 0 var(--tc, #fff)) drop-shadow(-2px 0 0 var(--tc, #fff)) drop-shadow(0 2px 0 var(--tc, #fff))
+    drop-shadow(0 -2px 0 var(--tc, #fff));
+}
 .trail {
   filter: brightness(1.6) saturate(0.6);
 }
@@ -35,17 +42,18 @@
   mix-blend-mode: screen;
 }
 
-/* ------------------------------------------------------------ the landing */
+/* ------------------------------------------------------------ the stamp */
 .stamp {
   position: absolute;
   inset: 0;
 }
+/* A quick flash in the tier's light, gone before the icon dives. */
 .flash {
   position: absolute;
   inset: 0;
   opacity: 0;
   mix-blend-mode: screen;
-  animation: flash 380ms steps(5, jump-none) forwards;
+  animation: flash 240ms steps(4, jump-none) forwards;
 }
 @keyframes flash {
   0% {
@@ -53,36 +61,6 @@
   }
   100% {
     opacity: 0;
-  }
-}
-.ring {
-  position: absolute;
-  left: var(--x);
-  top: var(--y);
-  width: var(--size);
-  height: var(--size);
-  margin: calc(var(--size) / -2) 0 0 calc(var(--size) / -2);
-  border-radius: 50%;
-  border: 6px solid var(--tc);
-  box-shadow: 0 0 0 2px #1a1326, inset 0 0 0 2px #1a1326;
-  opacity: 0;
-  animation: ring 460ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
-}
-.ring2 {
-  border-color: #ffffff;
-  border-width: 3px;
-  animation-delay: 70ms;
-  animation-duration: 560ms;
-}
-@keyframes ring {
-  0% {
-    opacity: 1;
-    transform: scale(0.35);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(2.1);
-    border-width: 1px;
   }
 }
 .stampRays {
@@ -93,44 +71,20 @@
   height: calc(var(--size) * 3.2);
   margin: calc(var(--size) * -1.6) 0 0 calc(var(--size) * -1.6);
   mix-blend-mode: screen;
-  animation: stampRays calc(var(--hold) + 420ms) linear forwards;
+  /* (Gone as the icon sets off for the spell: the slam's afterglow, not a second show.) */
+  animation: stampRays 300ms linear forwards;
 }
 @keyframes stampRays {
   0% {
     opacity: 0.95;
     transform: rotate(0deg) scale(1);
   }
-  70% {
-    opacity: 0.7;
+  50% {
+    opacity: 0.5;
   }
   100% {
     opacity: 0;
-    transform: rotate(50deg) scale(1.15);
-  }
-}
-.stampIcon {
-  position: absolute;
-  left: var(--x);
-  top: var(--y);
-  width: var(--size);
-  height: var(--size);
-  margin: calc(var(--size) / -2) 0 0 calc(var(--size) / -2);
-  image-rendering: pixelated;
-  filter: drop-shadow(3px 0 0 var(--tc)) drop-shadow(-3px 0 0 var(--tc)) drop-shadow(0 3px 0 var(--tc)) drop-shadow(0 -3px 0 var(--tc)) drop-shadow(0 4px 0 #1a1326);
-  animation:
-    squash 240ms steps(4, jump-none),
-    leave 260ms ease-in var(--hold) forwards;
-}
-/* The slam: squashed flat on impact, a bounce up, then still. */
-@keyframes squash {
-  0% {
-    transform: scale(1.22, 0.78) translateY(6%);
-  }
-  45% {
-    transform: scale(0.94, 1.08) translateY(-3%);
-  }
-  100% {
-    transform: none;
+    transform: rotate(24deg) scale(1.08);
   }
 }
 @keyframes leave {
@@ -173,9 +127,6 @@
   letter-spacing: 0.08em;
   color: var(--tc);
   text-shadow: 1px 0 0 #1a1326, -1px 0 0 #1a1326, 0 1px 0 #1a1326, 0 -1px 0 #1a1326, 0 2px 0 #1a1326;
-}
-.stamp[data-calm] .stampIcon {
-  animation: leave 260ms ease-in var(--hold) forwards;
 }
 .stamp[data-calm] .name {
   animation: leave 240ms ease-in calc(var(--hold) + 60ms) forwards;
