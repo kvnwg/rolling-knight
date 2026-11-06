@@ -1,9 +1,14 @@
 /**
- * Rain on the world: a soft hiss under everything while it rains, a low wash of heavier rain beneath
- * it, and a patter of single drops on top. It plays on the sound effects' bus, so the effects volume
- * sets it, and fades in and out as the weather changes from floor to floor.
+ * Rain on the world: a soft, dark hiss under everything while it rains, a low wash of heavier rain
+ * beneath it, and a sparse patter of single drops on top. Kept well down: rain is a bed under the
+ * fight, never in your ears (the bright hiss is cut off at 4 kHz, the whole bed about 10 dB under
+ * where it was). It plays on the sound effects' bus, so the effects volume sets it, and fades in and
+ * out as the weather changes from floor to floor.
  */
 import { engine, guarded, type Graph } from './engine';
+
+/** The rain bed's level at full rain, on the effects' bus. */
+const RAIN_GAIN = 0.032;
 
 interface Bed {
   graph: Graph;
@@ -40,7 +45,7 @@ class RainSound {
     if (this.level > 0) {
       this.bed ??= this.build(g, now);
       this.bed.gain.gain.cancelScheduledValues(now);
-      this.bed.gain.gain.setTargetAtTime(0.1 * this.level, now, 0.9);
+      this.bed.gain.gain.setTargetAtTime(RAIN_GAIN * this.level, now, 0.9);
       this.timer ??= setInterval(() => this.patter(), 70);
     } else {
       const b = this.bed;
@@ -84,7 +89,7 @@ class RainSound {
       src.start(now, Math.random() * 1.5);
       return src;
     };
-    const hiss = loop(0.93, [['highpass', 1100, 0.5], ['lowpass', 7500, 0.4]], 0.55);
+    const hiss = loop(0.93, [['highpass', 900, 0.5], ['lowpass', 4000, 0.5]], 0.4);
     const wash = loop(0.61, [['lowpass', 520, 0.6]], 0.9);
     return { graph: g, gain, srcs: [hiss, wash] };
   }
@@ -94,10 +99,10 @@ class RainSound {
     const g = engine.live;
     if (!g || !this.bed || engine.sfxVolume <= 0) return;
     const now = g.ctx.currentTime;
-    const n = Math.random() < 0.6 * this.level ? (Math.random() < 0.3 ? 2 : 1) : 0;
+    const n = Math.random() < 0.35 * this.level ? 1 : 0;
     for (let i = 0; i < n; i++) {
       const at = now + 0.02 + Math.random() * 0.06;
-      engine.noise(g.sfx, at, 0.02 + Math.random() * 0.03, { type: 'bandpass', freq: 2200 + Math.random() * 4200, q: 3, gain: (0.006 + Math.random() * 0.014) * this.level }, false);
+      engine.noise(g.sfx, at, 0.02 + Math.random() * 0.03, { type: 'bandpass', freq: 1800 + Math.random() * 2400, q: 3, gain: (0.002 + Math.random() * 0.005) * this.level }, false);
     }
   }
 }
