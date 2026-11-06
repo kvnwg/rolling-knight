@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatGold, mobKind, rewardText, type MobKind, type QuestReward } from '../core/quests';
 import type { Game } from '../game';
-import { npcFrame, questMarker } from '../render/art/npcs';
+import { npcPortrait, questMarker } from '../render/art/npcs';
 import { toCanvas } from '../render/art/draw';
 import type { DialogChoice, DialogJob, JobAim, Npc } from '../world/npcs';
 import { Px, type IconName } from './px';
@@ -27,7 +27,7 @@ export function DialogBox({ game, npc, onClose }: { game: Game; npc: Npc; onClos
   /** The job card shows its words. */
   const [info, setInfo] = useState(false);
   const node = graph[at] ?? graph.start;
-  const portrait = useMemo(() => toCanvas(npcFrame(npc.def, 'idle', 'down', 0).buf).toDataURL(), [npc]);
+  const portrait = useMemo(() => toCanvas(npcPortrait(npc.def)).toDataURL(), [npc]);
   // Type the words out, a few letters a frame; a tap shows them all.
   useEffect(() => {
     setShown(0);

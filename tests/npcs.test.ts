@@ -16,7 +16,7 @@ import {
 import { mend } from '../src/core/save';
 import { newGame } from '../src/core/newGame';
 import { addKnight, knightStats } from '../src/core/roster';
-import { npcFrame, questMarker, NPC_H, NPC_W } from '../src/render/art/npcs';
+import { npcFrame, npcHeight, npcPortrait, questMarker, NPC_H, NPC_W } from '../src/render/art/npcs';
 import { mobFrame } from '../src/render/art/mobs';
 import { propArt } from '../src/render/art/props';
 import { BIOME_ORDER, BIOMES, isBossFloor } from '../src/world/biomes';
@@ -28,6 +28,7 @@ import { floorMobs, type BossMove } from '../src/world/mobgen';
 import { World, type HeroSpec } from '../src/world/world';
 import {
   NPC_DEFS,
+  SHOPKEEPER,
   applyDialogAction,
   demonDefFor,
   demonMobType,
@@ -633,6 +634,32 @@ describe('NPC art', () => {
     const back = questMarker('turnIn');
     expect(offer.w * offer.h).toBeGreaterThan(50);
     expect(Array.from(offer.px)).not.toEqual(Array.from(back.px));
+  });
+
+  it('stands the merchant tall like the keepers, facing whichever way, with a portrait the size of anyone\'s', () => {
+    expect(SHOPKEEPER.look.tall).toBeTruthy();
+    for (const view of ['down', 'side', 'up'] as const) {
+      for (const dir of [1, -1] as const) {
+        const fr = npcFrame(SHOPKEEPER, 'idle', view, 3, dir);
+        expect(fr.faced, view).toBe(true);
+        expect(npcHeight(fr), `${view} ${dir}`).toBeGreaterThanOrEqual(36);
+        expect(npcHeight(fr), `${view} ${dir}`).toBeLessThanOrEqual(48);
+        // Standing on her feet.
+        let feet = 0;
+        for (let x = 0; x < fr.buf.w; x++) if (fr.buf.px[(fr.ay * fr.buf.w + x) * 4 + 3]) feet++;
+        expect(feet, view).toBeGreaterThan(3);
+      }
+    }
+    // The folk on the floors stay on the little mannequin.
+    for (const def of NPC_DEFS) expect(def.look.tall, def.id).toBeFalsy();
+    // Portraits for the talk card and a conversation: all one size; hers is her head and shoulders.
+    for (const def of [...NPC_DEFS, SHOPKEEPER]) {
+      const p = npcPortrait(def);
+      expect([p.w, p.h], def.id).toEqual([NPC_W, NPC_H]);
+      let opaque = 0;
+      for (let i = 3; i < p.px.length; i += 4) if (p.px[i]) opaque++;
+      expect(opaque, def.id).toBeGreaterThan(80);
+    }
   });
 
   it('draws every biome\'s set-up, lit where the night needs it', () => {

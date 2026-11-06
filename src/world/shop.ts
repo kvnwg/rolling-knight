@@ -90,7 +90,9 @@ export function placeShop(map: FloorMap, floor: number, biomeId: string, seed: n
   if (camp.room >= 0) map.spawns = map.spawns.filter((s) => s.boss || s.room !== camp.room);
   const items = pickWares(rng, spots.length);
   const wares: Ware[] = spots.map((p, i) => ({ uid: nextWareUid++, item: items[i], price: warePrice(items[i], killGold), x: p.x, y: p.y, sold: false }));
-  const merchant = makeNpc(SHOPKEEPER, camp.stand.x, camp.stand.y, floor, biomeId, rng.int(0, 0x3fffffff));
+  // (She stands tall, so under a stall's roof she steps up to the counter: camps.ts.)
+  const at = SHOPKEEPER.look.tall ? camp.tallStand : camp.stand;
+  const merchant = makeNpc(SHOPKEEPER, at.x, at.y, floor, biomeId, rng.int(0, 0x3fffffff));
   merchant.camp = camp;
   merchant.room = camp.room;
   return { merchant, wares, room: camp.room };

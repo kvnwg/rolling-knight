@@ -20,7 +20,7 @@
 import type { StationId } from '../../../world/hubWorld';
 import { HUB_CAST } from '../hubNpcs';
 import { GOLD, h2, IRON, Layer, PLANK, STONE, TIMBER, vnoise, rk, oval, type Ramp } from '../hubKit';
-import { paintBust, type BustSpec } from './bust';
+import { bustGeometry, paintBust, type BustSpec } from './bust';
 import {
   anvil, balance, banner, beam, birdcage, books, bottle, BRASS, candle, coins, counter, crystalOrb, curio, drape, flowerPot, forge, gear, jar, lantern, ledger,
   note, PARCH, shelf, shield, sigilStone, slateBoard, sunEmblem, sword, toolRack, wallPlanks, wallPlaster, wallStone,
@@ -49,8 +49,20 @@ const TEAL_CLOTH: Ramp = ['#0c2a2c', '#14403e', '#1c5650', '#2a6e64', '#3a8a7a']
 
 type Keeper = keyof typeof HUB_CAST;
 
-function bustFor(k: Keeper, extra: Partial<BustSpec> = {}): BustSpec {
-  return { look: HUB_CAST[k].look, ...extra };
+/** How each keeper looks at their counter: what they hold, their eyes, their mood. */
+export const KEEPER_BUSTS: Partial<Record<Keeper, Omit<BustSpec, 'look'>>> = {
+  oracle: { glowEyes: '#ffd84a', lashes: true, mouth: 'smile', tool: 'orbStaff' },
+  upgrades: { tool: 'wrench', mouth: 'grin', brows: 'raised' },
+  perks: { tool: 'staff', old: true, mouth: 'flat' },
+  rebirth: { tool: 'candle', lashes: true, mouth: 'smile' },
+  gate: { tool: 'spear', mouth: 'flat', brows: 'stern' },
+  smith: { tool: 'hammer', mouth: 'grin' },
+  scrap: { tool: 'magnifier', old: true, lashes: true, mouth: 'smile' },
+  squad: { tool: 'quill', lashes: true, mouth: 'smile', look2: -1 },
+};
+
+function bustFor(k: Keeper): BustSpec {
+  return { look: HUB_CAST[k].look, ...KEEPER_BUSTS[k] };
 }
 
 /** Paints a keeper's scene, `w` x `h` art pixels. */
@@ -144,7 +156,7 @@ const SCENES: Record<StationId, Painter> = {
     lantern(L, cx - 50, 0, Math.max(14, base - 58), { light: 0.7 });
     lantern(L, cx + 56, 0, Math.max(12, base - 70), { light: 0.45, r: 50 });
     keyLight(L, f);
-    const bust = paintBust(L, cx, base, bustFor('upgrades', { tool: 'wrench', mouth: 'grin', brows: 'raised' }));
+    const bust = paintBust(L, cx, base, bustFor('upgrades'));
     counter(L, 0, w, base, h, { seed: 7, ramp: PLANK });
     bust.front(L);
     // On the bench: a vise, gears and screws, a little clockwork reel, an oil can.
@@ -182,7 +194,7 @@ const SCENES: Record<StationId, Painter> = {
       if (y > 2) L.gl(x, y, h2(i, 3, 5) < 0.5 ? '#ffd060' : '#ff8a3a');
     }
     keyLight(L, f, '#ffc88a', 0.8);
-    const bust = paintBust(L, cx, base, bustFor('smith', { tool: 'hammer', mouth: 'grin' }));
+    const bust = paintBust(L, cx, base, bustFor('smith'));
     counter(L, 0, w, base, h, { seed: 9, ramp: ['#1a1210', '#2a1c16', '#3a2820', '#4c362a', '#604636', '#765a46', '#8e6e56', '#a88468'] });
     bust.front(L);
     anvil(L, cx - 36, base + 1);
@@ -229,7 +241,7 @@ const SCENES: Record<StationId, Painter> = {
     birdcage(L, cx + 52, 0, Math.max(16, base - 50));
     lantern(L, cx - 54, 0, Math.max(12, base - 56), { light: 0.75 });
     keyLight(L, f);
-    const bust = paintBust(L, cx, base, bustFor('scrap', { tool: 'magnifier', old: true, lashes: true, mouth: 'smile' }));
+    const bust = paintBust(L, cx, base, bustFor('scrap'));
     counter(L, 0, w, base, h, { seed: 5, ramp: PLANK });
     bust.front(L);
     balance(L, cx - 38, base);
@@ -283,7 +295,7 @@ const SCENES: Record<StationId, Painter> = {
     candle(L, cx + 36, base - 1, 10, { w: 3 });
     keyLight(L, f, '#ffe0b0', 0.85);
     L.light(cx + 30, base - 30, 70, '#7af0e0', 0.35);
-    const bust = paintBust(L, cx, base, bustFor('perks', { tool: 'staff', old: true, mouth: 'flat' }));
+    const bust = paintBust(L, cx, base, bustFor('perks'));
     counter(L, 0, w, base, h, { seed: 3, ramp: ['#100a08', '#1c120c', '#2a1c12', '#3a2818', '#4c3420', '#5e422a', '#725236', '#886444'], cloth: TEAL_CLOTH, trim: GOLD });
     bust.front(L);
     // An open book and a crystal on the cloth.
@@ -326,7 +338,7 @@ const SCENES: Record<StationId, Painter> = {
       }
     }
     keyLight(L, f, '#ffd8b0', 0.9);
-    const bust = paintBust(L, cx, base, bustFor('rebirth', { tool: 'candle', lashes: true, mouth: 'smile' }));
+    const bust = paintBust(L, cx, base, bustFor('rebirth'));
     counter(L, 0, w, base, h, { seed: 2, ramp: SAND, cloth: CLOTH_W, trim: GOLD });
     bust.front(L);
     candle(L, cx - 30, base, 8, { w: 3, light: 0.4 });
@@ -372,7 +384,7 @@ const SCENES: Record<StationId, Painter> = {
     }
     lantern(L, cx - 24, 0, Math.max(10, base - 66), { light: 0.6, r: 60 });
     keyLight(L, f);
-    const bust = paintBust(L, cx, base, bustFor('squad', { tool: 'quill', lashes: true, mouth: 'smile', look2: -1 }));
+    const bust = paintBust(L, cx, base, bustFor('squad'));
     counter(L, 0, w, base, h, { seed: 11, ramp: PLANK });
     bust.front(L);
     ledger(L, cx - 30, base);
@@ -391,8 +403,8 @@ const SCENES: Record<StationId, Painter> = {
     }
     // The great reel of the Gilded Reel, glowing behind her: a gilded ring of bulbs, spokes, a star,
     // round her head like a halo.
-    const ry = Math.max(22, base - 36);
-    const R = 24;
+    const R = 21;
+    const ry = Math.max(R + 1, bustGeometry(cx, base).headY + 2);
     for (let y = ry - R - 3; y <= ry + R + 3; y++) {
       for (let x = cx - R - 3; x <= cx + R + 3; x++) {
         const d = Math.hypot(x + 0.5 - cx, y + 0.5 - ry);
@@ -431,7 +443,7 @@ const SCENES: Record<StationId, Painter> = {
       }
     }
     keyLight(L, f, '#ffcc9a', 0.8);
-    const bust = paintBust(L, cx, base, bustFor('oracle', { glowEyes: '#ffd84a', lashes: true, mouth: 'smile', tool: 'orbStaff' }));
+    const bust = paintBust(L, cx, base, bustFor('oracle'));
     counter(L, 0, w, base, h, { seed: 13, ramp: ['#0e0812', '#1a0e1e', '#28162c', '#38203c', '#4a2c4e', '#5e3a62', '#744a78', '#8c5c90'], trim: GOLD, cloth: ['#1a0a2a', '#2c1640', '#4a2466', '#6e3a8e', '#8e5aae'] });
     bust.front(L);
     crystalOrb(L, cx - 30, base + 1, 8, '#9a6af0');
@@ -531,7 +543,7 @@ const SCENES: Record<StationId, Painter> = {
       }
     }
     keyLight(L, f, '#ffd29a', 0.85);
-    const bust = paintBust(L, cx, base, bustFor('gate', { tool: 'spear', mouth: 'flat', brows: 'stern' }));
+    const bust = paintBust(L, cx, base, bustFor('gate'));
     // A stone parapet in front of him.
     wallStone(L, 0, base, w, h, 23, STONE);
     for (let x = 0; x < w; x++) {

@@ -345,11 +345,12 @@ function stallBack(seed: number): Art {
 }
 
 function stallFront(seed: number): Art {
-  const p = new Pic(-24, -53, 23, 0);
+  const p = new Pic(-24, -62, 23, 0);
   const { c, w } = AWNINGS[Math.floor(hash(seed, 1) * AWNINGS.length)];
-  // Front posts, framing the counter, up to the awning.
-  post(p, -23, -36, 0, WOOD, 2);
-  post(p, 21, -36, 0, WOOD, 2);
+  // Front posts, framing the counter, up to the awning (high enough that a tall merchant's face shows
+  // under its valance).
+  post(p, -23, -45, 0, WOOD, 2);
+  post(p, 21, -45, 0, WOOD, 2);
   // The counter: its top (a board, lit along its front edge), its front of boards with a cloth draped over it.
   for (let y = -16; y <= -10; y++) for (let x = -21; x <= 20; x++) p.px(x, y, at(WOOD, y === -10 ? 5 : y === -16 ? 1.6 : 3.4 + (x < -8 ? 0.3 : 0) - (y - -16) * 0.08 + (hash(seed, x, y) < 0.06 ? -0.6 : 0)));
   boards(p, -21, -9, 42, 9, WOOD, seed + 9, 5, 2.4);
@@ -380,9 +381,9 @@ function stallFront(seed: number): Art {
   p.ball(-17, -3.5, 4, 3.6, ['#4e3c26', '#7a6040', '#a48660', '#c8ac84', '#e4d0a8']);
   p.hline(-18, -16, -7, '#5a4228');
   // The awning, a lantern hanging from its front edge on the left.
-  awning(p, -24, 23, -50, -37, 4, c, w);
-  lantern(p, -17, -35);
-  return p.art({ light: { dx: -17, dy: -30, color: '#ffc070', r: 58, flicker: true } });
+  awning(p, -24, 23, -59, -46, 4, c, w);
+  lantern(p, -17, -44);
+  return p.art({ light: { dx: -17, dy: -39, color: '#ffc070', r: 58, flicker: true } });
 }
 
 // ------------------------------------------------------------------ the shrine: a little roofed stall
@@ -435,9 +436,9 @@ function yataiBack(seed: number): Art {
 }
 
 function yataiFront(seed: number): Art {
-  const p = new Pic(-26, -54, 25, 0);
-  post(p, -23, -36, 0, LACQUER, 2);
-  post(p, 21, -36, 0, LACQUER, 2);
+  const p = new Pic(-26, -63, 25, 0);
+  post(p, -23, -45, 0, LACQUER, 2);
+  post(p, 21, -45, 0, LACQUER, 2);
   // The counter: lacquered red front with a dark plinth, a mat of split bamboo on top.
   for (let y = -16; y <= -10; y++) for (let x = -21; x <= 20; x++) p.px(x, y, (x + 30) % 2 === 0 ? at(HAY, y === -10 ? 5 : 3.6 - (y + 16) * 0.12) : at(HAY, y === -10 ? 4.4 : 2.9 - (y + 16) * 0.1));
   p.hline(-21, 20, -16, HAY[1]);
@@ -467,9 +468,10 @@ function yataiFront(seed: number): Art {
     p.px(x, -18, '#3a5aa0');
     p.px(x, -15, '#3a5aa0');
   }
-  // The roof: a short tiled roof with upturned corners over a red fascia board.
-  const yb = -53;
-  const yf = -39;
+  // The roof: a short tiled roof with upturned corners over a red fascia board (high enough that a tall
+  // merchant's face shows under its curtain).
+  const yb = -62;
+  const yf = -48;
   for (let y = yb; y <= yf; y++) {
     const t = (y - yb) / (yf - yb);
     const inset = Math.round((1 - t) * 3);
@@ -983,16 +985,17 @@ function rug(seed: number): Art {
 }
 
 function canopyFront(seed: number): Art {
-  const p = new Pic(-26, -60, 25, 0);
-  post(p, -23, -34, 0, WOOD, 2);
-  post(p, 21, -34, 0, WOOD, 2);
+  const p = new Pic(-26, -69, 25, 0);
+  post(p, -23, -43, 0, WOOD, 2);
+  post(p, 21, -43, 0, WOOD, 2);
   // A clay pot at the left pole's foot, a tall glazed jar at the right.
   jar(p, -18, 0, 9, 9, CLAY, seed + 4);
   jar(p, 17, 0, 7, 12, ['#0e2a2e', '#18444a', '#246468', '#3a8a88', '#6ab8b0', '#a8e0d4'], seed + 5);
   // The pavilion's roof: cloth rising from the eaves to a peak, sagging between, in broad stripes of
-  // red and cream with thin indigo lines running down from the peak; lit on the left, in shade on the right.
-  const peak = -55;
-  const eave = -36;
+  // red and cream with thin indigo lines running down from the peak; lit on the left, in shade on the
+  // right (high enough that a tall merchant's face shows under its tassels).
+  const peak = -64;
+  const eave = -45;
   const span = 25;
   for (let x = -span; x <= span - 1; x++) {
     const ax = Math.abs(x + 0.5) / span;
@@ -1025,15 +1028,15 @@ function canopyFront(seed: number): Art {
   }
   // Ropes tying it to the poles.
   for (const x of [-22, 22]) {
-    p.px(x, -32, ROPE);
-    p.px(x, -31, ROPE_DK);
+    p.px(x, -41, ROPE);
+    p.px(x, -40, ROPE_DK);
   }
   // A pierced brass lamp hanging off to the right.
-  p.vline(10, -32, -31, BRASS[2]);
-  p.ball(10, -27.5, 2.6, 3.2, BRASS);
-  for (const [x, y] of [[9, -28], [11, -27], [10, -26], [9, -26]] as const) p.px(x, y, GLOW[4]);
-  p.hline(9, 11, -24, BRASS[1]);
-  return p.art({ light: { dx: 10, dy: -26, color: '#ffb35a', r: 60, flicker: true } });
+  p.vline(10, -41, -40, BRASS[2]);
+  p.ball(10, -36.5, 2.6, 3.2, BRASS);
+  for (const [x, y] of [[9, -37], [11, -36], [10, -35], [9, -35]] as const) p.px(x, y, GLOW[4]);
+  p.hline(9, 11, -33, BRASS[1]);
+  return p.art({ light: { dx: 10, dy: -35, color: '#ffb35a', r: 60, flicker: true } });
 }
 
 // ------------------------------------------------------------------ the graves: a gate and a bench
