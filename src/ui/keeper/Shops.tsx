@@ -264,7 +264,15 @@ export function ShrineShop({ game, station, onClose }: { game: Game; station: Hu
           }
         />
         <ShopHint>
-          <b>Rebirth</b>: start over from floor 1, stronger for good. {ok ? 'You can rebirth now.' : <>Reach <b>floor {need}</b> first.</>} Tap a card for more.
+          {ok ? (
+            <>
+              <b>Rebirth now!</b> It's how you get stronger: every rebirth makes every run after it faster, with more luck, gold and power for good. Tap a card for more.
+            </>
+          ) : (
+            <>
+              <b>Rebirth</b>: start over from floor 1, stronger for good. Reach <b>floor {need}</b> first. Tap a card for more.
+            </>
+          )}
         </ShopHint>
         <ShopBody>
           <ShopGrid>
@@ -283,7 +291,7 @@ export function ShrineShop({ game, station, onClose }: { game: Game; station: Hu
               <i style={{ width: `${Math.min(100, (st.run.bestFloor / need) * 100)}%` }} />
             </div>
           </div>
-          <button className={`btn ${s.bigBtn}`} disabled={!ok} onClick={() => (uiSound('rebirth'), game.rebirth())} style={{ flex: 'none' }}>
+          <button className={`btn ${s.bigBtn}`} data-ready={ok || undefined} disabled={!ok} onClick={() => (uiSound('rebirth'), game.rebirth())} style={{ flex: 'none' }}>
             <Px icon={ok ? 'rebirth' : 'lock'} size="md" />
             {ok ? 'REBIRTH' : `FLOOR ${need}`}
           </button>

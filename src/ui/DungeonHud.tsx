@@ -17,6 +17,7 @@ import { Px } from './px';
 import { SkillRoll, skillSlotLabel, skillSlotState } from './SkillRoll';
 import { SpellSlam } from './SpellSlam';
 import { SquadCard } from './SquadCard';
+import { RebirthPill } from './RebirthPill';
 import { RUN_ITEMS, RUN_ITEM_IDS, canStack } from '../core/runItems';
 import { fmt } from './format';
 import { AltarReels } from './fx/AltarReels';
@@ -139,13 +140,15 @@ function useKeyFlash(): Record<string, number> {
 }
 
 
-export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, onLuck, onAltar, onTalk }: {
+export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, onLuck, onAltar, onTalk, onRebirth }: {
   game: Game;
   controls: Controls;
   press: (w: 'dodge' | 'special') => void;
   /** The attack: held while the Attack button is pressed. */
   hold: (on: boolean) => void;
   onCamp: () => void;
+  /** Back to camp and on to the Shrine (the rebirth push). */
+  onRebirth: () => void;
   onSettings: () => void;
   onLuck: () => void;
   onAltar: () => void;
@@ -214,6 +217,8 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
           <Chunky text="<< REWIND" size={14} grad="blue" />
         </div>
       )}
+
+      <RebirthPill game={game} onGo={onRebirth} />
 
       <div className="mini-roller" onClick={onAltar}>
         <div className="frame">

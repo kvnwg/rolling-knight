@@ -7,7 +7,7 @@ import { drawDesign } from './core/deck';
 import type { CoreEvent } from './core/events';
 import { knightDef } from './core/knights';
 import { currentLuck } from './core/luck';
-import { checkpointFor, newGame, rebirth as doRebirth } from './core/newGame';
+import { canRebirth, checkpointFor, newGame, rebirth as doRebirth } from './core/newGame';
 import { runOffline, type OfflineReport } from './core/offline';
 import { perksOpen } from './core/perks';
 import { floorDifficulty, squadPower, type Difficulty } from './core/power';
@@ -147,6 +147,11 @@ export class Game {
       this.emit({ type: 'checkpoint', floor });
     }
     s.records.bestFloorEver = Math.max(s.records.bestFloorEver, floor);
+    // The run just made it to the floor a rebirth needs: tell the player, once, right away.
+    if (canRebirth(s) && !s.run.rebirthTold) {
+      s.run.rebirthTold = true;
+      this.emit({ type: 'rebirthReady', next: s.rebirths + 1 });
+    }
     const biome = biomeForFloor(floor, s.run.biomeSeed);
     this.biome = biome;
     const boss = isBossFloor(floor);
