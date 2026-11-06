@@ -275,7 +275,7 @@ describe('the tutorial: one step at a time', () => {
     expect(phone).toEqual([
       'Your first knight! Now close the altar.',
       'Drag anywhere to walk.',
-      'Tap [DESCEND] to see your squad.',
+      'Tap [SQUAD] to see your squad.',
       'Your squad is set. Tap [DESCEND]!',
       'Hold [ATTACK] to fight.',
       'Tap [CAMP] to go spend your gold.',

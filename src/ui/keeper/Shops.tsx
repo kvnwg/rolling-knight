@@ -739,7 +739,7 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
       <ShopHint>
         {tab === 'squad' ? (
           <>
-            Who goes down? <b>Drag</b> a knight onto a slot (or tap a slot, then <b>ADD</b>); <b>LEAD</b> is the one you play. Each rebirth opens one more slot.
+            <b>Drag</b> a knight onto a slot (or tap a slot, then <b>ADD</b>). <b>LEAD</b> is the one you play.
           </>
         ) : tab === 'reforge' ? (
           <>

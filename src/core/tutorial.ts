@@ -285,9 +285,9 @@ function stepView(step: TutStepId, ctx: TutCtx, run: TutRun): TutView | null {
       return where === 'hub' ? line('move', touch ? 'Drag anywhere to walk.' : 'Walk with [WASD] or the arrows.', world('knight')) : null;
     case 'talk':
       if (where !== 'hub') return null;
-      // (His button at the hub says DESCEND: it opens his counter, where your squad is.)
+      // (His button at the hub says SQUAD: it opens his counter, where your squad is and DESCEND goes down.)
       return ctx.nearWarden
-        ? line('talk:open', touch ? 'Tap [DESCEND] to see your squad.' : 'Press [E] to see your squad.', ui('talk'))
+        ? line('talk:open', touch ? 'Tap [SQUAD] to see your squad.' : 'Press [E] to see your squad.', ui('talk'))
         : line('talk:walk', 'Walk up to [Warden Tobb].', world('warden'));
     case 'descend':
       if (where === 'warden') return line('descend:warden', touch ? 'Your squad is set. Tap [DESCEND]!' : 'Your squad is set. Click [DESCEND]!', ui('descend'));

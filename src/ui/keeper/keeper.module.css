@@ -1199,3 +1199,28 @@
     animation: none;
   }
 }
+
+/* A short screen (a phone in the Claude app, a small phone): the squad's cards come down in size so
+   the knights below them, and their LEVEL UP, keep room. */
+@media (max-height: 800px) {
+  .slot {
+    gap: calc(0.5 * var(--px));
+    padding: var(--px) var(--px) calc(1.5 * var(--px));
+  }
+  .slotArt {
+    height: calc(25 * var(--px));
+    overflow: hidden;
+  }
+  .slot .second {
+    min-height: calc(8.5 * var(--px)) !important;
+  }
+  .panel {
+    gap: calc(1.5 * var(--px));
+  }
+}
+/* A very short screen: the counter's one-line hint goes (the tutorial and the cards say it all). */
+@media (max-height: 680px) {
+  .hint {
+    display: none;
+  }
+}
