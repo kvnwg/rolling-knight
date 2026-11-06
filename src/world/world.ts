@@ -282,7 +282,8 @@ export class World {
 
   makeHero(h: HeroSpec, x: number, y: number): Unit {
     const lone = this.perks.has('loneWolf') ? 3 : 1;
-    const maxHp = h.stats.hp * lone;
+    const wall = this.perks.has('shieldWall') ? 1.35 : 1;
+    const maxHp = h.stats.hp * lone * wall;
     return {
       uid: uid(),
       team: 'hero',
