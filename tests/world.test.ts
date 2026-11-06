@@ -179,6 +179,23 @@ describe('the squad in a fight', () => {
     return new World({ map, biome, floor, boss: false, mobTypes: floorMobs(biome, floor, 99), bossType: null, squad: squad(ids), perks: [], controlled: 0, seed: 99, goldPerKill: 3 });
   }
 
+  it('takes the whole squad down with Lone Wolf, and gives its might only to a knight that goes alone', () => {
+    const biome = BIOMES.hamlet;
+    const map = generateFloor({ floor: 2, biome, seed: 99, boss: false });
+    const make = (ids: string[]) =>
+      new World({ map, biome, floor: 2, boss: false, mobTypes: floorMobs(biome, 2, 99), bossType: null, squad: squad(ids), perks: ['loneWolf'], controlled: 0, seed: 99, goldPerKill: 3 });
+    const three = make([knightId('rare', 'guardian'), knightId('rare', 'ranger'), knightId('rare', 'cleric')]);
+    expect(three.heroes.length).toBe(3);
+    expect(three.lone).toBe(false);
+    const plain = squad([knightId('rare', 'guardian')])[0];
+    expect(three.heroes[0].maxHp).toBeCloseTo(plain.stats.hp, 6);
+    const alone = make([knightId('rare', 'guardian')]);
+    expect(alone.heroes.length).toBe(1);
+    expect(alone.lone).toBe(true);
+    expect(alone.heroes[0].maxHp).toBeCloseTo(plain.stats.hp * 3, 6);
+    expect(alone.heroes[0].atk).toBeCloseTo(plain.stats.atk * 2.5, 6);
+  });
+
   it('clears an early floor on its own (the dev bot) and opens the portal', () => {
     const w = world([knightId('legendary', 'guardian'), knightId('legendary', 'ranger'), knightId('legendary', 'cleric')]);
     w.bot = true;

@@ -234,7 +234,6 @@ export class Game {
     const next = [...keep];
     for (const sp of specs) {
       if (keep.some((h) => h.knightId === sp.knightId && h.slot === sp.slot)) continue;
-      if (w.perks.has('loneWolf') && sp.slot !== this.state.controlled) continue;
       const x = lead?.x ?? w.map.start.x;
       const y = lead?.y ?? w.map.start.y;
       const h = w.makeHero(sp, x, y);

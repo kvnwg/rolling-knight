@@ -44,7 +44,7 @@ export const PERKS: PerkDef[] = [
   { id: 'handMeDowns', tree: 'underdog', name: 'Hand-Me-Downs', rarity: 'epic', icon: 'chest', short: 'Common level-ups cost half', text: 'Common and Uncommon knights cost half the gold to level up.' },
   // Command
   { id: 'tagTeam', tree: 'command', name: 'Tag Team', rarity: 'common', icon: 'swap', short: 'Switch in: +30% damage for 4 s', text: 'The knight you switch to hits 30% harder for 4 seconds (at most once every 10 s).' },
-  { id: 'loneWolf', tree: 'command', name: 'Lone Wolf', rarity: 'uncommon', icon: 'wolf', short: 'Fight alone: x3 HP, x2.5 damage', text: 'Your other two knights stay at camp. The one you control gets ×3 HP, ×2.5 damage and 30% faster specials.' },
+  { id: 'loneWolf', tree: 'command', name: 'Lone Wolf', rarity: 'uncommon', icon: 'wolf', short: 'Go alone: x3 HP, x2.5 damage', text: 'Go down alone (leave the other squad slots empty) and your knight gets ×3 HP, ×2.5 damage and 30% faster specials. With a squad, nothing changes.' },
   { id: 'hiveMind', tree: 'command', name: 'Hive Mind', rarity: 'uncommon', icon: 'eye', short: 'The squad dodges with you', text: 'When you dodge, your whole squad dodges with you. Allies\' skill rolls spin twice as fast.' },
   { id: 'warBanner', tree: 'command', name: 'War Banner', rarity: 'rare', icon: 'banner', short: 'Your hits speed up the squad', text: 'Each hit by the knight you control gives the squad +4% attack speed for 3 s, stacking to +40%.' },
   { id: 'shieldWall', tree: 'command', name: 'Shield Wall', rarity: 'epic', icon: 'shield', short: 'Squad +35% HP', text: 'Every knight in the squad has 35% more HP.' },

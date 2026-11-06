@@ -17,6 +17,7 @@ import { CHALLENGE, floorDifficulty, knightRating, squadPower } from '../../core
 import { activeQuests, MAX_ACTIVE_QUESTS, mobNoun, plural, questGoal, rewardText, type Quest } from '../../core/quests';
 import { RARITIES, RARITY_COLOR, RARITY_NAME, RARITY_ODDS, rarityChances, rarityIndex } from '../../core/rarity';
 import { drySpell, reelCount, spinCycle, tokenChance } from '../../core/roller';
+import { hasPerk } from '../../core/perks';
 import { benchKnight, bestSquad, canLevel, isBestSquad, levelCost, levelUp, maxedLevel, rankedKnights, rebirthStatMult, reforge, reforgeCost, sellKnight, sellValue, setSquadSlot, soloBonus, squadSize, squadSlots } from '../../core/roster';
 import type { Game } from '../../game';
 import { biomeForFloor } from '../../world/biomes';
@@ -781,6 +782,14 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
           <Px icon="coin" size="xs" />
           <span>
             Short-handed: <b>gold ×{bonus.toFixed(1)}</b> on this run
+          </span>
+        </div>
+      )}
+      {tab === 'squad' && hasPerk(st, 'loneWolf') && (
+        <div className={s.soloLine} title="Lone Wolf (a perk): a knight that goes down alone fights with x3 HP, x2.5 damage and faster specials">
+          <Px icon="sword" size="xs" />
+          <span>
+            Lone Wolf: go down <b>alone</b> for <b>×3 HP, ×2.5 damage</b>
           </span>
         </div>
       )}

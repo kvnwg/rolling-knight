@@ -147,6 +147,8 @@ export class World {
   exited = false;
   wiped = false;
   perks: Set<string>;
+  /** Lone Wolf, and the knight went down alone: it fights with the perk's might. */
+  lone = false;
   rng: Rng;
   goldPerKill: number;
   /** Seconds the camera should shake, and how hard. */
@@ -208,9 +210,9 @@ export class World {
     this.controlled = o.controlled;
     this.rng = new Rng(o.seed);
     this.goldPerKill = o.goldPerKill;
-    const lone = this.perks.has('loneWolf');
+    // Lone Wolf: a knight that goes down alone fights like three (the squad, if you take one, all goes).
+    this.lone = this.perks.has('loneWolf') && o.squad.length === 1;
     o.squad.forEach((h, i) => {
-      if (lone && h.slot !== o.controlled) return;
       const ox = (i - 1) * 12;
       this.heroes.push(this.makeHero(h, o.map.start.x + ox, o.map.start.y + (i === 1 ? 0 : 6)));
     });
@@ -281,7 +283,7 @@ export class World {
   }
 
   makeHero(h: HeroSpec, x: number, y: number): Unit {
-    const lone = this.perks.has('loneWolf') ? 3 : 1;
+    const lone = this.lone ? 3 : 1;
     const wall = this.perks.has('shieldWall') ? 1.35 : 1;
     const maxHp = h.stats.hp * lone * wall;
     return {
@@ -294,7 +296,7 @@ export class World {
       r: 4,
       hp: Math.max(0, maxHp * h.hpShare),
       maxHp,
-      atk: h.stats.atk * (this.perks.has('loneWolf') ? 2.5 : 1),
+      atk: h.stats.atk * (this.lone ? 2.5 : 1),
       armor: h.stats.armor,
       speed: h.stats.speed,
       dir: 1,
@@ -325,7 +327,7 @@ export class World {
       range: h.stats.range,
       dodgeCd: h.stats.dodgeCd * (this.perks.has('peasantRevolt') && this.underdogSquad() ? 0.5 : 1),
       dodgeT: 0,
-      specialCd: h.stats.specialCd * (this.perks.has('loneWolf') ? 0.7 : 1),
+      specialCd: h.stats.specialCd * (this.lone ? 0.7 : 1),
       // (Skill rolls have no cooldown now: in a fight the next starts as soon as the last skill is done.)
       specialT: 0,
       rollTimeMult: h.stats.rollTimeMult,
