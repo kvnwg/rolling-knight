@@ -1188,6 +1188,12 @@ export class Renderer {
         const ang = (a / 16) * Math.PI * 2;
         ctx.fillRect(sx(h.x) + Math.round(Math.cos(ang) * 6), sy(h.y) + Math.round(Math.sin(ang) * 3) + 1, 1, 1);
       }
+      // Auto battle playing it for you: AUTO over its head (gone the moment you steer or attack).
+      if (w.bot && w.auto && !w.hub) {
+        const tag = this.textCanvas('AUTO', { face: 'small', fill: '#ffe27a', ink: '#1a1326' });
+        const bob = Math.round(Math.sin(this.time * 3) * 1);
+        this.layers.ui.x.drawImage(tag, sx(h.x) - (tag.width >> 1), sy(h.y) - 33 + bob);
+      }
     }
     // The Arcanist's blink leaves an afterimage where it stood.
     if (pose.ghost && pose.ghost.alpha > 0) {

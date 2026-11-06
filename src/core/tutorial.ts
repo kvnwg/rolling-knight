@@ -10,6 +10,8 @@
  *  - attack:  with a foe close, attack;
  *  - skills:  your knight's skills roll and cast on their own (the line stays up a few seconds);
  *  - exit:    the door to the next floor;
+ *  - auto:    auto battle: tap AUTO and your knight fights and goes down on its own; once it's on,
+ *             how to take over (steer or attack); the line goes after a while either way;
  *  - camp:    once there's gold enough to level your knight up, head back up;
  *  - spend:   level a knight up at Warden Tobb's counter.
  *
@@ -30,7 +32,7 @@
  */
 import { BAL } from './balance';
 
-export const TUT_STEPS = ['altar', 'move', 'talk', 'descend', 'attack', 'skills', 'exit', 'camp', 'spend'] as const;
+export const TUT_STEPS = ['altar', 'move', 'talk', 'descend', 'attack', 'skills', 'exit', 'auto', 'camp', 'spend'] as const;
 export type TutStepId = (typeof TUT_STEPS)[number];
 export const TUT_TIPS = ['shop', 'checkpoint', 'rebirth', 'solo', 'auto'] as const;
 export type TutTipId = (typeof TUT_TIPS)[number];
@@ -44,6 +46,7 @@ export const TUT_AFTER: Record<TutStepId, TutStepId | null> = {
   attack: 'descend',
   skills: 'attack',
   exit: 'attack',
+  auto: 'exit',
   camp: 'exit',
   spend: 'camp',
 };
@@ -159,6 +162,9 @@ export type TutAction =
 export const SKILLS_READ = 4;
 /** The skills line comes up this long after a cast too (the fight may be over before the next roll). */
 export const SKILLS_LATE = 2;
+/** Seconds the auto battle line waits to be tapped, and stays up once it's on (how to take over). */
+export const AUTO_ASK = 9;
+export const AUTO_READ = 5;
 /** Seconds a tip stays up at most, and at least (unless the player leaves for somewhere else). */
 export const TIP_SECONDS = 7;
 export const TIP_MIN = 2.5;
@@ -263,6 +269,9 @@ function settled(step: TutStepId, ctx: TutCtx, run: TutRun, now: number): boolea
       return w === 'dungeon' && ctx.autoOn;
     case 'skills':
       return run.key === 'skills' && now - run.since >= SKILLS_READ;
+    case 'auto':
+      // Read once it's on (how to take over), or let be: the line asks for a while, then goes.
+      return (run.key === 'auto:on' && now - run.since >= AUTO_READ) || (run.key === 'auto:ask' && now - run.since >= AUTO_ASK);
     case 'camp':
       // Back up with gold to spend (whichever way: CAMP, or a wipe).
       return ctx.canLevel && AT_HUB.includes(w);
@@ -297,6 +306,10 @@ function stepView(step: TutStepId, ctx: TutCtx, run: TutRun): TutView | null {
       return touch ? line('attack', 'Hold [ATTACK] to fight.', ui('attack')) : line('attack', 'Hold [left click] to attack.', world('foe'));
     case 'skills':
       return where === 'dungeon' && (ctx.rolling || ctx.castAgo < SKILLS_LATE || run.key === 'skills') ? line('skills', 'Skills roll and cast on their own!', ui('reel')) : null;
+    case 'auto':
+      if (where !== 'dungeon') return null;
+      if (ctx.autoOn) return line('auto:on', touch ? 'Auto is on! Drag, or hold [ATTACK], to take over.' : 'Auto is on! Move or attack to take over.', ui('auto'));
+      return ctx.foeNear && run.key !== 'auto:ask' ? null : line('auto:ask', touch ? 'Tap [AUTO] and your knight plays on its own.' : 'Press [T] for [AUTO]: your knight plays itself.', ui('auto'));
     case 'exit':
       if (where !== 'dungeon' || ctx.foeNear || !ctx.exitOpen) return null;
       return ctx.doorInView ? line('exit:near', 'Step into the [door] to go deeper.', world('door')) : line('exit:far', 'Find the [door] to go deeper.', world('door'));
