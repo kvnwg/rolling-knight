@@ -13,6 +13,8 @@ export default defineConfig(({ mode }) => {
     define: { __APP_VERSION__: JSON.stringify(pkg.version) },
     build: {
       outDir: artifact ? 'dist-artifact' : 'dist',
+      // Older browsers too (Safari 14, Firefox 90, Chrome 90 and up): newer syntax is rewritten.
+      target: ['es2020', 'safari14', 'firefox90', 'chrome90', 'edge90'],
       chunkSizeWarningLimit: 2000,
       ...(artifact
         ? {

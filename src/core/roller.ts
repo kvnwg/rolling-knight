@@ -201,7 +201,8 @@ export function startSpin(state: GameState, rng: Rng, nowMs: number, emit: Event
   r.spinCount += 1;
   // (The start ends when the squad can be filled: checked as the knights land, in rollTick.)
   if (warm && r.spinCount >= BAL.tutorial.maxSpins) r.tutorial = 'done';
-  emit({ type: 'spinStart', spin: structuredClone(spin) });
+  // (A copy for the screen: plain data, so JSON does it in any browser; structuredClone needs a newer one.)
+  emit({ type: 'spinStart', spin: JSON.parse(JSON.stringify(spin)) as Spin });
   return spin;
 }
 

@@ -3584,3 +3584,53 @@ body,
     opacity: 0;
   }
 }
+
+/* ------------------------------------------------------------ when something goes wrong (Failure.tsx) */
+.boot-fail {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px 16px;
+  background: #0b0d16;
+  color: #fff4e0;
+  font-family: 'Pixelify Sans', system-ui, sans-serif;
+  text-align: center;
+}
+.boot-fail b {
+  font-size: 22px;
+  color: #ffd84a;
+}
+.boot-fail code {
+  max-width: min(640px, 100%);
+  padding: 10px 12px;
+  background: #1a1326;
+  border: 2px solid #3a2a4e;
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.boot-fail small {
+  max-width: min(640px, 100%);
+  font-size: 11px;
+  opacity: 0.55;
+  word-break: break-word;
+}
+.run-fail {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 1000;
+  padding: 8px 12px;
+  background: rgba(120, 20, 30, 0.92);
+  color: #fff4e0;
+  font: 13px ui-monospace, monospace;
+  word-break: break-word;
+  cursor: pointer;
+}
