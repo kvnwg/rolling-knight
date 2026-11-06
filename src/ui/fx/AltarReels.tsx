@@ -1185,11 +1185,13 @@ interface MiniPlan {
 const miniShown: Array<{ url: string; rim: string | null; state: string; chip: string; tier: number; gold: boolean }> = [];
 
 /**
- * The corner roller's art pixel (CSS px) for `n` reels: the mounted size for one reel; with more,
- * smaller, so the shrine never takes more room than the one-reel shrine does, across or down (its
- * windows still hold whole knights, just finer). Whole device pixels, and never under one CSS pixel.
+ * The corner roller's art pixel (CSS px) for `n` reels. With a set width (`width` CSS px: a desktop,
+ * where it matches the skill reel under it) the shrine fills that width whatever its reel count;
+ * otherwise (a phone) it keeps the mounted size for one reel and draws finer with more, never taking
+ * more room than the one-reel shrine across or down. Whole device pixels; on a phone never under one
+ * CSS pixel.
  */
-export function miniFitU(base: number, n: number, altarOn = true, dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1): number {
+export function miniFitU(base: number, n: number, altarOn = true, width = 0, dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1): number {
   const size = (k: number): [number, number] => {
     if (altarOn) {
       const l = miniLayout(k);
@@ -1199,18 +1201,26 @@ export function miniFitU(base: number, n: number, altarOn = true, dpr = typeof w
     const rows = k <= 2 ? 1 : 2;
     return [miniSpan(cols, MINI.winW), miniSpan(rows, MINI.winH)];
   };
-  const [w1, h1] = size(1);
   const [w, h] = size(n);
+  if (width > 0) return Math.max(1 / dpr, Math.floor((width / w) * dpr + 1e-6) / dpr);
+  const [w1, h1] = size(1);
   const u = Math.min(base, (base * w1) / w, (base * h1) / h);
   return Math.max(Math.min(base, 1), Math.floor(u * dpr + 1e-6) / dpr);
+}
+
+/** The corner roller's set width (CSS px; 0 for none), from the page (App sets it). */
+function miniWidth(): number {
+  if (typeof document === 'undefined') return 0;
+  const v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mini-w'));
+  return Number.isFinite(v) && v > 0 ? v : 0;
 }
 
 function MiniReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
   const countNow = () => Math.max(1, game.state.roll.current?.reels.length ?? reelCount(game.state));
   const [n, setN] = useState(countNow);
   const [uBase, setU] = useState(() => readU());
-  // More reels draw smaller: the shrine stays about the size it is with one reel.
-  const u = miniFitU(uBase, n, altarOn);
+  // The shrine's size: as wide as the skill reel on a desktop; on a phone more reels draw finer.
+  const u = miniFitU(uBase, n, altarOn, miniWidth());
   const uRef = useRef(u);
   uRef.current = u;
   const rootRef = useRef<HTMLDivElement>(null);
