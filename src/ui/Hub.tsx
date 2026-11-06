@@ -6,27 +6,23 @@
  *  - StationSheet: a keeper's counter, opened by talking to them: the altar, the smith, the scrapper,
  *    the quartermaster, the tinker, the sage, the shrine, the notice board, the gate; each one the
  *    shared keeper screen (src/ui/keeper/: the keeper at their counter, tabs, offers as cards);
- *  - CharacterSelect: who you play as, when the game opens.
+ *  - TitleScreen: the game's name and PLAY, over the camp at dusk, when the game opens.
  * In the dungeon none of this is reachable: to change your squad or spend anything you leave, or fall.
  */
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo } from 'react';
 import { sfx } from '../audio/sfx';
-import { knightDef } from '../core/knights';
-import { CHALLENGE, floorDifficulty, knightRating, squadPower } from '../core/power';
-import { RARITY_COLOR, RARITY_NAME } from '../core/rarity';
-import { rankedKnights, squadSize } from '../core/roster';
+import { CHALLENGE, floorDifficulty, squadPower } from '../core/power';
+import { squadSize } from '../core/roster';
 import type { Game } from '../game';
 import { npcFrame } from '../render/art/npcs';
 import { toCanvas } from '../render/art/draw';
 import { biomeForFloor } from '../world/biomes';
 import { type HubStation, type StationId } from '../world/hubWorld';
-import { Chunky, HeroArt, HeroLive } from './common';
+import { Chunky } from './common';
 import { AltarReels } from './fx/AltarReels';
-import { fmt } from './format';
 import { BoardShop, OracleShop, SageShop, ShrineShop, WardenShop } from './keeper/Shops';
 import { TinkerShop } from './keeper/TinkerShop';
 import { Px, type IconName } from './px';
-import { KNIGHT_PIC_H, KNIGHT_PIC_W } from './sprites';
 import { uiSound } from './sound';
 import { TopBar } from './TopBar';
 import { RebirthPill } from './RebirthPill';
@@ -166,66 +162,29 @@ export function StationSheet({ game, station, onOpen, onClose }: { game: Game; s
 // ------------------------------------------------------------------ who you play as
 
 /**
- * A knight picture about `s` UI pixels per art pixel, rounded to whole screen pixels per art pixel:
- * blown up big, a fractional scale draws some art pixels a screen pixel wider than others.
+ * The title screen the game opens on: the camp by the lake at dusk behind it (VistaCanvas, your
+ * squad round the fire), the game's name, and PLAY. Who you play as is picked at the Warden's
+ * counter (LEAD), not here.
  */
-function crispKnight(s: number): CSSProperties {
-  const px = parseFloat(document.documentElement.style.getPropertyValue('--px')) || 3;
-  const dpr = window.devicePixelRatio || 1;
-  const k = Math.max(1, Math.round(s * px * dpr)) / dpr;
-  return { width: `${KNIGHT_PIC_W * k}px`, height: `${KNIGHT_PIC_H * k}px` };
-}
-
-export function CharacterSelect({ game, onPick, onSelect }: { game: Game; onPick: () => void; onSelect?: (id: string) => void }) {
+export function TitleScreen({ game, onPlay }: { game: Game; onPlay: () => void }) {
   const s = game.state;
-  const ids = rankedKnights(s).slice(0, 12);
-  const [sel, setSel] = useState(s.squad[s.controlled] ?? ids[0] ?? null);
-  useEffect(() => {
-    if (sel) onSelect?.(sel);
-  }, [sel, onSelect]);
-  if (!sel) return null;
-  const def = knightDef(sel);
-  const pick = () => {
-    const slot = s.squad.indexOf(sel);
-    if (slot >= 0) s.controlled = slot;
-    else {
-      s.squad[s.controlled] = sel;
-    }
+  const fresh = Object.keys(s.roster).length === 0;
+  const play = () => {
     game.syncHub(true);
     uiSound('equip', 4);
-    onPick();
+    onPlay();
   };
   return (
-    <div className="char-select">
+    <div className="char-select title-screen">
       <div className="cs-title">
-        <Chunky text="CHOOSE YOUR KNIGHT" size={11} grad="gold" />
-        <span className="lead outlined">The other two in your squad follow you into the dark.</span>
+        <Chunky text="ROLLING KNIGHT" size={14} grad="gold" />
+        <span className="lead outlined">{fresh ? 'Roll your knights. Delve the dark. Come back stronger.' : `Best floor ${s.records.bestFloorEver}${s.rebirths ? ` · Rebirth ${s.rebirths}` : ''}`}</span>
       </div>
-      <div className="cs-stage">
-        <div className="cs-light" style={{ ['--rc' as string]: RARITY_COLOR[def.rarity] }} />
-        <HeroLive id={sel} mutation={s.roster[sel]?.mutation ?? null} s={2} style={crispKnight(2.2)} />
-      </div>
-      <div className="cs-name outlined">
-        <Chunky text={def.name.toUpperCase()} size={9} grad="white" />
-        <span style={{ color: RARITY_COLOR[def.rarity] }}>
-          {RARITY_NAME[def.rarity]} {def.cls}
-        </span>
-        <span className="t-muted">
-          Power <b className="t-gold">{fmt(knightRating(s, sel))}</b>
-        </span>
-      </div>
-      <div className="cs-row">
-        {ids.map((id) => (
-          <button key={id} className={`cs-pick card ${id === sel ? 'on' : ''}`} style={{ ['--rc' as string]: RARITY_COLOR[knightDef(id).rarity] }} onClick={() => (setSel(id), uiSound('tap'))}>
-            <HeroArt id={id} mutation={s.roster[id]?.mutation ?? null} s={1} />
-          </button>
-        ))}
-      </div>
-      <button className="btn gold big breathe" onClick={pick}>
+      <button className="btn gold big breathe ts-play" onClick={play}>
         <Px icon="swords" s={1.5} />
         <span>
-          PLAY AS {def.name.split(' ')[0].toUpperCase()}
-          <span className="sub">to the hub</span>
+          PLAY
+          <span className="sub">{fresh ? 'roll your first knights' : 'to the hub'}</span>
         </span>
       </button>
     </div>

@@ -20,7 +20,7 @@ import { Renderer } from '../render/renderer';
 import { Chunky, HeroArt, type Grad } from './common';
 import { DungeonHud } from './DungeonHud';
 import { fmt, secs } from './format';
-import { CharacterSelect, HubHud, StationSheet } from './Hub';
+import { HubHud, StationSheet, TitleScreen } from './Hub';
 import { KnightTile } from './KnightCard';
 import { HeroDetail, LuckSheet, SettingsSheet } from './panels';
 import { hubLayout, type HubStation } from '../world/hubWorld';
@@ -89,18 +89,16 @@ export function App() {
   const csPick = useRef<string | null>(null);
   // (The tutorial points at spots in the world: it needs the camera.)
   const rendRef = useRef<Renderer | null>(null);
-  const choosing = !picked && !game.inDungeon && Object.keys(game.state.roster).length > 0 && reveals.length === 0 && station === null;
+  // The title screen (PLAY over the camp at dusk) until the player starts.
+  const choosing = !picked && !game.inDungeon && reveals.length === 0 && station === null;
   const sheetOpen = detail !== null || settings || luck || station !== null || choosing;
   const sheetRef = useRef(sheetOpen);
   sheetRef.current = sheetOpen;
+  // The world waits on the title screen (no knights roll in behind it before PLAY).
+  const titleRef = useRef(choosing);
+  titleRef.current = choosing;
 
-  // A brand-new game opens at the altar, so you watch your first knights roll in.
-  useEffect(() => {
-    if (Object.keys(game.state.roster).length === 0 && !game.inDungeon) {
-      const altar = hubLayout().stations.find((x) => x.id === 'altar');
-      if (altar) setStation(altar);
-    }
-  }, [game]);
+  // (A brand-new game opens on the title too; its PLAY goes to the altar, to watch the first knights roll in.)
 
   // The UI's pixel size and layout.
   useEffect(() => {
@@ -251,7 +249,7 @@ export function App() {
       // knight outright in a fight: it moves, dodges, fights and goes down when the floor is done;
       // steering or attacking yourself takes over for as long as you do. A sheet open only aims and
       // attacks for you. The dev bot (?auto, the sim) never lets go.
-      game.paused = revealRef.current.length > 0 || talkRef.current !== null;
+      game.paused = revealRef.current.length > 0 || talkRef.current !== null || titleRef.current;
       if (w) {
         const autoBattle = game.inDungeon && game.state.settings.autoPlay && !(c.mx || c.my || c.attack);
         w.auto = game.state.settings.autoPlay || sheetRef.current;
@@ -398,7 +396,19 @@ export function App() {
           <i style={{ left: `calc(50% + ${ctl.controls.stick.x - ctl.controls.stick.ox}px)`, top: `calc(50% + ${ctl.controls.stick.y - ctl.controls.stick.oy}px)` }} />
         </div>
       )}
-      {choosing && <CharacterSelect game={game} onSelect={(id) => (csPick.current = id)} onPick={() => setPicked(true)} />}
+      {choosing && (
+        <TitleScreen
+          game={game}
+          onPlay={() => {
+            setPicked(true);
+            // A brand-new game goes to the altar first, to watch its first knights roll in.
+            if (Object.keys(game.state.roster).length === 0) {
+              const altar = hubLayout().stations.find((x) => x.id === 'altar');
+              if (altar) setStation(altar);
+            }
+          }}
+        />
+      )}
       {station && !inDungeon && <StationSheet game={game} station={station} onOpen={setDetail} onClose={() => setStation(null)} />}
       {talking && inDungeon && <DialogBox game={game} npc={talking} onClose={() => setTalking(null)} />}
       <div className="toasts">
