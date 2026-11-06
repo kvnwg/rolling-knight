@@ -5,7 +5,7 @@ import { SCENES, music } from '../src/audio/music';
 import { MUSIC_CREDIT, MUSIC_FILES, STINGS, TRACKS, type TrackId } from '../src/audio/tracks';
 import { BIOMES, BIOME_ORDER, biomeForFloor, isBossFloor } from '../src/world/biomes';
 
-const file = (id: string) => `src/assets/music/${id}.m4a`;
+const file = (id: string) => `src/assets/music/${id}.mp3`;
 
 describe('music', () => {
   it('every scene has a track: the camp, the boss and every biome, on every floor', () => {
@@ -58,11 +58,12 @@ describe('music', () => {
     expect(STINGS.victory.duration).toBeLessThan(10);
   });
 
-  it('every track is played somewhere, and the music stays under 5 MB', () => {
+  it('every track is played somewhere, and the music stays under 6 MB', () => {
     const used = new Set(Object.values(SCENES).map((d) => d.track));
     for (const id of Object.keys(TRACKS) as TrackId[]) expect(used.has(id), id).toBe(true);
     const total = [...Object.keys(TRACKS), ...Object.keys(STINGS)].reduce((s, id) => s + statSync(file(id)).size, 0);
-    expect(total).toBeLessThan(5_000_000);
+    // (MP3, which public sharing takes, needs a little more than the AAC it replaced.)
+    expect(total).toBeLessThan(6_000_000);
   });
 
   it('a scene set before the first tap is remembered (and nothing needs a browser)', () => {

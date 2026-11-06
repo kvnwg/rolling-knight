@@ -1,7 +1,7 @@
 /**
  * The music's recordings: a looping track for each mood and a victory sting, all by Kevin MacLeod
  * (credited in CREDITS.md and Settings), cut into seamless loops by tools/packs/music.py:
- * src/assets/music/<id>.m4a (AAC, normalized to -18 LUFS), with each loop's points in tracks.json.
+ * src/assets/music/<id>.mp3 (normalized to -18 LUFS), with each loop's points in tracks.json.
  * Each file is periodic over its whole length (a quarter second of the loop's own continuation on
  * either side of it), so the loop points hold whatever priming a decoder leaves at the front.
  *
@@ -86,12 +86,12 @@ export const MUSIC_CREDIT = (() => {
 
 let urls: Record<string, string> = {};
 try {
-  urls = import.meta.glob<string>('../assets/music/*.m4a', { eager: true, query: '?url', import: 'default' });
+  urls = import.meta.glob<string>('../assets/music/*.mp3', { eager: true, query: '?url', import: 'default' });
 } catch {
   /* not built by Vite: no music */
 }
 
 /** Each recording's URL by id (tracks and stings). */
 export const MUSIC_FILES: Readonly<Record<string, string>> = Object.fromEntries(
-  Object.entries(urls).map(([path, url]) => [path.slice(path.lastIndexOf('/') + 1, -'.m4a'.length), url]),
+  Object.entries(urls).map(([path, url]) => [path.slice(path.lastIndexOf('/') + 1, -'.mp3'.length), url]),
 );

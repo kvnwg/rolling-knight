@@ -552,7 +552,8 @@
   right: 0;
   height: calc(3 * var(--u));
   /* 8 x 3 art pixels: a stair-stepped yellow stripe on the band's black. */
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='3' shape-rendering='crispEdges'%3E%3Cpath fill='%23ffd23f' d='M0 0h4v1H0zM1 1h4v1H1zM2 2h4v1H2z'/%3E%3C/svg%3E") 0 0 / calc(8 * var(--u)) calc(3 * var(--u)) repeat-x;
+  background: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAADCAYAAACuyE5IAAAAIElEQVR42mP8f8n+PwMSYNQ7yIjMZ0IXQNfAhE0XsiIAeroMBvfsIk8AAAAASUVORK5CYII=") 0 0 / calc(8 * var(--u)) calc(3 * var(--u)) repeat-x;
+  image-rendering: pixelated;
   animation: stripes 400ms steps(8) infinite;
 }
 .hyperBand::before {
