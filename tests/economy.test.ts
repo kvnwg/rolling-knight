@@ -14,7 +14,7 @@ import { addKnight, dupeGold, killGold, levelCost } from '../src/core/roster';
 import { upgradeCost } from '../src/core/upgrades';
 
 const fresh = (rebirths = 0) => {
-  const s = newGame(7, 1_700_000_000_000);
+  const s = newGame(7);
   s.rebirths = rebirths;
   s.roll.tutorial = 'done';
   return s;
