@@ -10,7 +10,7 @@
  * of them from the game's state (quest offers, reminders, turn-ins, gifts, the demon's unmasking);
  * applyDialogAction does the bookkeeping for a chosen line. Quests live in core/quests.ts and the art
  * in render/art/npcs.ts (every NPC is dressed on the same Snoblin mannequin as the knights; the
- * merchant, like the hub's keepers, stands tall in a style of her own).
+ * merchant, like the hub's keepers, is drawn in a style of her own: art/tallFolk.ts).
  *
  * All text is plain ASCII with the bitmap font's punctuation (. , ! ? : ' " - ( )) so barks and
  * taunts can be drawn in the world too.

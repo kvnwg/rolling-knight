@@ -37,8 +37,9 @@ export interface CampPlan {
   /** Where the keeper's feet are, in px from the plan's top-left corner. */
   stand: { x: number; y: number };
   /**
-   * Under a roof over the counter (a stall, a yatai, a canopy): where a tall keeper (the merchant)
-   * stands instead, a step nearer the counter, so her face shows under the roof's edge.
+   * Under a roof over the counter (a stall, a yatai, a canopy): where the merchant (drawn in the
+   * keepers' style, a head taller than the folk on the little mannequin) stands instead, a step nearer
+   * the counter, so her whole face shows under the roof's edge.
    */
   tallStand?: { x: number; y: number };
 }

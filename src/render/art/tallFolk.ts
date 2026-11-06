@@ -1,8 +1,9 @@
 /**
  * The keepers (and the floors' merchant) as figures in the world, in the style of their portraits
- * (keepers/bust.ts): anime proportions at a small scale, 38 px from crown to sole, about four and a
- * half heads tall: a head nine pixels wide with big eyes (a lash line over an iris lit at its foot and a
- * white glint), a neck, shoulders half again as wide as the head, long legs, slender arms. Cel shaded
+ * (keepers/bust.ts), about a knight's height: drawn on a frame 38 px from crown to sole (a head nine
+ * pixels wide with big eyes: a lash line over an iris lit at its foot and a white glint; a neck,
+ * shoulders half again as wide as the head, slender arms), with rows of the hips and the legs taken
+ * out as they're painted (SHORT), so they stand 25 px tall, a little under three heads. Cel shaded
  * in a few hue-shifted steps of each material (keepers/ramps.ts), lit from the top left, with a
  * coloured outline. Facing you, from the side or from behind, standing or sitting; the idle breathes
  * (the upper body sinks a pixel and rises again) and blinks now and then.
@@ -29,6 +30,16 @@ const FOOT = 54;
 const TOP = FOOT - 37;
 /** How far a sitting figure's upper body drops onto the seat. */
 const SIT = 8;
+/**
+ * The figure's rows (0 the crown, 37 the sole) left out, standing and sitting: two at the hips under
+ * the belt, and the legs' long middle (standing), or two across the lap and the shins (sitting).
+ * Whatever falls on them isn't painted and everything above them comes down, so the face, the hair and
+ * the hats keep every pixel while the figure stands about a knight's height.
+ */
+const SHORT: Record<TallPose, readonly number[]> = {
+  stand: [17, 18, ...Array.from({ length: 11 }, (_, i) => 23 + i)],
+  sit: [17, 18, 26, 27, 30, 31, 32, 33, 34],
+};
 /** Frames in the idle: four a second, breathing in two-second swells, a blink every four seconds. */
 export const TALL_FRAMES = 16;
 
@@ -106,6 +117,9 @@ function palette(look: NpcLook): Pal {
 /** One figure being painted: where, which way, and what state it's in. */
 interface Fig {
   L: Layer;
+  /** Rows left out (SHORT), and how far each row comes down for them (from row -16 on). */
+  cut: ReadonlySet<number>;
+  drop: readonly number[];
   look: NpcLook;
   pal: Pal;
   slim: boolean;
@@ -119,12 +133,19 @@ interface Fig {
   shut: boolean;
 }
 
+/** The frame row of the figure's row `r` (rows left out bring everything above them down). */
+function row(F: Fig, r: number, upper: boolean): number {
+  return TOP + r + (F.drop[Math.max(0, Math.min(F.drop.length - 1, r + 16))] ?? 0) + (upper ? F.up : 0);
+}
+
 /** Paints at (dx, r) from the figure's middle and its crown; the upper body (head, torso, arms) moves with the breath. */
 function px(F: Fig, dx: number, r: number, c: string | null | undefined, upper = true): void {
-  F.L.px(CX + dx, TOP + r + (upper ? F.up : 0), c);
+  if (F.cut.has(r)) return;
+  F.L.px(CX + dx, row(F, r, upper), c);
 }
 function gl(F: Fig, dx: number, r: number, c: string, upper = true): void {
-  F.L.gl(CX + dx, TOP + r + (upper ? F.up : 0), c);
+  if (F.cut.has(r)) return;
+  F.L.gl(CX + dx, row(F, r, upper), c);
 }
 /** Is a column on the lit side (toward the light)? */
 const litSide = (F: Fig, dx: number) => F.light * dx < 0;
@@ -159,11 +180,16 @@ const TORSO_SIDE_S: ReadonlyArray<readonly [number, number]> = [[-2, 2], [-3, 2]
 const LEG_B: ReadonlyArray<readonly [number, number]> = [[0, 5], [1, 5], [1, 4], [1, 4], [1, 4], [1, 4], [1, 4], [1, 4], [1, 3], [1, 3], [1, 3], [1, 3], [1, 3], [1, 3], [1, 3], [1, 3]];
 const LEG_S: ReadonlyArray<readonly [number, number]> = [[0, 4], [1, 4], [1, 4], [1, 4], [1, 3], [1, 3], [1, 3], [1, 3], [1, 3], [1, 3], [1, 3], [1, 2], [1, 2], [1, 2], [1, 2], [1, 3]];
 
-const torso = (F: Fig, r: number) => (F.slim ? TORSO_S : TORSO_B)[r - 10];
+const torso = (F: Fig, r: number) => (F.slim ? TORSO_S : TORSO_B)[Math.min(19, r) - 10];
 const torsoSide = (F: Fig, r: number) => (F.slim ? TORSO_SIDE_S : TORSO_SIDE_B)[r - 10];
 const armCols = (F: Fig): [number, number] => (F.slim ? [5, 6] : [6, 7]);
-/** A robe's half-width on a row, from the waist down to the hem. */
-const skirtHW = (F: Fig, r: number) => (r < 17 ? torso(F, Math.min(19, r)) : (F.slim ? 4 : 5) + Math.floor((r - 17) / 5));
+/** A robe's half-width on a row, from the waist down to the hem (flaring by the rows that show). */
+const skirtHW = (F: Fig, r: number) => {
+  if (r < 17) return torso(F, Math.min(19, r));
+  let shown = 0;
+  for (let k = 17; k < r; k++) if (!F.cut.has(k)) shown++;
+  return (F.slim ? 4 : 5) + Math.floor(shown / 3);
+};
 
 // ------------------------------------------------------------------ the figure
 
@@ -171,15 +197,15 @@ const skirtHW = (F: Fig, r: number) => (r < 17 ? torso(F, Math.min(19, r)) : (F.
  * A tall figure in a pose. `frame` counts up freely (the idle breathes and blinks); `dir` is which way
  * a side view faces (1 right, -1 left: the frame comes back already facing it).
  */
-export function tallFrame(def: NpcDef, pose: TallPose, view: View, frame: number, tool?: TallTool, dir: 1 | -1 = 1): TallFrame {
+export function tallFrame(def: NpcDef, pose: TallPose, view: View, frame: number, tool?: TallTool, dir: 1 | -1 = 1, whole = false): TallFrame {
   const f = ((frame % TALL_FRAMES) + TALL_FRAMES) % TALL_FRAMES;
   const d = view === 'side' ? dir : 1;
   // Painted once each (the renderer asks every frame): treat the buffers as read-only.
-  const key = `${def.id}|${pose}|${view}|${f}|${tool ?? ''}|${d}`;
+  const key = `${def.id}|${pose}|${view}|${f}|${tool ?? ''}|${d}|${whole ? 1 : 0}`;
   let fr = painted.get(key);
   if (!fr) {
     if (painted.size > 600) painted.clear();
-    fr = paintTall(def, pose, view, f, tool, d);
+    fr = paintTall(def, pose, view, f, tool, d, whole);
     painted.set(key, fr);
   }
   return fr;
@@ -187,13 +213,18 @@ export function tallFrame(def: NpcDef, pose: TallPose, view: View, frame: number
 
 const painted = new Map<string, TallFrame>();
 
-function paintTall(def: NpcDef, pose: TallPose, view: View, f: number, tool: TallTool | undefined, dir: 1 | -1): TallFrame {
+function paintTall(def: NpcDef, pose: TallPose, view: View, f: number, tool: TallTool | undefined, dir: 1 | -1, whole: boolean): TallFrame {
   const look = def.look;
   const breath = f % 8 >= 4 ? 1 : 0;
   const L = new Layer(0, 0, TALL_W, TALL_H);
   const turn = view === 'side' && dir < 0;
+  // (`whole`: the figure as drawn, every row: the talk card's portrait crops its head and shoulders.)
+  const cut = new Set(whole ? [] : SHORT[pose]);
+  const drop = Array.from({ length: 16 + 38 }, (_, i) => [...cut].filter((c) => c > i - 16).length);
   const F: Fig = {
     L,
+    cut,
+    drop,
     look,
     pal: palette(look),
     slim: !!look.tall?.slim,
@@ -231,7 +262,7 @@ export function reachOf(b: PixelBuf, ay: number): number {
 
 /** A tall figure's head and shoulders, facing you, `w` x `h` (for a talk card's portrait). */
 export function tallPortrait(def: NpcDef, w: number, h: number): PixelBuf {
-  const src = tallFrame(def, 'stand', 'down', 0).buf;
+  const src = tallFrame(def, 'stand', 'down', 0, undefined, 1, true).buf;
   const out = blank(w, h);
   const x0 = CX - Math.floor(w / 2);
   const y0 = TOP - 4;
@@ -777,7 +808,7 @@ function hatFront(F: Fig, back: boolean): void {
     draw(back ? HOOD_BACK : HOOD_F, -3);
     if (!back && F.look.tall?.glow) {
       // Her face in the hood's shadow, her hair swept from a parting under its brim.
-      for (let r = 2; r <= 4; r++) for (let dx = -4; dx <= 4; dx++) F.L.tint(CX + dx, TOP + r + F.up, R[0], r === 2 ? 0.4 : r === 3 ? 0.22 : 0.1);
+      for (let r = 2; r <= 4; r++) for (let dx = -4; dx <= 4; dx++) F.L.tint(CX + dx, row(F, r, true), R[0], r === 2 ? 0.4 : r === 3 ? 0.22 : 0.1);
     }
     if (!back) {
       const H = F.pal.hair;
@@ -1172,7 +1203,7 @@ function hatSide(F: Fig): void {
     px(F, 1, 2, H[3]);
     px(F, 2, 2, H[2]);
     px(F, 1, 3, H[2]);
-    if (F.look.tall?.glow) for (let dx = -1; dx <= 3; dx++) for (let r = 2; r <= 4; r++) F.L.tint(CX + dx, TOP + r + F.up, R[0], 0.4);
+    if (F.look.tall?.glow) for (let dx = -1; dx <= 3; dx++) for (let r = 2; r <= 4; r++) F.L.tint(CX + dx, row(F, r, true), R[0], 0.4);
     return;
   }
   if (h.kind === 'kettle') {
@@ -1255,10 +1286,10 @@ function longItem(F: Fig, item: NonNullable<NpcLook['item']>, view: 'down' | 'si
   const t = top + seat;
   if (item === 'orbStaff') {
     const ORB = ['#3a1a6a', '#6a3ab8', '#9a6af0', '#d0b0ff', '#fff4ff'];
-    for (const [dx, dy, k] of [[0, -3, 3], [1, -3, 2], [-1, -2, 3], [0, -2, 4], [1, -2, 2], [2, -2, 1], [-1, -1, 2], [0, -1, 3], [1, -1, 2], [2, -1, 1], [0, 0, 1], [1, 0, 1]] as const) F.L.gl(CX + x + dx, TOP + t + dy, ORB[k]);
+    for (const [dx, dy, k] of [[0, -3, 3], [1, -3, 2], [-1, -2, 3], [0, -2, 4], [1, -2, 2], [2, -2, 1], [-1, -1, 2], [0, -1, 3], [1, -1, 2], [2, -1, 1], [0, 0, 1], [1, 0, 1]] as const) F.L.gl(CX + x + dx, row(F, t + dy, false), ORB[k]);
     px(F, x, t + 1, '#f0c850', false);
     px(F, x + 1, t + 1, '#b8862a', false);
-    F.L.light(CX + x, TOP + t - 2, 18, '#b08aff', 0.4);
+    F.L.light(CX + x, row(F, t - 2, false), 18, '#b08aff', 0.4);
   } else if (item === 'spear') {
     const M = ['#2a2a34', '#7a7a8e', '#b0b0c2', '#f2f6fc'];
     for (const [dx, dy, k] of [[0, -5, 3], [0, -4, 3], [1, -4, 1], [-1, -3, 2], [0, -3, 3], [1, -3, 1], [-1, -2, 2], [0, -2, 3], [1, -2, 1], [0, -1, 2], [1, -1, 1]] as const) px(F, x + dx, t + dy, M[k], false);
@@ -1300,8 +1331,8 @@ function heldTool(F: Fig, tool: TallTool, view: 'down' | 'side'): void {
     px(F, x, y - 3, '#3a2a24');
     gl(F, x, y - 4, '#ffb040');
     gl(F, x, y - 5, '#fff4c0');
-    F.L.halo(CX + x, TOP + y - 6 + F.up, '#ffd060', 0.5);
-    F.L.light(CX + x, TOP + y - 4 + F.up, 24, '#ffb060', 0.45, 0.3);
+    F.L.halo(CX + x, row(F, y - 6, true), '#ffd060', 0.5);
+    F.L.light(CX + x, row(F, y - 4, true), 24, '#ffb060', 0.45, 0.3);
     return;
   }
   const [hx, hy] = handAt(F, view);

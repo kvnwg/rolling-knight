@@ -125,8 +125,8 @@ recording: [`docs/SOUNDS.md`](docs/SOUNDS.md).
   proportions, big eyes with a lash line and a glint, hair in locks with a band of shine, cloth in
   soft folds, a few hue-shifted cel steps per material and a coloured outline. Up close they're busts
   at their counters (`src/render/art/keepers/bust.ts`); in the hub and on the floors they stand about
-  twice a knight's height, breathing and blinking, lit from the top left whichever way they face
-  (`src/render/art/tallFolk.ts`).
+  a knight's height (a little under three heads tall: the hips and legs drawn short), breathing and
+  blinking, lit from the top left whichever way they face (`src/render/art/tallFolk.ts`).
 
 ## The sound
 

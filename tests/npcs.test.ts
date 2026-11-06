@@ -636,14 +636,14 @@ describe('NPC art', () => {
     expect(Array.from(offer.px)).not.toEqual(Array.from(back.px));
   });
 
-  it('stands the merchant tall like the keepers, facing whichever way, with a portrait the size of anyone\'s', () => {
+  it('stands the merchant like the keepers, a knight\'s height, facing whichever way, with a portrait the size of anyone\'s', () => {
     expect(SHOPKEEPER.look.tall).toBeTruthy();
     for (const view of ['down', 'side', 'up'] as const) {
       for (const dir of [1, -1] as const) {
         const fr = npcFrame(SHOPKEEPER, 'idle', view, 3, dir);
         expect(fr.faced, view).toBe(true);
-        expect(npcHeight(fr), `${view} ${dir}`).toBeGreaterThanOrEqual(36);
-        expect(npcHeight(fr), `${view} ${dir}`).toBeLessThanOrEqual(48);
+        expect(npcHeight(fr), `${view} ${dir}`).toBeGreaterThanOrEqual(24);
+        expect(npcHeight(fr), `${view} ${dir}`).toBeLessThanOrEqual(34);
         // Standing on her feet.
         let feet = 0;
         for (let x = 0; x < fr.buf.w; x++) if (fr.buf.px[(fr.ay * fr.buf.w + x) * 4 + 3]) feet++;

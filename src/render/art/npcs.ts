@@ -6,8 +6,8 @@
  * a backpack, the thing in their hand, a ghost's wisp, a goblin's ears, a chicken costume's beak, and
  * a demon's tells (a little tail poking out, horn tips under the hat, a curl of smoke, red eyes).
  * Same ink outline and light from the top left as the knights. Side frames face right. (The
- * keepers and the floors' merchant stand tall in the style of the keepers' portraits instead:
- * art/tallFolk.ts, which npcFrame hands them to.)
+ * keepers and the floors' merchant are drawn in the style of the keepers' portraits instead, about
+ * a knight's height: art/tallFolk.ts, which npcFrame hands them to.)
  */
 import type { HatKind, NpcDef, NpcItem, NpcLook } from '../../world/npcs';
 import { blank, type PixelBuf } from '../pixel/buf';

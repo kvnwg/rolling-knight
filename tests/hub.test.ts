@@ -149,7 +149,7 @@ describe('hub', () => {
     }
   });
 
-  it('stands the keepers tall, in their portraits\' style: breathing, blinking, lit from the left either way they face', () => {
+  it('stands the keepers about a knight\'s height, in their portraits\' style: breathing, blinking, lit from the left either way they face', () => {
     const diff = (a: Uint8ClampedArray, b: Uint8ClampedArray) => {
       let n = 0;
       for (let i = 0; i < a.length; i += 4) if (a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 2] !== b[i + 2] || a[i + 3] !== b[i + 3]) n++;
@@ -159,10 +159,10 @@ describe('hub', () => {
     expect(keepers.length).toBeGreaterThanOrEqual(5);
     for (const [k, def] of keepers) {
       const tool = HUB_TOOLS[k as keyof typeof HUB_CAST];
-      // About twice a knight's height standing (hats and staffs on top), less sitting.
+      // About a knight's height standing (25 px crown to sole; hats and staffs on top), less sitting.
       const stand = keeperFrame(def, 'stand', 'down', 0, tool);
-      expect(stand.height, k).toBeGreaterThanOrEqual(36);
-      expect(stand.height, k).toBeLessThanOrEqual(48);
+      expect(stand.height, k).toBeGreaterThanOrEqual(24);
+      expect(stand.height, k).toBeLessThanOrEqual(34);
       expect(keeperFrame(def, 'sit', 'side', 0, tool).height, k).toBeLessThan(stand.height);
       // The idle: a breath moves the upper body; a blink changes only a few pixels (the eyes).
       const breath = keeperFrame(def, 'stand', 'down', 4, tool);

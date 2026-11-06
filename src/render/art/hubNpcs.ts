@@ -1,7 +1,7 @@
 /**
  * The hub's keepers and regulars: their looks, the tools of their trade (a smith's hammer, a tinker's
- * wrench, a priestess's candle) and their poses. The keepers stand tall in the style of their
- * portraits (tallFolk.ts); the regulars are dressed on the same Snoblin mannequin as every NPC
+ * wrench, a priestess's candle) and their poses. The keepers are drawn in the style of their
+ * portraits, about a knight's height (tallFolk.ts); the regulars are dressed on the same Snoblin mannequin as every NPC
  * (art/npcs.ts), with the poses the stock NPC frames don't have: sitting on a bench or a chair facing
  * you, and sitting at a table seen from behind. `keeperFrame` draws any of them, standing or sitting,
  * so the renderer only needs where they are and which way they face.
