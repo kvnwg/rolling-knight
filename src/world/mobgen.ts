@@ -246,6 +246,16 @@ const OWN_RAMPS: Partial<Record<BodyPlan, Ramp>> = {
 const BOSS_NAMES = ['Grumblor', 'Vexmaw', 'Old Gnarl', 'Skarr', 'Mother Brood', 'Kragg', 'Morrow', 'Ysgarth', 'Thul', 'Belloc', 'Nyssa', 'Ozrak'];
 const BOSS_TITLES = ['Tyrant', 'Devourer', 'Warden', 'Undying', 'Matriarch', 'Hollow King', 'Gatekeeper', 'Ravager'];
 
+/** The dark halls, where the boss is Rook, the black knight (but a ghost or a pumpkin is itself). */
+export const ROOK_HALLS: ReadonlySet<string> = new Set(['dungeon', 'crypt', 'graveyard']);
+const ROOK_PLANS: ReadonlySet<string> = new Set(['golem', 'beast', 'humanoid', 'slime']);
+const ROOK_TITLES = ['the Black Knight', 'Oathbreaker', 'Knight of the Red Cape', 'Who Kneels to None', 'Bane of Squires', 'the Last Champion'];
+
+/** Whether a boss of this plan in this biome is Rook. */
+export function isRook(biome: string, plan: string): boolean {
+  return ROOK_HALLS.has(biome) && ROOK_PLANS.has(plan);
+}
+
 /**
  * Each behavior's shape (power.ts measures HP and hit against the chaser's, so those two stay the
  * reference) and its pace in px/s. Knights walk 50 to 62: chasers come on at nearly that (and sprint
@@ -395,9 +405,14 @@ export function floorBoss(biome: Biome, floor: number, seed: number): MobType {
     const swap = ['summon', 'rain', ...(closers > 1 ? ['charge'] : []), 'slam'].find((m) => moves.includes(m as BossMove));
     if (swap) moves[moves.indexOf(swap as BossMove)] = 'fan';
   }
+  // Rook fights alone and up close: his ring of blood crescents, his looping charge, and a fan of
+  // crescents, a slam or a leaping slam (no summons, no rain).
+  const rook = isRook(biome.id, plan);
+  if (rook) moves.splice(0, 3, 'ring', 'charge', rng.pick(['fan', 'slam', 'leap'] as BossMove[]));
   let name: string;
   let title: string;
   if (own) [name, title] = rng.pick(own.names);
+  else if (rook) [name, title] = ['Rook', rng.pick(ROOK_TITLES)];
   else {
     name = rng.pick(BOSS_NAMES);
     title = `${rng.pick(biome.mobs.adjectives)} ${rng.pick(BOSS_TITLES)}`;

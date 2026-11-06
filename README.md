@@ -31,28 +31,34 @@ recording: [`docs/SOUNDS.md`](docs/SOUNDS.md).
 
 - The knights and most mobs come from PixelForge, the game's character pipeline: chibi sprites in
   one palette with a 1 px plum outline, drawn in four directions with real attacks, dodges, hurts,
-  deaths and victories (`src/render/pf/`). Each class has a silhouette of its own: the Guardian in a
-  great helm, pauldrons and a cloak, the Blade with spiky hair and a scarf streaming behind, the
-  Ranger an elf in a wide feathered hat and cloak, the Cleric in a mitre and cloak over a white robe,
-  the Arcanist a bearded wizard in a pointed hat, the Lancer in a winged helm with twin tails. They
+  deaths and victories (`src/render/pf/`), in PixelForge's vivid second design pass. Each class has a
+  silhouette of its own: the Guardian in a great helm with a gold cross and a tall white plume, the
+  Blade with spiky hair and a long scarf streaming out, the Ranger in a pointed hood and a mantle
+  over a tunic, the Cleric in a tall mitre over a white robe, the Arcanist a bearded wizard in a
+  banded witch hat with an orb on his staff, the Lancer in a winged gold cap with twin tails. They
   breathe standing (a six-frame idle, a blink on its rest frame), walk on eight frames when slow and
   run at a knight's pace (the run is drawn for it, so the feet stay planted); the Blade and the
   Guardian cleave (a coil, a blur and a wide arc across the body), and the Whirlwind is a real spin
   through every view, looped while it lasts. Each knight's class sheet is recolored at runtime
-  for its rarity (iron and undyed cloth at Common, then bronze, steel, violet silver, gold, rose
-  steel, verdigris, crimson steel, star-silver, aurora steel, white gold, obsidian, and cycling
-  colors at Primordial, with cloth dyed in the rarity's color through the class's own values: the
-  Cleric's robe stays white under a dyed cloak, the Blade's scarf is the vivid part over a dark
-  tunic, the Lancer's helm a second metal), with capes from Epic (the cloaked classes wear their
-  cloak dyed instead), halos from Celestial and the mutations (Gilded, Shadow, Radiant, Void). Mobs
+  for its rarity in PixelForge's presets (iron and undyed cloth at Common, then bronze and emerald,
+  steel and royal blue, violet silver, gold, rose gold and magenta, verdigris, crimson steel,
+  star-silver, aurora steel, white gold, obsidian, and cycling colors at Primordial, with cloth dyed
+  in the rarity's color through the class's own values: the Cleric's robe stays white, the Blade's
+  scarf is the vivid part over a dark tunic, the Ranger's tunic takes the tier's trim, the Lancer's
+  cap a second metal, the Arcanist's orb the rarity's own color), and hair and skin of PixelForge's
+  (one knight in three keeps its class's own hair), with capes from Epic (the Ranger wears his mantle
+  dyed instead), halos from Celestial and the mutations (Gilded, Shadow, Radiant, Void). Mobs
   map by body plan (bats, wolves that howl as they wake, goblins, goblin archers and chiefs, orcs,
   skeletons, ogres that roar as they wake; from floor 36 a chaser's elite is the Ashen Duelist, a tall
   quick glaive fighter) and wear their floor's colors. The bosses are the Stone Warden, a forest
   guardian of boulders with an antlered skull and a leafy mane in each place's stone and leaves (its
-  leaves autumn red at half HP), and in the Ember Depths the Cinderwyrm, a big slow dragon in
+  leaves autumn red at half HP), in the Ember Depths the Cinderwyrm, a big slow dragon in
   obsidian scales (dark against the lava; its embers show at half HP) that breathes a fan of
-  fireballs, roars up rings of them, lunges to bite and sweeps its tail. Monsters
-  swing with PixelForge's white trails. The slimes (a green blob with a face) and the undead of the dark
+  fireballs, roars up rings of them, lunges to bite and sweeps its tail, and in the dark halls (the
+  dungeon, the crypt, the graveyard) Rook, a black knight with a horned crest, a scarlet cape and a
+  greatsword, who fights alone: a ring and a fan of blood crescents, a charge that loops and cuts
+  past, a leaping slam, a two-hit slash up close; at half HP his plate cracks open on embers. Monsters
+  swing with PixelForge's white trails (Rook's are blood red). The slimes (a green blob with a face) and the undead of the dark
   biomes (a skeleton with a sword, one with a scythe and a robed vampire, their attacks with their
   own slash smears) come from supplied packs, side views turned to face their targets, played by the
   same sim-driven animator. The farm's animals, ghosts, pumpkins, bugs, plants, casters and the
@@ -190,7 +196,7 @@ wind-up warning; the camera, the weather, the hub's map and keepers, folk and qu
 map, the combat and perk rolls (their odds, prices, doubles and free rolls; a full pool rolls nothing),
 Attack Speed, Quick Roll and every chance upgrade in a fight, the keepers' scenes and cards, a full game
 starting up; and the PixelForge art: every sheet holding what the game plays in four directions, the
-body plan to monster mapping (the Cinderwyrm in the Ember Depths, the Ashen Duelist's elites), the
+body plan to monster mapping (the Cinderwyrm in the Ember Depths, Rook in the dark halls, the Ashen Duelist's elites), the
 material recolors, every rarity's and mutation's ramps (each class's outfit dressed in them, its
 second tones too), the knights drawn without PixelForge's swing trails, and the animations the
 sim's state picks (attacks on the hit's tick, the Cleave and the Whirlwind's spin, windups over the
@@ -298,7 +304,8 @@ knights' swings itself), with PixelForge's own Python; it writes `<pixelforge>/o
 
 Then the import (it keeps the animations the game plays, each distinct frame once, as indexed PNGs
 with every color's material and shade, for the runtime recolors; it checks the knights' trail-free
-build matches the full one):
+build matches the full one; the Cinderwyrm is the game's own, drawn by `tools/wyrm/`, and is never
+imported):
 
 ```bash
 python3 -I tools/packs/pixelforge.py "<pixelforge>" src/assets/pf

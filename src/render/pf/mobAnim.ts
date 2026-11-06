@@ -77,6 +77,9 @@ const KITS: Record<MonsterId, Kit> = {
   cinderwyrm: { walk: 'walk', cycle: 30, melee: 'attack_bite', ranged: 'breath', death: 'death', lunge: 'attack_bite', dash: 'hold', enrage: 'roar', linger: 300 },
   // A quick elite of the later floors: its glaive sweeps, it lunges with the glaive out in front.
   ashen_duelist: { walk: 'walk', cycle: 24, melee: 'attack_slash', ranged: 'attack_slash', death: 'death', lunge: 'attack_lunge' },
+  // The dark halls' boss: a greatsword's two-hit slash up close, a charge that loops and cuts past, a
+  // leaping slam; he dies on one knee and stays there a moment.
+  rook: { walk: 'walk', cycle: 32, melee: 'attack_slash', ranged: 'attack_fan', death: 'death', lunge: 'charge', enrage: 'enrage', linger: 900 },
   pk_skeleton: { walk: 'walk', cycle: 22, melee: 'attack', death: 'death', linger: 1100, poof: null },
   pk_reaper: { walk: 'walk', cycle: 22, melee: 'attack', death: 'death', linger: 1100, poof: null },
   pk_vampire: { walk: 'walk', cycle: 18, melee: 'attack', death: 'death', linger: 500, poof: null },
@@ -116,7 +119,22 @@ export const WYRM_ANIM: Record<string, string> = {
   leap: 'roar',
 };
 
-const BOSS_ANIMS: Partial<Record<MonsterId, Record<string, string>>> = { stone_warden: BOSS_ANIM, cinderwyrm: WYRM_ANIM };
+/**
+ * The boss moves as Rook's: his ring and his fan the blood crescents his greatsword throws, his charge
+ * his own, his slam and his leap the leaping slam; summoning and calling down a rain, he raises the
+ * blade and roars (his enrage).
+ */
+export const ROOK_ANIM: Record<string, string> = {
+  ring: 'attack_ring',
+  fan: 'attack_fan',
+  charge: 'charge',
+  slam: 'attack_slam',
+  summon: 'enrage',
+  rain: 'enrage',
+  leap: 'attack_slam',
+};
+
+const BOSS_ANIMS: Partial<Record<MonsterId, Record<string, string>>> = { stone_warden: BOSS_ANIM, cinderwyrm: WYRM_ANIM, rook: ROOK_ANIM };
 
 /** Moves whose aim follows the target through the first half of the wind-up (the sprite turns with it). */
 const AIMED: ReadonlySet<string> = new Set(['dash', 'charge', 'leap']);

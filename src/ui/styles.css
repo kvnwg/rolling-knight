@@ -3508,9 +3508,26 @@ body,
     display: none;
   }
 }
-/* A boss's bar sits at the top middle: the plate goes under it. */
+/* A boss's bar, its title and the news under it hold the top middle: the plate steps aside, under
+   the floor's plate on the left (on a tall screen, under the boss's band, between the squad and the
+   little altar). */
 .dhud.has-boss .rebirth-pill {
-  top: calc(46 * var(--px) + env(safe-area-inset-top, 0px));
+  left: calc(3 * var(--px) + env(safe-area-inset-left, 0px));
+  top: calc(31 * var(--px) + env(safe-area-inset-top, 0px));
+  transform: none;
+}
+.dhud.has-boss .rebirth-pill:active {
+  transform: translateY(var(--px));
+}
+@media (max-aspect-ratio: 1/1) {
+  .dhud.has-boss .rebirth-pill {
+    left: 50%;
+    top: calc(62 * var(--px) + env(safe-area-inset-top, 0px));
+    transform: translateX(-50%);
+  }
+  .dhud.has-boss .rebirth-pill:active {
+    transform: translateX(-50%) translateY(var(--px));
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .rebirth-pill,

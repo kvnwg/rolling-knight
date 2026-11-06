@@ -5,7 +5,7 @@ import { addKnight, knightStats } from '../src/core/roster';
 import { Game } from '../src/game';
 import { BIOME_ORDER, BIOMES, biomeForFloor, isBossFloor } from '../src/world/biomes';
 import { BLOCKED, FLOOR, SOLID, TILE, bfs, generateFloor, tileAt } from '../src/world/mapgen';
-import { floorBoss, floorMobs } from '../src/world/mobgen';
+import { floorBoss, floorMobs, isRook } from '../src/world/mobgen';
 import { CAST_TIME, rigSkill } from '../src/world/skills';
 import { EXIT_HOLD, World, type HeroSpec } from '../src/world/world';
 
@@ -340,5 +340,30 @@ describe('the game', () => {
     expect(g.world!.heroes.length).toBe(3);
     g.leaveDungeon();
     expect(g.inDungeon).toBe(false);
+  });
+});
+
+describe('the dark halls', () => {
+  it('puts Rook, the black knight, in the dark halls: alone, with his crescents and his charge', () => {
+    let rooks = 0;
+    for (const id of ['dungeon', 'crypt', 'graveyard'] as const) {
+      for (const seed of [1, 2, 3, 4, 5, 6]) {
+        const boss = floorBoss(BIOMES[id], 25, seed);
+        if (!isRook(id, boss.plan)) {
+          // (A ghost or a pumpkin there is itself.)
+          expect(['ghost', 'pumpkin']).toContain(boss.plan);
+          continue;
+        }
+        rooks++;
+        expect(boss.name).toBe('Rook');
+        const moves = boss.boss!.moves;
+        expect(moves.slice(0, 2)).toEqual(['ring', 'charge']);
+        expect(['fan', 'slam', 'leap']).toContain(moves[2]);
+        expect(moves).not.toContain('summon');
+        expect(moves).not.toContain('rain');
+      }
+    }
+    expect(rooks).toBeGreaterThan(8);
+    expect(isRook('forest', 'humanoid')).toBe(false);
   });
 });

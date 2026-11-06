@@ -49,17 +49,20 @@ SHEETS = {
     'skeleton': ['idle', 'walk', 'run', 'combat_idle', 'attack_slash', 'hurt', 'stun', 'death_crumble'],
     'ogre': ['idle', 'walk', 'combat_idle', 'attack_heavy', 'roar', 'hurt', 'death'],
     'stone_warden': ['idle', 'walk', 'combat_idle', 'attack_slam', 'cast_ring', 'attack_fan', 'charge', 'summon', 'stomp', 'enrage', 'hurt', 'death'],
-    'cinderwyrm': ['idle', 'walk', 'combat_idle', 'attack_bite', 'attack_tail', 'breath', 'roar', 'hurt', 'death'],
+    # The dark knight boss: a two-hit slash, a looping charge, a leaping slam, a ring and a fan of
+    # blood crescents. Enraged, his plate cracks open on embers (a part of its own: a sheet of its own).
+    'rook': ['idle', 'walk', 'combat_idle', 'attack_slash', 'charge', 'attack_slam', 'attack_ring', 'attack_fan', 'enrage', 'hurt', 'death'],
+    'rook_enraged': ['idle', 'walk', 'combat_idle', 'attack_slash', 'charge', 'attack_slam', 'attack_ring', 'attack_fan', 'enrage', 'hurt', 'death'],
     'ashen_duelist': ['idle', 'walk', 'combat_idle', 'attack_slash', 'attack_lunge', 'hurt', 'death'],
 }
 
 # Recipes that are pure palette swaps of a sheet above are made in the game (frost_wolf from wolf,
-# stone_warden_enraged from stone_warden, cinderwyrm_obsidian from cinderwyrm), so they ship no
-# pixels of their own.
+# stone_warden_enraged from stone_warden), so they ship no pixels of their own. The Cinderwyrm is the
+# game's own (tools/wyrm draws it), so PixelForge's is never imported.
 
 # FX (out/fx/<name>/, after `pf fx build --all`), written as fx_<name>: the mobs' death poofs, the
 # skeleton's crumble, the stun stars, the Stone Warden's thrown shards, the Cinderwyrm's fireballs,
-# the rings of a wolf's howl.
+# the rings of a wolf's howl, Rook's blood crescents.
 FX = {
     'poof_smoke': ['play'],
     'bone_crumble': ['play'],
@@ -67,6 +70,7 @@ FX = {
     'rock_shard': ['travel'],
     'fireball': ['travel'],
     'howl_rings': ['play'],
+    'blood_crescent': ['travel'],
 }
 
 KNIGHT_ANCHORS = ('chin', 'back', 'hip')
@@ -127,8 +131,8 @@ def owners_for(repo, style, recipe):
         # Set by the recipe first, a part dyed apart before its material, then OWNER_ORDER.
         cands.sort(key=lambda c: (not c[2], not c[0][-1:].isdigit(), rank.get(c[0], 99)))
         out[h] = (cands[0][0], cands[0][1])
-    # The swing trails: rim, mid and the white core.
-    for shade, h in enumerate(style['fx_ramps']['swing']):
+    # The swing trails: rim, mid and the white core (or the ramp the recipe names: Rook's are blood).
+    for shade, h in enumerate(style['fx_ramps'][recipe.get('trail') or 'swing']):
         out.setdefault(h.lower(), ('trail', shade))
     return out
 

@@ -22,7 +22,7 @@
  * hue, at PixelForge's lightness steps and a muted chroma, paints the monster's main material, and
  * the biome's eye color lights its glow eyes. Elites wear a darker, richer version with red eyes.
  */
-import type { MobType } from '../../world/mobgen';
+import { isRook, type MobType } from '../../world/mobgen';
 import type { SheetName } from './assets';
 import { hexToOklch, oklchToHex, ramp, rampLike, shiftL } from './color';
 import type { Paint } from './frames';
@@ -30,7 +30,7 @@ import type { Recolor } from './sheet';
 
 export type MonsterId =
   | 'slime' | 'bat' | 'wolf' | 'frost_wolf' | 'goblin' | 'goblin_archer' | 'goblin_chief' | 'orc' | 'skeleton' | 'ogre' | 'stone_warden'
-  | 'cinderwyrm' | 'ashen_duelist'
+  | 'cinderwyrm' | 'ashen_duelist' | 'rook'
   // The supplied packs' (tools/packs/enemies.py): side views, mirrored for the other facing.
   | 'pk_skeleton' | 'pk_reaper' | 'pk_vampire' | 'pk_slime';
 
@@ -48,6 +48,7 @@ export const MONSTER_SHEET: Record<MonsterId, SheetName> = {
   stone_warden: 'stone_warden',
   cinderwyrm: 'cinderwyrm',
   ashen_duelist: 'ashen_duelist',
+  rook: 'rook',
   pk_skeleton: 'pk_skeleton',
   pk_reaper: 'pk_reaper',
   pk_vampire: 'pk_vampire',
@@ -81,7 +82,8 @@ export function monsterFor(t: MobType, elite: boolean, boss: boolean): MonsterId
   if (t.id.includes('-demon-')) return null;
   if (boss) {
     if (['pig', 'ram', 'chicken', 'ghost', 'pumpkin', 'bug', 'plant'].includes(t.plan)) return null;
-    return biome === 'ember' ? 'cinderwyrm' : 'stone_warden';
+    // The Ember Depths' Cinderwyrm, the dark halls' Rook (world/mobgen.ts names him), else the Stone Warden.
+    return biome === 'ember' ? 'cinderwyrm' : isRook(biome, t.plan) ? 'rook' : 'stone_warden';
   }
   switch (t.plan) {
     case 'slime':
@@ -105,27 +107,27 @@ export function monsterFor(t: MobType, elite: boolean, boss: boolean): MonsterId
   }
 }
 
-// PixelForge presets the recolors start from (style/style.json).
+// PixelForge presets the recolors start from (style/style.json, its vivid second design pass).
 const P = {
-  slime: ['#3c6553', '#4f7c6d', '#659488', '#7bada5'],
-  membrane: ['#4b344a', '#61455b'],
-  furGray: ['#564a43', '#6c6158', '#83786e', '#9a9085'],
-  furBrown: ['#5f3f31', '#755644', '#8c6d58', '#a3856e'],
-  furFrost: ['#536674', '#718393', '#91a0b1', '#b0bbcc'],
-  hide: ['#525b2b', '#637345', '#758c5f'],
-  bog: ['#394523', '#4a5c3a', '#5c7453'],
+  slime: ['#067e3f', '#00a668', '#37ce98', '#80f1cc'],
+  membrane: ['#5d3568', '#825186'],
+  furGray: ['#554b43', '#7a6f66', '#a1968c', '#c7bfb6'],
+  furBrown: ['#693923', '#905a3a', '#b47f5a', '#d1a887'],
+  furFrost: ['#5b798c', '#7d9db5', '#a5c2dc', '#d2e7fe'],
+  hide: ['#5b6c00', '#709310', '#8bb858'],
+  bog: ['#3a5101', '#4f7229', '#6b9456'],
   cloth: ['#4c445a', '#5a556b'],
-  orcSkin: ['#526540', '#67805c', '#7b9977'],
-  ogreSkin: ['#755e4d', '#8f7863', '#a8957e'],
-  bone: ['#7b705e', '#958b78', '#aca490', '#c1baa5'],
-  iron: ['#3e4349', '#565b62', '#70757c', '#8b8f97'],
-  steel: ['#50555e', '#6d727b', '#8b8f99', '#a7aab5'],
-  granite: ['#504d42', '#68675a', '#828175', '#9c9c90'],
-  basalt: ['#363b45', '#4a505b', '#606771', '#777e87'],
-  sandstone: ['#71543d', '#8a6e54', '#a38a6e', '#bca78b'],
-  frostStone: ['#3f5a64', '#5a737f', '#768d9a', '#94a8b6'],
-  leatherDark: ['#443333', '#554341', '#65534f'],
-  gold: ['#bc8f5f', '#d2ab70'],
+  orcSkin: ['#4f6f16', '#65953d', '#82b970'],
+  ogreSkin: ['#856042', '#a7815b', '#c4a57f'],
+  bone: ['#8c7e68', '#ada086', '#cec4a8', '#eee8d1'],
+  iron: ['#3f4348', '#63686f', '#8b8f97', '#b6b9bf'],
+  steel: ['#4c535e', '#737b88', '#9ea5b3', '#cdd1db'],
+  granite: ['#555348', '#777568', '#9a998b', '#bebfb3'],
+  basalt: ['#353b44', '#555b66', '#787d89', '#9ea1ac'],
+  sandstone: ['#785538', '#9e7853', '#c19e75', '#e0c6a4'],
+  frostStone: ['#3c5d6b', '#5c8093', '#82a4b9', '#aec8dc'],
+  leatherDark: ['#482d28', '#64463c', '#7d6255'],
+  gold: ['#df9c21', '#ffcc59'],
 } as const;
 
 /** The supplied packs' monsters as drawn: the slime's gel, the skeletons' bone and blades, the vampire's robe. */
@@ -134,16 +136,16 @@ const BONE = ['#676057', '#b3b2a1', '#e6e6e6'];
 const PK_METAL = ['#6d758d', '#b3b9d1', '#dae0ea'];
 const PK_ROBE = ['#5e4e3a', '#827860'];
 
-/** A glow eye in the biome's color, kept inside PixelForge's glow limits (L 0.85, C 0.14). */
+/** A glow eye in the biome's color, kept inside PixelForge's glow limits (L 0.88, C 0.22). */
 export function glowEye(hex: string): string {
   const [L, C, h] = hexToOklch(hex);
-  return oklchToHex(Math.min(0.85, Math.max(0.6, L)), Math.min(0.14, C), h);
+  return oklchToHex(Math.min(0.88, Math.max(0.6, L)), Math.min(0.22, C), h);
 }
 
-/** The mob design's signature hue and a muted chroma from it. */
+/** The mob design's signature hue and a chroma from it (as vivid as PixelForge's cloth, at most). */
 function hueOf(t: MobType): { h: number; c: number } {
   const [, C, h] = hexToOklch(t.ramp[Math.min(2, t.ramp.length - 1)]);
-  return { h, c: Math.max(0.02, Math.min(0.085, C * 0.7)) };
+  return { h, c: Math.max(0.03, Math.min(0.15, C)) };
 }
 
 /**
@@ -156,11 +158,11 @@ const SLIME_HUE: Record<string, [h: number, c: number]> = {
 };
 
 /** PixelForge's forest guardian as drawn: charcoal boulders, spring leaves, berries; at half HP the leaves go autumn, the berries blood. */
-const LEAF = ['#1b5524', '#397028', '#5c8a30', '#83a342'];
-const AUTUMN = ['#822d22', '#a24628', '#be6436', '#d98346'];
-const BERRY = ['#bf623d', '#d77e49'];
-const BLOOD = ['#933235', '#ad4c42'];
-const CHARCOAL = ['#2a3139', '#3a4049', '#4b5059', '#5d606a'];
+const LEAF = ['#005e28', '#238523', '#62a739', '#99ca59'];
+const AUTUMN = ['#982519', '#c6481c', '#ec7433', '#ffaa71'];
+const BERRY = ['#d45d30', '#fe843d'];
+const BLOOD = ['#a92032', '#d74840'];
+const CHARCOAL = ['#2a3139', '#444b55', '#606672', '#7f838d'];
 
 /**
  * The Stone Warden in each place: its boulders in the stone there, its mane in the leaves there (a
@@ -169,18 +171,18 @@ const CHARCOAL = ['#2a3139', '#3a4049', '#4b5059', '#5d606a'];
  * eyes in the place's glow.
  */
 const WARDEN: Record<string, { stone: readonly string[]; leaf: readonly string[]; fruit?: readonly string[]; eye: string }> = {
-  hamlet: { stone: P.granite, leaf: rampLike(LEAF, 0.1, 132, 5, 0.03), eye: '#ffe066' },
+  hamlet: { stone: P.granite, leaf: rampLike(LEAF, 0.14, 132, 5, 0.02), eye: '#ffe066' },
   forest: { stone: CHARCOAL, leaf: LEAF, eye: '#a2d060' },
-  tundra: { stone: P.frostStone, leaf: rampLike(LEAF, 0.035, 205, 3, 0.16), eye: '#7ae0ff' },
-  dungeon: { stone: rampLike(P.granite, 0.035, 330, 4, -0.06), leaf: rampLike(LEAF, 0.045, 62, 5, -0.02), fruit: BLOOD, eye: '#ff6a3a' },
-  crypt: { stone: P.basalt, leaf: rampLike(LEAF, 0.04, 150, 4, 0.02), fruit: rampLike(BERRY, 0.04, 120, 4, 0.02), eye: '#ff3a2a' },
-  swamp: { stone: rampLike(P.granite, 0.025, 115, 4, -0.06), leaf: rampLike(LEAF, 0.075, 118, 4, -0.02), fruit: rampLike(BERRY, 0.11, 95, 4, 0.04), eye: '#e8ff4a' },
-  desert: { stone: P.sandstone, leaf: rampLike(LEAF, 0.07, 88, 5, 0.1), fruit: rampLike(BERRY, 0.09, 40, 4, -0.08), eye: '#ffb03a' },
-  graveyard: { stone: rampLike(P.basalt, 0.025, 300, 3, 0.02), leaf: rampLike(LEAF, 0.045, 300, 3, 0.06), fruit: BLOOD, eye: '#b8ff5a' },
+  tundra: { stone: P.frostStone, leaf: rampLike(LEAF, 0.05, 205, 3, 0.12), eye: '#7ae0ff' },
+  dungeon: { stone: rampLike(P.granite, 0.045, 330, 4, -0.08), leaf: rampLike(LEAF, 0.065, 62, 5, -0.04), fruit: BLOOD, eye: '#ff6a3a' },
+  crypt: { stone: P.basalt, leaf: rampLike(LEAF, 0.06, 150, 4, 0), fruit: rampLike(BERRY, 0.06, 120, 4, 0), eye: '#ff3a2a' },
+  swamp: { stone: rampLike(P.granite, 0.035, 115, 4, -0.08), leaf: rampLike(LEAF, 0.11, 118, 4, -0.04), fruit: rampLike(BERRY, 0.15, 95, 4, 0.02), eye: '#e8ff4a' },
+  desert: { stone: P.sandstone, leaf: rampLike(LEAF, 0.1, 88, 5, 0.06), fruit: rampLike(BERRY, 0.13, 40, 4, -0.1), eye: '#ffb03a' },
+  graveyard: { stone: rampLike(P.basalt, 0.035, 300, 3, 0), leaf: rampLike(LEAF, 0.065, 300, 3, 0.03), fruit: BLOOD, eye: '#b8ff5a' },
   // (The Ember Depths have the Cinderwyrm; a warden there would be basalt with leaves of fire.)
-  ember: { stone: P.basalt, leaf: ramp([0.45, 0.56, 0.66, 0.76], 0.14, 34, 14), eye: '#ffb04a' },
-  crystal: { stone: rampLike(P.granite, 0.06, 292, 4, 0.02), leaf: rampLike(LEAF, 0.08, 200, 4, 0.12), fruit: rampLike(BERRY, 0.1, 330, 4, 0.06), eye: '#e8f8ff' },
-  shrine: { stone: rampLike(P.granite, 0.04, 170, 4, -0.03), leaf: rampLike(LEAF, 0.08, 352, 3, 0.2), fruit: rampLike(BERRY, 0.12, 85, 4, 0.06), eye: '#ffd84a' },
+  ember: { stone: P.basalt, leaf: ramp([0.5, 0.62, 0.74, 0.86], 0.18, 34, 14), eye: '#ffb04a' },
+  crystal: { stone: rampLike(P.granite, 0.08, 292, 4, 0), leaf: rampLike(LEAF, 0.12, 200, 4, 0.08), fruit: rampLike(BERRY, 0.15, 330, 4, 0.04), eye: '#e8f8ff' },
+  shrine: { stone: rampLike(P.granite, 0.05, 170, 4, -0.05), leaf: rampLike(LEAF, 0.12, 352, 3, 0.14), fruit: rampLike(BERRY, 0.16, 85, 4, 0.04), eye: '#ffd84a' },
 };
 
 /**
@@ -238,18 +240,18 @@ export function mobPaint(t: MobType, elite: boolean, boss: boolean, enraged = fa
       break;
     }
     case 'bat':
-      r.membrane = rampLike(P.membrane, Math.min(0.07, c * ce), h, 5, dL);
-      r.fur = rampLike(P.furBrown, Math.min(0.045, c * 0.6), h, 5, dL - 0.02);
+      r.membrane = rampLike(P.membrane, Math.min(0.12, c * ce), h, 5, dL);
+      r.fur = rampLike(P.furBrown, Math.min(0.07, c * 0.6), h, 5, dL - 0.02);
       break;
     case 'wolf':
     case 'frost_wolf': {
-      if (monster === 'frost_wolf') r.fur = rampLike(P.furFrost, 0.03, 245, 5, dL);
-      else if (biome === 'ember') r.fur = rampLike(P.furGray, 0.03, 30, 4, dL - 0.08);
-      else if (biome === 'desert') r.fur = rampLike(P.furGray, 0.05, 72, 4, dL + 0.05);
+      if (monster === 'frost_wolf') r.fur = rampLike(P.furFrost, 0.045, 245, 5, dL);
+      else if (biome === 'ember') r.fur = rampLike(P.furGray, 0.04, 30, 4, dL - 0.1);
+      else if (biome === 'desert') r.fur = rampLike(P.furGray, 0.07, 72, 4, dL + 0.03);
       else {
         // Fur stays fur: browns and tans keep a little of the design's hue, anything else goes grey.
         const natural = h >= 20 && h <= 85;
-        r.fur = rampLike(P.furGray, natural ? Math.max(0.015, Math.min(0.04, c * 0.45)) : 0.012, natural ? h : 60, 4, dL - (biome === 'forest' ? 0.05 : 0));
+        r.fur = rampLike(P.furGray, natural ? Math.max(0.02, Math.min(0.06, c * 0.45)) : 0.014, natural ? h : 60, 4, dL - (biome === 'forest' ? 0.05 : 0));
       }
       break;
     }
@@ -259,40 +261,40 @@ export function mobPaint(t: MobType, elite: boolean, boss: boolean, enraged = fa
       const chief = monster === 'goblin_chief';
       const base = chief ? P.bog : P.hide;
       const hide: Record<string, readonly string[]> = {
-        ember: rampLike(base, 0.09, 28, 5, 0.02), // imps
-        crypt: rampLike(base, 0.03, 160, 4, 0.08), // ghouls
-        graveyard: rampLike(base, 0.03, 200, 4, 0.06),
-        desert: rampLike(base, 0.06, 88, 5, 0.04),
+        ember: rampLike(base, 0.14, 28, 5, 0.02), // imps
+        crypt: rampLike(base, 0.045, 160, 4, 0.06), // ghouls
+        graveyard: rampLike(base, 0.045, 200, 4, 0.04),
+        desert: rampLike(base, 0.1, 88, 5, 0.02),
         tundra: rampLike(base, 0.045, 222, 4, 0.06),
-        shrine: rampLike(base, 0.07, 168, 5, 0.02),
+        shrine: rampLike(base, 0.11, 168, 5, 0.02),
         swamp: P.bog,
-        crystal: rampLike(base, 0.06, 290, 4, 0.04),
+        crystal: rampLike(base, 0.1, 290, 4, 0.02),
       };
-      r.hide = shiftL(hide[biome] ?? (elite && !chief ? rampLike(base, 0.075, 124, 5) : base), dL);
-      r.cloth = rampLike(P.cloth, Math.min(0.08, c * ce), h, 5, chief ? -0.03 : 0.03);
+      r.hide = shiftL(hide[biome] ?? (elite && !chief ? rampLike(base, 0.12, 124, 5) : base), dL);
+      r.cloth = rampLike(P.cloth, Math.min(0.14, c * ce), h, 5, chief ? -0.03 : 0.03);
       break;
     }
     case 'orc':
-      r.skin = biome === 'tundra' ? rampLike(P.orcSkin, 0.03, 235, 4, 0.03) : biome === 'ember' ? rampLike(P.orcSkin, 0.07, 32, 5, -0.02) : rampLike(P.orcSkin, 0.061, 136, 5, dL);
+      r.skin = biome === 'tundra' ? rampLike(P.orcSkin, 0.05, 235, 4, 0.03) : biome === 'ember' ? rampLike(P.orcSkin, 0.11, 32, 5, -0.02) : rampLike(P.orcSkin, 0.11, 136, 5, dL);
       r.metal = elite ? P.steel : biome === 'tundra' ? rampLike(P.iron, 0.02, 240, 3, 0.04) : P.iron;
       if (elite) r.accent = P.gold;
       break;
     case 'skeleton':
-      r.bone = biome === 'crypt' ? rampLike(P.bone, 0.03, 140, 4) : biome === 'graveyard' ? rampLike(P.bone, 0.025, 255, 3) : biome === 'desert' ? rampLike(P.bone, 0.045, 78, 4, 0.02) : P.bone;
+      r.bone = biome === 'crypt' ? rampLike(P.bone, 0.04, 140, 4, -0.04) : biome === 'graveyard' ? rampLike(P.bone, 0.035, 255, 3, -0.03) : biome === 'desert' ? rampLike(P.bone, 0.06, 78, 4) : P.bone;
       if (elite) r.metal = P.steel;
       break;
     case 'ogre': {
       // Golems: an ogre of the biome's stone.
       const stone: Record<string, readonly string[]> = {
-        tundra: rampLike(P.ogreSkin, 0.032, 232, 3, -0.02),
-        ember: rampLike(P.ogreSkin, 0.02, 262, 3, -0.12),
-        crystal: rampLike(P.ogreSkin, 0.07, 296, 4, -0.04),
-        desert: rampLike(P.ogreSkin, 0.05, 64, 4),
-        crypt: rampLike(P.ogreSkin, 0.02, 200, 3, -0.08),
+        tundra: rampLike(P.ogreSkin, 0.05, 232, 3, -0.04),
+        ember: rampLike(P.ogreSkin, 0.03, 262, 3, -0.14),
+        crystal: rampLike(P.ogreSkin, 0.1, 296, 4, -0.06),
+        desert: rampLike(P.ogreSkin, 0.07, 64, 4, -0.02),
+        crypt: rampLike(P.ogreSkin, 0.03, 200, 3, -0.1),
       };
-      r.skin = shiftL(stone[biome] ?? rampLike(P.ogreSkin, 0.018, 100, 3, -0.04), dL);
-      r.cloth = rampLike(P.cloth, Math.min(0.08, c * ce), h, 5, -0.02);
-      r.hair = rampLike(P.leatherDark, 0.02, h, 3);
+      r.skin = shiftL(stone[biome] ?? rampLike(P.ogreSkin, 0.03, 100, 3, -0.06), dL);
+      r.cloth = rampLike(P.cloth, Math.min(0.14, c * ce), h, 5, -0.02);
+      r.hair = rampLike(P.leatherDark, 0.03, h, 3);
       break;
     }
     case 'pk_slime': {
@@ -339,8 +341,14 @@ export function mobPaint(t: MobType, elite: boolean, boss: boolean, enraged = fa
       // Its own dark plate and crimson cape; the elites' red glare.
       r.eyes = [eye];
       break;
+    case 'rook':
+      // His own black plate, scarlet cape and red glare wherever he waits; at half HP the plate cracks
+      // open on embers (a sheet of its own).
+      delete r.eyes;
+      break;
   }
-  p = { monster, sheet: MONSTER_SHEET[monster], recolor: r, key };
+  const sheet: SheetName = monster === 'rook' && enraged ? 'rook_enraged' : MONSTER_SHEET[monster];
+  p = { monster, sheet, recolor: r, key };
   cache.set(key, p);
   if (cache.size > 300) cache.delete(cache.keys().next().value!);
   return p;

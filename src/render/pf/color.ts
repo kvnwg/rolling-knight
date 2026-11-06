@@ -74,7 +74,7 @@ export function warmer(h: number, deg: number): number {
 /** A ramp with the same lightness steps as `like` (a PixelForge preset), in another hue and chroma. */
 export function rampLike(like: readonly string[], C: number, h: number, shift = 5, dL = 0): string[] {
   return ramp(
-    like.map((x) => Math.max(0.3, Math.min(0.82, hexToOklch(x)[0] + dL))),
+    like.map((x) => Math.max(0.3, Math.min(0.93, hexToOklch(x)[0] + dL))),
     C,
     h,
     shift,
@@ -92,7 +92,7 @@ export function shiftL(r: readonly string[], dL: number): string[] {
   if (!dL) return [...r];
   return r.map((x) => {
     const [L, C, h] = hexToOklch(x);
-    return oklchToHex(Math.max(0.3, Math.min(0.85, L + dL)), C, h);
+    return oklchToHex(Math.max(0.3, Math.min(0.93, L + dL)), C, h);
   });
 }
 

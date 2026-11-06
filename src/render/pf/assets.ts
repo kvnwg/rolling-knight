@@ -9,6 +9,7 @@
 import ashenDuelist from '../../assets/pf/ashen_duelist.json';
 import bat from '../../assets/pf/bat.json';
 import cinderwyrm from '../../assets/pf/cinderwyrm.json';
+import fxBloodCrescent from '../../assets/pf/fx_blood_crescent.json';
 import fxBoneCrumble from '../../assets/pf/fx_bone_crumble.json';
 import fxFireball from '../../assets/pf/fx_fireball.json';
 import fxHowlRings from '../../assets/pf/fx_howl_rings.json';
@@ -27,6 +28,8 @@ import rkGuardian from '../../assets/pf/rk_guardian.json';
 import rkKevin from '../../assets/pf/rk_kevin.json';
 import rkLancer from '../../assets/pf/rk_lancer.json';
 import rkRanger from '../../assets/pf/rk_ranger.json';
+import rook from '../../assets/pf/rook.json';
+import rookEnraged from '../../assets/pf/rook_enraged.json';
 import skeleton from '../../assets/pf/skeleton.json';
 import slime from '../../assets/pf/slime.json';
 import stoneWarden from '../../assets/pf/stone_warden.json';
@@ -56,6 +59,8 @@ const METAS = {
   ogre,
   stone_warden: stoneWarden,
   cinderwyrm,
+  rook,
+  rook_enraged: rookEnraged,
   ashen_duelist: ashenDuelist,
   pk_skeleton: pkSkeleton,
   pk_reaper: pkReaper,
@@ -67,6 +72,7 @@ const METAS = {
   fx_rock_shard: fxRockShard,
   fx_fireball: fxFireball,
   fx_howl_rings: fxHowlRings,
+  fx_blood_crescent: fxBloodCrescent,
 } as const;
 
 export type SheetName = keyof typeof METAS;

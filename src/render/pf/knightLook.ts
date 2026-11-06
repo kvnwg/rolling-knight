@@ -44,71 +44,100 @@ export function knightSheet(id: string): SheetName {
   return KNIGHT_SHEET_BY_ID[id] ?? KNIGHT_SHEET[knightDef(id).cls];
 }
 
-// PixelForge's presets (style/style.json), dark to light.
+// PixelForge's presets (style/style.json, its vivid second design pass), dark to light.
 export const PF = {
-  iron: ['#3e4349', '#565b62', '#70757c', '#8b8f97'],
-  steel: ['#50555e', '#6d727b', '#8b8f99', '#a7aab5'],
-  bronze: ['#775230', '#8f6d46', '#a88a5e', '#c0a778'],
-  gold: ['#926837', '#ac8450', '#c29e66', '#d5b67b'],
-  accentGold: ['#bc8f5f', '#d2ab70'],
-  accentSilver: ['#81868f', '#a0a5ae'],
+  iron: ['#3f4348', '#63686f', '#8b8f97', '#b6b9bf'],
+  steel: ['#4c535e', '#737b88', '#9ea5b3', '#cdd1db'],
+  bronze: ['#864e1b', '#b17434', '#d69e5b', '#f5cd94'],
+  gold: ['#996000', '#c38600', '#e4b243', '#fee18c'],
+  obsidian: ['#2f2f3e', '#4d4a5c', '#6e687b', '#908998'],
+  roseGold: ['#99523f', '#c67656', '#ed9f77', '#ffd2b5'],
+  blued: ['#1a4f80', '#4275b2', '#719dde', '#a7c6fe'],
+  accentGold: ['#df9c21', '#ffcc59'],
+  accentSilver: ['#9a9fa8', '#ccd1db'],
+  accentPearl: ['#c8c4b7', '#ebe8da'],
   leatherBrown: ['#5e494c', '#735b51', '#826b5e'],
-  leatherDark: ['#443333', '#554341', '#65534f'],
-  leatherTan: ['#795d46', '#8c7258', '#9f886b'],
+  leatherDark: ['#482d28', '#64463c', '#7d6255'],
+  leatherBlack: ['#302e3b', '#494554', '#635e6b'],
+  leatherTan: ['#8c5c3b', '#ae7d52', '#cba276'],
+  // light, fair, tan, deep, ebony, porcelain
   skins: [
     ['#9f6f65', '#c08d80', '#dba292'],
-    ['#aa8173', '#c69d8c', '#ddb3a0'],
-    ['#865f4a', '#a3785f', '#bb9174'],
-    ['#5f3e33', '#785444', '#8f6b57'],
+    ['#c4917d', '#e7b094', '#ffd4b9'],
+    ['#a0684d', '#c58864', '#e3ae87'],
+    ['#724130', '#945e45', '#b08063'],
+    ['#60352a', '#7f503e', '#9a6f5a'],
+    ['#c3ac9f', '#dfc7b7', '#f8e4d3'],
   ],
+  // brown, black, blonde, auburn, silver, fire, platinum, raven, chestnut, golden, copper, snow, and
+  // the bright ones (HAIR_NATURAL on): bubblegum, lavender, sky, mint.
   hairs: [
     ['#735b51', '#826b5e', '#957e6d'],
-    ['#3f3a49', '#504a58', '#625a68'],
-    ['#a08461', '#b7996c', '#cbb17d'],
-    ['#7b4d42', '#8f5e4c', '#a3735c'],
-    ['#797983', '#92919a', '#aeacb6'],
+    ['#2c2e45', '#484762', '#66627c'],
+    ['#c7943d', '#e7b852', '#ffde84'],
+    ['#8b3724', '#b25634', '#d07d55'],
+    ['#848591', '#acadbb', '#d6d6e3'],
+    ['#b83022', '#e4531f', '#ff8342'],
+    ['#b0ab98', '#cdcab4', '#eae9d5'],
+    ['#22304a', '#3c4867', '#596280'],
+    ['#6c3623', '#905538', '#ad7858'],
+    ['#c98000', '#eca407', '#ffd06f'],
+    ['#b54e18', '#dc7020', '#f89b4d'],
+    ['#b0b9bf', '#c9d2da', '#e5ecf4'],
+    ['#c45f8c', '#f27ca2', '#ffb2bf'],
+    ['#816ab9', '#aa87de', '#d3a9f8'],
+    ['#2a8ab8', '#50abe4', '#8ccbff'],
+    ['#46987b', '#5cbca2', '#86deca'],
   ],
 } as const;
 
-const clothL = (l: number) => [l, l + 0.07];
+/** How many of PF.hairs are natural colors (the rest are bright: no wizard's beard is bubblegum pink). */
+const HAIR_NATURAL = 12;
+
+/** A two-shade cloth at lightness `l`, a full PixelForge step apart. */
+const clothL = (l: number) => [l, l + 0.12];
 
 interface Tier {
   metal: readonly string[];
   cloth: readonly string[];
   accent: readonly string[];
   leather: readonly string[];
-  /** A part dyed apart: a scarf, a cloak, a mitre (dressed: the class's own values in the tier's dye). */
+  /** A part dyed apart: a scarf, a cloak, a plume (dressed: the class's own values in the tier's dye). */
   cloth2?: readonly string[];
-  /** A part in another metal: the Lancer's helm and spearhead (the tier's trim metal). */
+  /** A third cloth (the Ranger's tunic under its hood and mantle): the tier's trim, dressed. */
+  cloth3?: readonly string[];
+  /** A part in another metal: the Lancer's winged cap (the tier's trim metal). */
   metal2?: readonly string[];
+  /** A gem (the Arcanist's orb): the rarity's own color. */
+  accent2?: readonly string[];
 }
 
-/** One look per rarity (the order is RARITIES'). */
+/** One look per rarity (the order is RARITIES'), in PixelForge's vivid presets. */
 const TIERS: Record<Rarity, Tier> = {
   // Iron and undyed wool, a tarnished brass buckle.
-  common: { metal: PF.iron, cloth: ramp(clothL(0.43), 0.022, 65), accent: ramp([0.56, 0.64], 0.04, 75), leather: PF.leatherBrown },
-  // Bronze and forest green.
-  uncommon: { metal: PF.bronze, cloth: ramp(clothL(0.42), 0.065, 148), accent: ramp([0.62, 0.7], 0.06, 80), leather: PF.leatherBrown },
+  common: { metal: PF.iron, cloth: ramp(clothL(0.5), 0.026, 72), accent: ramp([0.6, 0.72], 0.05, 78), leather: PF.leatherBrown },
+  // Bronze and emerald.
+  uncommon: { metal: PF.bronze, cloth: ramp(clothL(0.48), 0.14, 150), accent: ramp([0.66, 0.78], 0.09, 80), leather: PF.leatherBrown },
   // Bright steel and royal blue.
-  rare: { metal: PF.steel, cloth: ramp(clothL(0.42), 0.08, 258), accent: PF.accentSilver, leather: PF.leatherDark },
-  // Silver with a violet sheen, purple cloth, gold trim.
-  epic: { metal: rampLike(PF.steel, 0.032, 300, 4, 0.03), cloth: ramp(clothL(0.41), 0.09, 312), accent: PF.accentGold, leather: PF.leatherDark },
+  rare: { metal: PF.steel, cloth: ramp(clothL(0.45), 0.17, 262), accent: PF.accentSilver, leather: PF.leatherBlack },
+  // Silver with a violet sheen, violet cloth, gold trim.
+  epic: { metal: rampLike(PF.steel, 0.045, 300, 4, 0.02), cloth: ramp(clothL(0.45), 0.16, 305), accent: PF.accentGold, leather: PF.leatherBlack },
   // Gold, and cloth of gold.
-  legendary: { metal: PF.gold, cloth: ramp(clothL(0.56), 0.095, 80), accent: ramp([0.72, 0.8], 0.09, 84), leather: PF.leatherDark },
-  // Rose steel and magenta.
-  mythic: { metal: rampLike(PF.steel, 0.048, 345, 3), cloth: ramp(clothL(0.41), 0.11, 352), accent: PF.accentGold, leather: PF.leatherDark },
+  legendary: { metal: PF.gold, cloth: ramp(clothL(0.66), 0.15, 82), accent: ramp([0.78, 0.9], 0.13, 88), leather: PF.leatherDark },
+  // Rose gold and magenta.
+  mythic: { metal: PF.roseGold, cloth: ramp(clothL(0.5), 0.18, 345), accent: PF.accentGold, leather: PF.leatherBlack },
   // Bronze gone green in its shadows (verdigris), and rust.
-  ancient: { metal: [oklchToHex(0.39, 0.04, 178), oklchToHex(0.48, 0.045, 150), oklchToHex(0.58, 0.065, 92), oklchToHex(0.67, 0.07, 82)], cloth: ramp(clothL(0.42), 0.1, 42), accent: ramp([0.6, 0.68], 0.07, 70), leather: PF.leatherDark },
+  ancient: { metal: [oklchToHex(0.42, 0.065, 178), oklchToHex(0.54, 0.08, 150), oklchToHex(0.67, 0.1, 88), oklchToHex(0.8, 0.1, 80)], cloth: ramp(clothL(0.5), 0.15, 42), accent: ramp([0.66, 0.78], 0.1, 70), leather: PF.leatherDark },
   // Blackened crimson steel, blood-red cloth, gold.
-  exalted: { metal: ramp([0.36, 0.44, 0.53, 0.62], 0.05, 18, 4), cloth: ramp(clothL(0.38), 0.11, 24), accent: PF.accentGold, leather: PF.leatherDark },
-  // Star-silver and azure.
-  celestial: { metal: rampLike(PF.steel, 0.032, 235, 3, 0.06), cloth: ramp(clothL(0.46), 0.09, 228), accent: ramp([0.74, 0.81], 0.06, 88), leather: PF.leatherDark },
+  exalted: { metal: ramp([0.34, 0.45, 0.57, 0.7], 0.07, 20, 4), cloth: ramp(clothL(0.42), 0.17, 22), accent: PF.accentGold, leather: PF.leatherBlack },
+  // Star-silver and sky.
+  celestial: { metal: rampLike(PF.steel, 0.045, 235, 3, 0.04), cloth: ramp(clothL(0.6), 0.13, 228), accent: ramp([0.8, 0.9], 0.07, 90), leather: PF.leatherBlack },
   // Aurora steel and mint.
-  astral: { metal: rampLike(PF.steel, 0.045, 182, 3, 0.04), cloth: ramp(clothL(0.5), 0.09, 172), accent: ramp([0.7, 0.79], 0.03, 180), leather: PF.leatherDark },
+  astral: { metal: rampLike(PF.steel, 0.06, 182, 3, 0.04), cloth: ramp(clothL(0.6), 0.13, 168), accent: ramp([0.76, 0.88], 0.06, 180), leather: PF.leatherBlack },
   // White gold and ivory.
-  divine: { metal: rampLike(PF.gold, 0.05, 86, 3, 0.05), cloth: ramp(clothL(0.7), 0.03, 88), accent: ramp([0.74, 0.81], 0.09, 82), leather: PF.leatherTan },
+  divine: { metal: rampLike(PF.gold, 0.06, 86, 3, 0.06), cloth: ramp(clothL(0.78), 0.035, 88), accent: PF.accentGold, leather: PF.leatherTan },
   // Obsidian with lavender cloth.
-  eternal: { metal: ramp([0.32, 0.4, 0.49, 0.6], 0.035, 296, 3), cloth: ramp(clothL(0.5), 0.08, 296), accent: ramp([0.66, 0.75], 0.05, 300), leather: ramp([0.31, 0.35, 0.4], 0.02, 300) },
+  eternal: { metal: PF.obsidian, cloth: ramp(clothL(0.6), 0.11, 296), accent: ramp([0.72, 0.84], 0.08, 300), leather: ramp([0.31, 0.37, 0.44], 0.025, 300) },
   // Cycling (see primordialTier); this is its look at step 0.
   primordial: { metal: PF.gold, cloth: PF.accentGold, accent: PF.accentGold, leather: PF.leatherDark },
   // Kevin: no shining armor, just plain dark clothes (he doesn't need it).
@@ -126,9 +155,9 @@ export const PRIMORDIAL_STEPS = 24;
 function primordialTier(step: number): Tier {
   const h = (step / PRIMORDIAL_STEPS) * 360;
   return {
-    metal: [oklchToHex(0.5, 0.075, h), oklchToHex(0.6, 0.08, h + 55), oklchToHex(0.7, 0.075, h + 110), oklchToHex(0.8, 0.065, h + 165)],
-    cloth: ramp(clothL(0.42), 0.11, (h + 340) % 360),
-    accent: ramp([0.74, 0.81], 0.09, 82),
+    metal: [oklchToHex(0.5, 0.1, h), oklchToHex(0.62, 0.11, h + 55), oklchToHex(0.74, 0.1, h + 110), oklchToHex(0.86, 0.08, h + 165)],
+    cloth: ramp(clothL(0.45), 0.16, (h + 340) % 360),
+    accent: ramp([0.78, 0.9], 0.13, 88),
     leather: PF.leatherDark,
   };
 }
@@ -186,24 +215,30 @@ function dress(tier: readonly string[], d: Design | null, refL: number, refC: nu
   const h0 = hexToOklch(tier[0])[2];
   const lo = Math.min(...d.L);
   const hi = Math.max(...d.L);
-  const dL = Math.max(0.31 - lo, Math.min(0.83 - hi, (Lt - refL) * 0.5));
+  const dL = Math.max(0.31 - lo, Math.min(0.93 - hi, (Lt - refL) * 0.5));
   const C = Ct * Math.max(0.3, Math.min(1.2, d.C / refC));
   return d.L.map((L, i) => oklchToHex(L + dL, C, warmer((h0 + dh + 360) % 360, 5 * i)));
 }
 
-/** A tier dressed for a class's sheet: its cloth, its second cloth and its leather through the class's values, its trim metal from its accent. */
-function dressFor(t: Tier, sheet: SheetName): Tier {
+/**
+ * A tier dressed for a class's sheet: its cloth, its second cloth and its leather through the class's
+ * values, a third cloth in its trim, its trim metal from its accent, a gem in the rarity's color.
+ */
+function dressFor(t: Tier, sheet: SheetName, gem: string): Tier {
   const cloth = designOf(sheet, 'cloth', 2);
   const cloth2 = designOf(sheet, 'cloth2', 2);
+  const cloth3 = designOf(sheet, 'cloth3', 2);
   // A second dye a little round the wheel from the first, as the class's own two are (both vivid).
   const dh = cloth && cloth2 && cloth.C > 0.06 && cloth2.C > 0.06 ? Math.max(-25, Math.min(25, ((cloth2.h - cloth.h + 540) % 360) - 180)) : 0;
   const [, aC, aH] = hexToOklch(t.accent[t.accent.length - 1]);
   return {
     ...t,
-    cloth: dress(t.cloth, cloth, 0.49, 0.09),
-    cloth2: dress(t.cloth, cloth2, 0.49, 0.09, dh),
-    leather: dress(t.leather, designOf(sheet, 'leather', 3), 0.45, 0.03),
-    metal2: t.metal.map((x, i) => oklchToHex(Math.min(0.83, hexToOklch(x)[0] + 0.03), Math.max(0.02, Math.min(0.1, aC)), warmer(aH, 4 * i))),
+    cloth: dress(t.cloth, cloth, 0.56, 0.15),
+    cloth2: dress(t.cloth, cloth2, 0.56, 0.15, dh),
+    ...(cloth3 ? { cloth3: dress(t.accent, cloth3, 0.7, 0.1) } : {}),
+    leather: dress(t.leather, designOf(sheet, 'leather', 3), 0.45, 0.04),
+    metal2: t.metal.map((x, i) => oklchToHex(Math.min(0.93, hexToOklch(x)[0] + 0.03), Math.max(0.02, Math.min(0.16, aC)), warmer(aH, 4 * i))),
+    accent2: ramp([0.5, 0.68], Math.min(0.17, hexToOklch(gem)[1]), hexToOklch(gem)[2], 6),
   };
 }
 
@@ -213,14 +248,14 @@ function mutate(t: Tier, m: MutationId | null, cls: ClassId): Tier {
   const whiten = (r: readonly string[]) =>
     r.map((c) => {
       const [L, C, h] = hexToOklch(c);
-      return oklchToHex(L + (0.84 - L) * 0.5, C * 0.75, h);
+      return oklchToHex(L + (0.9 - L) * 0.5, C * 0.75, h);
     });
   switch (m) {
     case 'gilded': {
-      const gold = ramp([0.58, 0.67, 0.75, 0.81], 0.095, 70, 4);
+      const gold = [...PF.gold];
       // Classes without armor gild their wood: the Ranger's bow, the casters' staves.
       const unarmored = cls === 'ranger' || cls === 'cleric' || cls === 'arcanist';
-      return { ...t, metal: gold, metal2: gold, accent: ramp([0.76, 0.82], 0.1, 85), leather: unarmored ? ramp([0.5, 0.58, 0.66], 0.085, 72, 4) : t.leather };
+      return { ...t, metal: gold, metal2: gold, accent: PF.accentGold, leather: unarmored ? ramp([0.52, 0.64, 0.76], 0.12, 72, 4) : t.leather };
     }
     case 'shadow': {
       const metal = ramp([0.31, 0.36, 0.43, 0.51], 0.035, 300, 3);
@@ -228,19 +263,23 @@ function mutate(t: Tier, m: MutationId | null, cls: ClassId): Tier {
         metal,
         metal2: metal,
         cloth: ramp([0.31, 0.37], 0.05, 305),
-        cloth2: ramp([0.36, 0.43], 0.085, 300),
-        accent: ramp([0.5, 0.6], 0.09, 305),
+        cloth2: ramp([0.36, 0.45], 0.1, 300),
+        cloth3: ramp([0.33, 0.4], 0.06, 300),
+        accent: ramp([0.5, 0.62], 0.11, 305),
+        accent2: ramp([0.45, 0.62], 0.15, 300),
         leather: ramp([0.3, 0.33, 0.37], 0.02, 300),
       };
     }
     case 'radiant': {
-      const metal = ramp([0.66, 0.72, 0.78, 0.82], 0.035, 90, 2);
+      const metal = ramp([0.7, 0.78, 0.86, 0.93], 0.04, 90, 2);
       return {
         metal,
         metal2: metal,
         cloth: whiten(t.cloth),
         ...(t.cloth2 ? { cloth2: whiten(t.cloth2) } : {}),
-        accent: ramp([0.76, 0.82], 0.09, 85),
+        ...(t.cloth3 ? { cloth3: whiten(t.cloth3) } : {}),
+        accent: ramp([0.8, 0.9], 0.1, 88),
+        ...(t.accent2 ? { accent2: t.accent2 } : {}),
         leather: PF.leatherTan,
       };
     }
@@ -250,8 +289,10 @@ function mutate(t: Tier, m: MutationId | null, cls: ClassId): Tier {
         metal,
         metal2: metal,
         cloth: ramp([0.3, 0.34], 0.04, 290),
-        cloth2: ramp([0.33, 0.39], 0.06, 212),
-        accent: ramp([0.64, 0.78], 0.11, 205, 0),
+        cloth2: ramp([0.33, 0.4], 0.07, 212),
+        cloth3: ramp([0.3, 0.35], 0.04, 290),
+        accent: ramp([0.64, 0.78], 0.12, 205, 0),
+        accent2: ramp([0.6, 0.78], 0.13, 205, 0),
         leather: ramp([0.3, 0.32, 0.35], 0.02, 290),
       };
     }
@@ -300,7 +341,8 @@ export function knightPaint(id: string, mutation: MutationId | null, step = 0): 
   const base = r === 'primordial' ? primordialTier(step) : TIERS[r];
   // The tier as it is (the cape), and dressed for the class's outfit (the knight).
   const plain = mutate(base, mutation, def.cls);
-  const tier = mutate(dressFor(base, sheet), mutation, def.cls);
+  const gem = r === 'primordial' ? oklchToHex(0.75, 0.15, (step / PRIMORDIAL_STEPS) * 360) : RARITY_COLOR[r];
+  const tier = mutate(dressFor(base, sheet, gem), mutation, def.cls);
   const h = hashStr(def.name);
   const recolor: Recolor = {
     metal: tier.metal,
@@ -308,10 +350,15 @@ export function knightPaint(id: string, mutation: MutationId | null, step = 0): 
     accent: tier.accent,
     leather: tier.leather,
     skin: PF.skins[h % PF.skins.length],
-    hair: PF.hairs[(h >>> 8) % PF.hairs.length],
   };
+  // One knight in three keeps its class's own hair (the Cleric's fire, the Arcanist's snow white); an
+  // Arcanist's (and his beard's) stays a natural color.
+  const hairs = def.cls === 'arcanist' ? HAIR_NATURAL : PF.hairs.length;
+  if ((h >>> 8) % 3) recolor.hair = PF.hairs[(h >>> 12) % hairs];
   if (tier.cloth2) recolor.cloth2 = tier.cloth2;
+  if (tier.cloth3) recolor.cloth3 = tier.cloth3;
   if (tier.metal2) recolor.metal2 = tier.metal2;
+  if (tier.accent2) recolor.accent2 = tier.accent2;
   if (mutation === 'void') recolor.eyes = ['#6ae8ff'];
   if (mutation === 'shadow') recolor.skin = rampLike(PF.skins[h % PF.skins.length], 0.035, 30, 2, -0.1);
   const ri = rarityIndex(r);

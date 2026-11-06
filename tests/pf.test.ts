@@ -7,7 +7,7 @@ import { SHEETS, type SheetName } from '../src/render/pf/assets';
 import { hexToOklch, oklchToHex, ramp } from '../src/render/pf/color';
 import { attackAnim, dodgeAnim, gaitFor, heavySpins, heroPose, travelDir, travelDir8 } from '../src/render/pf/heroAnim';
 import { KNIGHT_SHEET, KNIGHT_SHEET_BY_ID, knightPaint, knightSheet, paintStep, PRIMORDIAL_STEPS, tierRamps } from '../src/render/pf/knightLook';
-import { BOSS_ANIM, kitOf, mobPose, moveAnim, WYRM_ANIM } from '../src/render/pf/mobAnim';
+import { BOSS_ANIM, kitOf, mobPose, moveAnim, ROOK_ANIM, WYRM_ANIM } from '../src/render/pf/mobAnim';
 import { MONSTER_SHEET, mobPaint, monsterFor, undeadFor, type MonsterId } from '../src/render/pf/mobLook';
 import { DIRS, DIRS8, eventFrame, facing, facing8, PFSheet, type Dir, type PFMeta } from '../src/render/pf/sheet';
 import { readPng } from '../tools/knights/lib/png';
@@ -137,9 +137,11 @@ describe('PixelForge sheets', () => {
 
   it('draw the knights without PixelForge\'s swing trails (the game draws their swings), the monsters with them', () => {
     for (const [name] of knightSheets()) expect(SHEETS[name].meta.colors.some((c) => c[2] === 'trail'), name).toBe(false);
-    for (const name of ['goblin', 'ogre', 'stone_warden', 'cinderwyrm', 'ashen_duelist'] as const) {
+    for (const name of ['goblin', 'ogre', 'stone_warden', 'cinderwyrm', 'ashen_duelist', 'rook', 'rook_enraged'] as const) {
       expect(SHEETS[name].meta.colors.some((c) => c[2] === 'trail'), name).toBe(true);
     }
+    // Rook's trails are blood red.
+    for (const [hex, , mat] of SHEETS.rook.meta.colors) if (mat === 'trail') expect(hexToOklch(hex)[2], hex).toBeLessThan(40);
   });
 
   it('give every monster its kit in every facing it draws (s, e, n and w; e and w for the packs\' side views), and the bosses all their moves', () => {
@@ -160,6 +162,16 @@ describe('PixelForge sheets', () => {
       for (const d of DIRS) expect(SHEETS.cinderwyrm.has(a, d), `${move} ${a}_${d}`).toBe(true);
     }
     expect(moveAnim('cinderwyrm', 'fan', true)).toBe('breath');
+    // Rook: every boss move is one of his (the crescents, the charge, the leaping slam, the roar), in
+    // both of his sheets; his charge loops its dash frames.
+    for (const move of Object.keys(BOSS_ANIM)) {
+      const a = moveAnim('rook', move, true);
+      expect(a, move).toBe(ROOK_ANIM[move]);
+      for (const sheet of ['rook', 'rook_enraged'] as const) for (const d of DIRS) expect(SHEETS[sheet].has(a, d), `${sheet} ${move} ${a}_${d}`).toBe(true);
+    }
+    expect(SHEETS.rook.meta.anims.charge.loopFrames).toEqual([2, 3]);
+    expect(Object.keys(SHEETS.rook_enraged.meta.anims)).toEqual(Object.keys(SHEETS.rook.meta.anims));
+    for (const d of DIRS) expect(SHEETS.fx_blood_crescent.has('travel', d)).toBe(true);
     expect(moveAnim('ashen_duelist', 'dash', false)).toBe('attack_lunge');
     // Waking, a wolf howls and an ogre roars; the howl calls up its rings.
     expect(kitOf('wolf').wake).toBe('howl');
@@ -197,9 +209,9 @@ describe('knight looks', () => {
           for (const hex of r) expect(hex).toMatch(/^#[0-9a-f]{6}$/);
           const Ls = r.map(LIGHTNESS);
           for (let i = 1; i < Ls.length; i++) expect(Ls[i], `${k.id} ${mut} ${mat}`).toBeGreaterThan(Ls[i - 1]);
-          // Nothing darker than the outline (L 0.30), nothing near white except Void's cyan glint.
+          // Nothing darker than the outline (L 0.30), nothing past PixelForge's lightest (L 0.95).
           expect(Math.min(...Ls)).toBeGreaterThan(0.28);
-          expect(Math.max(...Ls)).toBeLessThan(0.86);
+          expect(Math.max(...Ls)).toBeLessThan(0.96);
         }
       }
     }
@@ -224,7 +236,8 @@ describe('knight looks', () => {
       expect(!!p.cape, k.id).toBe(!own && !SHEETS[p.sheet].meta.cloak && rarityIndex(k.rarity) >= rarityIndex('epic'));
       expect(!!p.halo, k.id).toBe(!own && rarityIndex(k.rarity) >= rarityIndex('celestial'));
     }
-    expect(['guardian', 'ranger', 'cleric'].map((c) => !!SHEETS[KNIGHT_SHEET[c as ClassId]].meta.cloak)).toEqual([true, true, true]);
+    // (The Ranger's mantle; the Guardian wears a plume and the Cleric a mitre instead.)
+    expect(['guardian', 'ranger', 'cleric'].map((c) => !!SHEETS[KNIGHT_SHEET[c as ClassId]].meta.cloak)).toEqual([false, true, false]);
     const steps = new Set(Array.from({ length: 60 }, (_, i) => paintStep('primordial', i * 0.5)));
     expect(steps.size).toBe(PRIMORDIAL_STEPS);
     expect(knightPaint('primordial-blade', null, 0).recolor.metal).not.toEqual(knightPaint('primordial-blade', null, 12).recolor.metal);
@@ -295,6 +308,8 @@ describe('mobs as PixelForge monsters', () => {
     for (const plan of ['bug', 'plant', 'pumpkin', 'ghost', 'pig', 'ram', 'chicken'] as const) expect(monsterFor(mob('hamlet', plan, 'chaser'), false, false)).toBeNull();
     // Bosses: the Stone Warden, but the farm's pig, ghosts and pumpkins keep theirs, and so does the demon.
     expect(monsterFor(mob('forest', 'beast', 'chaser'), false, true)).toBe('stone_warden');
+    // ...the dark halls' boss is Rook.
+    for (const b of ['dungeon', 'crypt', 'graveyard']) expect(monsterFor(mob(b, 'humanoid', 'chaser'), false, true), b).toBe('rook');
     expect(monsterFor(mob('farmland', 'pig', 'charger'), false, true)).toBeNull();
     expect(monsterFor(mob('graveyard', 'ghost', 'caster'), false, true)).toBeNull();
     expect(monsterFor({ ...mob('ember', 'humanoid', 'chaser'), id: 'ember-demon-x-hamlet-3' }, false, true)).toBeNull();
@@ -334,6 +349,11 @@ describe('mobs as PixelForge monsters', () => {
     expect(warden('ember').monster).toBe('cinderwyrm');
     expect(monsterFor(floorBoss(BIOMES.ember, 50, 7), false, true)).toBe('cinderwyrm');
     expect(LIGHTNESS(warden('ember', true).recolor.scales![2])).toBeGreaterThan(LIGHTNESS(warden('ember').recolor.scales![2]));
+    // Rook guards the dungeon's floor 25 in his own colors; at half HP his plate cracks open (a sheet of its own).
+    expect(monsterFor(floorBoss(BIOMES.dungeon, 25, 7), false, true)).toBe('rook');
+    expect(warden('crypt').sheet).toBe('rook');
+    expect(warden('crypt', true).sheet).toBe('rook_enraged');
+    expect(warden('crypt').recolor).toEqual({});
     // From floor 36 on, a humanoid chaser's elite is the Ashen Duelist; before, the goblin chief.
     expect(monsterFor({ ...mob('ember', 'humanoid', 'chaser'), id: 'ember-47-0' }, true, false)).toBe('ashen_duelist');
     expect(monsterFor({ ...mob('ember', 'humanoid', 'chaser'), id: 'ember-47-0' }, false, false)).toBe('goblin');

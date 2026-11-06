@@ -268,6 +268,9 @@ function splitBuf(b: PixelBuf, keep: 'body' | 'shadow', color?: string): PixelBu
 
 type Ctx = CanvasRenderingContext2D;
 
+/** The PixelForge FX a boss's shots fly as. */
+type BossShotFx = 'fx_rock_shard' | 'fx_fireball' | 'fx_blood_crescent';
+
 interface Particle {
   x: number;
   y: number;
@@ -1844,16 +1847,16 @@ export class Renderer {
     ctx.drawImage(c, x - 3, y - 6);
   }
 
-  /** What this shot is, if a PixelForge boss threw it: the Stone Warden's shard, the Cinderwyrm's fireball (else null). */
-  private bossShot(w: World, s: Shot): 'fx_rock_shard' | 'fx_fireball' | null {
+  /** What this shot is, if a PixelForge boss threw it: the Stone Warden's shard, the Cinderwyrm's fireball, Rook's blood crescent (else null). */
+  private bossShot(w: World, s: Shot): BossShotFx | null {
     if (s.team !== 'mob' || s.kind !== 'bullet') return null;
     const m = w.bossUnit && w.bossUnit.uid === s.from ? w.bossUnit : null;
     const monster = m ? mobPaint(m.type!, !!m.elite, true)?.monster : undefined;
-    return monster === 'stone_warden' ? 'fx_rock_shard' : monster === 'cinderwyrm' ? 'fx_fireball' : null;
+    return monster === 'stone_warden' ? 'fx_rock_shard' : monster === 'cinderwyrm' ? 'fx_fireball' : monster === 'rook' ? 'fx_blood_crescent' : null;
   }
 
-  /** A boss's shot as PixelForge draws it (a spinning stone, a fireball), turned to its flight (whole quarter turns). */
-  private drawRockShard(ctx: Ctx, s: Shot, sx: (x: number) => number, sy: (y: number) => number, name: 'fx_rock_shard' | 'fx_fireball'): void {
+  /** A boss's shot as PixelForge draws it (a spinning stone, a fireball, a crescent), turned to its flight (whole quarter turns). */
+  private drawRockShard(ctx: Ctx, s: Shot, sx: (x: number) => number, sy: (y: number) => number, name: BossShotFx): void {
     const sheet = SHEETS[name];
     const dir = facing(s.vx, s.vy);
     const f = sheet.clip('travel', dir);
