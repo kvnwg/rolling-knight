@@ -1,8 +1,10 @@
 /**
  * While you're away the altar keeps rolling under the same rules (tokens, Lucky and Golden Spins,
- * bad-luck protection), at 1/10 speed and 75% efficiency (Night Watch adds 40% per tier), stopping
- * at 1,000 rolls or 8 hours. Only Epic-or-better finds are kept; the rest are dropped. The squad's
- * gold income runs on too, from your recent gold per minute.
+ * bad-luck protection), at 1/10 speed, stopping at BAL.offline.maxRolls rolls or 8 hours. Only
+ * Epic-or-better finds are kept; the rest are dropped, and the duplicates among the finds turn into
+ * a share (`dupeShare`) of their usual gold. The squad's fight income runs on at `efficiency` of its
+ * last ten minutes' rate (picked-up gold, not duplicates, sales or spending; Night Watch adds
+ * `perTier` a tier): a night away is worth about an hour of play.
  */
 import { BAL } from './balance';
 import { rarityAtLeast, type Rarity } from './rarity';
@@ -48,14 +50,18 @@ export function runOffline(state: GameState, rng: Rng, awaySeconds: number, nowM
       done += 1;
     }
     const before = new Set(Object.keys(state.roster));
+    const gold0 = state.gold;
     landReels(state, (e) => {
       if (e.type === 'land') kept.push({ knightId: e.knightId, rarity: e.rarity, mutation: e.mutation, isNew: !before.has(e.knightId) });
     });
+    // Duplicates found while away pay only a share of their gold.
+    state.gold = gold0 + (state.gold - gold0) * BAL.offline.dupeShare;
     state.roll.current = null;
     state.roll.timer = 0;
   }
   state.roll.hist = savedHist;
-  const gold = Math.round(state.stats.goldPerMinute * (seconds / 60) * eff);
+  const rate = state.stats.combatPerMinute ?? Math.min(state.stats.goldPerMinute, 0);
+  const gold = Math.round(rate * (seconds / 60) * eff);
   state.gold += gold;
   return { seconds, rolls, kept, gold };
 }

@@ -5,6 +5,7 @@
  * The sheet is the skin's bolted plate (styles.css .modal), like the hero and settings sheets.
  */
 import { effectAt, lineOf, nodeName, roman, HEX_BY_KEY, nodeKey, type HexNode } from '../../core/upgradeTree';
+import { priceScale } from '../../core/economy';
 import { tier, upgradeCostAt, upgradeUnlocked } from '../../core/upgrades';
 import type { Game } from '../../game';
 import { Chunky } from '../common';
@@ -18,7 +19,8 @@ export function UpgradePopup({ game, node, onBuy, onClose }: { game: Game; node:
   const def = lineOf(node);
   const level = tier(st, def.id);
   const open = upgradeUnlocked(st, def.id) && level < def.max;
-  const cost = upgradeCostAt(def, level);
+  const scale = priceScale(st);
+  const cost = upgradeCostAt(def, level, scale);
   const afford = st.gold >= cost;
   const hold = useHoldRepeat(onBuy);
   const parent = def.requires ? HEX_BY_KEY.get(nodeKey(def.requires.id, def.requires.tier)) : undefined;
@@ -60,7 +62,7 @@ export function UpgradePopup({ game, node, onBuy, onClose }: { game: Game; node:
               ) : (
                 <span className={s.rungPrice}>
                   <Px icon="coin" size="xs" />
-                  {fmt(upgradeCostAt(def, t - 1))}
+                  {fmt(upgradeCostAt(def, t - 1, scale))}
                 </span>
               )}
             </div>

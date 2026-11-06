@@ -47,7 +47,7 @@ export const PERKS: PerkDef[] = [
   { id: 'loneWolf', tree: 'command', name: 'Lone Wolf', rarity: 'uncommon', icon: 'wolf', short: 'Fight alone: x3 HP, x2.5 damage', text: 'Your other two knights stay at camp. The one you control gets ×3 HP, ×2.5 damage and 30% faster specials.' },
   { id: 'hiveMind', tree: 'command', name: 'Hive Mind', rarity: 'uncommon', icon: 'eye', short: 'The squad dodges with you', text: 'When you dodge, your whole squad dodges with you. Allies\' skill rolls spin twice as fast.' },
   { id: 'warBanner', tree: 'command', name: 'War Banner', rarity: 'rare', icon: 'banner', short: 'Your hits speed up the squad', text: 'Each hit by the knight you control gives the squad +4% attack speed for 3 s, stacking to +40%.' },
-  { id: 'heirloom', tree: 'command', name: 'Heirloom', rarity: 'epic', icon: 'crown', short: 'Keep your knight through rebirth', text: 'Your controlled knight survives your next rebirth with its levels.' },
+  { id: 'shieldWall', tree: 'command', name: 'Shield Wall', rarity: 'epic', icon: 'shield', short: 'Squad +35% HP', text: 'Every knight in the squad has 35% more HP.' },
   // Rigged Reels
   { id: 'fourLeafLitter', tree: 'reels', name: 'Four-Leaf Litter', rarity: 'common', icon: 'clover', short: '3x luck tokens, half sell price', text: 'Luck tokens land 3× as often. Duplicates sell for half.' },
   { id: 'bootlegReel', tree: 'reels', name: 'Bootleg Reel', rarity: 'uncommon', icon: 'reel', short: '+1 reel, slower spins', text: '+1 reel, but every spin is 50% slower.' },

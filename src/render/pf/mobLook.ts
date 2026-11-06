@@ -184,12 +184,27 @@ const WARDEN: Record<string, { stone: readonly string[]; leaf: readonly string[]
 };
 
 /**
- * The Cinderwyrm: on the lava-lit floors of the Ember Depths it comes in its obsidian scales, ash
- * wings and gilded horns (PixelForge's cinderwyrm_obsidian), dark against the glow; at half HP it
- * cracks open into its embers (the Cinderwyrm as drawn: ember scales and wings, pale horns).
+ * The Cinderwyrm (tools/wyrm draws it): on the lava-lit floors of the Ember Depths it comes in
+ * obsidian, blue-black scales going sea-green where the light catches them, gilded horns and
+ * spikes, wings like dark glass and a red glare, dark against the glow; at half HP it cracks open
+ * into its embers (the sheet as drawn: red-gold scales with plum shadows, a white-hot glare).
  */
-const WYRM_OBSIDIAN = { scales: ['#2e2e3f', '#3f3d4f', '#514d5f', '#635d6f'], membrane: ['#4c4b5d', '#625d70'], horn: ['#9c703a', '#b58947', '#caa55e'] };
-const WYRM_EMBER = { scales: ['#6f181e', '#8c2e26', '#a64832', '#c06240'], membrane: ['#9f4325', '#b75e30'], horn: ['#7d6f5f', '#9a8d7b', '#b5a996'] };
+const WYRM_OBSIDIAN = {
+  scales: ['#080a11', '#0f1820', '#162733', '#1e3843', '#2a4d55', '#3c6766', '#5e8a7e'],
+  belly: ['#1b2027', '#2d383a', '#47544d', '#657664'],
+  horn: ['#3e2a12', '#6e4c1a', '#a67a28', '#d6aa46', '#f6dc84'],
+  membrane: ['#0b1017', '#141f29', '#1f323e', '#2e4753'],
+  mouth: ['#2a0608', '#7c1410', '#e2441e'],
+  outline: ['#05070b'],
+};
+const WYRM_EMBER = {
+  scales: ['#22102a', '#421634', '#6a1d35', '#952833', '#be3e2c', '#e0682b', '#f6a440'],
+  belly: ['#5c2a2c', '#97492e', '#cc7c38', '#eeb85c'],
+  horn: ['#4e2a16', '#835220', '#b8842e', '#e3b64c', '#fde894'],
+  membrane: ['#2c1028', '#4e1932', '#7a2836', '#b0473a'],
+  mouth: ['#2c0810', '#901e14', '#f6702c'],
+  outline: ['#180a17'],
+};
 
 export interface MobPaint extends Paint {
   monster: MonsterId;
@@ -316,10 +331,8 @@ export function mobPaint(t: MobType, elite: boolean, boss: boolean, enraged = fa
     case 'cinderwyrm': {
       // Obsidian with red eyes; at half HP, its embers with white-hot eyes.
       const look = enraged ? WYRM_EMBER : WYRM_OBSIDIAN;
-      r.scales = look.scales;
-      r.membrane = look.membrane;
-      r.horn = look.horn;
-      r.eyes = [glowEye(enraged ? '#fff0a0' : '#cd605a')];
+      Object.assign(r, look);
+      r.eyes = enraged ? ['#ffb43a', '#fff6b8'] : ['#ff4a36', '#ffb4a2'];
       break;
     }
     case 'ashen_duelist':

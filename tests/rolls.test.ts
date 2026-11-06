@@ -389,12 +389,13 @@ describe('an older save', () => {
   it('keeps its upgrades and perks: combat tiers whose old parents are gone stay; unknown or repeated perks go', () => {
     const old = game({ luck: 2, quickRoll: 3, ladyLuck: 1, pratfall: 2 });
     old.rebirths = 1;
-    old.perks = ['glassCannon', 'heirloom'];
+    old.perks = ['glassCannon', 'shieldWall'];
     const raw = JSON.parse(JSON.stringify(old));
-    raw.perks = ['glassCannon', 'glassCannon', 'nope', 7, 'heirloom'];
+    raw.perks = ['glassCannon', 'glassCannon', 'nope', 7, 'heirloom', 'shieldWall'];
     const s = mend(raw);
     expect(s.upgrades).toEqual({ luck: 2, quickRoll: 3, ladyLuck: 1, pratfall: 2 });
-    expect(s.perks).toEqual(['glassCannon', 'heirloom']);
+    // (Heirloom, which kept a knight through a rebirth, is gone: an old save's copy is dropped.)
+    expect(s.perks).toEqual(['glassCannon', 'shieldWall']);
     expect(perkOdds(s).map((o) => o.perk.id)).not.toContain('glassCannon');
     expect(mend({ ...raw, perks: 'junk' }).perks).toEqual([]);
   });

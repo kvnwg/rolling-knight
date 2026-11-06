@@ -36,6 +36,7 @@ import { HubPaint } from './hubPaint';
 import { HUB_H, HUB_W } from '../world/hub';
 import { HUB_CX, HUB_STEPS_Y } from './art/hubScene';
 import type { Sky } from '../world/sky';
+import { canRebirth } from '../core/newGame';
 import { npcFrame, questMarker } from './art/npcs';
 import { npcMarker } from '../world/npcs';
 import { pfReady, SHEETS, type SheetName } from './pf/assets';
@@ -797,7 +798,9 @@ export class Renderer {
           }
           const bob = Math.round(Math.sin(this.time * 4) * 1.5);
           const mark = this.cached(`qmark|${near === k ? 'turnIn' : 'offer'}`, () => toCanvas(questMarker(near === k ? 'turnIn' : 'offer')));
-          if (near === k || !k.def) ui.drawImage(mark, sx(k.x) - Math.floor(mark.width / 2), sy(k.y) - (k.def ? 34 : 22) + bob);
+          // The Shrine calls once a rebirth is ready (from anywhere at camp, not just up close).
+          const calls = k.id === 'rebirth' && canRebirth(game.state);
+          if (near === k || !k.def || calls) ui.drawImage(calls && near !== k ? this.cached('qmark|offer', () => toCanvas(questMarker('offer'))) : mark, sx(k.x) - Math.floor(mark.width / 2), sy(k.y) - (k.def ? 34 : 22) + bob);
         },
       });
     }

@@ -30,6 +30,7 @@ import { Reveal, type RevealItem } from './fx/Reveal';
 import { setFxSound } from './fx/fxSound';
 import type { SoundName } from '../audio/sfx';
 import { uiSound } from './sound';
+import { rebirthPitch } from './RebirthPill';
 import { VistaCanvas } from './VistaCanvas';
 
 export interface Toast {
@@ -111,6 +112,10 @@ export function App() {
       const dpr = window.devicePixelRatio || 1;
       const miniU = narrow ? Math.max(1.25, Math.round(uiPx() * 0.5 * dpr) / dpr) : desk ? Math.round(uiPx() * 1.7 * dpr) / dpr : uiPx();
       document.documentElement.style.setProperty('--mini-u', `${miniU}px`);
+      // On a desktop the corner altar is as wide as the skill reel under it (46 art px; its frame less a
+      // pixel of padding each side), whatever its reel count, the two on one line down the right side;
+      // on a phone it keeps its own small size.
+      document.documentElement.style.setProperty('--mini-w', desk ? `${44 * uiPx()}px` : '0px');
       // The dungeon HUD on a phone: about 70% of the UI's pixel (less on a short screen), in whole
       // device pixels; its text comes down less, never under about 10 px.
       const phone = Math.min(window.innerWidth, window.innerHeight) < 600;
@@ -192,6 +197,12 @@ export function App() {
         case 'rebirth':
           show({ title: `REBIRTH ${e.count}`, sub: 'Luck, gold and power up for good', grad: 'gold' });
           setStation(null);
+          break;
+        case 'rebirthReady':
+          // The moment a rebirth opens up: a fanfare, the call, and what it brings.
+          uiSound('rebirth');
+          show({ title: 'REBIRTH READY!', sub: 'At the Shrine: start over stronger, for good', grad: 'gold' });
+          toast({ text: rebirthPitch(game.state), color: '#ffcf4a' });
           break;
         case 'toast':
           toast({ text: e.text, color: e.tone === 'bad' ? '#ff7a6b' : e.tone === 'gold' ? '#ffcf4a' : undefined });
@@ -364,6 +375,12 @@ export function App() {
           press={ctl.press}
           hold={ctl.hold}
           onCamp={() => game.leaveDungeon()}
+          onRebirth={() => {
+            // Back to camp, the Shrine's screen open there.
+            game.leaveDungeon();
+            const shrine = hubLayout().stations.find((x) => x.id === 'rebirth');
+            if (shrine) setStation(shrine);
+          }}
           onSettings={() => setSettings(true)}
           onLuck={() => setLuck(true)}
           onAltar={() => setLuck(true)}

@@ -43,22 +43,36 @@ const homeZoom = (wide: boolean) => (wide ? 0.85 : 1);
 /** The canvas's pixels at most (about 16 MB): a screen's worth on any phone, a little softer on a 4K monitor. */
 const MAX_CANVAS_PX = 4_200_000;
 
-function hexPoints(r: number): string {
-  return [0, 60, 120, 180, 240, 300]
-    .map((a) => {
-      const rad = (a * Math.PI) / 180;
-      return `${(r * Math.cos(rad)).toFixed(1)},${(r * Math.sin(rad)).toFixed(1)}`;
-    })
-    .join(' ');
-}
-/** The faint honeycomb behind the map: one tile of it (3R x 2HH) as a picture the window repeats. */
+/**
+ * The faint honeycomb behind the map: one tile of it (3R x 2HH) as a picture the window repeats,
+ * drawn at twice its size so it stays sharp zoomed in (a PNG: the published page carries only the
+ * image formats public sharing takes).
+ */
 const GRID_URL = (() => {
-  const outer = hexPoints(R * DRAW);
+  if (typeof document === 'undefined') return 'none';
+  const S = 2;
   const w = 3 * R;
   const h = 2 * HH;
-  const hexes = [[0, 0], [w, 0], [0, h], [w, h], [1.5 * R, HH]].map(([x, y]) => `<polygon points="${outer}" transform="translate(${x} ${y})"/>`).join('');
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h.toFixed(2)}" viewBox="0 0 ${w} ${h.toFixed(2)}"><g fill="none" stroke="rgba(255,214,150,0.05)" stroke-width="3">${hexes}</g></svg>`;
-  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+  const c = document.createElement('canvas');
+  c.width = Math.round(w * S);
+  c.height = Math.round(h * S);
+  const g = c.getContext('2d');
+  if (!g) return 'none';
+  g.scale(S, S);
+  g.strokeStyle = 'rgba(255,214,150,0.05)';
+  g.lineWidth = 3;
+  const r = R * DRAW;
+  for (const [x, y] of [[0, 0], [w, 0], [0, h], [w, h], [1.5 * R, HH]]) {
+    g.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = (i * Math.PI) / 3;
+      if (i) g.lineTo(x + r * Math.cos(a), y + r * Math.sin(a));
+      else g.moveTo(x + r * Math.cos(a), y + r * Math.sin(a));
+    }
+    g.closePath();
+    g.stroke();
+  }
+  return `url("${c.toDataURL('image/png')}")`;
 })();
 
 /** Each line's name in lines that fit its hex (measured once the pixel font is in), and the size it fits at. */

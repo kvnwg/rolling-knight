@@ -4,6 +4,7 @@
  * Also the squad: three slots, one of them yours to control. Empty slots fill themselves with your
  * strongest free knight; anything else is your choice at the Warden's (or Best squad).
  */
+import { priceScale } from './economy';
 import { BAL } from './balance';
 import { CLASSES, knightDef, type ClassId } from './knights';
 import { hasPerk } from './perks';
@@ -155,7 +156,7 @@ export function levelCost(state: GameState, id: string): number {
   const R = BAL.roster;
   const rec = state.roster[id];
   const rarity = knightDef(id).rarity;
-  let g = R.goldBase * Math.pow(R.goldGrowth, (rec?.level ?? 1) - 1) * Math.pow(R.rarityGrowth, rarityIndex(rarity));
+  let g = R.goldBase * Math.pow(R.goldGrowth, (rec?.level ?? 1) - 1) * Math.pow(R.rarityGrowth, rarityIndex(rarity)) * priceScale(state);
   if (hasPerk(state, 'handMeDowns') && isUnderdog(rarity)) g *= 0.5;
   return Math.max(1, Math.round(g));
 }

@@ -24,7 +24,6 @@ export function newGame(seed = Date.now()): GameState {
     upgrades: {},
     perks: [],
     rebirths: 0,
-    heirloom: null,
     roll: {
       count: 0,
       spinCount: 0,
@@ -66,13 +65,11 @@ export function canRebirth(state: GameState): boolean {
 
 /**
  * Rebirth: start over from Floor 1 with permanently more luck, gold and stats, and new classes to
- * roll. Gold, upgrades, knights (with their levels), perks and sigils go.
- * The Codex, records and settings stay. Heirloom (a perk) keeps one knight.
+ * roll. Gold, upgrades, every knight (with its levels), perks and sigils go: no knight ever comes
+ * through. The Codex, records and settings stay.
  */
 export function rebirth(state: GameState): boolean {
   if (!canRebirth(state)) return false;
-  const heir = state.perks.includes('heirloom') ? state.squad[state.controlled] : null;
-  const kept = heir ? state.roster[heir] : null;
   state.rebirths += 1;
   state.gold = 0;
   state.hourglasses = 0;
@@ -83,11 +80,6 @@ export function rebirth(state: GameState): boolean {
   state.squad = [null, null, null];
   state.leftEmpty = [false, false, false];
   state.controlled = 0;
-  if (kept) {
-    state.roster[kept.id] = { ...kept };
-    state.squad[0] = kept.id;
-  }
-  state.heirloom = kept?.id ?? null;
   state.potionEndsAt = null;
   // The deck of floor designs carries on through the rebirth (no design comes round early).
   const { designDeck, lastDesign } = state.run;
@@ -97,8 +89,9 @@ export function rebirth(state: GameState): boolean {
   state.roll.timer = 0;
   state.roll.sinceLucky = 0;
   state.roll.dry = 0;
-  // A new run warms up with three quick spins so the squad fills straight away.
-  state.roll.tutorial = kept ? 'done' : 'rewarm';
-  if (!kept) state.roll.spinCount = 0;
+  // A new run warms up with three quick spins so the squad fills straight away (no knight ever comes
+  // through a rebirth: every run is rolled fresh).
+  state.roll.tutorial = 'rewarm';
+  state.roll.spinCount = 0;
   return true;
 }

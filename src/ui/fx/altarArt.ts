@@ -739,15 +739,28 @@ export interface MiniCell {
 
 /** Window size and grid for `n` reels in the mini shrine (all within about 70 x 64 art px). */
 export function miniGrid(n: number): { w: number; h: number; cols: number; rows: number; gap: number } {
-  if (n <= 1) return { w: 34, h: 25, cols: 1, rows: 1, gap: 1 };
-  if (n === 2) return { w: 26, h: 22, cols: 2, rows: 1, gap: 1 };
-  if (n === 3) return { w: 18, h: 20, cols: 3, rows: 1, gap: 1 };
-  if (n === 4) return { w: 24, h: 18, cols: 2, rows: 2, gap: 1 };
-  return { w: 18, h: 17, cols: 3, rows: 2, gap: 1 };
+  // Every window the same size, whatever the count (tall enough for a whole knight, helmet or hat to
+  // boots; a long weapon crops at the sides): one row of up to three, then two rows (2 + 2, 3 + 2).
+  const w = 24;
+  const h = 25;
+  if (n <= 3) return { w, h, cols: Math.max(1, n), rows: 1, gap: 1 };
+  if (n === 4) return { w, h, cols: 2, rows: 2, gap: 1 };
+  return { w, h, cols: 3, rows: 2, gap: 1 };
 }
 
-/** The windows (canvas px) and the shrine's size for `n` reels. */
-export function miniLayout(n: number): { W: number; H: number; cells: MiniCell[] } {
+/** One row of windows and the frame round it (canvas px): its windows' span and the frame's. */
+export interface MiniRow {
+  x0: number;
+  x1: number;
+  y0: number;
+  y1: number;
+}
+
+/**
+ * The windows (canvas px) and the shrine's size for `n` reels. The frame follows the rows: a short
+ * second row (three over two) gets a narrower frame of its own, stepped in under the first.
+ */
+export function miniLayout(n: number): { W: number; H: number; cells: MiniCell[]; rows: MiniRow[] } {
   const g = miniGrid(n);
   const R = MINI_ART.rim;
   const cw = g.cols * g.w + (g.cols - 1) * g.gap;
@@ -755,28 +768,68 @@ export function miniLayout(n: number): { W: number; H: number; cells: MiniCell[]
   const W = cw + 2 * R;
   const H = MINI_ART.crest + ch + 2 * R + MINI_ART.base;
   const cells: MiniCell[] = [];
-  for (let k = 0; k < n; k++) {
-    const row = Math.floor(k / g.cols);
+  const rows: MiniRow[] = [];
+  for (let row = 0; row < g.rows; row++) {
     const inRow = Math.min(g.cols, n - row * g.cols);
-    const col = k - row * g.cols;
     const rowW = inRow * g.w + (inRow - 1) * g.gap;
-    cells.push({ x: R + Math.floor((cw - rowW) / 2) + col * (g.w + g.gap), y: MINI_ART.crest + R + row * (g.h + g.gap), w: g.w, h: g.h });
+    const x = R + Math.floor((cw - rowW) / 2);
+    const y = MINI_ART.crest + R + row * (g.h + g.gap);
+    for (let col = 0; col < inRow; col++) cells.push({ x: x + col * (g.w + g.gap), y, w: g.w, h: g.h });
+    // The frame round this row: the rim on every side (where two rows' frames overlap, the shrine is
+    // one panel; where a long row overhangs a short one, its own rim runs under it).
+    rows.push({ x0: x - R, x1: x + rowW + R, y0: row === 0 ? MINI_ART.crest : y - R, y1: y + g.h + R });
   }
-  return { W, H, cells };
+  return { W, H, cells, rows };
 }
 
 export function paintMini(n: number): AltarArt {
-  const { W, H, cells } = miniLayout(n);
+  const { W, H, cells, rows } = miniLayout(n);
   const p = new Painter(W, H);
   const top = MINI_ART.crest;
   const bot = H - MINI_ART.base; // the frame's bottom edge (exclusive)
   const cx = (W - 1) / 2;
   const half = Math.floor(W / 2);
   const runes: Rune[] = [];
+  // The frame's outline: the rows' frames together (a rectangle, or stepped in under a long row).
+  const inside = (x: number, y: number) => rows.some((r) => x >= r.x0 && x < r.x1 && y >= r.y0 && y < r.y1);
+  // How far in from the outline (chessboard: the bands turn square corners, in and out).
+  const dist = new Int16Array(W * H).fill(-1);
+  const queue: number[] = [];
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (!inside(x, y)) continue;
+      let edge = false;
+      for (let j = -1; j <= 1 && !edge; j++) for (let i = -1; i <= 1 && !edge; i++) if (!inside(x + i, y + j)) edge = true;
+      if (edge) {
+        dist[y * W + x] = 0;
+        queue.push(y * W + x);
+      }
+    }
+  }
+  for (let q = 0; q < queue.length; q++) {
+    const i = queue[q];
+    const x = i % W;
+    const y = Math.floor(i / W);
+    for (let j = -1; j <= 1; j++) {
+      for (let k = -1; k <= 1; k++) {
+        const xx = x + k;
+        const yy = y + j;
+        if (xx < 0 || yy < 0 || xx >= W || yy >= H || !inside(xx, yy)) continue;
+        const o = yy * W + xx;
+        if (dist[o] >= 0) continue;
+        dist[o] = dist[i] + 1;
+        queue.push(o);
+      }
+    }
+  }
+  /** Which way the band faces here: up (its top edge, lit), down (its underside) or sideways. */
+  const facing = (x: number, y: number, d: number): number => (!inside(x, y - d - 1) ? -1 : !inside(x, y + d + 1) ? 1 : 0);
   // The frame: ink, a 3-pixel rune band in dark wood, a brass trim; the back panel inside.
-  for (let y = top; y < bot; y++) {
+  for (let y = 0; y < H; y++) {
     for (let x = 0; x <= half; x++) {
-      const d = Math.min(x, y - top, bot - 1 - y);
+      const d = dist[y * W + x];
+      if (d < 0) continue;
+      const f = facing(x, y, d);
       let col: string;
       let h: number;
       let mat: number = M.wood;
@@ -785,11 +838,11 @@ export function paintMini(n: number): AltarArt {
         h = 2;
         mat = M.ink;
       } else if (d <= 3) {
-        col = d === 1 && y - top === 1 ? C.dk4 : C.slot;
+        col = d === 1 && f === -1 ? C.dk4 : C.slot;
         h = d === 2 ? 3.2 : 2.6;
         mat = M.slot;
       } else if (d === 4) {
-        col = y - top === 4 ? C.br4 : bot - 1 - y === 4 ? C.br1 : C.br2;
+        col = f === -1 ? C.br4 : f === 1 ? C.br1 : C.br2;
         h = 6;
         mat = M.brass;
       } else {
@@ -799,29 +852,50 @@ export function paintMini(n: number): AltarArt {
       p.sym(x, y, col, h, mat);
     }
   }
-  // Runes round the band (3 x 3), avoiding the corners.
+  // Runes along the band's straight runs (3 x 3, every 5 px), clear of its corners.
   const g3 = (k: number) => GLYPHS3[k % GLYPHS3.length];
   let k = 0;
-  for (let x = 6; x + 3 <= W - 6; x += 5) runes.push(carveRune(p, x, top + 1, g3(k++), 0));
-  for (let y = top + 6; y + 3 <= bot - 6; y += 5) runes.push(carveRune(p, W - 4, y, g3(k++), 0));
-  for (let x = W - 9; x >= 6; x -= 5) runes.push(carveRune(p, x, bot - 4, g3(k++), 0));
-  for (let y = bot - 9; y >= top + 6; y -= 5) runes.push(carveRune(p, 1, y, g3(k++), 0));
-  // Brass caps on the frame's corners, with an iron rivet.
-  for (const [sx, sy] of [
-    [0, 0],
-    [1, 0],
-    [0, 1],
-    [1, 1],
-  ]) {
-    const x0 = sx ? W - 4 : 0;
-    const y0 = sy ? bot - 4 : top;
-    for (let j = 0; j < 4; j++) {
-      for (let i = 0; i < 4; i++) {
-        const edge = (sx ? i === 3 : i === 0) || (sy ? j === 3 : j === 0);
-        p.set(x0 + i, y0 + j, edge ? C.ink : j < 2 ? C.br4 : C.br2, edge ? 3 : 7, edge ? M.ink : M.brass);
+  const band = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && dist[y * W + x] >= 1 && dist[y * W + x] <= 3;
+  const runAt = (x: number, y: number) => {
+    for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++) if (!band(x + i, y + j)) return false;
+    // Clear of corners: the band runs on a pixel past it, both ways along it.
+    return (band(x - 2, y + 1) && band(x + 4, y + 1)) || (band(x + 1, y - 2) && band(x + 1, y + 4));
+  };
+  const taken: Array<[number, number]> = [];
+  const free = (x: number, y: number) => taken.every(([tx, ty]) => Math.abs(tx - x) >= 5 || Math.abs(ty - y) >= 5);
+  const carve = (x: number, y: number) => {
+    if (!runAt(x, y) || !free(x, y)) return;
+    taken.push([x, y]);
+    runes.push(carveRune(p, x, y, g3(k++), 0));
+  };
+  // Clockwise: along the top, down the right side and every step, back along the bottom, up the left.
+  for (const r of rows) {
+    for (let x = r.x0 + 6; x + 3 <= r.x1 - 6; x += 5) carve(x, r.y0 + 1);
+    for (let y = r.y0 + 6; y + 3 <= r.y1 - 6; y += 5) carve(r.x1 - 4, y);
+  }
+  for (let ri = rows.length - 1; ri >= 0; ri--) {
+    const r = rows[ri];
+    for (let x = r.x1 - 9; x >= r.x0 + 6; x -= 5) carve(x, r.y1 - 4);
+    for (let y = r.y1 - 9; y >= r.y0 + 6; y -= 5) carve(r.x0 + 1, y);
+  }
+  // Brass caps on the frame's outer corners, with an iron rivet.
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (dist[y * W + x] !== 0) continue;
+      // An outer corner: outside both ways round it (left or right, and up or down).
+      const sx = !inside(x - 1, y) ? 0 : !inside(x + 1, y) ? 1 : -1;
+      const sy = !inside(x, y - 1) ? 0 : !inside(x, y + 1) ? 1 : -1;
+      if (sx < 0 || sy < 0) continue;
+      const x0 = sx ? x - 3 : x;
+      const y0 = sy ? y - 3 : y;
+      for (let j = 0; j < 4; j++) {
+        for (let i = 0; i < 4; i++) {
+          const edge = (sx ? i === 3 : i === 0) || (sy ? j === 3 : j === 0);
+          p.set(x0 + i, y0 + j, edge ? C.ink : j < 2 ? C.br4 : C.br2, edge ? 3 : 7, edge ? M.ink : M.brass);
+        }
       }
+      p.set(x0 + (sx ? 1 : 2), y0 + (sy ? 1 : 2), C.ir5, 8, M.iron);
     }
-    p.set(x0 + (sx ? 1 : 2), y0 + (sy ? 1 : 2), C.ir5, 8, M.iron);
   }
   // The windows: a dark rim (lit in the find's color) round each hole.
   const rims: number[][] = [];
@@ -878,14 +952,16 @@ export function paintMini(n: number): AltarArt {
     p.set(bx, top - 5, C.ink, 4, M.ink);
     flames.push({ x: bx, y: top - 6, hw: 1, h: 5, coals: [] });
   }
-  // The base: a short plinth.
-  for (let x = 1; x <= half; x++) {
+  // The base: a short plinth under the bottom row's frame.
+  const last = rows[rows.length - 1];
+  for (let x = last.x0 + 1; x <= half; x++) {
+    const q = x - last.x0;
     p.sym(x, bot, C.wd4, 6);
     p.sym(x, bot + 1, C.wd2, 5);
-    p.sym(x, bot + 2, x < 3 ? C.br2 : C.dk3, 5, x < 3 ? M.brass : M.wood);
+    p.sym(x, bot + 2, q < 3 ? C.br2 : C.dk3, 5, q < 3 ? M.brass : M.wood);
     p.sym(x, bot + 3, C.ink, 3, M.ink);
   }
-  for (let y = bot; y < H; y++) p.sym(0, y, C.ink, 3, M.ink);
+  for (let y = bot; y < H; y++) p.sym(last.x0, y, C.ink, 3, M.ink);
   orderRunes(runes, cx, (top + bot) / 2);
   const reels = cells.map((c) => ({ x: c.x + c.w / 2, y: c.y + c.h / 2, z: 12, r: Math.max(34, W * 0.7) }));
   return finish(

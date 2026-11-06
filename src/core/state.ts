@@ -96,7 +96,6 @@ export interface GameState {
   perks: string[];
   rebirths: number;
   /** Perk: Heirloom keeps this knight through the next rebirth. */
-  heirloom: string | null;
 
   roll: {
     count: number;
@@ -119,6 +118,8 @@ export interface GameState {
   run: {
     floor: number;
     bestFloor: number;
+    /** The player has been told this run can rebirth now (the alert comes once a run). */
+    rebirthTold?: boolean;
     /** Bosses beaten this run (depth luck, sigils). */
     bosses: number;
     /** First floor of the current biome stretch: where a wiped squad starts again. */
@@ -141,7 +142,15 @@ export interface GameState {
 
   codex: Record<string, { count: number; best: MutationId | null; firstAt: number }>;
   records: { bestOneIn: number; bestName: string | null; bestFloorEver: number; kills: number; spins: number };
-  stats: { killsThisRun: number; goldPerMinute: number; goldWindow: Array<[number, number]> };
+  stats: {
+    killsThisRun: number;
+    goldPerMinute: number;
+    goldWindow: Array<[number, number]>;
+    /** Gold picked up in fights, all told; its last ten minutes' rate is what pays while you're away. */
+    combatGold?: number;
+    combatWindow?: Array<[number, number]>;
+    combatPerMinute?: number;
+  };
 
   settings: {
     sfx: number;

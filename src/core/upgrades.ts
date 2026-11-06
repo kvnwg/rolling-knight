@@ -20,6 +20,8 @@
  *
  * `upgradeFx` turns the tiers owned into the numbers the rest of the game reads.
  */
+import { BAL } from './balance';
+import { priceScale } from './economy';
 import type { GameState } from './state';
 
 export type UpgradeId =
@@ -196,7 +198,7 @@ export const UPGRADES: UpgradeDef[] = [
     id: 'offline', name: 'Night Watch', kind: 'fortune', group: 'squad', max: 5, cost: 1500, growth: 3, icon: 'moon', path: 'se*5',
     requires: { id: 'potionTime', tier: 2 },
     desc: 'The altar and the squad earn more while you are away.',
-    text: () => '+40% rolls and gold while away',
+    text: () => `+${Math.round(BAL.offline.perTier * 100)}% of your fight gold, and rolls, while away`,
   },
   // ---------------------------------------------------------------- the squad (the Combat tab: rolled, combatRoll.ts)
   {
@@ -307,14 +309,15 @@ export function tier(state: Pick<GameState, 'upgrades'>, id: UpgradeId): number 
 }
 
 /** The price of tier `level + 1` of a Luck line (a combat line has none: it is rolled, never bought). */
-export function upgradeCostAt(def: UpgradeDef, level: number): number {
+/** A tier's price: the line's base times its growth per tier owned, times the run's scale (`scale`, core/economy.ts). */
+export function upgradeCostAt(def: UpgradeDef, level: number, scale = 1): number {
   if (def.cost === undefined || def.growth === undefined) return Infinity;
-  return Math.max(1, Math.round(def.cost * Math.pow(def.growth, level)));
+  return Math.max(1, Math.round(def.cost * Math.pow(def.growth, level) * scale));
 }
 
 /** The price of the next tier of a line. */
-export function upgradeCost(state: Pick<GameState, 'upgrades'>, id: UpgradeId): number {
-  return upgradeCostAt(UPGRADES_BY_ID.get(id)!, tier(state, id));
+export function upgradeCost(state: Pick<GameState, 'upgrades'> & Partial<Pick<GameState, 'rebirths'>>, id: UpgradeId): number {
+  return upgradeCostAt(UPGRADES_BY_ID.get(id)!, tier(state, id), priceScale(state));
 }
 
 /** True once the tier this line hangs off is owned (Luck, the map's root, and every combat line are always open). */
@@ -403,7 +406,7 @@ export function upgradeFx(state: Pick<GameState, 'upgrades'>) {
     atkCdPct: ATTACK_SPEED.cdPct * t('atkSpeed'),
     /** Quick Roll: how much shorter a skill roll spins, in percent. */
     rollSpinPct: QUICK_ROLL.spinPct * t('quickRoll'),
-    offlineEff: 0.4 * t('offline'),
+    offlineEff: BAL.offline.perTier * t('offline'),
   };
 }
 
