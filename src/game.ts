@@ -139,10 +139,10 @@ export class Game {
     return currentLuck(this.state, Date.now()) * runMults(this.state.run.items).luck;
   }
 
-  /** A knight's stats with the run's merchant items on top (Whetstone Oil, Iron Tonic, Swift Tonic). */
-  private runStats<T extends { atk: number; hp: number; atkCd: number }>(st: T): T {
+  /** A knight's stats with the run's merchant items on top (Whetstone Oil, Iron Tonic, Swift Tonic, Traveler's Boots). */
+  private runStats<T extends { atk: number; hp: number; atkCd: number; speed: number }>(st: T): T {
     const m = runMults(this.state.run.items);
-    return { ...st, atk: st.atk * m.dmg, hp: st.hp * m.hp, atkCd: st.atkCd / m.atkSpd };
+    return { ...st, atk: st.atk * m.dmg, hp: st.hp * m.hp, atkCd: st.atkCd / m.atkSpd, speed: st.speed * m.speed };
   }
 
   squadSpecs(): HeroSpec[] {
@@ -384,11 +384,12 @@ export class Game {
     this.version++;
   }
 
-  /** The run's merchant items that the world plays out (lifesteal, thorns, revives left). */
+  /** The run's merchant items that the world plays out (lifesteal, thorns, damage taken, revives left). */
   private applyRunItems(): void {
     const w = this.world;
     if (!w) return;
     const m = runMults(this.state.run.items);
+    w.guard = m.guard;
     w.lifesteal = m.lifesteal;
     w.thorns = m.thorns;
     w.phoenix = m.phoenix;
@@ -444,6 +445,7 @@ export class Game {
       h.maxHp *= hp;
       if (!h.downed) h.hp *= hp;
       if (h.atkCd !== undefined) h.atkCd /= after.atkSpd / before.atkSpd;
+      h.speed *= after.speed / before.speed;
     }
     w.goldPerKill *= after.gold / before.gold;
     this.applyRunItems();

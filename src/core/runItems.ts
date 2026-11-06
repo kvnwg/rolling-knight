@@ -1,13 +1,14 @@
 /**
  * The wares a floor's merchant sells (world/shop.ts sets out the shop): things for this run only.
- * Heals and revives help now; tonics, charms and trinkets last until you head back to camp (a wipe,
- * or going up yourself), stacking when bought again. Prices follow the floor's gold, so a shop is
- * always worth a look and never a free lunch.
+ * Heals and revives help now; tonics, charms, trinkets and gear last until you head back to camp (a
+ * wipe, or going up yourself), stacking when bought again. The gear (Thorn Mail, the Lucky Charm, the
+ * Iron Helm, the Traveler's Boots) shows PixelForge's gear-set icons. Prices follow the floor's gold,
+ * so a shop is always worth a look and never a free lunch.
  */
 import { BAL } from './balance';
 import type { IconName } from '../ui/px';
 
-export type RunItemId = 'draught' | 'phoenix' | 'whetstone' | 'ironTonic' | 'swiftTonic' | 'fang' | 'thorns' | 'idol' | 'charm' | 'scroll';
+export type RunItemId = 'draught' | 'phoenix' | 'whetstone' | 'ironTonic' | 'swiftTonic' | 'fang' | 'thorns' | 'idol' | 'charm' | 'scroll' | 'helm' | 'boots';
 
 export interface RunItemDef {
   id: RunItemId;
@@ -34,21 +35,27 @@ export const RUN_ITEMS: Readonly<Record<RunItemId, RunItemDef>> = {
   ironTonic: { id: 'ironTonic', name: 'Iron Tonic', icon: 'heart', short: '+25% max HP this run', text: 'Every knight has 25% more HP until you head back to camp.', cost: 14, weight: 14, max: 5 },
   swiftTonic: { id: 'swiftTonic', name: 'Swift Tonic', icon: 'bolt', short: '+15% attack speed this run', text: 'The squad attacks 15% faster until you head back to camp.', cost: 16, weight: 12, max: 5 },
   fang: { id: 'fang', name: 'Vampire Fang', icon: 'drop', short: 'Hits heal 4% of the damage', text: 'Every hit the squad lands heals the hitter for 4% of the damage, this run.', cost: 18, weight: 9, max: 4 },
-  thorns: { id: 'thorns', name: 'Thorn Mail', icon: 'shield', short: 'Foes that hit you take 30% back', text: 'Foes that hit a knight up close take 30% of it back, this run.', cost: 15, weight: 9, max: 4 },
+  thorns: { id: 'thorns', name: 'Thorn Mail', icon: 'item:crimson:torso_wear', short: 'Foes that hit you take 30% back', text: 'Foes that hit a knight up close take 30% of it back, this run.', cost: 15, weight: 9, max: 4 },
   idol: { id: 'idol', name: 'Golden Idol', icon: 'treasure', short: '+30% gold this run', text: 'All the gold you find is worth 30% more until you head back to camp.', cost: 20, weight: 8, max: 3 },
-  charm: { id: 'charm', name: 'Lucky Charm', icon: 'clover', short: '+25% luck this run', text: 'Luck (skill rolls and the altar) is 25% higher until you head back to camp.', cost: 20, weight: 8, max: 3 },
+  charm: { id: 'charm', name: 'Lucky Charm', icon: 'item:forest:amulet', short: '+25% luck this run', text: 'Luck (skill rolls and the altar) is 25% higher until you head back to camp.', cost: 20, weight: 8, max: 3 },
   scroll: { id: 'scroll', name: 'Spell Scroll', icon: 'book', short: 'Your next skill roll: Epic or better', text: 'The skill roll of the knight you play lands on an Epic or Legendary skill next time.', cost: 22, weight: 7, now: true, max: 99 },
+  helm: { id: 'helm', name: 'Iron Helm', icon: 'item:iron:headwear', short: 'Take 15% less damage this run', text: 'Every knight takes 15% less damage until you head back to camp.', cost: 15, weight: 10, max: 3 },
+  boots: { id: 'boots', name: "Traveler's Boots", icon: 'item:traveler:feet', short: '+12% move speed this run', text: 'The squad moves 12% faster until you head back to camp.', cost: 12, weight: 10, max: 3 },
 };
 
 export const RUN_ITEM_IDS = Object.keys(RUN_ITEMS) as RunItemId[];
 
 export type RunItems = Partial<Record<RunItemId, number>>;
 
-/** What the run's items add up to: multipliers for stats, gold and luck; shares for lifesteal and thorns; revives left. */
+/** What the run's items add up to: multipliers for stats, gold and luck, damage taken and speed; shares for lifesteal and thorns; revives left. */
 export interface RunMults {
   dmg: number;
   hp: number;
   atkSpd: number;
+  /** Damage the squad takes (the Iron Helm). */
+  guard: number;
+  /** The squad's move speed (the Traveler's Boots). */
+  speed: number;
   gold: number;
   luck: number;
   lifesteal: number;
@@ -62,6 +69,8 @@ export function runMults(items: RunItems | undefined): RunMults {
     dmg: 1 + 0.2 * n('whetstone'),
     hp: 1 + 0.25 * n('ironTonic'),
     atkSpd: 1 + 0.15 * n('swiftTonic'),
+    guard: Math.pow(0.85, n('helm')),
+    speed: 1 + 0.12 * n('boots'),
     gold: 1 + 0.3 * n('idol'),
     luck: 1 + 0.25 * n('charm'),
     lifesteal: 0.04 * n('fang'),

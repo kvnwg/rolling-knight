@@ -25,7 +25,7 @@ from pixelforge.export import export
 from pixelforge.recipe import find_recipe, load_recipe
 from pixelforge.style import load_style
 
-KNIGHTS = ['rk_guardian', 'rk_blade', 'rk_ranger', 'rk_cleric', 'rk_arcanist', 'rk_lancer']
+KNIGHTS = ['rk_guardian', 'rk_blade', 'rk_ranger', 'rk_cleric', 'rk_arcanist', 'rk_lancer', 'rk_kevin']
 
 
 def main():

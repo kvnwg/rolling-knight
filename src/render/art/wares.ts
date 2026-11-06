@@ -4,6 +4,7 @@
  * the ware, adds its glow and hangs the price tag under the table.
  */
 import { blank, fromRows, type PixelBuf } from '../pixel/buf';
+import { isItemIcon, itemBuf } from './items';
 import { UI_MD, UI_SM, UI_SPRITES, type UiIcon } from '../pixel/ui';
 import { setRGB } from './draw';
 
@@ -41,8 +42,10 @@ export function wareTable(): PixelBuf {
   return b;
 }
 
-/** The ware itself: its icon at the UI's middle size (big enough to read on the table). */
+/** The ware itself: its icon at the UI's middle size (big enough to read on the table), or a piece of PixelForge gear. */
 export function wareIcon(icon: string): PixelBuf {
+  const gear = isItemIcon(icon) ? itemBuf(icon) : null;
+  if (gear) return gear;
   const rows = UI_MD[icon as UiIcon] ?? UI_SPRITES[icon as UiIcon] ?? UI_SPRITES.star;
   const w = Math.max(...rows.map((r) => r.length));
   return fromRows(rows.map((r) => r.padEnd(w, '.')));

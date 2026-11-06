@@ -1,10 +1,11 @@
 /**
  * Pixel pictures in the UI: Dumpster Legend's UI icons (src/render/pixel/ui.ts) plus a few drawn for
- * this game, all shown at exactly one art pixel = var(--px) CSS px, so the UI and its icons share one
- * pixel size.
+ * this game, and PixelForge's gear-set item icons (`item:<set>:<piece>`, render/art/items.ts), all
+ * shown at exactly one art pixel = var(--px) CSS px, so the UI and its icons share one pixel size.
  */
 import type { CSSProperties } from 'react';
-import { fromRows, type Rows } from '../render/pixel/buf';
+import { isItemIcon, itemBuf, type ItemIcon } from '../render/art/items';
+import { fromRows, type PixelBuf, type Rows } from '../render/pixel/buf';
 import { LUCK_TOKENS, UI_MD, UI_SM, UI_SPRITES, UI_XS, type UiIcon } from '../render/pixel/ui';
 
 /** Icons this game adds (same palette keys as the rest of the pixel art). */
@@ -86,7 +87,7 @@ const EXTRA: Record<string, Rows> = {
   quill: ['.......kk', '......kWk', '.....kW5k', '....kW5k.', '...kW5k..', '..kW5k...', '.kx5k....', 'kxkk.....', 'kk.......'],
 };
 
-export type IconName = UiIcon | keyof typeof EXTRA | `token${2 | 3 | 5 | 10}`;
+export type IconName = UiIcon | keyof typeof EXTRA | `token${2 | 3 | 5 | 10}` | ItemIcon;
 export type IconSize = 'xs' | 'sm' | 'md' | 'lg';
 
 const urls = new Map<string, { url: string; w: number; h: number }>();
@@ -105,9 +106,12 @@ export function iconArt(icon: IconName, size: IconSize = 'md'): { url: string; w
   const key = `${icon}|${size}`;
   let a = urls.get(key);
   if (a) return a;
-  const rows = rowsFor(icon, size) ?? UI_SPRITES.star;
-  const w = Math.max(...rows.map((r) => r.length));
-  const b = fromRows(rows.map((r) => r.padEnd(w, '.')));
+  let b: PixelBuf | null = isItemIcon(icon) ? itemBuf(icon) : null;
+  if (!b) {
+    const rows = rowsFor(icon, size) ?? UI_SPRITES.star;
+    const w = Math.max(...rows.map((r) => r.length));
+    b = fromRows(rows.map((r) => r.padEnd(w, '.')));
+  }
   const c = document.createElement('canvas');
   c.width = b.w;
   c.height = b.h;

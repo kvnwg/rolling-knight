@@ -33,7 +33,8 @@ type Px = readonly [number, number];
 export const CAST_POSES: Readonly<Partial<Record<SheetName, { side: boolean; tips: Partial<Record<Dir, readonly [null, Px, Px, Px]>> }>>> = {
   rk_guardian: { side: false, tips: { s: [null, [9, 10], [9, 14], [9, 13]] } },
   rk_blade: { side: false, tips: { s: [null, [9, 8], [9, 12], [9, 11]] } },
-  rk_kevin: { side: false, tips: { s: [null, [17, 8], [17, 14], [17, 12]] } },
+  // (Kevin is a Blade on PixelForge's humanoid rig: his sword goes up where the Blade's does.)
+  rk_kevin: { side: false, tips: { s: [null, [9, 8], [9, 12], [9, 11]] } },
   rk_lancer: { side: false, tips: { s: [null, [9, 7], [9, 11], [9, 10]] } },
   rk_cleric: { side: false, tips: { s: [null, [8, 9], [8, 13], [8, 12]] } },
   rk_arcanist: { side: false, tips: { s: [null, [8, 9], [8, 13], [8, 12]] } },

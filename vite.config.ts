@@ -3,8 +3,10 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import pkg from './package.json' with { type: 'json' };
 
-// `--mode artifact` builds one self-contained page for the claude.ai artifact viewer
-// (fonts, images and chunks inlined; tools/buildArtifact.mjs folds the JS and CSS into the HTML).
+// `--mode artifact` builds one page for the claude.ai artifact viewer (fonts, images and chunks
+// inlined; tools/buildArtifact.mjs folds the JS and CSS into the HTML). The music and sounds stay
+// files of their own, published beside the page (the page is a quarter the size, quick to open for
+// anyone, and the audio comes in as it's needed).
 export default defineConfig(({ mode }) => {
   const artifact = mode === 'artifact';
   return {
@@ -18,7 +20,7 @@ export default defineConfig(({ mode }) => {
       chunkSizeWarningLimit: 2000,
       ...(artifact
         ? {
-            assetsInlineLimit: 100_000_000,
+            assetsInlineLimit: (file: string) => !file.endsWith('.mp3'),
             cssCodeSplit: false,
             modulePreload: false,
             rollupOptions: { output: { inlineDynamicImports: true } },

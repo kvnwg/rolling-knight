@@ -129,10 +129,11 @@ describe('PixelForge sheets', () => {
     expect(attackAnim('blade', 'excalibur', 0, SHEETS.rk_blade)).toBe('attack_slash');
     expect(attackAnim('guardian', 'groundPound', 0, SHEETS.rk_guardian)).toBe('attack_slash');
     expect(attackAnim('guardian', 'shieldSlam', 0, SHEETS.rk_guardian)).toBe('block_enter');
-    // Kevin's heavy attack is one blow (an overhead smash): every fourth swing and the heavy skills.
-    expect(heavySpins(SHEETS.rk_kevin)).toBe(false);
-    expect(attackAnim('blade', null, 3, SHEETS.rk_kevin)).toBe('attack_heavy');
-    expect(attackAnim('blade', 'excalibur', 0, SHEETS.rk_kevin)).toBe('attack_heavy');
+    // Kevin is a Blade on PixelForge's rig (his own clothes, the Blade's whole set): he cleaves and spins
+    // like any Blade, and keeps the Blade's sword point for the power-up.
+    expect(heavySpins(SHEETS.rk_kevin)).toBe(true);
+    expect(attackAnim('blade', null, 3, SHEETS.rk_kevin)).toBe('attack_slash');
+    expect(SHEETS.rk_kevin.meta.cell).toBe(SHEETS.rk_blade.meta.cell);
   });
 
   it('draw the knights without PixelForge\'s swing trails (the game draws their swings), the monsters with them', () => {
@@ -507,13 +508,13 @@ describe('knight animations from the sim', () => {
     expect(changes).toBeLessThanOrEqual(10);
     expect(changes).toBeGreaterThanOrEqual(6);
     for (const k of frames.slice(12)) expect(SHEETS.rk_ranger.clip('run', 'e').some((f) => f[0] === k)).toBe(true);
-    // Every class runs at its own pace and walks when slowed (60%); Kevin, who has no run, walks.
+    // Every class runs at its own pace and walks when slowed (60%); Kevin too (a Blade).
     for (const cls of CLASS_IDS) {
       const sheet = SHEETS[KNIGHT_SHEET[cls]];
       expect(gaitFor(sheet, CLASSES[cls].speed, 'walk'), cls).toBe('run');
       expect(gaitFor(sheet, CLASSES[cls].speed * 0.6, 'run'), cls).toBe('walk');
     }
-    expect(gaitFor(SHEETS.rk_kevin, 60, 'walk')).toBe('walk');
+    expect(gaitFor(SHEETS.rk_kevin, 60, 'walk')).toBe('run');
     // Standing again, it breathes (the idle's frames) and blinks only on the breath's rest frame.
     h.moving = false;
     const seen = new Set<number>();

@@ -3,6 +3,7 @@ import { BAL } from '../src/core/balance';
 import { knightId } from '../src/core/knights';
 import { addKnight, killGold } from '../src/core/roster';
 import { RUN_ITEMS, RUN_ITEM_IDS, canStack, runMults, warePrice } from '../src/core/runItems';
+import { isItemIcon, itemBuf, itemIcons } from '../src/render/art/items';
 import { SKILLS, tierStep } from '../src/core/skillbook';
 import { Game } from '../src/game';
 import { BIOMES, isBossFloor } from '../src/world/biomes';
@@ -141,6 +142,47 @@ describe('buying', () => {
     // Back at camp, the run is over.
     g.leaveDungeon();
     expect(g.state.run.items).toEqual({});
+  });
+
+  it('the gear: the Iron Helm takes 15% off every hit on the squad, the Traveler\'s Boots speed it up 12%, on this floor and the next', () => {
+    const g = shopGame();
+    const w = g.world!;
+    const h = w.heroes[0];
+    const speed = h.speed;
+    const hitFor = (target: typeof h) => {
+      target.invuln = 0;
+      target.hp = target.maxHp;
+      const before = target.hp;
+      w.damage(target, 100, null, { silent: true });
+      return before - target.hp;
+    };
+    const plain = hitFor(h);
+    const ware = w.wares[0];
+    ware.item = 'helm';
+    expect(g.buyWare(ware)).toBe('ok');
+    expect(w.guard).toBeCloseTo(0.85, 9);
+    expect(hitFor(h) / plain).toBeCloseTo(0.85, 1);
+    const w2 = w.wares[1] ?? w.wares[0];
+    w2.sold = false;
+    w2.item = 'boots';
+    expect(g.buyWare(w2)).toBe('ok');
+    expect(h.speed).toBeCloseTo(speed * 1.12, 6);
+    // The next floor is built with them.
+    g.startFloor(6);
+    const h2 = g.world!.heroes.find((x) => x.knightId === h.knightId)!;
+    expect(h2.speed).toBeCloseTo(speed * 1.12, 6);
+    expect(g.world!.guard).toBeCloseTo(0.85, 9);
+  });
+
+  it('shows the gear in PixelForge\'s gear-set icons, every one there to draw', () => {
+    for (const id of RUN_ITEM_IDS) {
+      const icon = RUN_ITEMS[id].icon;
+      if (isItemIcon(icon)) expect(itemBuf(icon), `${id} ${icon}`).not.toBeNull();
+    }
+    expect(['thorns', 'charm', 'helm', 'boots'].every((id) => isItemIcon(RUN_ITEMS[id as keyof typeof RUN_ITEMS].icon))).toBe(true);
+    expect(itemIcons().length).toBeGreaterThanOrEqual(60);
+    const helm = itemBuf('item:iron:headwear')!;
+    expect([helm.w, helm.h]).toEqual([16, 16]);
   });
 
   it('a Phoenix Feather catches the next knight to fall; a Spell Scroll rigs the next roll Epic or better', () => {

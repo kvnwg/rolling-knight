@@ -188,7 +188,8 @@ export class World {
   npcs: Npc[] = [];
   /** A merchant's wares set out on the floor (world/shop.ts); Game.buyWare sells them. */
   wares: Ware[] = [];
-  /** The run's merchant items (Game sets them, core/runItems.ts): lifesteal and thorns shares, revives left. */
+  /** The run's merchant items (Game sets them, core/runItems.ts): damage the squad takes (the Iron Helm), lifesteal and thorns shares, revives left. */
+  guard = 1;
   lifesteal = 0;
   thorns = 0;
   phoenix = 0;
@@ -535,6 +536,7 @@ export class World {
       if ((from.tagBoostT ?? 0) > 0) amount *= 1.3;
     }
     amount *= 1 - target.armor;
+    if (target.team === 'hero') amount *= this.guard;
     if (target.drT > 0) amount *= target.dr;
     amount = Math.max(1, amount);
     // The upgrade map's chance lines (chance.ts): lucky and doubled hits, fumbles, Second Wind...

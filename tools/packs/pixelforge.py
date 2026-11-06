@@ -39,6 +39,8 @@ SHEETS = {
     'rk_cleric': ['idle', 'blink', 'walk', 'run', 'combat_idle', 'cast', 'roll', 'hurt', 'stun', 'death', 'victory'],
     'rk_arcanist': ['idle', 'blink', 'walk', 'run', 'combat_idle', 'cast', 'dodge', 'hurt', 'stun', 'death', 'victory'],
     'rk_lancer': ['idle', 'blink', 'walk', 'run', 'combat_idle', 'attack_slash', 'vault', 'hurt', 'stun', 'death', 'victory'],
+    # Kevin, the one Absolute knight: a Blade in his own plain clothes (the game never recolors him).
+    'rk_kevin': ['idle', 'blink', 'walk', 'run', 'combat_idle', 'attack_slash', 'attack_heavy', 'roll', 'hurt', 'stun', 'death', 'victory'],
     'slime': ['idle', 'move', 'attack_slam', 'attack_spit', 'hurt', 'death'],
     'bat': ['idle', 'attack_swoop', 'hurt', 'death'],
     'wolf': ['idle', 'combat_idle', 'walk', 'run', 'attack_bite', 'howl', 'hurt', 'death'],
@@ -72,6 +74,11 @@ FX = {
     'howl_rings': ['play'],
     'blood_crescent': ['travel'],
 }
+
+# The gear sets' item icons (out/icons/, after `pf icons`): every set's pieces, 16 x 16, written as
+# src/assets/pf/items.json (each icon its own little palette and rows of it, so the UI draws them at
+# once, like its own icons).
+ICON_ALPHABET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 
 KNIGHT_ANCHORS = ('chin', 'back', 'hip')
 OWNER_ORDER = ['metal', 'cloth', 'leather', 'accent', 'skin', 'hair', 'hide', 'fur', 'slime', 'slime_highlight', 'stone', 'bone',
@@ -318,6 +325,39 @@ def main():
         total += size
         print(f'{out_name}: {len(cells)} frames, {len(table)} colors, {size // 1024} KB')
     print(f'total {total // 1024} KB of PNG')
+    write_icons(repo, out_dir)
+
+
+def write_icons(repo, out_dir):
+    """The gear sets' item icons, cut from out/icons/icons.png by its index.json."""
+    src = os.path.join(repo, 'out', 'icons')
+    index = json.load(open(os.path.join(src, 'index.json')))
+    sheet = Image.open(os.path.join(src, 'icons.png')).convert('RGBA')
+    cell = index['cell']
+    icons = {}
+    for set_name, s in index['sets'].items():
+        for piece, p in s['pieces'].items():
+            img = sheet.crop((p['col'] * cell, s['row'] * cell, (p['col'] + 1) * cell, (s['row'] + 1) * cell))
+            pal = []
+            rows = []
+            for y in range(cell):
+                row = ''
+                for x in range(cell):
+                    px = img.getpixel((x, y))
+                    if px[3] == 0:
+                        row += '.'
+                        continue
+                    h = hexs(px) if px[3] == 255 else hexs(px) + '%02x' % px[3]
+                    if h not in pal:
+                        pal.append(h)
+                    row += ICON_ALPHABET[pal.index(h)]
+                rows.append(row)
+            if len(pal) > len(ICON_ALPHABET):
+                raise SystemExit(f'icon {set_name}:{piece}: {len(pal)} colors')
+            icons[f'{set_name}:{piece}'] = {'label': p['label'], 'pal': pal, 'rows': rows}
+    with open(os.path.join(out_dir, 'items.json'), 'w') as f:
+        json.dump({'cell': cell, 'icons': icons}, f, separators=(',', ':'))
+    print(f'items.json: {len(icons)} item icons from {len(index["sets"])} gear sets')
 
 
 if __name__ == '__main__':
