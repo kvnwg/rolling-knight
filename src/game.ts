@@ -91,8 +91,12 @@ export class Game {
   /** The latest summons, newest first (the Summon tab's log). */
   recent: Summoned[] = [];
 
+  /** No save behind this game: a brand-new player (or ?fresh). */
+  readonly isNew: boolean;
+
   constructor(fresh = false) {
     const loaded = fresh ? null : loadGame();
+    this.isNew = !loaded;
     this.state = loaded ?? newGame();
     this.rng = new Rng(this.state.rngState);
     this.biome = biomeForFloor(this.state.run.floor, this.state.run.biomeSeed);
@@ -466,12 +470,21 @@ export class Game {
     this.version++;
   }
 
+  /** The altar's seal is broken: it starts to spin (the first spin on the next tick). */
+  breakSeal(): void {
+    if (!this.state.roll.sealed) return;
+    this.state.roll.sealed = false;
+    this.version++;
+    this.save();
+  }
+
   tick(dt: number): void {
     const s = this.state;
     if (this.paused) return;
     dt = Math.min(dt, 0.1);
     s.playTimeMs += dt * 1000;
-    rollTick(s, this.rng, Date.now(), dt, this.emit);
+    // (A sealed altar waits for its seal to be broken.)
+    if (!s.roll.sealed) rollTick(s, this.rng, Date.now(), dt, this.emit);
     s.rngState = this.rng.state;
     if (!this.inDungeon) {
       // At the hub: your knight walks among the keepers; the dungeon waits. Empty squad slots fill
@@ -695,9 +708,11 @@ export class Game {
     saveGame(this.state);
   }
 
+  /** A new game from nothing (Settings): its altar sealed, like a new player's. */
   reset(): void {
     clearSave();
     this.state = newGame();
+    this.state.roll.sealed = true;
     this.rng = new Rng(this.state.rngState);
     this.world = null;
     this.inDungeon = false;

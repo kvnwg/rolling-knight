@@ -3,7 +3,8 @@
  * each with a pointer on the one thing it's about (a button, a keeper, the door, a foe), and each one
  * done when you've done that thing, never on a "Next". In the order a new player meets them:
  *
- *  - altar:   your first knight lands at the Oracle's altar (a new game opens on it): close it;
+ *  - seal:    a new game opens on the Oracle's altar, sealed: break the seal to summon;
+ *  - altar:   your first knight lands at the Oracle's altar: close it;
  *  - move:    walk (drag on a phone; WASD or the arrows on a computer);
  *  - talk:    walk up to Warden Tobb and open his counter (he keeps your squad);
  *  - descend: DESCEND at his counter (or walk down the steps);
@@ -32,14 +33,15 @@
  */
 import { BAL } from './balance';
 
-export const TUT_STEPS = ['altar', 'move', 'talk', 'descend', 'attack', 'skills', 'exit', 'auto', 'camp', 'spend'] as const;
+export const TUT_STEPS = ['seal', 'altar', 'move', 'talk', 'descend', 'attack', 'skills', 'exit', 'auto', 'camp', 'spend'] as const;
 export type TutStepId = (typeof TUT_STEPS)[number];
 export const TUT_TIPS = ['shop', 'checkpoint', 'rebirth', 'solo', 'auto'] as const;
 export type TutTipId = (typeof TUT_TIPS)[number];
 
 /** The step each one waits for: it never shows before that one's done. */
 export const TUT_AFTER: Record<TutStepId, TutStepId | null> = {
-  altar: null,
+  seal: null,
+  altar: 'seal',
   move: 'altar',
   talk: 'move',
   descend: 'talk',
@@ -85,6 +87,8 @@ export interface TutCtx {
   touch: boolean;
   /** Someone in the squad (there's a knight to play). */
   hasKnight: boolean;
+  /** The altar is still sealed (a new game, before its first summon). */
+  sealed: boolean;
   /** At the hub, standing by Warden Tobb (his button is up). */
   nearWarden: boolean;
   /** Gold enough to level up the knight you play. */
@@ -115,7 +119,7 @@ export interface TutCtx {
 
 /** What a line points at: a part of the screen, or a spot in the world. */
 export type TutTarget =
-  | { kind: 'ui'; id: 'close' | 'talk' | 'descend' | 'level' | 'squadTab' | 'attack' | 'reel' | 'camp' | 'auto' | 'floor' | 'solo' }
+  | { kind: 'ui'; id: 'seal' | 'close' | 'talk' | 'descend' | 'level' | 'squadTab' | 'attack' | 'reel' | 'camp' | 'auto' | 'floor' | 'solo' }
   | { kind: 'world'; id: 'knight' | 'warden' | 'steps' | 'foe' | 'door' | 'shop' | 'shrine' };
 
 /** The line on the screen. */
@@ -256,6 +260,8 @@ const AT_HUB: readonly TutWhere[] = ['hub', 'warden', 'keeper'];
 function settled(step: TutStepId, ctx: TutCtx, run: TutRun, now: number): boolean {
   const w = ctx.where;
   switch (step) {
+    case 'seal':
+      return !ctx.sealed;
     case 'altar':
       return ctx.hasKnight && w !== 'altar' && w !== 'busy';
     case 'move':
@@ -288,6 +294,9 @@ const line = (key: string, text: string, target: TutTarget, tip = false): TutVie
 function stepView(step: TutStepId, ctx: TutCtx, run: TutRun): TutView | null {
   const { where, touch } = ctx;
   switch (step) {
+    case 'seal':
+      // (The Oracle, over her sealed altar.)
+      return where === 'altar' && ctx.sealed ? line('seal', touch ? 'Tap the [seal] to summon your first knight!' : 'Click the [seal] to summon your first knight!', ui('seal')) : null;
     case 'altar':
       return where === 'altar' && ctx.hasKnight ? line('altar', 'Your first knight! Now close the altar.', ui('close')) : null;
     case 'move':

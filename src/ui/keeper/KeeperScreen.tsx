@@ -89,6 +89,7 @@ export function KeeperScreen({
   tab,
   onTab,
   onClose,
+  locked = false,
   children,
 }: {
   game: Game;
@@ -97,11 +98,13 @@ export function KeeperScreen({
   tab: string;
   onTab: (id: string) => void;
   onClose: () => void;
+  /** It can't be closed yet (the Oracle's sealed altar, a new game's first screen): no close button. */
+  locked?: boolean;
   children: ReactNode;
 }) {
   const calm = !!game.state.settings.reduceMotion;
   return (
-    <div className={s.screen} onPointerDown={(e) => e.target === e.currentTarget && (uiSound('close'), onClose())} data-keeper={station.id}>
+    <div className={s.screen} onPointerDown={(e) => !locked && e.target === e.currentTarget && (uiSound('close'), onClose())} data-keeper={station.id}>
       <div className={s.col}>
         <SceneView id={station.id} calm={calm} title={station.name} />
         <div className={s.tabs} role="tablist">
@@ -123,9 +126,11 @@ export function KeeperScreen({
               {!!t.badge && <span className={s.badge}>{t.badge}</span>}
             </button>
           ))}
-          <button className={s.x} onClick={() => (uiSound('close'), onClose())} aria-label="Close" title="Close (Esc)">
-            <i />
-          </button>
+          {!locked && (
+            <button className={s.x} onClick={() => (uiSound('close'), onClose())} aria-label="Close" title="Close (Esc)">
+              <i />
+            </button>
+          )}
         </div>
         <div className={s.panel}>{children}</div>
       </div>

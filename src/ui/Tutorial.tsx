@@ -133,6 +133,8 @@ function levelButton(id: string | null): Element | null {
 function uiTarget(game: Game, id: Extract<TutTarget, { kind: 'ui' }>['id']): Element | null {
   const st = game.state;
   switch (id) {
+    case 'seal':
+      return document.querySelector('[data-keeper="altar"] [data-seal-disc]') ?? document.querySelector('[data-keeper="altar"] [data-altar-seal]');
     case 'close':
       return document.querySelector('[data-keeper="altar"] button[aria-label="Close"]');
     case 'talk':
@@ -595,6 +597,7 @@ export function Tutorial(props: TutorialProps) {
         where,
         touch,
         hasKnight: !!playing,
+        sealed: !!st.roll.sealed,
         nearWarden: !game.inDungeon && game.hub?.nearStation()?.id === 'gate',
         canLevel: !!playing && canLevel(st, playing),
         levelShown: where === 'warden' && !!levelButton(playing),

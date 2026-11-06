@@ -113,6 +113,11 @@ export interface GameState {
     since: number | null;
     /** The start (and after a rebirth): quick ordinary spins until the squad is full, then ordinary play. */
     tutorial: 'warmup' | 'done' | 'rewarm';
+    /**
+     * A new player's altar is sealed: it doesn't spin until the seal is broken (a tap on it, at the
+     * Oracle's; ui/fx/AltarSeal.tsx). Only a brand-new game starts sealed (dev.ts); never after.
+     */
+    sealed?: boolean;
     nextSpinId: number;
   };
 

@@ -135,7 +135,7 @@ export function HeroDetail({ game, id, onClose }: { game: Game; id: string; onCl
 const settingsMemory = { tab: 'game' as 'game' | 'controls' | 'save' | 'credits' };
 
 /** Settings, in tabs: the game's switches, the controls, your save, the credits. */
-export function SettingsSheet({ game, onClose }: { game: Game; onClose: () => void }) {
+export function SettingsSheet({ game, onClose, onReset }: { game: Game; onClose: () => void; onReset?: () => void }) {
   const s = game.state;
   const [, bump] = useState(0);
   const [confirm, setConfirm] = useState(false);
@@ -242,7 +242,7 @@ export function SettingsSheet({ game, onClose }: { game: Game; onClose: () => vo
         ) : (
           <div className="row">
             <span className="outlined">Erase everything?</span>
-            <button className="btn red small" onClick={() => (game.reset(), setConfirm(false), onClose())}>
+            <button className="btn red small" onClick={() => (game.reset(), setConfirm(false), onClose(), onReset?.())}>
               Erase
             </button>
             <button className="btn navy small" onClick={() => setConfirm(false)}>

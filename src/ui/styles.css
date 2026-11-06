@@ -3563,3 +3563,24 @@ body,
   min-width: min(calc(110 * var(--px)), 80vw);
   justify-content: center;
 }
+
+/* ------------------------------------------------------------ a new game's opening */
+/* From black onto the Oracle's sealed altar: held a beat, then lifting in steps (App.tsx intro). */
+.intro-fade {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: #07050c;
+  pointer-events: none;
+  animation: introFade 2s both;
+}
+@keyframes introFade {
+  0%,
+  30% {
+    opacity: 1;
+    animation-timing-function: steps(8, end);
+  }
+  100% {
+    opacity: 0;
+  }
+}

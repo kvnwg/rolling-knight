@@ -1,6 +1,7 @@
 /**
  * Dev shortcuts by URL, for playtesting and screenshots (no effect without them):
- *   ?fresh            a new game (the save is left alone until it's overwritten)
+ *   ?fresh            a new game (the save is left alone until it's overwritten): the sealed altar,
+ *                     the intro and the tutorial, as a new player gets them
  *   ?floor=16         start on that floor with a ready squad (tutorial skipped)
  *   ?squad=legendary  the squad's rarity for ?floor (default epic)
  *   ?auto             the knight you control plays itself (the dev bot: it moves, dodges and fights)
@@ -64,6 +65,8 @@ export function devGame(): Game {
     tut.tips = [];
     tut.skipped = false;
   }
+  // A brand-new player's altar is sealed until they break the seal (a ready-made squad's isn't).
+  if (game.isNew && floor <= 0 && Object.keys(s.roster).length === 0) s.roll.sealed = true;
   if (q.has('camp')) game.inDungeon = false;
   if (q.has('gold')) s.gold = Number(q.get('gold'));
   if (q.has('auto')) game.bot = true;

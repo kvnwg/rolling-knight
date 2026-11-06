@@ -18,7 +18,10 @@ who picks the three you send down, levels them up and reforges them: one job eac
 among the things of their trade, and their wares below as cards on beige paper: a picture, a level,
 a number or two and a price, the details a tap away. Above all of them, at 1 in 2.5 billion, sits the Absolute tier and its one knight: Kevin, a
 black-haired normal guy and the strongest in the game by far. A knight you already have turns
-straight into gold; gold levels your knights. You start on ordinary rolls: no scripted finds. Rebirth
+straight into gold; gold levels your knights. A new game opens from black on the Oracle's altar,
+sealed under runic bands: she asks you to break the seal, a tap cracks it (Dumpster Legend's padlocked
+dumpster, made magic: the same jolt, launch and fall, with a flash, a ring of light and sparks) and
+the altar starts to roll. You start on ordinary rolls: no scripted finds. Rebirth
 for permanent luck and power; perks from the first rebirth change how a run plays. Folk on the floors
 keep a set-up of their own off the fighting (a market stall, a tent by a campfire, a candlelit shrine)
 and hand out jobs, and one of them may be a demon in disguise.

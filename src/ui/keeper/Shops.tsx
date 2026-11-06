@@ -24,6 +24,7 @@ import { biomeForFloor } from '../../world/biomes';
 import type { HubStation } from '../../world/hubWorld';
 import { HeroArt } from '../common';
 import { AltarReels } from '../fx/AltarReels';
+import { AltarSeal } from '../fx/AltarSeal';
 import { fmt, oneIn } from '../format';
 import { Px, type IconName } from '../px';
 import { uiSound } from '../sound';
@@ -452,6 +453,7 @@ export function OracleShop({ game, station, onClose, onOpen }: { game: Game; sta
       tab={tab}
       onTab={setTab}
       onClose={onClose}
+      locked={!!st.roll.sealed}
     >
       <ShopTop
         purse={
@@ -471,11 +473,16 @@ export function OracleShop({ game, station, onClose, onOpen }: { game: Game; sta
         }
       />
       <ShopHint>
-        {tab === 'summon' && (
-          <>
-            The altar <b>summons a free knight every {spinCycle(st).toFixed(1)}s</b>, even while you fight. More luck, rarer knights.
-          </>
-        )}
+        {tab === 'summon' &&
+          (st.roll.sealed ? (
+            <>
+              The altar is <b>sealed</b>. Break the seal and it <b>summons a free knight every {spinCycle(st).toFixed(1)}s</b>, even while you fight.
+            </>
+          ) : (
+            <>
+              The altar <b>summons a free knight every {spinCycle(st).toFixed(1)}s</b>, even while you fight. More luck, rarer knights.
+            </>
+          ))}
         {tab === 'latest' && <>Your last summons, newest first. Tap one to see that knight.</>}
         {tab === 'odds' && (
           <>
@@ -491,8 +498,10 @@ export function OracleShop({ game, station, onClose, onOpen }: { game: Game; sta
       <ShopBody scrollKey={tab}>
         {tab === 'summon' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'calc(3 * var(--px))' }}>
-            <div style={{ background: '#1a0e14', boxShadow: '0 0 0 var(--px) #2b170c', padding: 'calc(1 * var(--px))' }}>
+            <div style={{ position: 'relative', background: '#1a0e14', boxShadow: '0 0 0 var(--px) #2b170c', padding: 'calc(1 * var(--px))' }}>
               <AltarReels game={game} variant="big" />
+              {/* A new game's altar is sealed: a tap breaks the seal and the altar starts to spin. */}
+              <AltarSeal game={game} />
             </div>
             <div className={s.chips}>
               <Stat icon="star" label="Lucky spin in" title="Every 10th spin is lucky: extra luck">

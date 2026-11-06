@@ -76,6 +76,8 @@ export function App() {
   const talkRef = useRef(talking);
   talkRef.current = talking;
   const [picked, setPicked] = useState(game.inDungeon || location.search.includes('hub'));
+  /** A new game's opening: from black onto the Oracle's sealed altar (the tutorial's line waits for it). */
+  const [intro, setIntro] = useState(false);
   const [detail, setDetail] = useState<string | null>(null);
   const [settings, setSettings] = useState(false);
   const [luck, setLuck] = useState(false);
@@ -333,7 +335,8 @@ export function App() {
           setDetail(null);
           setSettings(false);
           setLuck(false);
-          setStation(null);
+          // (The Oracle's sealed altar stays: a new game's first screen, until the seal is broken.)
+          setStation((st) => (st?.id === 'altar' && game.state.roll.sealed ? st : null));
         } else if (game.inDungeon) game.leaveDungeon();
       }
       // At the hub, E or Enter talks to the keeper you're standing by; in the dungeon (where E is
@@ -401,10 +404,15 @@ export function App() {
           game={game}
           onPlay={() => {
             setPicked(true);
-            // A brand-new game goes to the altar first, to watch its first knights roll in.
+            // A brand-new game goes to the altar first, to watch its first knights roll in (sealed, the
+            // first time: it fades in from black, the Oracle asks for the seal to be broken).
             if (Object.keys(game.state.roster).length === 0) {
               const altar = hubLayout().stations.find((x) => x.id === 'altar');
-              if (altar) setStation(altar);
+              if (game.state.roll.sealed && !game.state.settings.reduceMotion) {
+                // Black at once; the altar's screen (heavy to build) comes up under it a frame later.
+                setIntro(true);
+                if (altar) requestAnimationFrame(() => setStation(altar));
+              } else if (altar) setStation(altar);
             }
           }}
         />
@@ -438,10 +446,21 @@ export function App() {
         controls={ctl.controls}
         station={station && !inDungeon ? station.id : null}
         choosing={choosing}
-        blocked={detail !== null || settings || luck || talking !== null || reveals.length > 0 || offline !== null}
+        blocked={intro || detail !== null || settings || luck || talking !== null || reveals.length > 0 || offline !== null}
       />
+      {intro && <div className="intro-fade" onAnimationEnd={() => setIntro(false)} aria-hidden />}
       {detail && <HeroDetail game={game} id={detail} onClose={() => setDetail(null)} />}
-      {settings && <SettingsSheet game={game} onClose={() => setSettings(false)} />}
+      {settings && (
+        <SettingsSheet
+          game={game}
+          onClose={() => setSettings(false)}
+          onReset={() => {
+            // A new game from nothing: back to the title, PLAY opens the sealed altar.
+            setStation(null);
+            setPicked(false);
+          }}
+        />
+      )}
       {luck && <LuckSheet game={game} onClose={() => setLuck(false)} />}
       {reveals.length > 0 && <Reveal key={reveals.length + ':' + reveals[0].knightId} item={reveals[0]} calm={game.state.settings.reduceMotion} onDone={() => (uiSound('tap'), setReveals((r) => r.slice(1)))} />}
       {offline && (

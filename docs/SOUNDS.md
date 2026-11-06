@@ -187,8 +187,6 @@ Older sounds (from Dumpster Legend), played as they always were.
 | `boss_down` | A boss falls (the music’s victory sting carries the fanfare). | A boom and a shower of coins. | — |
 | `wipe` | The squad is wiped. | Four notes sliding down, the last one wobbling. | — |
 | `treasure` | A chest or a treasure room. (Not played by the game yet.) | A sparkle of bells. | — |
-| `lock_tap` | A tap on a lock. (Not played by the game yet.) Recorded (`lock_tap.mp3`, gain 0.384). | A heavy metal clank. | — |
-| `lock_break` | A lock breaks. (Not played by the game yet.) Recorded (`lock_break.mp3`, gain 0.496). | A ping, a crash and clatter. | — |
 | `title_start` | Setting off: down the hub’s steps into the dungeon, or the warden’s button. Recorded (`title_start.mp3`, gain 0.164). | A punchy press, a run up the chord and sparkles. | — |
 | `rebirth` | A rebirth. | Two pickup notes, the chord, bells and a shower of coins. | — |
 
@@ -198,11 +196,13 @@ The Summoning Altar.
 
 | Sound | When it plays | Placeholder | Mix |
 | --- | --- | --- | --- |
+| `lock_tap` | A tap on a new game’s sealed altar (the seal jolts); a merchant’s ware you can’t afford. Recorded (`lock_tap.mp3`, gain 0.384). | A heavy metal clank. | — |
+| `lock_break` | The altar’s seal cracks and its bindings fall off (with glow_up). Recorded (`lock_break.mp3`, gain 0.496). | A ping, a crash and clatter. | — |
 | `reel_start` | The altar spins (quiet when the altar isn’t on screen), and a roll at the tinker’s or the sage’s. | A lever clack and a short whirr. | — |
 | `reel_tick` | A cell clicking past an altar reel’s line (the altar on screen) or a keeper’s roll’s, and the reveal’s odds counting. | A tick that climbs as the reel slows. | — |
 | `reel_creep` | A rare find crawling the last few cells toward the line (the altar, a keeper’s roll). Recorded (`reel_creep.mp3`, gain 0.1). | Notches climbing a step each. | — |
 | `reel_land` | An altar reel or a keeper’s roll lands, heavier for rarer finds. Recorded (`reel_land.mp3`, gain 0.018). | A thud and a bell. | — |
-| `glow_up` | A teased find’s glow climbs a tier (the altar, a keeper’s roll). Recorded (`glow_up.mp3`, gain 0.06). | An upward flick and two bells. | — |
+| `glow_up` | A teased find’s glow climbs a tier (the altar, a keeper’s roll); the altar’s seal breaking. Recorded (`glow_up.mp3`, gain 0.06). | An upward flick and two bells. | — |
 | `rattle` | The build-up before a reveal: the reel shakes. Recorded (`rattle.mp3`, gain 0.113). | Rattling beats with a heartbeat. | — |
 | `riser_short` | A teased find’s short build-up. Recorded (`riser_short.mp3`, gain 0.064). | A rising tone. | — |
 | `riser_long` | The long build-up before a reveal (HYPER RARE’s summoning too). Recorded (`riser_long.mp3`, gain 0.114). | A tone that seems to keep rising. | — |
