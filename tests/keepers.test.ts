@@ -120,16 +120,19 @@ describe('the keepers at their counters', () => {
     }
   });
 
-  it('are chibis: a big head about three fifths of the figure, wider than the shoulders under it', () => {
+  it('stand in anime proportions: a head well under half the figure, shoulders far wider than it', () => {
     const base = SHORTEST - COUNTER_H;
     for (const [id, def] of Object.entries(HUB_CAST)) {
       const L = new Layer(0, -40, 120, SHORTEST + 40);
       paintBust(L, 60, base, { look: def.look });
       const g = bustGeometry(60, base);
+      // Crown to chin is about four tenths of crown to counter (a chibi's head was three fifths), and
+      // under about half even counting the hair or hat over it.
+      const head = (g.chin - g.top + 1) / (base - g.top);
+      expect(head, id).toBeGreaterThan(0.38);
+      expect(head, id).toBeLessThan(0.48);
       const top = topRow(L);
-      const share = (g.chin - top + 1) / (base - top);
-      expect(share, id).toBeGreaterThan(0.55);
-      expect(share, id).toBeLessThan(0.66);
+      expect((g.chin - top + 1) / (base - top), id).toBeLessThan(0.53);
       const width = (y0: number, y1: number) => {
         let w = 0;
         for (let y = y0; y <= y1; y++) {
@@ -140,7 +143,28 @@ describe('the keepers at their counters', () => {
         }
         return w;
       };
-      expect(width(g.top, g.chin), id).toBeGreaterThan(width(g.chin + 6, base - 1));
+      // The shoulders under the neck are far wider than the head, hair and hoods and all.
+      expect(width(g.chin + 8, base - 1), id).toBeGreaterThan(width(g.eyeY, g.chin) * 1.25);
     }
+  });
+
+  it('blink with their eyes only, and never paint the same face twice', () => {
+    const base = SHORTEST - COUNTER_H;
+    const faces = new Set<string>();
+    for (const [id, def] of Object.entries(HUB_CAST)) {
+      const L = new Layer(0, -40, 120, SHORTEST + 40);
+      const out = paintBust(L, 60, base, { look: def.look });
+      const g = bustGeometry(60, base);
+      // Every pixel that shuts lies on the eyes' rows (lids, lashes, a flick at the corners).
+      for (const [, y] of out.blink) {
+        expect(y, id).toBeGreaterThanOrEqual(g.eyeY - 2);
+        expect(y, id).toBeLessThanOrEqual(g.eyeY + 6);
+      }
+      expect(out.blink.length, id).toBeGreaterThanOrEqual(16);
+      let face = '';
+      for (let y = g.top - 4; y <= g.chin; y++) for (let x = 44; x <= 76; x++) face += L.get(x, y) ?? '.';
+      faces.add(face);
+    }
+    expect(faces.size).toBe(Object.keys(HUB_CAST).length);
   });
 });

@@ -148,4 +148,38 @@ describe('hub', () => {
       }
     }
   });
+
+  it('stands the keepers tall, in their portraits\' style: breathing, blinking, lit from the left either way they face', () => {
+    const diff = (a: Uint8ClampedArray, b: Uint8ClampedArray) => {
+      let n = 0;
+      for (let i = 0; i < a.length; i += 4) if (a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 2] !== b[i + 2] || a[i + 3] !== b[i + 3]) n++;
+      return n;
+    };
+    const keepers = Object.entries(HUB_CAST).filter(([, def]) => def.look.tall);
+    expect(keepers.length).toBeGreaterThanOrEqual(5);
+    for (const [k, def] of keepers) {
+      const tool = HUB_TOOLS[k as keyof typeof HUB_CAST];
+      // About twice a knight's height standing (hats and staffs on top), less sitting.
+      const stand = keeperFrame(def, 'stand', 'down', 0, tool);
+      expect(stand.height, k).toBeGreaterThanOrEqual(36);
+      expect(stand.height, k).toBeLessThanOrEqual(48);
+      expect(keeperFrame(def, 'sit', 'side', 0, tool).height, k).toBeLessThan(stand.height);
+      // The idle: a breath moves the upper body; a blink changes only a few pixels (the eyes).
+      const breath = keeperFrame(def, 'stand', 'down', 4, tool);
+      expect(diff(stand.buf.px, breath.buf.px), k).toBeGreaterThan(30);
+      const blink = keeperFrame(def, 'stand', 'down', 10, tool);
+      const open = keeperFrame(def, 'stand', 'down', 9, tool);
+      const shut = diff(open.buf.px, blink.buf.px);
+      expect(shut, k).toBeGreaterThan(0);
+      expect(shut, k).toBeLessThan(20);
+      // Facing left is painted that way round, not mirrored: the light stays on the top left.
+      const right = keeperFrame(def, 'stand', 'side', 0, tool, 1);
+      const left = keeperFrame(def, 'stand', 'side', 0, tool, -1);
+      const W = right.buf.w;
+      const mirrored = new Uint8ClampedArray(right.buf.px.length);
+      for (let y = 0; y < right.buf.h; y++) for (let x = 0; x < W; x++) mirrored.set(right.buf.px.subarray((y * W + x) * 4, (y * W + x) * 4 + 4), (y * W + W - 1 - x) * 4);
+      expect(diff(mirrored, left.buf.px), k).toBeGreaterThan(20);
+      expect(left.ax, k).toBe(W - 1 - right.ax);
+    }
+  });
 });

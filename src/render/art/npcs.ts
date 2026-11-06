@@ -5,13 +5,16 @@
  * then hair, a beard, glasses and a hat are laid over the head for each view, and the extras go on:
  * a backpack, the thing in their hand, a ghost's wisp, a goblin's ears, a chicken costume's beak, and
  * a demon's tells (a little tail poking out, horn tips under the hat, a curl of smoke, red eyes).
- * Same ink outline and light from the top left as the knights. Side frames face right.
+ * Same ink outline and light from the top left as the knights. Side frames face right. (The
+ * keepers and the floors' merchant stand tall in the style of the keepers' portraits instead:
+ * art/tallFolk.ts, which npcFrame hands them to.)
  */
 import type { HatKind, NpcDef, NpcItem, NpcLook } from '../../world/npcs';
 import { blank, type PixelBuf } from '../pixel/buf';
 import { BODY_ANCHOR, BODY_ANIMS, BODY_FRAMES, BODY_H, BODY_W, type BodyFrame } from '../packs/mannequin';
 import { inkOutline, mixHex, setRGB } from './draw';
 import { OUTLINE, type View } from './knights';
+import { isTall, tallFrame, tallPortrait } from './tallFolk';
 
 /** NPC frames: the mannequin with room round it for hats, tails and things held. */
 export const NPC_W = BODY_W + 6;
@@ -422,11 +425,27 @@ function frameOf(anim: 'idle' | 'walk', view: View, frame: number): BodyFrame {
   return BODY_FRAMES[list[((frame % list.length) + list.length) % list.length]];
 }
 
+export interface NpcFrame {
+  buf: PixelBuf;
+  /** The feet. */
+  ax: number;
+  ay: number;
+  /** Already facing the `dir` asked for (a tall figure, painted that way round); else a side frame faces right. */
+  faced?: boolean;
+  /** How far it reaches above its feet (a tall figure's; else unset). */
+  height?: number;
+}
+
 /**
- * One NPC frame, facing right in side view (flip it for left). `frame` counts up freely: the body
- * cycles through its animation and the tail and smoke drift with it. The feet are at (ax, ay).
+ * One NPC frame. `frame` counts up freely: the body cycles through its animation and the tail and
+ * smoke drift with it. A side view faces right (flip it for left), except a tall figure's (the
+ * merchant's: tallFolk.ts), which comes back facing `dir` with its light still on the top left.
  */
-export function npcFrame(def: NpcDef, anim: 'idle' | 'walk', view: View, frame: number): { buf: PixelBuf; ax: number; ay: number } {
+export function npcFrame(def: NpcDef, anim: 'idle' | 'walk', view: View, frame: number, dir: 1 | -1 = 1): NpcFrame {
+  if (isTall(def.look)) {
+    const t = tallFrame(def, 'stand', view, frame, undefined, dir);
+    return { buf: t.buf, ax: t.ax, ay: t.ay, faced: true, height: t.height };
+  }
   const L = def.look;
   const f = frameOf(anim, view, frame);
   const b = blank(NPC_W, NPC_H);
@@ -487,6 +506,19 @@ export function npcFrame(def: NpcDef, anim: 'idle' | 'walk', view: View, frame: 
   if (L.demon?.smoke) smoke(b, hx, hy + (L.hat ? 0 : 2), frame);
   if (L.ghost) fade(b, 205);
   return { buf: b, ax: NPC_ANCHOR.x, ay: NPC_ANCHOR.y };
+}
+
+/**
+ * A face for a talk card or a conversation, the size of an NPC frame: their idle frame facing you, or
+ * a tall figure's head and shoulders.
+ */
+export function npcPortrait(def: NpcDef): PixelBuf {
+  return isTall(def.look) ? tallPortrait(def, NPC_W, NPC_H) : npcFrame(def, 'idle', 'down', 0).buf;
+}
+
+/** How far an NPC (hat and all) reaches above its feet, for the marker over its head. */
+export function npcHeight(f: NpcFrame): number {
+  return f.height ?? 22;
 }
 
 /** A dress or robe: the gap between the legs fills in and the hem flares a pixel. */

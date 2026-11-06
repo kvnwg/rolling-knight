@@ -36,6 +36,11 @@ export interface CampPlan {
   pieces: readonly CampPiece[];
   /** Where the keeper's feet are, in px from the plan's top-left corner. */
   stand: { x: number; y: number };
+  /**
+   * Under a roof over the counter (a stall, a yatai, a canopy): where a tall keeper (the merchant)
+   * stands instead, a step nearer the counter, so her face shows under the roof's edge.
+   */
+  tallStand?: { x: number; y: number };
 }
 
 /** A set-up pitched on a floor. */
@@ -53,6 +58,8 @@ export interface Camp {
   /** Where the keeper stands, and the spot in front of the set-up to talk to them from (world px). */
   stand: { x: number; y: number };
   talk: { x: number; y: number };
+  /** Where a tall keeper stands (the plan's tallStand, else the stand). */
+  tallStand: { x: number; y: number };
 }
 
 const piece = (kind: PropKind, x: number, y: number, solid = true): CampPiece => ({ kind, x, y, solid });
@@ -63,18 +70,18 @@ const piece = (kind: PropKind, x: number, y: number, solid = true): CampPiece =>
  * behind its keeper, its counter in front.)
  */
 export const CAMP_PLANS: Readonly<Record<BiomeId, CampPlan>> = {
-  hamlet: { rows: ['###', '#N#', '...'], pieces: [piece('stallBack', 24, 14), piece('stallFront', 24, 31)], stand: { x: 24, y: 20 } },
+  hamlet: { rows: ['###', '#N#', '...'], pieces: [piece('stallBack', 24, 14), piece('stallFront', 24, 31)], stand: { x: 24, y: 20 }, tallStand: { x: 24, y: 26 } },
   farmland: { rows: ['###', '.n.', '...'], pieces: [piece('hayCart', 17, 14), piece('produceStand', 39, 14)], stand: { x: 25, y: 25 } },
   forest: { rows: ['###', '#n#', '...'], pieces: [piece('canvasTent', 20, 14), piece('logSeat', 8, 29), piece('campfire', 40, 28)], stand: { x: 24, y: 25 } },
   tundra: { rows: ['###', '#n#', '...'], pieces: [piece('hideTent', 21, 14), piece('woodpile', 8, 29), piece('fireBowl', 40, 29)], stand: { x: 24, y: 25 } },
   dungeon: { rows: ['###', '#n#', '...'], pieces: [piece('shrineNiche', 24, 14), piece('fireBowl', 40, 29)], stand: { x: 24, y: 26 } },
   crypt: { rows: ['###', '.n.', '...'], pieces: [piece('shrineNiche', 24, 14)], stand: { x: 24, y: 26 } },
   swamp: { rows: ['###', '#n.', '...'], pieces: [piece('stiltHut', 24, 14), piece('rowboat', 10, 29)], stand: { x: 27, y: 25 } },
-  desert: { rows: ['###', '#n#', '...'], pieces: [piece('canopyBack', 24, 16), piece('rug', 24, 17, false), piece('canopyFront', 24, 30)], stand: { x: 24, y: 24 } },
+  desert: { rows: ['###', '#n#', '...'], pieces: [piece('canopyBack', 24, 16), piece('rug', 24, 17, false), piece('canopyFront', 24, 30)], stand: { x: 24, y: 24 }, tallStand: { x: 24, y: 27 } },
   graveyard: { rows: ['###', '#n#', '...'], pieces: [piece('graveGate', 24, 14), piece('stoneBench', 8, 29), piece('lanternPost', 37, 30)], stand: { x: 24, y: 25 } },
   ember: { rows: ['###', '#n#', '...'], pieces: [piece('smithCart', 20, 14), piece('anvil', 8, 29), piece('fireBowl', 40, 29)], stand: { x: 24, y: 25 } },
   crystal: { rows: ['###', '.n#', '...'], pieces: [piece('leanTo', 20, 14), piece('crystalLamp', 40, 30)], stand: { x: 23, y: 25 } },
-  shrine: { rows: ['###', '#N#', '...'], pieces: [piece('yataiBack', 24, 14), piece('yataiFront', 24, 31)], stand: { x: 24, y: 20 } },
+  shrine: { rows: ['###', '#N#', '...'], pieces: [piece('yataiBack', 24, 14), piece('yataiFront', 24, 31)], stand: { x: 24, y: 20 }, tallStand: { x: 24, y: 26 } },
 };
 
 /** Every piece kind a set-up can be built from. */
@@ -304,7 +311,8 @@ function build(m: FloorMap, plan: CampPlan, biome: BiomeId, s: Site, rng: Rng): 
   });
   for (const pc of plan.pieces) m.props.push({ kind: pc.kind, x: x0 + pc.x, y: y0 + pc.y, solid: pc.solid, seed: rng.int(0, 1 << 30) });
   const stand = { x: x0 + plan.stand.x, y: y0 + plan.stand.y };
-  return { biome, tx: s.tx, ty: s.ty, w, h, room: s.room, nook: s.carve.length > 0, stand, talk: { x: stand.x, y: (s.ty + h - 1) * TILE + 6 } };
+  const tallStand = plan.tallStand ? { x: x0 + plan.tallStand.x, y: y0 + plan.tallStand.y } : stand;
+  return { biome, tx: s.tx, ty: s.ty, w, h, room: s.room, nook: s.carve.length > 0, stand, talk: { x: stand.x, y: (s.ty + h - 1) * TILE + 6 }, tallStand };
 }
 
 /**

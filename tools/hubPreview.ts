@@ -95,16 +95,25 @@ for (const g of scene.emissive) {
   list.push({ y: g.sort + 0.01, draw: () => drawEmit(g.buf, g.x, g.y) });
 }
 const figures = [...scene.stations.filter((s) => s.def).map((s) => ({ ...s, def: s.def! })), ...scene.extras];
+/** Where the light is held to a range, as the game's cap layer does for its characters (the keepers here). */
+const capped = new Uint8Array(W * H);
 figures.forEach((f, i) => {
-  const fr = keeperFrame(f.def, f.pose, f.view, i, f.tool);
-  const flip = f.view === 'side' && f.dir < 0;
-  const ax = flip ? fr.buf.w - 1 - fr.ax : fr.ax;
+  // (Frames come back facing the way asked.)
+  const fr = keeperFrame(f.def, f.pose, f.view, i, f.tool, f.view === 'side' && f.dir < 0 ? -1 : 1);
   list.push({
     y: f.y,
     draw: () => {
-      draw(img, fr.buf, f.x - ax, f.y - fr.ay, flip);
-      mask(fr.buf, f.x - ax, f.y - fr.ay, flip);
-      if (fr.glow) drawEmit(fr.glow, f.x - ax, f.y - fr.ay, flip);
+      draw(img, fr.buf, f.x - fr.ax, f.y - fr.ay);
+      mask(fr.buf, f.x - fr.ax, f.y - fr.ay);
+      if (fr.glow) drawEmit(fr.glow, f.x - fr.ax, f.y - fr.ay);
+      if (!f.def.look.tall) return;
+      for (let y = 0; y < fr.buf.h; y++) {
+        for (let x = 0; x < fr.buf.w; x++) {
+          const X = f.x - fr.ax + x;
+          const Y = f.y - fr.ay + y;
+          if (fr.buf.px[(y * fr.buf.w + x) * 4 + 3] && X >= 0 && Y >= 0 && X < W && Y < H) capped[Y * W + X] = 1;
+        }
+      }
     },
   });
 });
@@ -234,9 +243,11 @@ for (let y = 0; y < SH; y++) {
   for (let x = 0; x < SW; x++) {
     const i = y * SW + x;
     const ai = (Math.floor(y / S) * W + Math.floor(x / S)) * 4;
-    const Lr = Math.min(1, lightR[i]) * 2;
-    const Lg = Math.min(1, lightG[i]) * 2;
-    const Lb = Math.min(1, lightB[i]) * 2;
+    // (On a keeper the light is held between 0.7 and 1.12, as the renderer's cap range.)
+    const held = (v: number) => (capped[ai / 4] ? Math.max(0.7, Math.min(1.12, v)) : v);
+    const Lr = held(Math.min(1, lightR[i]) * 2);
+    const Lg = held(Math.min(1, lightG[i]) * 2);
+    const Lb = held(Math.min(1, lightB[i]) * 2);
     let r = (img.px[ai] / 255) * Lr;
     let g = (img.px[ai + 1] / 255) * Lg;
     let b = (img.px[ai + 2] / 255) * Lb;

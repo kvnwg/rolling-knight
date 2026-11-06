@@ -14,7 +14,7 @@ import { sfx } from '../audio/sfx';
 import { CHALLENGE, floorDifficulty, squadPower } from '../core/power';
 import { squadSize } from '../core/roster';
 import type { Game } from '../game';
-import { npcFrame } from '../render/art/npcs';
+import { npcPortrait } from '../render/art/npcs';
 import { toCanvas } from '../render/art/draw';
 import { biomeForFloor } from '../world/biomes';
 import { type HubStation, type StationId } from '../world/hubWorld';
@@ -41,12 +41,12 @@ const STATION_ICON: Record<StationId, IconName> = {
   quests: 'star',
 };
 
-/** A keeper's portrait (their idle frame, facing you), as an image. */
+/** A keeper's portrait (their head and shoulders, facing you), as an image. */
 function usePortrait(st: HubStation | null): string | null {
   return useMemo(() => {
     if (!st?.def) return null;
-    const f = npcFrame(st.def, 'idle', 'down', 0);
-    return toCanvas(f.buf).toDataURL();
+    const f = npcPortrait(st.def);
+    return toCanvas(f).toDataURL();
   }, [st]);
 }
 

@@ -37,7 +37,7 @@ import { HUB_H, HUB_W } from '../world/hub';
 import { HUB_CX, HUB_STEPS_Y } from './art/hubScene';
 import type { Sky } from '../world/sky';
 import { canRebirth } from '../core/newGame';
-import { npcFrame, questMarker } from './art/npcs';
+import { npcFrame, npcHeight, questMarker } from './art/npcs';
 import { npcMarker } from '../world/npcs';
 import { pfReady, SHEETS, type SheetName } from './pf/assets';
 import { frameBuf as pfFrameBuf, frameCanvas, frameMask, haloCanvas, haloSpot, haloWidth, headTop, type Paint } from './pf/frames';
@@ -792,18 +792,25 @@ export class Renderer {
       list.push({
         y: k.y,
         draw: () => {
-          if (hub && k.def) hub.drawFigure(st, em, k, sx(k.x), sy(k.y), this.time);
-          else if (k.def) {
-            const f = npcFrame(k.def, 'idle', k.view, Math.floor(this.time * 4 + k.x));
-            const c = this.cached(`npc|${k.def.id}|${k.view}|${k.dir}|${Math.floor(this.time * 4 + k.x) % 8}`, () => toCanvas(k.dir < 0 && k.view === 'side' ? flipX(f.buf) : f.buf));
-            const ax = k.dir < 0 && k.view === 'side' ? f.buf.w - 1 - f.ax : f.ax;
-            st.drawImage(c, sx(k.x) - ax, sy(k.y) - f.ay);
+          // (A keeper's marker floats just over their head, however tall they stand.)
+          let tall = 22;
+          if (hub && k.def) {
+            hub.drawFigure(st, em, k, sx(k.x), sy(k.y), this.time, this.layers.cap.x);
+            tall = hub.figureHeight(k, this.time);
+          } else if (k.def) {
+            const fr = Math.floor(this.time * 4 + k.x);
+            const flip = k.dir < 0 && k.view === 'side';
+            const f = npcFrame(k.def, 'idle', k.view, fr, flip ? -1 : 1);
+            const turn = flip && !f.faced;
+            const c = this.cached(`npc|${k.def.id}|${k.view}|${k.dir}|${fr % 16}`, () => toCanvas(turn ? flipX(f.buf) : f.buf));
+            st.drawImage(c, sx(k.x) - (turn ? f.buf.w - 1 - f.ax : f.ax), sy(k.y) - f.ay);
+            tall = npcHeight(f);
           }
           const bob = Math.round(Math.sin(this.time * 4) * 1.5);
           const mark = this.cached(`qmark|${near === k ? 'turnIn' : 'offer'}`, () => toCanvas(questMarker(near === k ? 'turnIn' : 'offer')));
           // The Shrine calls once a rebirth is ready (from anywhere at camp, not just up close).
           const calls = k.id === 'rebirth' && canRebirth(game.state);
-          if (near === k || !k.def || calls) ui.drawImage(calls && near !== k ? this.cached('qmark|offer', () => toCanvas(questMarker('offer'))) : mark, sx(k.x) - Math.floor(mark.width / 2), sy(k.y) - (k.def ? 34 : 22) + bob);
+          if (near === k || !k.def || calls) ui.drawImage(calls && near !== k ? this.cached('qmark|offer', () => toCanvas(questMarker('offer'))) : mark, sx(k.x) - Math.floor(mark.width / 2), sy(k.y) - (k.def ? tall + 12 : 22) + bob);
         },
       });
     }
@@ -815,15 +822,18 @@ export class Renderer {
         y: n.y,
         draw: () => {
           const fr = Math.floor(n.animT * 4);
-          const f = npcFrame(n.def, 'idle', n.view, fr);
           const flip = n.dir < 0 && n.view === 'side';
-          const c = this.cached(`npc|${n.def.id}|${n.view}|${flip ? 1 : 0}|${fr % 8}`, () => toCanvas(flip ? flipX(f.buf) : f.buf));
-          st.drawImage(c, sx(n.x) - (flip ? f.buf.w - 1 - f.ax : f.ax), sy(n.y) - f.ay);
+          const f = npcFrame(n.def, 'idle', n.view, fr, flip ? -1 : 1);
+          const turn = flip && !f.faced;
+          const c = this.cached(`npc|${n.def.id}|${n.view}|${flip ? 1 : 0}|${fr % 16}`, () => toCanvas(turn ? flipX(f.buf) : f.buf));
+          st.drawImage(c, sx(n.x) - (turn ? f.buf.w - 1 - f.ax : f.ax), sy(n.y) - f.ay);
+          // The merchant, tall like the keepers, is lit within a range like the knights (post.ts).
+          if (f.faced) this.layers.cap.x.drawImage(this.cached(`npcCap|${n.def.id}|${n.view}|${flip ? 1 : 0}|${fr % 16}`, () => toCanvas(flash(f.buf))), sx(n.x) - f.ax, sy(n.y) - f.ay);
           const mk = npcMarker(n, game.state.quests ?? []) ?? (talkTo === n ? 'offer' : null);
           if (mk) {
             const bob = Math.round(Math.sin(this.time * 4 + n.x) * 1.5);
             const m = this.cached(`qmark|${mk}`, () => toCanvas(questMarker(mk)));
-            ui.drawImage(m, sx(n.x) - Math.floor(m.width / 2), sy(n.y) - 34 + bob);
+            ui.drawImage(m, sx(n.x) - Math.floor(m.width / 2), sy(n.y) - (f.faced ? npcHeight(f) + 12 : 34) + bob);
           }
         },
       });
