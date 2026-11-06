@@ -49,16 +49,19 @@ const TEAL_CLOTH: Ramp = ['#0c2a2c', '#14403e', '#1c5650', '#2a6e64', '#3a8a7a']
 
 type Keeper = keyof typeof HUB_CAST;
 
-/** How each keeper looks at their counter: what they hold, their eyes, their mood. */
+/**
+ * How each keeper looks at their counter: what they hold, their eyes (the irises' colour up close:
+ * the little hub figures keep their plain dark eyes), their mood.
+ */
 export const KEEPER_BUSTS: Partial<Record<Keeper, Omit<BustSpec, 'look'>>> = {
   oracle: { glowEyes: '#ffd84a', lashes: true, mouth: 'smile', tool: 'orbStaff' },
-  upgrades: { tool: 'wrench', mouth: 'grin', brows: 'raised' },
-  perks: { tool: 'staff', old: true, mouth: 'flat' },
-  rebirth: { tool: 'candle', lashes: true, mouth: 'smile' },
-  gate: { tool: 'spear', mouth: 'flat', brows: 'stern' },
-  smith: { tool: 'hammer', mouth: 'grin' },
-  scrap: { tool: 'magnifier', old: true, lashes: true, mouth: 'smile' },
-  squad: { tool: 'quill', lashes: true, mouth: 'smile', look2: -1 },
+  upgrades: { tool: 'wrench', mouth: 'grin', brows: 'raised', iris: '#e0902a' },
+  perks: { tool: 'staff', old: true, mouth: 'flat', iris: '#6a92c8' },
+  rebirth: { tool: 'candle', lashes: true, mouth: 'smile', iris: '#d8962a' },
+  gate: { tool: 'spear', mouth: 'flat', brows: 'stern', iris: '#b8742a' },
+  smith: { tool: 'hammer', mouth: 'grin', iris: '#5a9a4a' },
+  scrap: { tool: 'magnifier', old: true, lashes: true, mouth: 'smile', iris: '#7a9a3a' },
+  squad: { tool: 'quill', lashes: true, mouth: 'smile', look2: -1, iris: '#3a7ad8' },
 };
 
 function bustFor(k: Keeper): BustSpec {

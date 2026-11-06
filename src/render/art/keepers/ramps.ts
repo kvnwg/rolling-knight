@@ -1,6 +1,6 @@
 /**
- * The keepers' colours and line, shared by their big portraits (bust.ts) and their figures in the hub
- * and on the floors (art/tallFolk.ts): soft cel shading in five hue-shifted steps per material (cool
+ * The keepers' colours and line for their big portraits (bust.ts) and the scenes round them: soft cel
+ * shading in five hue-shifted steps per material (cool
  * shadows, warm lights) built from an NpcLook's three, and a 1 px coloured outline that leans to a deep
  * plum (never black), lighter where the edge faces the light.
  */

@@ -9,8 +9,7 @@
  * placeNpcs puts 0-2 on a floor (none on boss floors); dialogFor builds a small dialog graph for one
  * of them from the game's state (quest offers, reminders, turn-ins, gifts, the demon's unmasking);
  * applyDialogAction does the bookkeeping for a chosen line. Quests live in core/quests.ts and the art
- * in render/art/npcs.ts (every NPC is dressed on the same Snoblin mannequin as the knights; the
- * merchant, like the hub's keepers, is drawn in a style of her own: art/tallFolk.ts).
+ * in render/art/npcs.ts (every NPC is dressed on the same Snoblin mannequin as the knights).
  *
  * All text is plain ASCII with the bitmap font's punctuation (. , ! ? : ' " - ( )) so barks and
  * taunts can be drawn in the world too.
@@ -68,12 +67,6 @@ export interface NpcLook {
   beak?: boolean;
   /** A demon's tells: a tail poking out, horn tips under the hat, smoke. */
   demon?: { tail: Ramp3; horns: boolean; smoke: boolean };
-  /**
-   * Drawn as a tall figure in the keepers' anime style (render/art/tallFolk.ts) instead of on the
-   * little mannequin: the keepers and the merchant. `slim`: a slighter build, with lashes; `glow`: the
-   * eyes shine (the Oracle's, out of her hood).
-   */
-  tall?: { slim?: boolean; glow?: boolean };
 }
 
 /** A job an NPC hands out (quest text placeholders: see fillQuestText in core/quests.ts). */
@@ -835,8 +828,6 @@ export const SHOPKEEPER: NpcDef = {
     glasses: true,
     pack: ['#3a2414', '#5e3c22', '#8a5c34'],
     item: 'ledger',
-    eyes: '#4aa066',
-    tall: { slim: true },
   },
   barks: ['Wares for coin!', 'Potions! Tonics! Charms!', 'Everything must go!', 'Coin first, friend.', 'No refunds. No haggling.'],
   quests: [],

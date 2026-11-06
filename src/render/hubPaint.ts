@@ -9,10 +9,10 @@
  * instead of the window shining through the knight.
  */
 import { hubScene, type HubFigure, type HubScene, type HubStation } from '../world/hub';
-import { flash, toCanvas } from './art/draw';
+import { toCanvas } from './art/draw';
 import { keeperFrame } from './art/hubNpcs';
-import { isTall, TALL_FRAMES } from './art/tallFolk';
 import type { Light } from './lighting';
+import { flipX, type PixelBuf } from './pixel/buf';
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -50,7 +50,7 @@ export class HubPaint {
   private sprites: Array<{ x: number; y: number; sort: number; c: HTMLCanvasElement }>;
   private glows: Glow[];
   private fore: Array<{ x: number; y: number; c: HTMLCanvasElement }>;
-  private figures = new Map<string, { c: HTMLCanvasElement; glow: HTMLCanvasElement | null; cap: HTMLCanvasElement | null; ax: number; ay: number; height: number }>();
+  private figures = new Map<string, { c: HTMLCanvasElement; glow: HTMLCanvasElement | null; ax: number; ay: number }>();
   private motes: Mote[] = [];
   private spawnT: number[] = [];
 
@@ -113,38 +113,22 @@ export class HubPaint {
     return out;
   }
 
-  /**
-   * A keeper or a regular, in their pose, breathing (and blinking); clears the glow behind them. A
-   * keeper also goes on the `cap` layer, if given: like the knights, the lamps light them within a
-   * range (post.ts), so the doorway's glare doesn't burn their faces out.
-   */
-  drawFigure(st: Ctx, em: Ctx, f: HubFigure | HubStation, x: number, y: number, time: number, cap?: Ctx): void {
-    const fig = this.figure(f, time);
-    if (!fig) return;
+  /** A keeper or a regular, in their pose, breathing; clears the glow behind them. */
+  drawFigure(st: Ctx, em: Ctx, f: HubFigure | HubStation, x: number, y: number, time: number): void {
+    if (!f.def) return;
+    const frame = ((Math.floor(time * 4 + f.x * 0.37) % 8) + 8) % 8;
+    const flip = f.view === 'side' && f.dir < 0;
+    const key = `${f.def.id}|${f.pose}|${f.view}|${f.tool ?? ''}|${frame}|${flip ? 1 : 0}`;
+    let fig = this.figures.get(key);
+    if (!fig) {
+      const fr = keeperFrame(f.def, f.pose, f.view, frame, f.tool);
+      const flipBuf = (b: PixelBuf) => (flip ? flipX(b) : b);
+      fig = { c: toCanvas(flipBuf(fr.buf)), glow: fr.glow ? toCanvas(flipBuf(fr.glow)) : null, ax: flip ? fr.buf.w - 1 - fr.ax : fr.ax, ay: fr.ay };
+      this.figures.set(key, fig);
+    }
     st.drawImage(fig.c, x - fig.ax, y - fig.ay);
     this.mask(em, fig.c, x - fig.ax, y - fig.ay);
     if (fig.glow) em.drawImage(fig.glow, x - fig.ax, y - fig.ay);
-    if (cap && fig.cap) cap.drawImage(fig.cap, x - fig.ax, y - fig.ay);
-  }
-
-  /** How far a keeper reaches above where they stand (for the marker over them). */
-  figureHeight(f: HubFigure | HubStation, time: number): number {
-    return this.figure(f, time)?.height ?? 22;
-  }
-
-  private figure(f: HubFigure | HubStation, time: number) {
-    if (!f.def) return null;
-    const frame = ((Math.floor(time * 4 + f.x * 0.37) % TALL_FRAMES) + TALL_FRAMES) % TALL_FRAMES;
-    const dir = f.view === 'side' && f.dir < 0 ? -1 : 1;
-    const key = `${f.def.id}|${f.pose}|${f.view}|${f.tool ?? ''}|${frame}|${dir}`;
-    let fig = this.figures.get(key);
-    if (!fig) {
-      const fr = keeperFrame(f.def, f.pose, f.view, frame, f.tool, dir);
-      const cap = isTall(f.def.look) ? toCanvas(flash(fr.buf)) : null;
-      fig = { c: toCanvas(fr.buf), glow: fr.glow ? toCanvas(fr.glow) : null, cap, ax: fr.ax, ay: fr.ay, height: fr.height };
-      this.figures.set(key, fig);
-    }
-    return fig;
   }
 
   /** The leaves framing the front, over everything (lit with the rest). */

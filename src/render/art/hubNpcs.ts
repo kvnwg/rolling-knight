@@ -1,18 +1,16 @@
 /**
- * The hub's keepers and regulars: their looks, the tools of their trade (a smith's hammer, a tinker's
- * wrench, a priestess's candle) and their poses. The keepers are drawn in the style of their
- * portraits, about a knight's height (tallFolk.ts); the regulars are dressed on the same Snoblin mannequin as every NPC
- * (art/npcs.ts), with the poses the stock NPC frames don't have: sitting on a bench or a chair facing
- * you, and sitting at a table seen from behind. `keeperFrame` draws any of them, standing or sitting,
- * so the renderer only needs where they are and which way they face.
+ * The hub's keepers and regulars, dressed on the same Snoblin mannequin as every NPC (art/npcs.ts):
+ * their looks, the tools of their trade (a smith's hammer, a tinker's wrench, a priestess's candle)
+ * and the poses the stock NPC frames don't have: sitting on a bench or a chair facing you, and
+ * sitting at a table seen from behind. `keeperFrame` draws any of them, standing or sitting, so the
+ * renderer only needs where they are and which way they face.
  */
 import type { NpcDef, NpcLook, Ramp2, Ramp3 } from '../../world/npcs';
-import { blank, flipX, type PixelBuf } from '../pixel/buf';
+import { blank, type PixelBuf } from '../pixel/buf';
 import { BODY_ANCHOR, BODY_ANIMS, BODY_FRAMES, BODY_H } from '../packs/mannequin';
 import { inkOutline, setRGB } from './draw';
 import { OUTLINE, type View } from './knights';
 import { NPC_ANCHOR, NPC_H, NPC_W, npcFrame } from './npcs';
-import { isTall, reachOf, tallFrame } from './tallFolk';
 
 /** Where the mannequin sits inside an NPC frame (same offsets as art/npcs.ts). */
 const OX = NPC_ANCHOR.x - BODY_ANCHOR.x;
@@ -63,8 +61,7 @@ export const HUB_CAST = {
     hat: { kind: 'hood', ramp: ['#2c1640', '#4a2466', '#6e3a8e'], trim: GOLD2 },
     eyes: '#ffd84a',
     item: 'orbStaff',
-    tall: { slim: true, glow: true },
-  },['The reels never stop.', 'Fortune favors the patient. And the lucky.', 'Hm. I sense a Legendary in your future. Or soup.']),
+  }, ['The reels never stop.', 'Fortune favors the patient. And the lucky.', 'Hm. I sense a Legendary in your future. Or soup.']),
   smith: keeper('smith', 'Brannoc', 'the smith', {
     skin: SKIN.tan,
     hair: HAIR.ginger,
@@ -75,8 +72,6 @@ export const HUB_CAST = {
     pants: ['#2a2018', '#43342a', '#5e4a3a'],
     shoes: BOOTS,
     panel: { kind: 'apron', ramp: ['#5a3418', '#8a5428'] },
-    eyes: '#5a9a4a',
-    tall: {},
   }, ['Clang.', 'Shards. Gold. Hammer. Better knight.', 'Mind the sparks.']),
   scrap: keeper('scrap', 'Rusty Mags', 'junk dealer', {
     skin: SKIN.pale,
@@ -88,8 +83,6 @@ export const HUB_CAST = {
     panel: { kind: 'vest', ramp: ['#3e2a1a', '#6a4a2e'] },
     pants: ['#22304a', '#34507a', '#5076a6'],
     shoes: SHOES,
-    eyes: '#7a9a3a',
-    tall: { slim: true },
   }, ['One knight\'s spare is another knight\'s shards.', 'Everything breaks down. Eventually.', 'I buy doubles. I buy triples. I buy.']),
   squad: keeper('squad', 'Quartermaster Hilde', 'keeper of the roster', {
     skin: SKIN.light,
@@ -101,9 +94,7 @@ export const HUB_CAST = {
     shoes: BOOTS,
     hat: { kind: 'beret', ramp: ['#1a2240', '#2a3a66', '#3e5490'], trim: GOLD2 },
     item: 'ledger',
-    eyes: '#3a7ad8',
-    tall: { slim: true },
-  },['Three to a squad. No exceptions. Mostly.', 'Who\'s leading today?', 'Names, classes, boot sizes.']),
+  }, ['Three to a squad. No exceptions. Mostly.', 'Who\'s leading today?', 'Names, classes, boot sizes.']),
   upgrades: keeper('upgrades', 'Tinker Pell', 'outfitter', {
     skin: SKIN.brown,
     hair: HAIR.black,
@@ -113,8 +104,6 @@ export const HUB_CAST = {
     panel: { kind: 'apron', ramp: ['#8a7a5a', '#b8a67a'] },
     pants: ['#2a2018', '#43342a', '#5e4a3a'],
     shoes: SHOES,
-    eyes: '#e0902a',
-    tall: {},
   }, ['A gear here, a spring there...', 'Faster reels? I can do faster reels.', 'Don\'t touch that. Or do. It\'s fine.']),
   perks: keeper('perks', 'Sage Orrin', 'reader of sigils', {
     skin: SKIN.pale,
@@ -127,9 +116,7 @@ export const HUB_CAST = {
     dress: true,
     panel: { kind: 'shawl', ramp: ['#8a6a2a', '#c8a048'] },
     item: 'staff',
-    eyes: '#6a92c8',
-    tall: {},
-  },['Mm.', 'The sigils remember every rebirth.', 'Sit. Listen. The stones are talking.']),
+  }, ['Mm.', 'The sigils remember every rebirth.', 'Sit. Listen. The stones are talking.']),
   rebirth: keeper('rebirth', 'Sister Maren', 'priestess of the shrine', {
     skin: SKIN.brown,
     hair: HAIR.black,
@@ -140,8 +127,6 @@ export const HUB_CAST = {
     dress: true,
     panel: { kind: 'tabard', ramp: GOLD2 },
     hat: { kind: 'hood', ramp: ['#9a94a8', '#cfc8da', '#f4f0f8'], trim: GOLD2 },
-    eyes: '#d8962a',
-    tall: { slim: true },
   }, ['Every ending is a door.', 'Rise again, and rise stronger.', 'The flame never goes out. I check.']),
   gate: keeper('gate', 'Warden Tobb', 'keeper of the stairs', {
     skin: SKIN.dark,
@@ -155,9 +140,7 @@ export const HUB_CAST = {
     hat: { kind: 'kettle', ramp: ['#3e4450', '#6e7684', '#a4acb8'] },
     beard: 'mustache',
     item: 'spear',
-    eyes: '#b8742a',
-    tall: {},
-  },['Stairs go down. Monsters come up.', 'Mind the bottom step. It glows.', 'Back in one piece, I hope.']),
+  }, ['Stairs go down. Monsters come up.', 'Mind the bottom step. It glows.', 'Back in one piece, I hope.']),
   traveller: keeper('traveller', 'A traveller', 'resting his feet', {
     skin: SKIN.light,
     hair: HAIR.brown,
@@ -260,31 +243,17 @@ export interface KeeperFrame {
   ay: number;
   /** Pixels that glow (a candle's flame), same size as buf, or null. */
   glow: PixelBuf | null;
-  /** How far the figure (hat, staff and all) reaches above its anchor. */
-  height: number;
 }
 
 /**
- * A keeper (or a regular) in a pose, facing `dir` in a side view (-1 left). The keepers are tall
- * figures in the style of their portraits (tallFolk.ts), painted facing whichever way so their light
- * stays on the top left. A regular is the stock NPC frame (with their tool in hand): sitting facing
- * you, the upper body drops a pixel, the thighs come toward you as a wide lap row and the shoes rest
- * under it (put a bench or chair behind); sitting seen from behind, the back and the seat of the
- * trousers, the legs hidden under the table in front of them, the frame's anchor the floor under the
- * stool, 4 px below the hips (draw the stool first). `frame` counts up freely (the idle breathes, and
- * a keeper blinks).
+ * A keeper (or a regular) in a pose. Standing is the stock NPC frame (with the keeper's tool in hand).
+ * Sitting facing you: the upper body drops a pixel, the thighs come toward you as a wide lap row and
+ * the shoes rest under it (put a bench or chair behind). Sitting seen from behind: the back and the
+ * seat of the trousers, the legs hidden under the table in front of them; the frame's anchor is the
+ * floor under the stool, 4 px below the hips (draw the stool first).
+ * Side frames face right; flip for left. `frame` counts up freely (the idle breathes).
  */
-export function keeperFrame(def: NpcDef, pose: KeeperPose, view: View, frame: number, tool?: KeeperTool, dir: 1 | -1 = 1): KeeperFrame {
-  if (isTall(def.look)) {
-    const t = tallFrame(def, pose, view, frame, tool, dir);
-    return { buf: t.buf, ax: t.ax, ay: t.ay, glow: t.glow, height: t.height };
-  }
-  const fr = mannequinFrame(def, pose, view, frame, tool);
-  if (view !== 'side' || dir > 0) return fr;
-  return { ...fr, buf: flipX(fr.buf), glow: fr.glow ? flipX(fr.glow) : null, ax: fr.buf.w - 1 - fr.ax };
-}
-
-function mannequinFrame(def: NpcDef, pose: KeeperPose, view: View, frame: number, tool?: KeeperTool): KeeperFrame {
+export function keeperFrame(def: NpcDef, pose: KeeperPose, view: View, frame: number, tool?: KeeperTool): KeeperFrame {
   const look = def.look;
   const src = npcFrame(def, 'idle', view, frame).buf;
   const f = bodyFrame(view, frame);
@@ -349,5 +318,5 @@ function mannequinFrame(def: NpcDef, pose: KeeperPose, view: View, frame: number
       }
     }
   }
-  return { buf, ax, ay, glow, height: reachOf(buf, ay) };
+  return { buf, ax, ay, glow };
 }

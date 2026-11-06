@@ -17,8 +17,8 @@
  * Drawing it (what tools/hubPreview.ts does, in the shader pipeline's terms):
  *  - ground: the whole buffer to the ground layer (shadows are baked in);
  *  - stand layer, y-sorted with the walking characters: every sprite at (x - ax, y - ay); every
- *    keeper and extra with keeperFrame(def, pose, view, frame, tool, dir) from render/art/hubNpcs.ts
- *    (frames come back facing dir, -1 left in a side view), drawn at (x - ax, y - ay) like the sprites;
+ *    keeper and extra with keeperFrame(def, pose, view, frame, tool) from render/art/hubNpcs.ts
+ *    (side frames face right: flip for dir -1), drawn at (x - ax, y - ay) like the sprites;
  *  - emit layer: every glow at (x, y), in the same sorted pass at its `sort` line, cycling `frames`
  *    at `fps` when given; a character drawn after a glow (lower down, in front) should clear the
  *    glow under its own pixels (destination-out), or a window shines through whoever stands before it;

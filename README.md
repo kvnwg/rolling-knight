@@ -121,12 +121,11 @@ recording: [`docs/SOUNDS.md`](docs/SOUNDS.md).
   painted and lit in code (`src/render/art/keepers/`: the keeper's bust from their hub look, their
   trade round them, lamps, candles, coals and glowing glass in stepped pools of warm light), at a
   whole number of screen pixels per art pixel; `keepers-preview.html` shows them all.
-- The keepers (and the floors' merchant) are drawn in an anime pixel style of their own: natural
-  proportions, big eyes with a lash line and a glint, hair in locks with a band of shine, cloth in
-  soft folds, a few hue-shifted cel steps per material and a coloured outline. Up close they're busts
-  at their counters (`src/render/art/keepers/bust.ts`); in the hub and on the floors they stand about
-  a knight's height (a little under three heads tall: the hips and legs drawn short), breathing and
-  blinking, lit from the top left whichever way they face (`src/render/art/tallFolk.ts`).
+- Up close at their counters the keepers are drawn in an anime pixel style of their own
+  (`src/render/art/keepers/bust.ts`): natural proportions, big eyes with a lash line and a glint, hair
+  in locks with a band of shine, cloth in soft folds, a few hue-shifted cel steps per material and a
+  coloured outline. Out in the hub (and the merchant on the floors) they stay little chibis on the
+  same mannequin as the folk.
 
 ## The sound
 
