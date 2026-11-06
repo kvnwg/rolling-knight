@@ -883,6 +883,11 @@
   filter: drop-shadow(0 calc(2 * var(--px)) 0 rgba(26, 19, 38, 0.45)) brightness(1.08);
   opacity: 0.95;
 }
+/* Out of its slot and away from the slots: letting go takes it out of the squad. */
+.dragGhost[data-out] {
+  opacity: 0.55;
+  filter: grayscale(0.8) drop-shadow(0 calc(2 * var(--px)) 0 rgba(26, 19, 38, 0.45));
+}
 /* Empty this slot on purpose: a small x in its corner. */
 .slotX {
   position: absolute;

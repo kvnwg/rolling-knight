@@ -769,7 +769,7 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
                     </button>
                   )}
                   <div className={s.slotArt}>
-                    <DragKnight onDrop={(to) => putAt(id, to)} title="Drag onto another slot to swap">
+                    <DragKnight onDrop={(to) => putAt(id, to)} onDropOut={filled > 1 ? () => bench(slot) : undefined} title={filled > 1 ? 'Drag onto another slot to swap, or off the slots to take out of the squad' : 'Drag onto another slot to move'}>
                       <HeroArt id={id} mutation={st.roster[id]?.mutation ?? null} s={1} />
                     </DragKnight>
                     {slot === st.controlled && (

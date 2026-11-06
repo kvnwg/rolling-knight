@@ -1184,10 +1184,33 @@ interface MiniPlan {
 /** What the windows last showed, kept while the mini roller is away (so it comes back as it was). */
 const miniShown: Array<{ url: string; rim: string | null; state: string; chip: string; tier: number; gold: boolean }> = [];
 
+/**
+ * The corner roller's art pixel (CSS px) for `n` reels: the mounted size for one reel; with more,
+ * smaller, so the shrine never takes more room than the one-reel shrine does, across or down (its
+ * windows still hold whole knights, just finer). Whole device pixels, and never under one CSS pixel.
+ */
+export function miniFitU(base: number, n: number, altarOn = true, dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1): number {
+  const size = (k: number): [number, number] => {
+    if (altarOn) {
+      const l = miniLayout(k);
+      return [l.W, l.H];
+    }
+    const cols = k <= 1 ? 1 : k <= 4 ? 2 : 3;
+    const rows = k <= 2 ? 1 : 2;
+    return [miniSpan(cols, MINI.winW), miniSpan(rows, MINI.winH)];
+  };
+  const [w1, h1] = size(1);
+  const [w, h] = size(n);
+  const u = Math.min(base, (base * w1) / w, (base * h1) / h);
+  return Math.max(Math.min(base, 1), Math.floor(u * dpr + 1e-6) / dpr);
+}
+
 function MiniReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
   const countNow = () => Math.max(1, game.state.roll.current?.reels.length ?? reelCount(game.state));
   const [n, setN] = useState(countNow);
-  const [u, setU] = useState(() => readU());
+  const [uBase, setU] = useState(() => readU());
+  // More reels draw smaller: the shrine stays about the size it is with one reel.
+  const u = miniFitU(uBase, n, altarOn);
   const uRef = useRef(u);
   uRef.current = u;
   const rootRef = useRef<HTMLDivElement>(null);
