@@ -16,6 +16,7 @@
  * Variance. One roll in ten is a DOUBLE: the line gains two tiers (when it has two to go). One in
  * twenty is FREE: the gold comes back.
  */
+import { priceScale } from './economy';
 import { pickWeighted, tidyPrice, type RollRarity } from './rolls';
 import type { GameState } from './state';
 import { UPGRADES, tier, upgradeTab, type UpgradeDef, type UpgradeId } from './upgrades';
@@ -39,14 +40,14 @@ export function combatTiers(state: Pick<GameState, 'upgrades'>): number {
 }
 
 /** The price of a roll with `owned` combat tiers owned. */
-export function combatRollPriceAt(owned: number): number {
+export function combatRollPriceAt(owned: number, scale = 1): number {
   const P = COMBAT_ROLL.price;
-  return tidyPrice(P.base * Math.pow(P.growth, Math.max(0, owned)));
+  return tidyPrice(P.base * Math.pow(P.growth, Math.max(0, owned)) * scale);
 }
 
 /** What the next roll costs. */
-export function combatRollPrice(state: Pick<GameState, 'upgrades'>): number {
-  return combatRollPriceAt(combatTiers(state));
+export function combatRollPrice(state: Pick<GameState, 'upgrades'> & Partial<Pick<GameState, 'rebirths'>>): number {
+  return combatRollPriceAt(combatTiers(state), priceScale(state));
 }
 
 /** A line's weight in the roll for landing its tier `next` (1-based). */
@@ -98,12 +99,13 @@ export function canRollCombat(state: Pick<GameState, 'upgrades' | 'gold'>): bool
 }
 
 /** How many rolls the gold covers in a row (each one dearer than the last), up to `cap`. */
-export function combatRollsAffordable(state: Pick<GameState, 'upgrades' | 'gold'>, cap = 99): number {
+export function combatRollsAffordable(state: Pick<GameState, 'upgrades' | 'gold'> & Partial<Pick<GameState, 'rebirths'>>, cap = 99): number {
   let gold = state.gold;
   let owned = combatTiers(state);
   let n = 0;
+  const scale = priceScale(state);
   while (n < cap && owned < COMBAT_TIERS_MAX) {
-    const price = combatRollPriceAt(owned);
+    const price = combatRollPriceAt(owned, scale);
     if (gold < price) break;
     gold -= price;
     owned++;

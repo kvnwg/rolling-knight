@@ -142,7 +142,15 @@ export interface GameState {
 
   codex: Record<string, { count: number; best: MutationId | null; firstAt: number }>;
   records: { bestOneIn: number; bestName: string | null; bestFloorEver: number; kills: number; spins: number };
-  stats: { killsThisRun: number; goldPerMinute: number; goldWindow: Array<[number, number]> };
+  stats: {
+    killsThisRun: number;
+    goldPerMinute: number;
+    goldWindow: Array<[number, number]>;
+    /** Gold picked up in fights, all told; its last ten minutes' rate is what pays while you're away. */
+    combatGold?: number;
+    combatWindow?: Array<[number, number]>;
+    combatPerMinute?: number;
+  };
 
   settings: {
     sfx: number;

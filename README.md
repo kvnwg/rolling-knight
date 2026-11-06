@@ -171,7 +171,7 @@ as usual). `?fresh` starts a new game. The game is on
 npm test
 ```
 
-363 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
+368 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
 timing, extra reels, the start's ordinary quick spins, bad-luck protection, Lucky Spins, duplicates
 turning into gold, gold-only levels and reforging, old saves' spares cashed in, Humble Beginnings' 3x,
 rebirth; every biome's floors fully
@@ -199,13 +199,21 @@ distance, the idle's blink, deaths and revives); and the music: a track for ever
 floor, each one's file, credit and loop points, the 5 MB budget; the Dungeon: its floors valid in
 both stones, every prop drawn from the packs, its traps warning before they strike, rolled through
 untouched, hurting mobs; the packs' monsters having every animation the sim asks for, striking on
-the frame their smear lands, facing the way the sim says.
+the frame their smear lands, facing the way the sim says; the economy: every price scaling per
+rebirth, a night away paying about an hour of the fights' gold, duplicates worth a few kills.
 
 ```bash
 npx tsx tools/music.ts
 ```
 
 Checks the music files too: each one's length and loudness (with ffmpeg installed).
+
+```bash
+npm run econ -- --hours 6 --seed 1
+```
+
+The economy's pace, played out: several runs with spending, rebirths and nights away, and what each
+run took, earned, bought and owned. docs/ECONOMY.md has the design and the current results.
 
 ```bash
 npm run sim -- --minutes 40
