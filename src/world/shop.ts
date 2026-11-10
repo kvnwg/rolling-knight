@@ -3,11 +3,12 @@
  * often on the floor before a boss, to stock up). Her set-up (the biome's stall, tent or cart:
  * camps.ts) stands with its back to a wall, her wares are set out on the floor in front of it, each on
  * a little display with its price tag, and nothing spawns in the room. Walk up to a ware to buy it
- * (Game.buyWare); talk to her for a word.
+ * (Game.buyWare), or to steal it (Game.stealWare, world/thief.ts: she fights); talk to her for a word.
+ * A merchant who has heard you're a thief (you stole from one earlier this run) marks everything up.
  */
 import { BAL } from '../core/balance';
 import { Rng } from '../core/rng';
-import { RUN_ITEMS, RUN_ITEM_IDS, warePrice, type RunItemId } from '../core/runItems';
+import { RUN_ITEMS, RUN_ITEM_IDS, thiefPrice, warePrice, type RunItemId } from '../core/runItems';
 import { isBossFloor } from './biomes';
 import { pitchCamp, type Camp } from './camps';
 import { FLOOR, TILE, tileAt, type FloorMap } from './mapgen';
@@ -77,9 +78,10 @@ function pickWares(rng: Rng, n: number): RunItemId[] {
  * Sets out a shop on `map` (or none: chance, or nowhere fits). Changes the map like an NPC's set-up
  * does (its tiles blocked, its pieces added to the props) and clears the spawns from the merchant's
  * room. `killGold`: this floor's gold per kill (prices follow it). Call after placeNpcs, passing
- * their set-ups so the merchant keeps clear of them.
+ * their set-ups so the merchant keeps clear of them. `thief`: you stole from a merchant earlier this
+ * run, and word got round: her prices are a thief's (the same shop otherwise).
  */
-export function placeShop(map: FloorMap, floor: number, biomeId: string, seed: number, killGold: number, camps: readonly Camp[] = []): Shop | null {
+export function placeShop(map: FloorMap, floor: number, biomeId: string, seed: number, killGold: number, camps: readonly Camp[] = [], thief = false): Shop | null {
   const rng = new Rng(Rng.hashSeed((seed ^ Math.imul(floor, 0x51ed) ^ 0x5409) >>> 0));
   if (!rng.chance(shopChance(floor))) return null;
   const camp = pitchCamp(map, biomeId, rng.fork(1), camps);
@@ -89,7 +91,8 @@ export function placeShop(map: FloorMap, floor: number, biomeId: string, seed: n
   // The merchant's room: nothing spawns in it.
   if (camp.room >= 0) map.spawns = map.spawns.filter((s) => s.boss || s.room !== camp.room);
   const items = pickWares(rng, spots.length);
-  const wares: Ware[] = spots.map((p, i) => ({ uid: nextWareUid++, item: items[i], price: warePrice(items[i], killGold), x: p.x, y: p.y, sold: false }));
+  const price = (id: RunItemId) => (thief ? thiefPrice(warePrice(id, killGold)) : warePrice(id, killGold));
+  const wares: Ware[] = spots.map((p, i) => ({ uid: nextWareUid++, item: items[i], price: price(items[i]), x: p.x, y: p.y, sold: false }));
   const merchant = makeNpc(SHOPKEEPER, camp.stand.x, camp.stand.y, floor, biomeId, rng.int(0, 0x3fffffff));
   merchant.camp = camp;
   merchant.room = camp.room;

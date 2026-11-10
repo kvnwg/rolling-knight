@@ -482,7 +482,8 @@ export function Tutorial(props: TutorialProps) {
     const did = (a: TutAction) => !game.bot && tutorialDid(game.state.seen.tutorial, run.current, a);
     const off = game.on((e) => {
       if (e.type === 'floorStart') mem.floorAt = performance.now() / 1000;
-      if (e.type === 'bought') did('bought');
+      // (Taking a ware without paying is having been to the shop too.)
+      if (e.type === 'bought' || e.type === 'stolen') did('bought');
     });
 
     const hideAll = () => {

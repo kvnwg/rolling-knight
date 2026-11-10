@@ -77,6 +77,13 @@ export function mobMotion(m: Unit, now: number): MobMotion {
     const k = Math.min(1, rise / RISE);
     return { ...STILL, wide: Math.round(2 * k), tall: -Math.round(5 * k * amp), fade: Math.max(0.25, Math.round((1 - k) * 4) / 4) };
   }
+  const v = m.vault;
+  if (v) {
+    // A vault (a merchant over her counter): the same arc as a leap, without the afterimages.
+    const p = Math.min(1, v.t / Math.max(0.01, v.dur));
+    const lift = Math.round(v.height * 4 * p * (1 - p));
+    return { ...STILL, lift, wide: p < 0.3 || p > 0.75 ? -1 : 0, tall: p < 0.3 || p > 0.75 ? amp : 0, shadow: Math.max(0.5, 1 - (lift / Math.max(1, v.height)) * 0.5) };
+  }
   const r = m.rush;
   if (r) {
     const p = Math.min(1, r.t / Math.max(0.01, r.dur));

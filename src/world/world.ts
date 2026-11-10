@@ -17,6 +17,7 @@ import { type MobType } from './mobgen';
 import { TALK_RANGE, type HubStation } from './hubWorld';
 import { demonDeathLines, demonEnrageLines, demonMobType, demonTauntsFor, type Npc, type NpcDef } from './npcs';
 import type { Ware } from './shop';
+import { furyFalls, tickFury, type Fury } from './thief';
 import { floorPar, foeStats } from '../core/power';
 import { heroDodge, heroSpecial, heroTick } from './skills';
 import { CLEAR, skyOf, type Sky } from './sky';
@@ -36,7 +37,10 @@ export interface HeroSpec {
 }
 
 export type WorldEvent =
-  | { type: 'kill'; gold: number; elite: boolean; boss: boolean; x: number; y: number; name: string }
+  /** (`robbed`: the merchant you stole from, beaten: a boss to fight, but not the floor's.) */
+  | { type: 'kill'; gold: number; elite: boolean; boss: boolean; x: number; y: number; name: string; robbed?: boolean }
+  /** The merchant you stole from has turned: she's on the floor as a foe (thief.ts). */
+  | { type: 'fury'; name: string }
   | { type: 'pickup'; kind: Pickup['kind']; amount: number }
   | { type: 'cleared' }
   /** A boss floor's way down opened (its boss fell). */
@@ -209,6 +213,10 @@ export class World {
   phoenix = 0;
   /** An unmasked demon (fought like a boss, but it doesn't take the floor with it), and its banter clock. */
   demon: { unit: Unit; def: NpcDef; tauntT: number; enraged: boolean } | null = null;
+  /** The merchant you stole from on this floor (thief.ts): her warning, then her as a foe; it stays once she's beaten. Null: nothing stolen here. */
+  fury: Fury | null = null;
+  /** The floor's seed (what its boss would be is built from it: thief.ts). */
+  seed: number;
 
   constructor(o: WorldOptions) {
     this.camp = !!o.camp;
@@ -224,6 +232,7 @@ export class World {
     this.perks = new Set(o.perks);
     this.controlled = o.controlled;
     this.rng = new Rng(o.seed);
+    this.seed = o.seed;
     this.goldPerKill = o.goldPerKill;
     // Lone Wolf: a knight that goes down alone fights like three (the squad, if you take one, all goes).
     this.lone = this.perks.has('loneWolf') && o.squad.length === 1;
@@ -647,22 +656,29 @@ export class World {
     m.hp = 0;
     const t = m.type!;
     this.fx.push({ kind: 'death', x: m.x, y: m.y - 4, color: t.ramp[2], size: m.boss ? 3 : m.elite ? 2 : 1, src: m.boss ? 'boss' : t.plan === 'slime' ? 'slime' : undefined });
-    const gold = Math.max(1, Math.round(this.goldPerKill * (m.boss ? 25 : m.elite ? 4 : 1)));
-    this.events.push({ type: 'kill', gold, elite: !!m.elite, boss: !!m.boss, x: m.x, y: m.y, name: t.name });
+    // (A robbed merchant: a boss's fight, her purse for it, and nothing of the floor's falls with her.)
+    const robbed = this.fury?.unit === m;
+    const gold = Math.max(1, Math.round(this.goldPerKill * (robbed ? BAL.shop.thief.loot : m.boss ? 25 : m.elite ? 4 : 1)));
+    this.events.push({ type: 'kill', gold, elite: !!m.elite, boss: !!m.boss, x: m.x, y: m.y, name: t.name, ...(robbed ? { robbed } : {}) });
     onKill(this, m);
+    if (robbed) furyFalls(this, m);
     if (this.demon && this.demon.unit === m) {
       this.text(m.x, m.y - 34, this.rng.pick(demonDeathLines), '#ff9a6a', true);
       this.demon = null;
-      if (this.bossUnit === m) this.bossUnit = null;
+      // (The bar goes back to a robbed merchant, if she's still after you.)
+      if (this.bossUnit === m) this.bossUnit = this.fury?.unit && !this.fury.unit.dead ? this.fury.unit : null;
     }
     // Coins burst out and fly to the squad.
-    const coins = m.boss ? 18 : m.elite ? 6 : 2 + this.rng.int(0, 1);
+    const coins = robbed ? 30 : m.boss ? 18 : m.elite ? 6 : 2 + this.rng.int(0, 1);
     for (let i = 0; i < coins; i++) this.spawnPickup(m.x, m.y, 'gold', Math.max(1, Math.round(gold / coins)));
     const d = BAL.dungeon.drops;
     if (this.rng.chance(m.boss ? d.potionBoss : m.elite ? d.potionElite : d.potionMob)) this.spawnPickup(m.x, m.y, 'potion', 1);
-    if (m.boss) this.spawnPickup(m.x, m.y, 'hourglass', d.hourglassBoss);
+    if (m.boss && !robbed) this.spawnPickup(m.x, m.y, 'hourglass', d.hourglassBoss);
     else if (m.elite && this.rng.chance(d.hourglassElite)) this.spawnPickup(m.x, m.y, 'hourglass', 1);
-    if (m.boss && m.type?.id.startsWith('ember-')) {
+    if (robbed) {
+      this.shakeIt(5, 0.6);
+      this.hitStop = 0.2;
+    } else if (m.boss && m.type?.id.startsWith('ember-')) {
       // An unmasked demon: a big moment, but the floor's other foes don't fall with it.
       this.shakeIt(5, 0.6);
       this.hitStop = 0.2;
@@ -823,6 +839,8 @@ export class World {
     let best: Npc | null = null;
     let bd = TALK_RANGE;
     for (const n of this.npcs) {
+      // (A merchant who's just been robbed is past talking.)
+      if (this.fury?.npc === n) continue;
       const t = n.camp?.talk;
       const d = Math.min(dist(h.x, h.y, n.x, n.y), t ? dist(h.x, h.y, t.x, t.y) + 4 : Infinity);
       if (d < bd) {
@@ -927,7 +945,7 @@ export class World {
     // --- folk: they idle, and turn to face your knight when it comes close
     for (const n of this.npcs) {
       n.animT += dt;
-      if (lead && dist(lead.x, lead.y, n.x, n.y) < 60) {
+      if (lead && dist(lead.x, lead.y, n.x, n.y) < 60 && this.fury?.npc !== n) {
         n.view = 'side';
         n.dir = lead.x < n.x ? -1 : 1;
       }
@@ -947,6 +965,8 @@ export class World {
         this.shakeIt(3, 0.3);
       }
     }
+    // --- a robbed merchant: her warning, then her fury
+    if (this.fury) tickFury(this, dt);
     // --- heroes (none of it in a portal's warp: the squad holds still where the portal caught it,
     // its input and its AI waiting until it's out, its burns and timers too)
     for (const h of this.warping() ? [] : this.heroes) {

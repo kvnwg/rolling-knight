@@ -182,6 +182,11 @@ export interface Unit {
   bossT?: number;
   bossPhase?: number;
   spawnT?: number;
+  /**
+   * A jump that's only for show and takes it over what it couldn't walk through (a robbed merchant
+   * vaulting her counter: thief.ts moves her along it): from, to, seconds in and its length, its height (px).
+   */
+  vault?: { x0: number; y0: number; x1: number; y1: number; t: number; dur: number; height: number };
 }
 
 /**

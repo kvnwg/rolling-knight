@@ -41,7 +41,7 @@ const SWINGERS = new Set(['humanoid', 'ghost']);
 
 /** What a foe of this design is made of (following what the art draws it as). */
 export function materialOf(t: MobType, boss = false): Material {
-  if (t.id.includes('-demon-')) return 'flesh';
+  if (t.id.includes('-demon-') || t.id.includes('-merchant-')) return 'flesh';
   if (boss && !OWN_BOSS.has(t.plan)) return 'stone';
   const biome = t.id.split('-')[0];
   switch (t.plan) {

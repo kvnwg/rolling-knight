@@ -37,7 +37,10 @@ import { HUB_H, HUB_W } from '../world/hub';
 import { HUB_CX, HUB_STEPS_Y } from './art/hubScene';
 import type { Sky } from '../world/sky';
 import { canRebirth } from '../core/newGame';
+import { BAL } from '../core/balance';
 import { npcFrame, questMarker } from './art/npcs';
+import { dazedFrame, turningFrame } from './art/furious';
+import { furious } from '../world/thief';
 import { npcMarker } from '../world/npcs';
 import { pfReady, SHEETS, type SheetName } from './pf/assets';
 import { frameBuf as pfFrameBuf, frameCanvas, frameMask, haloCanvas, haloSpot, haloWidth, headTop, type Paint } from './pf/frames';
@@ -657,6 +660,7 @@ export class Renderer {
     // drawn there after it, the spells' bright effects and the bars, stays bright).
     this.castFx.update(w, game.state.settings.reduceMotion, dt);
     this.castFx.drawDark(ui, cx, cy, this.LW, this.LH);
+    this.drawFuryRed(ui, w, cx, cy);
     for (const a of w.areas) this.drawArea(g, ui, a, sx, sy);
     // Lunges' tells on the ground: a dash's lane, a leap's landing ring.
     for (const m of w.mobs) if (!m.dead && visible(m.x, m.y, 160)) this.drawTell(g, m, sx, sy);
@@ -760,7 +764,7 @@ export class Renderer {
     const atWare = hub ? null : w.nearWare();
     for (const wa of w.wares) {
       if (wa.sold || !visible(wa.x, wa.y)) continue;
-      list.push({ y: wa.y, draw: () => this.drawWare(st, em, ui, wa, sx, sy, wa === atWare, game.state.gold >= wa.price) });
+      list.push({ y: wa.y, draw: () => this.drawWare(st, em, ui, wa, sx, sy, wa === atWare, game.state.gold >= wa.price, !!w.fury) });
     }
     for (const m of w.mobs) {
       if (!visible(m.x, m.y)) continue;
@@ -824,6 +828,15 @@ export class Renderer {
         y: n.y,
         draw: () => {
           const fr = Math.floor(n.animT * 4);
+          if (w.fury?.npc === n) {
+            // Just robbed: red in the face and shouting, shaking harder as the warning runs out, a red "!" over her.
+            const p = Math.min(1, w.fury.t / BAL.shop.thief.turn);
+            const a = turningFrame(Math.floor(this.time * 8));
+            const shiver = p > 0.3 ? (Math.floor(this.time * 30) % 2 ? 1 : -1) : 0;
+            st.drawImage(this.cached(`fury|turn|${Math.floor(this.time * 8) % 4}`, () => toCanvas(a.buf)), sx(n.x) - a.ax + shiver, sy(n.y) - a.ay);
+            this.drawTellMark(sx(n.x), sy(n.y) - 26, p < 0.5 || Math.floor(this.time * 16) % 2 ? 1 : 0.35);
+            return;
+          }
           const f = npcFrame(n.def, 'idle', n.view, fr);
           const flip = n.dir < 0 && n.view === 'side';
           const c = this.cached(`npc|${n.def.id}|${n.view}|${flip ? 1 : 0}|${fr % 8}`, () => toCanvas(flip ? flipX(f.buf) : f.buf));
@@ -834,6 +847,20 @@ export class Renderer {
             const m = this.cached(`qmark|${mk}`, () => toCanvas(questMarker(mk)));
             ui.drawImage(m, sx(n.x) - Math.floor(m.width / 2), sy(n.y) - 34 + bob);
           }
+        },
+      });
+    }
+    // A robbed merchant, beaten: once the burst of her fall has cleared she's herself again, dazed, where she fell.
+    const fell = w.fury?.fell;
+    if (fell && w.time - fell.at > 0.45 && visible(fell.x, fell.y)) {
+      list.push({
+        y: fell.y,
+        draw: () => {
+          const fr = Math.floor(this.time * 8) % 24;
+          const a = dazedFrame(fr);
+          st.fillStyle = 'rgba(8,6,16,0.38)';
+          this.ellipse(st, sx(fell.x), sy(fell.y), 5, 2);
+          st.drawImage(this.cached(`fury|dazed|${fr}`, () => toCanvas(a.buf)), sx(fell.x) - a.ax, sy(fell.y) - a.ay);
         },
       });
     }
@@ -2090,8 +2117,53 @@ export class Renderer {
     st.globalAlpha = 1;
   }
 
-  /** A ware on its table: the ware floating over it (bobbing, glowing), its price on a tag underneath. */
-  private drawWare(st: Ctx, em: Ctx, ui: Ctx, wa: Ware, sx: (x: number) => number, sy: (y: number) => number, near: boolean, afford: boolean): void {
+  /**
+   * A robbed merchant's anger colors the light (world/thief.ts): the view goes red-ish from the moment
+   * she's stolen from, building through her warning, flashing as she turns and throbbing while she's
+   * after you, fading with her distance from the middle of the view (run far enough and it's gone).
+   */
+  private drawFuryRed(ui: Ctx, w: World, cx: number, cy: number): void {
+    const f = w.fury;
+    if (!f || f.fell || (f.unit && f.unit.dead)) return;
+    const at = f.unit ?? f;
+    const far = Math.hypot(at.x - (cx + this.LW / 2), at.y - (cy + this.LH / 2));
+    const near = Math.max(0, Math.min(1, (420 - far) / 240));
+    const rise = f.unit ? 1 : Math.min(1, f.t / BAL.shop.thief.turn);
+    const throb = f.unit ? 0.85 + 0.15 * Math.sin(this.time * 5) : 1;
+    const k = Math.round(near * rise * throb * 8) / 8;
+    if (k <= 0) return;
+    // A wash of red, thin in the middle of the view (the fight stays readable) and deepening toward
+    // its edges, in steps too fine to show as rings.
+    const W = this.LW;
+    const H = this.LH;
+    const wash = this.cached(`fury|red|${W}|${H}`, () => {
+      const c = makeCanvas(W, H) as HTMLCanvasElement;
+      const x = c.getContext('2d')!;
+      const img = x.createImageData(W, H);
+      for (let py = 0; py < H; py++) for (let px = 0; px < W; px++) {
+        const d = Math.min(1, Math.hypot((px + 0.5 - W / 2) / (W / 2), (py + 0.5 - H / 2) / (H / 2)));
+        const i = (py * W + px) * 4;
+        img.data[i] = 255;
+        img.data[i + 1] = 34;
+        img.data[i + 2] = 18;
+        img.data[i + 3] = Math.round(255 * (0.05 + 0.12 * d * d));
+      }
+      x.putImageData(img, 0, 0);
+      return c;
+    });
+    // The moment she turns it flashes, three times as deep for a blink (not with reduce motion).
+    const since = f.unit ? f.t - BAL.shop.thief.turn : -1;
+    const flare = since >= 0 && since < 0.2 && !w.calm ? 1 + 2 * (1 - Math.round((since / 0.2) * 4) / 4) : 1;
+    ui.globalAlpha = Math.min(1, k * flare);
+    ui.drawImage(wash, 0, 0);
+    ui.globalAlpha = 1;
+  }
+
+  /**
+   * A ware on its table: the ware floating over it (bobbing, glowing), its price on a tag underneath
+   * (`free`: the stall's been robbed, nobody's selling: the tag says FREE).
+   */
+  private drawWare(st: Ctx, em: Ctx, ui: Ctx, wa: Ware, sx: (x: number) => number, sy: (y: number) => number, near: boolean, afford: boolean, free = false): void {
     const x = sx(wa.x);
     const y = sy(wa.y);
     const table = this.cached('ware|table', () => toCanvas(wareTable()));
@@ -2112,6 +2184,11 @@ export class Renderer {
       em.globalAlpha = 0.35;
       em.drawImage(icon, ix, iy);
       em.globalAlpha = 1;
+    }
+    if (free) {
+      const tag = this.textCanvas('FREE', { face: 'small', fill: near ? '#fff4c0' : '#ffd86a', ink: '#1a1326' });
+      ui.drawImage(tag, x - (tag.width >> 1), y + 2);
+      return;
     }
     // The tag: a coin and the price (red while you can't afford it), on the unlit top layer.
     const tag = this.textCanvas(String(wa.price), { face: 'small', fill: afford ? (near ? '#fff4c0' : '#ffd86a') : '#ff8a7a', ink: '#1a1326' });
@@ -2243,6 +2320,12 @@ export class Renderer {
       else if (L && (m.move === 'dash' || m.move === 'charge') && m.moveX !== undefined && m.moveY !== undefined) {
         out.push({ x: sx(m.x + (m.moveX * L.reach) / 2), y: sy(m.y + (m.moveY * L.reach) / 2), r: L.reach * 0.55, color: '#ff4a3a', intensity: 0.3 });
       }
+    }
+    // A robbed merchant: her stall's light goes red as she turns, and she carries it with her while she's after you.
+    if (w.fury && !w.fury.fell) {
+      const f = w.fury;
+      const k = f.unit ? 0.75 + 0.15 * Math.sin(this.time * 5) : Math.min(1, f.t / BAL.shop.thief.turn);
+      if (furious(w) || !f.unit) out.push({ x: sx((f.unit ?? f).x), y: sy((f.unit ?? f).y) - 10, r: 90, color: '#ff3020', intensity: 0.8 * k, bloom: false });
     }
     if (!w.hub) {
       // (Brighter while it takes the squad, brightest as it flares.)

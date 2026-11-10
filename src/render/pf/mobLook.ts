@@ -15,7 +15,8 @@
  *   bosses           the Ember Depths' is the Cinderwyrm, a big slow dragon in obsidian (its embers at half HP);
  *                    the rest the Stone Warden, a forest guardian of boulders, an antlered skull and
  *                    a leafy mane, in each place's stone and leaves (autumn red at half HP); the
- *                    farm's pig, the ram, ghosts, pumpkins and the unmasked demon keep their own art
+ *                    farm's pig, the ram, ghosts, pumpkins, the unmasked demon and a robbed merchant
+ *                    (world/thief.ts) keep their own art
  *
  * Everything else (bugs, plants, pumpkins, ghosts, the farm's animals) keeps the game's sprites.
  * Colors come from the mob's design (mobgen.ts gives each type a ramp from its biome, twisted): its
@@ -79,7 +80,8 @@ export function floorOf(t: MobType): number {
 /** The monster for a mob design, or null to keep the game's own sprite. */
 export function monsterFor(t: MobType, elite: boolean, boss: boolean): MonsterId | null {
   const biome = biomeOf(t);
-  if (t.id.includes('-demon-')) return null;
+  // (And a robbed merchant is drawn as herself: art/furious.ts.)
+  if (t.id.includes('-demon-') || t.id.includes('-merchant-')) return null;
   if (boss) {
     if (['pig', 'ram', 'chicken', 'ghost', 'pumpkin', 'bug', 'plant'].includes(t.plan)) return null;
     // The Ember Depths' Cinderwyrm, the dark halls' Rook (world/mobgen.ts names him), else the Stone Warden.

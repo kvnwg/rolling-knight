@@ -4,7 +4,7 @@
  * dressed on the same Snoblin mannequin as the knights; slimes, beasts, flyers (crows on the farm),
  * plants, golems, bugs and chickens are painted from shapes at their own size (bosses at 2.2x,
  * natively, not scaled up). The farm's pig and ram are the supplied pack sprites (its boss pig wears
- * a crown).
+ * a crown). A merchant you stole from fights as herself (art/furious.ts).
  */
 import { blank, blit, flipX, type PixelBuf } from '../pixel/buf';
 import { fromIndexed, type AnimSheet } from '../pixel/indexed';
@@ -12,6 +12,7 @@ import { BODY_ANIMS, BODY_FRAMES } from '../packs/mannequin';
 import { PIG, RAM } from '../packs/farm';
 import type { MobType } from '../../world/mobgen';
 import { ball, hash, inkOutline, line, mixHex, rect, setRGB, shade } from './draw';
+import { furiousFrame } from './furious';
 import { OUTLINE, type View } from './knights';
 
 export type MobPose = 'idle' | 'walk' | 'wind' | 'strike';
@@ -615,6 +616,8 @@ function scaleFrame(m: MobFrame, k: number): MobFrame {
 
 /** A mob frame facing right. `elite` and `boss` change the size. */
 export function mobFrame(t: MobType, pose: MobPose, f: number, view: View, elite: boolean, boss: boolean): MobFrame {
+  // A robbed merchant (world/thief.ts) is herself, furious.
+  if (t.id.includes('-merchant-')) return furiousFrame(pose, f);
   const s = t.size * (elite ? 1.3 : 1) * (boss ? 1 : 1);
   switch (t.plan) {
     case 'slime':

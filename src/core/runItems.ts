@@ -3,7 +3,7 @@
  * Heals and revives help now; tonics, charms, trinkets and gear last until you head back to camp (a
  * wipe, or going up yourself), stacking when bought again. The gear (Thorn Mail, the Lucky Charm, the
  * Iron Helm, the Traveler's Boots) shows PixelForge's gear-set icons. Prices follow the floor's gold,
- * so a shop is always worth a look and never a free lunch.
+ * so a shop is always worth a look and never a free lunch (unless you steal it: world/thief.ts).
  */
 import { BAL } from './balance';
 import type { IconName } from '../ui/px';
@@ -81,9 +81,18 @@ export function runMults(items: RunItems | undefined): RunMults {
 
 /** A ware's price on `floor`: its cost in kills' worth of that floor's gold, rounded to a tidy figure. */
 export function warePrice(id: RunItemId, killGold: number): number {
-  const g = Math.max(1, RUN_ITEMS[id].cost * killGold * BAL.shop.priceMult);
+  return tidy(Math.max(1, RUN_ITEMS[id].cost * killGold * BAL.shop.priceMult));
+}
+
+/** A price tag's figure: rounded to the nearest 5, 10 or 50 as it grows. */
+function tidy(g: number): number {
   const step = g >= 1000 ? 50 : g >= 200 ? 10 : g >= 50 ? 5 : 1;
   return Math.max(step, Math.round(g / step) * step);
+}
+
+/** What a merchant charges a known thief for a ware priced `price` (world/thief.ts): BAL.shop.thief.markup on top. */
+export function thiefPrice(price: number): number {
+  return tidy(price * BAL.shop.thief.markup);
 }
 
 /** Can another of this be bought this run (stacking items stop at their max)? */

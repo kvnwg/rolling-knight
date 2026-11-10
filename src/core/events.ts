@@ -35,6 +35,12 @@ export type CoreEvent =
   | { type: 'checkpoint'; floor: number }
   /** A ware bought off a merchant's display (core/runItems.ts). */
   | { type: 'bought'; item: import('./runItems').RunItemId; price: number }
+  /** A ware taken off a merchant's display without paying (world/thief.ts); `first`: the theft that turned her on you. */
+  | { type: 'stolen'; item: import('./runItems').RunItemId; first: boolean }
+  /** The merchant you stole from comes for you: fought like a boss. */
+  | { type: 'merchantFury'; name: string }
+  /** She's beaten: what's left on her stall is yours. */
+  | { type: 'merchantDown'; name: string }
   | { type: 'wipe'; floor: number; back: number }
   | { type: 'rebirth'; count: number }
   /** This run just reached the floor a rebirth needs (once a run). */

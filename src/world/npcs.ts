@@ -211,6 +211,8 @@ export interface DialogCtx {
   cleared?: boolean;
   /** The knight doing the talking (the bard sings about them). Optional. */
   heroName?: string;
+  /** You stole from a merchant earlier this run: the next ones have heard (and charge for it). Optional. */
+  thief?: boolean;
 }
 
 // ------------------------------------------------------------------ the cast
@@ -806,7 +808,7 @@ export const NPC_DEFS: readonly NpcDef[] = [
 
 /**
  * The floors' shopkeeper (world/shop.ts): she keeps a merchant's room, wares set out in front of her
- * stall. No jobs; never one of the floor's random locals.
+ * stall. No jobs; never one of the floor's random locals. Steal from her and she fights (world/thief.ts).
  */
 export const SHOPKEEPER: NpcDef = {
   id: 'shopkeeper',
@@ -829,7 +831,7 @@ export const SHOPKEEPER: NpcDef = {
     pack: ['#3a2414', '#5e3c22', '#8a5c34'],
     item: 'ledger',
   },
-  barks: ['Wares for coin!', 'Potions! Tonics! Charms!', 'Everything must go!', 'Coin first, friend.', 'No refunds. No haggling.'],
+  barks: ['Wares for coin!', 'Potions! Tonics! Charms!', 'Everything must go!', 'Coin first, friend.', 'No refunds. No haggling.', 'Thieves get what\'s coming.'],
   quests: [],
 };
 
@@ -1268,13 +1270,34 @@ function turnInGraph(s: S, q: Quest): Graph {
 
 type Script = (s: S) => void;
 
+/** A salt that changes each time you've talked to them (a different line on a second visit). */
+const talksSalt = (s: S): number => 3 + s.npc.talkedTo;
+
 const SCRIPTS: Record<string, Script> = {
   shopkeeper(s) {
+    // Word of a theft travels (world/thief.ts): she's heard, and it's on the tags.
+    if (s.ctx.thief) {
+      s.node(
+        'start',
+        s.pick(
+          [
+            'Oh, it\'s you. We merchants talk, you know. Half again on every tag, for the trouble. And I\'m watching your hands.',
+            'I know that face: the thief. Prices are up by half, for you. Touch nothing you haven\'t paid for.',
+          ],
+          talksSalt(s),
+        ),
+        bye('Fair enough.'),
+      );
+      return;
+    }
     s.node(
       'start',
       s.open(
-        ['Madame Thrift, travelling merchant. Walk up to anything you fancy: the price is on the tag.', 'Coin for wares, friend! Potions, tonics, charms. Step up to the one you want.'],
-        ['Back for more? Step right up to the counter.', 'Still browsing? The tags don\'t bite.'],
+        [
+          'Madame Thrift, travelling merchant. Walk up to anything you fancy: the price is on the tag. Pay first, mind. Thieves get what\'s coming.',
+          'Coin for wares, friend! Potions, tonics, charms. Step up to the one you want. And no sticky fingers: thieves get what\'s coming.',
+        ],
+        ['Back for more? Step right up to the counter.', 'Still browsing? The tags don\'t bite. I do, if anything walks off.'],
       ),
       bye('Just looking.'),
     );

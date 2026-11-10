@@ -139,6 +139,12 @@ export const BAL = {
     chanceBeforeBoss: 0.85,
     /** Wares on the counter. */
     wares: 3,
+    /**
+     * Stealing (world/thief.ts): a robbed merchant fights with `might` times the HP and the hit of the
+     * boss this floor would have, after `turn` seconds of warning; beating her pays `loot` kills' worth
+     * of gold (a few wares' price). For the rest of the run, other merchants charge a thief `markup`.
+     */
+    thief: { might: 3, turn: 0.9, loot: 60, markup: 1.5 },
   },
   dungeon: {
     /** Progress is saved every this many floors: a wipe on floor 25 sends the squad back to floor 20. */

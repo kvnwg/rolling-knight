@@ -24,7 +24,9 @@ dumpster, made magic: the same jolt, launch and fall, with a flash, a ring of li
 the altar starts to roll. You start on ordinary rolls: no scripted finds. Rebirth
 for permanent luck and power; perks from the first rebirth change how a run plays. Folk on the floors
 keep a set-up of their own off the fighting (a market stall, a tent by a campfire, a candlelit shrine)
-and hand out jobs, and one of them may be a demon in disguise.
+and hand out jobs, and one of them may be a demon in disguise. Now and then a floor has a merchant,
+Madame Thrift, her wares for this run set out in front of her stall: buy them, or steal one and she
+comes for you herself, three times as strong as the floor's boss would be.
 
 How every system works, with its numbers: [`DESIGN.md`](DESIGN.md). Art sources and licenses:
 [`CREDITS.md`](CREDITS.md). Every sound by name, when it plays, and how to replace it with a
@@ -64,8 +66,9 @@ recording: [`docs/SOUNDS.md`](docs/SOUNDS.md).
   swing with PixelForge's white trails (Rook's are blood red). The slimes (a green blob with a face) and the undead of the dark
   biomes (a skeleton with a sword, one with a scythe and a robed vampire, their attacks with their
   own slash smears) come from supplied packs, side views turned to face their targets, played by the
-  same sim-driven animator. The farm's animals, ghosts, pumpkins, bugs, plants, casters and the
-  demon keep the game's own sprites (built on Snoblin's prototype mannequin or painted from shapes).
+  same sim-driven animator. The farm's animals, ghosts, pumpkins, bugs, plants, casters, the
+  demon and a merchant you've robbed (her own chibi, red in the face and twice the size) keep the
+  game's own sprites (built on Snoblin's prototype mannequin or painted from shapes).
 - Attacks are drawn by code on the pixel grid (`src/render/vfx/`). The melee knights swing solid
   white smears in the classic pixel-art way: on the hit, one wedge sweeps from behind the head far
   out in front to a crisp point, then a thin streak, then it's gone (the Guardian's a heavy chop, the
