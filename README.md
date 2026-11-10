@@ -1,4 +1,6 @@
-# Rolling Knight
+# Roll a Knight!: Idle RPG
+
+(The repository, the package and the save keep the working title, `rolling-knight`.)
 
 A top-down (3/4 view) pixel action roguelite with a rolling game on top, in the style of Dumpster
 Legend. A free Summoning Altar rolls knights forever; you field a squad of three in endless,
@@ -30,6 +32,9 @@ keep a set-up of their own off the fighting (a market stall, a tent by a campfir
 and hand out jobs, and one of them may be a demon in disguise. Now and then a floor has a merchant,
 Madame Thrift, her wares for this run set out in front of her stall: buy them, or steal one and she
 comes for you herself, three times as strong as the floor's boss would be.
+
+Publishing on CrazyGames (the build, the SDK, the covers, the trailer, the listing):
+[`crazygames/README.md`](crazygames/README.md).
 
 How every system works, with its numbers: [`DESIGN.md`](DESIGN.md). Art sources and licenses:
 [`CREDITS.md`](CREDITS.md). Every sound by name, when it plays, and how to replace it with a
@@ -212,7 +217,7 @@ brackets mark it), or drag from the Attack button to aim by hand like a second s
 button, named for your class's dash, and the others do the rest. Your other two knights attack on
 their own whenever something is in range (and yours too, on Auto attack).
 
-Dev shortcuts by URL: `?floor=16` starts on that floor with a ready squad, `&squad=mythic` sets its
+Dev shortcuts by URL (off in the CrazyGames build, except on localhost): `?floor=16` starts on that floor with a ready squad, `&squad=mythic` sets its
 rarity, `&classes=arcanist,guardian,cleric` its classes, `&auto` hands your knight to a dev bot
 that plays by itself (moving and dodging too), `&gold=100000`;
 `&camp` stays at the hub and `&hub` skips choosing a knight, `&sky=rain` (or `clear`, `overcast`) sets
@@ -226,7 +231,7 @@ as usual). `?fresh` starts a new game. The game is on
 npm test
 ```
 
-460 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
+535 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
 timing, extra reels, the start's ordinary quick spins, bad-luck protection, Lucky Spins, repeat pulls
 kept as extras at the worth they landed with and sold (one knight's, all at once, or with the knight
 at the Warden's) without touching the knight, old saves' spares cashed in and extras mended,
@@ -261,7 +266,10 @@ both stones, every prop drawn from the packs, its traps warning before they stri
 untouched, hurting mobs; the packs' monsters having every animation the sim asks for, striking on
 the frame their smear lands, facing the way the sim says; the economy: every price scaling per
 rebirth, a night away paying about an hour of the fights' gold and landing every pull (repeats as
-extras at a share of their worth), a repeat's extra worth a few kills.
+extras at a share of their worth), a repeat's extra worth a few kills; and the portal: what
+CrazyGames' SDK is told and when, an ad holding the game and its sound only while it lasts, saves
+on the player's account with the browser to fall back on, where an ad break falls (after a boss
+floor, after a wipe, nowhere else) and the two rewards for watching one.
 
 ```bash
 npx tsx tools/music.ts
@@ -319,11 +327,22 @@ npm run build
 npm run build:artifact
 ```
 
+```bash
+npm run build:crazygames
+```
+
 The second writes `artifact/rolling-knight.html`, one page with the fonts, art and code inlined
 (about 3 MB), and the music and sounds beside it as files of their own (the page asks for each next
 to itself), with `artifact/files.json` mapping each published name to its file for the artifact's
 `files`. A playable copy is published as a claude.ai artifact:
 https://claude.ai/artifact/3h8iQEex8H8z78bq9GtUSQ (saves live in that page's browser storage).
+
+The third builds the game for CrazyGames with the portal's SDK on the page (`dist-crazygames/`),
+checks it against the portal's limits and zips it for upload
+(`crazygames/build/roll-a-knight-crazygames.zip`); `npm run dev:crazygames` runs that build's code
+on localhost, where the SDK stands in for the portal. The portal code is `src/platform/`; with no
+SDK on the page (every other build) it does nothing. [`crazygames/README.md`](crazygames/README.md)
+has the rest.
 
 ## Packs
 

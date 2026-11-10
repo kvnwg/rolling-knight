@@ -1,4 +1,4 @@
-# Rolling Knight: how it works
+# Roll a Knight!: Idle RPG, how it works
 
 A top-down (3/4 view) pixel action roguelite with a rolling game on top. A free altar rolls knights
 forever; you field a squad of three in endless procedural dungeons, control one, and the other two
@@ -374,3 +374,20 @@ fight income runs on too.
 
 The start: ordinary rolls, no scripted finds and no gift to hook you; the first spins are just quick
 (1.6 s) until you have three knights for a squad.
+
+## 11. On a portal (CrazyGames)
+
+`src/platform/`. The CrazyGames build (`npm run build:crazygames`) has the portal's SDK on the page;
+no other build does, and without it none of this exists for the player.
+
+- **Saves** go to the SDK's data module (the player's CrazyGames account, on every device), under
+  the same key as everywhere else; the browser's storage is the fallback if the module is off.
+- **Ad breaks** (`break` events, `src/game.ts`): with the screen black after a boss floor's portal,
+  and as the hub comes up after a wipe. Not in a player's first four minutes, and never anywhere
+  else. The game is paused from the ask until the ad is over; its sound goes only while one plays.
+- **Rewards for watching an ad**, both optional and both away from the fight:
+  - the welcome back's GOLD x2: the squad's gold from the time away, paid once more;
+  - the Oracle's Favour, in the Luck sheet at the hub: a Luck Potion (as if one had dropped; it
+    adds to one that's running), once every 10 minutes.
+- The portal's mute switch silences the game above its own volume sliders; its device type (not
+  the browser's touch support) decides between touch controls and keyboard hints.

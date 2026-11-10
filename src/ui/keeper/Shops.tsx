@@ -41,6 +41,7 @@ import { artPx, OddsChip } from '../KnightCard';
 import { Codex } from '../panels';
 import { coinFly } from '../fx/coinFly';
 import { DragKnight } from './DragKnight';
+import { touchUi } from '../../platform/portal';
 
 /** A rarity's color made dark enough to read on paper. */
 function inkOf(c: string): string {
@@ -636,7 +637,6 @@ function extrasLine(n: number): CardLine[] {
  * mutation) on its own tab; DESCEND at the foot. Everything to do with your knights happens here.
  */
 /** A touch screen: knights are picked up by holding them (a swipe scrolls). */
-const TOUCH_UI = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
 /** A phone, or any screen too short to show the counter's slots and a list of knights at once. */
 const COMPACT = '(max-width: 599px), (max-height: 800px)';
@@ -869,7 +869,7 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
       <ShopHint>
         {tab === 'squad' ? (
           <>
-            {TOUCH_UI ? (
+            {touchUi() ? (
               <>
                 <b>Hold</b> a knight, then drag it onto a slot (or tap <b>ADD TO SQUAD</b>). <b>LEAD</b> is the one you play.
               </>
@@ -955,7 +955,7 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
                     level={`Lv ${rec.level}`}
                     levelRight={<ClassTag cls={def.cls} short />}
                     art={
-                      <DragKnight onDrop={(to) => putAt(id, to)} title={TOUCH_UI ? 'Hold, then drag onto a squad slot' : 'Drag onto a squad slot'}>
+                      <DragKnight onDrop={(to) => putAt(id, to)} title={touchUi() ? 'Hold, then drag onto a squad slot' : 'Drag onto a squad slot'}>
                         <HeroArt id={id} mutation={rec.mutation} s={1} />
                       </DragKnight>
                     }

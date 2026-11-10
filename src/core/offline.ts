@@ -23,6 +23,8 @@ export interface OfflineReport {
   extras: number;
   /** The squad's fight gold while away (in the purse already). */
   gold: number;
+  /** That gold has been paid a second time (Game.doubleAway: the welcome back's reward for an ad). */
+  doubled?: boolean;
 }
 
 export function offlineEfficiency(state: GameState): number {

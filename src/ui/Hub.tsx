@@ -26,8 +26,8 @@ import { Px, type IconName } from './px';
 import { uiSound } from './sound';
 import { TopBar } from './TopBar';
 import { RebirthPill } from './RebirthPill';
+import { touchUi } from '../platform/portal';
 
-const touch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
 const STATION_ICON: Record<StationId, IconName> = {
   altar: 'reelGold',
@@ -139,7 +139,7 @@ export function HubHud({ game, onTalk, onSettings, onLuck }: { game: Game; onTal
               <Chunky text={STATION_WORD[near.id]} size={9} grad={STATION_GRAD[near.id]} />
               <span className="tp-name">{near.name}</span>
             </span>
-            {!touch && <kbd className="tp-key">E</kbd>}
+            {!touchUi() && <kbd className="tp-key">E</kbd>}
           </button>
         </div>
       ) : null}
@@ -196,7 +196,7 @@ export function TitleScreen({ game, onPlay }: { game: Game; onPlay: () => void }
   return (
     <div className="char-select title-screen">
       <div className="cs-title">
-        <Chunky text="ROLLING KNIGHT" size={14} grad="gold" />
+        <Chunky text="ROLL A KNIGHT!" size={14} grad="gold" />
         <span className="lead outlined">{fresh ? 'Roll your knights. Delve the dark. Come back stronger.' : `Best floor ${s.records.bestFloorEver}${s.rebirths ? ` · Rebirth ${s.rebirths}` : ''}`}</span>
       </div>
       <button className="btn gold big breathe ts-play" onClick={play}>

@@ -14,8 +14,9 @@ import { sfx } from '../audio/sfx';
 import type { CoreEvent } from '../core/events';
 import { knightDef } from '../core/knights';
 import { RARITY_COLOR } from '../core/rarity';
-import { devGame } from '../dev';
-import { createControls } from '../input/input';
+import { devFlags, devGame } from '../dev';
+import { portal } from '../platform/portal';
+import { createControls, keyOf } from '../input/input';
 import { Renderer } from '../render/renderer';
 import { Chunky, HeroArt, type Grad } from './common';
 import { DungeonHud } from './DungeonHud';
@@ -54,6 +55,21 @@ export interface Banner {
 let nextId = 1;
 
 /**
+ * No ad break in a player's first minutes (CrazyGames' advice: let them get into the game first).
+ * After that every break is offered to the portal, which shows an ad at most every few minutes.
+ */
+const FIRST_AD_AFTER_MS = 4 * 60_000;
+
+/**
+ * How far through the game a player is (0 to 100), for the portal: the dungeon has twelve places of
+ * five floors each, and the first trip through all of them (floor 60) is everything there is to see.
+ * The deepest floor ever reached counts (a rebirth starts the floors again, not the record).
+ */
+function completion(bestFloorEver: number): number {
+  return Math.min(100, (Math.max(0, bestFloorEver - 1) / 59) * 100);
+}
+
+/**
  * CSS px per art pixel for the UI: about 130 art pixels across a phone (so text and buttons are big
  * enough to read and tap: 3 CSS px a pixel on a 393 px wide phone), about 180 on a desktop's short
  * side, capped for big screens.
@@ -78,7 +94,7 @@ export function App() {
   const [talking, setTalking] = useState<Npc | null>(null);
   const talkRef = useRef(talking);
   talkRef.current = talking;
-  const [picked, setPicked] = useState(game.inDungeon || location.search.includes('hub'));
+  const [picked, setPicked] = useState(game.inDungeon || devFlags().has('hub'));
   /** A new game's opening: from black onto the Oracle's sealed altar (the tutorial's line waits for it). */
   const [intro, setIntro] = useState(false);
   const [detail, setDetail] = useState<string | null>(null);
@@ -132,7 +148,9 @@ export function App() {
       // device pixels; its text comes down less, never under about 10 px.
       const phone = Math.min(window.innerWidth, window.innerHeight) < 600;
       const k = window.innerHeight < 680 ? 0.62 : 0.7;
-      const hudPx = phone ? Math.max(1.5, Math.round(uiPx() * k * dpr) / dpr) : uiPx();
+      // (On a screen of one device pixel per CSS pixel, a small desktop frame rather than a phone, a
+      // pixel and a half would smear: two whole ones there.)
+      const hudPx = phone ? Math.max(dpr < 1.5 ? 2 : 1.5, Math.round(uiPx() * k * dpr) / dpr) : uiPx();
       const hudFpx = phone ? Math.max(hudPx, Math.round(uiPx() * 0.82 * dpr) / dpr) : uiPx();
       document.documentElement.style.setProperty('--hud-px', `${hudPx}px`);
       document.documentElement.style.setProperty('--hud-fpx', `${hudFpx}px`);
@@ -179,6 +197,8 @@ export function App() {
           break;
         }
         case 'floorStart':
+          portal.context({ floor: e.floor, biome: e.biome, rebirths: game.state.rebirths });
+          portal.progress(completion(game.state.records.bestFloorEver));
           if (game.inDungeon) {
             show({ title: e.boss ? `BOSS FLOOR ${e.floor}` : `FLOOR ${e.floor}`, sub: e.biome, grad: e.boss ? 'red' : 'gold' });
             const scene = e.boss ? 'boss' : music.sceneFor(e.biome);
@@ -193,6 +213,13 @@ export function App() {
           break;
         case 'bossDown':
           show({ title: 'BOSS DEFEATED', sub: e.first && game.state.rebirths > 0 ? '+1 Sigil' : undefined, grad: 'gold' });
+          // (A boss beaten for the first time this run: the portal celebrates with it.)
+          if (e.first) portal.happytime();
+          break;
+        case 'break':
+          // The screen is black between two stretches of play: the portal may show an ad. The game
+          // waits while it asks and while one plays (the loop pauses on portal.busy).
+          if (game.state.playTimeMs > FIRST_AD_AFTER_MS) void portal.ad('midgame');
           break;
         case 'bought':
           toast({ text: `Bought ${RUN_ITEMS[e.item].name}: ${RUN_ITEMS[e.item].short.toLowerCase()}`, color: '#ffcf4a' });
@@ -232,6 +259,7 @@ export function App() {
         case 'rebirth':
           show({ title: `REBIRTH ${e.count}`, sub: 'Luck, gold and power up for good', grad: 'gold' });
           setStation(null);
+          portal.happytime();
           break;
         case 'rebirthReady':
           // The moment a rebirth opens up: a fanfare, the call, and what it brings.
@@ -283,7 +311,8 @@ export function App() {
       // knight outright in a fight: it moves, dodges, fights and goes down when the floor is done;
       // steering or attacking yourself takes over for as long as you do. A sheet open only aims and
       // attacks for you. The dev bot (?auto, the sim) never lets go.
-      game.paused = revealRef.current.length > 0 || talkRef.current !== null || titleRef.current || campAskRef.current;
+      // (So does an ad: from the moment the portal is asked for one until it's over.)
+      game.paused = revealRef.current.length > 0 || talkRef.current !== null || titleRef.current || campAskRef.current || portal.busy;
       if (w) {
         const autoBattle = game.inDungeon && game.state.settings.autoPlay && !(c.mx || c.my || c.attack);
         w.auto = game.state.settings.autoPlay || sheetRef.current;
@@ -360,7 +389,7 @@ export function App() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const k = e.key.toLowerCase();
+      const k = keyOf(e);
       if (k === 'escape') {
         // (A keeper's own overlays, the upgrade map and the details popups, take Esc first.)
         if (sheetRef.current) {
@@ -411,7 +440,7 @@ export function App() {
   // G at a merchant's ware: steal it (the first press asks, the second does it; world/thief.ts).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() !== 'g' || e.repeat || !game.inDungeon || sheetRef.current || talkRef.current) return;
+      if (keyOf(e) !== 'g' || e.repeat || !game.inDungeon || sheetRef.current || talkRef.current) return;
       const ware = game.world?.nearWare();
       if (!ware) return;
       const r = game.reachForWare(ware);
@@ -420,6 +449,11 @@ export function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [game]);
+
+  // The portal hears when the player is playing and when they're on a break: the title, Settings,
+  // the question before leaving for camp, the welcome back. (Not when the tab loses focus: it knows.)
+  const onBreak = choosing || settings || campAsk || (offline !== null && picked);
+  useEffect(() => portal.gameplay(!onBreak), [onBreak]);
 
   const inDungeon = game.inDungeon;
   // In a fight you steer with the mouse, the game's crosshair stands in for the pointer.
@@ -532,7 +566,9 @@ export function App() {
       {luck && <LuckSheet game={game} onClose={() => setLuck(false)} />}
       {reveals.length > 0 && <Reveal key={reveals.length + ':' + reveals[0].knightId} item={reveals[0]} calm={game.state.settings.reduceMotion} onDone={() => (uiSound('tap'), setReveals((r) => r.slice(1)))} />}
       {/* Back after time away: not over the title (that opens the game), but once you've pressed PLAY. */}
-      {offline && picked && !intro && <WelcomeBack report={offline} onClose={() => setOffline(null)} />}
+      {offline && picked && !intro && <WelcomeBack game={game} report={offline} onClose={() => setOffline(null)} />}
+      {/* An ad is being fetched or is playing: nothing in the game can be pressed until it's over. */}
+      {portal.busy && <div className="ad-wait" aria-hidden />}
     </>
   );
 }

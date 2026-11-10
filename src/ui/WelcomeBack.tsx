@@ -3,9 +3,12 @@
  * long you were gone, then what the altar rolled meanwhile laid out tier by tier, rarest first, each
  * with its own icon, how many, a bar for how many next to the rest, and how many of them are new;
  * the best find standing in its rarity's little scene; the gold your squad brought back and the
- * repeats kept as extras. COLLECT puts it away.
+ * repeats kept as extras. COLLECT puts it away. On a portal with rewarded ads there's a second button
+ * the same size beside it: the squad's gold twice over, for watching one (once per report).
  */
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import type { Game } from '../game';
+import { portal } from '../platform/portal';
 import type { OfflineReport } from '../core/offline';
 import { RARITIES, RARITY_COLOR, RARITY_NAME, rarityIndex, type Rarity } from '../core/rarity';
 import { CLASSES, knightDef } from '../core/knights';
@@ -42,7 +45,7 @@ function bestFind(report: Pick<OfflineReport, 'kept'>): OfflineReport['kept'][nu
   return best;
 }
 
-export function WelcomeBack({ report, onClose }: { report: OfflineReport; onClose: () => void }) {
+export function WelcomeBack({ game, report, onClose }: { game: Game; report: OfflineReport; onClose: () => void }) {
   const lines = tally(report);
   const most = Math.max(1, ...lines.map((l) => l.n));
   const best = bestFind(report);
@@ -52,8 +55,20 @@ export function WelcomeBack({ report, onClose }: { report: OfflineReport; onClos
     uiSound('collect', 3);
     onClose();
   };
+  // The gold again for watching an ad: an offer beside COLLECT, never in its way.
+  const [ad, setAd] = useState<'idle' | 'wait' | 'none'>('idle');
+  const canDouble = portal.rewards && report.gold > 0 && !report.doubled;
+  const double = async () => {
+    if (ad === 'wait') return;
+    setAd('wait');
+    const outcome = await portal.ad('rewarded');
+    if (outcome === 'done') {
+      game.doubleAway(report);
+      collect();
+    } else setAd(outcome === 'none' ? 'none' : 'idle');
+  };
   return (
-    <div className="modal" onPointerDown={(e) => e.target === e.currentTarget && collect()}>
+    <div className="modal" onPointerDown={(e) => e.target === e.currentTarget && ad !== 'wait' && collect()}>
       <div className="sheet wb-sheet">
         <div className="hero-banner">
           <Chunky text="WELCOME BACK" size={10} grad="gold" />
@@ -107,9 +122,24 @@ export function WelcomeBack({ report, onClose }: { report: OfflineReport; onClos
             </span>
           )}
         </div>
-        <button className="btn gold big" onClick={collect}>
-          COLLECT
-        </button>
+        {canDouble ? (
+          <div className="wb-collect">
+            <button className="btn gold big" onClick={collect} disabled={ad === 'wait'}>
+              COLLECT
+            </button>
+            <button className="btn gold big" onClick={double} disabled={ad === 'wait'}>
+              <span>
+                GOLD ×2
+                <span className="sub">watch an ad</span>
+              </span>
+            </button>
+          </div>
+        ) : (
+          <button className="btn gold big" onClick={collect}>
+            COLLECT
+          </button>
+        )}
+        {ad === 'none' && <span className="lead outlined wb-noad">No ad to show right now. Try again in a little while.</span>}
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 /**
- * Saves live in localStorage as JSON. A save that fails to load is kept under a rescue key instead
- * of being thrown away, and anything missing from an older save is filled in from a new game.
+ * Saves live in localStorage as JSON (or, on a portal, in the store it gives: setSaveStore). A save
+ * that fails to load is kept under a rescue key instead of being thrown away, and anything missing
+ * from an older save is filled in from a new game.
  */
 import { cleanDeck, isDesign, shuffleDeck } from './deck';
 import { newGame } from './newGame';
@@ -15,7 +16,26 @@ import { sanitizeUpgrades } from './upgrades';
 export const SAVE_KEY = 'rolling-knight-save';
 const RESCUE_KEY = 'rolling-knight-rescue';
 
-function storage(): Storage | null {
+/** Somewhere to keep a save: localStorage's own shape, so anything with these three will do. */
+export interface SaveStore {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+}
+
+let store: SaveStore | null = null;
+
+/**
+ * Keeps saves in `to` instead of the browser's localStorage: a portal's own storage, tied to the
+ * player's account and synced across their devices (platform/crazygames.ts). Null: localStorage again.
+ * Set before the game is made (the Game loads its save as it starts).
+ */
+export function setSaveStore(to: SaveStore | null): void {
+  store = to;
+}
+
+function storage(): SaveStore | null {
+  if (store) return store;
   try {
     return typeof localStorage !== 'undefined' ? localStorage : null;
   } catch {
@@ -109,12 +129,21 @@ function mendDeck(out: GameState, saved: Partial<GameState['run']> | undefined):
 
 export function loadGame(): GameState | null {
   const st = storage();
-  const text = st?.getItem(SAVE_KEY);
+  let text: string | null | undefined;
+  try {
+    text = st?.getItem(SAVE_KEY);
+  } catch {
+    return null;
+  }
   if (!text) return null;
   try {
     return mend(JSON.parse(text));
   } catch {
-    st?.setItem(RESCUE_KEY, text);
+    try {
+      st?.setItem(RESCUE_KEY, text);
+    } catch {
+      // Nowhere to keep it: a new game all the same.
+    }
     return null;
   }
 }
@@ -131,7 +160,11 @@ export function saveGame(state: GameState): void {
 }
 
 export function clearSave(): void {
-  storage()?.removeItem(SAVE_KEY);
+  try {
+    storage()?.removeItem(SAVE_KEY);
+  } catch {
+    // Storage blocked: nothing to clear.
+  }
 }
 
 /**

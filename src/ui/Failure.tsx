@@ -25,7 +25,7 @@ function panel(message: string): HTMLElement {
   const box = document.createElement('div');
   box.className = 'boot-fail';
   const title = document.createElement('b');
-  title.textContent = "Rolling Knight couldn't start";
+  title.textContent = "Roll a Knight! couldn't start";
   const what = document.createElement('code');
   what.textContent = message;
   const where = document.createElement('small');

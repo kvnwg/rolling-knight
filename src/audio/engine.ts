@@ -133,12 +133,17 @@ function leadIn(buf: AudioBuffer): number {
   return first === max ? 0 : first / buf.sampleRate;
 }
 
+/** The master level when nothing has muted the game. */
+const MASTER_GAIN = 0.9;
+
 class Engine {
   graph: Graph | null = null;
   readonly rnd = makeRnd(0x5eed);
   private builders: Array<(g: Graph) => void> = [];
   private sfxVol = 0.7;
   private musicVol = 0.5;
+  /** Silenced from outside the game (a portal's mute switch, an ad playing): above both volumes. */
+  private muted = false;
   private recs = new Map<string, Recording>();
   private loading: Promise<void> | null = null;
   private loaded = false;
@@ -196,6 +201,23 @@ class Engine {
     this.musicVol = clamp01(v);
     const g = this.graph;
     if (g) g.music.gain.setTargetAtTime(this.musicVol * this.musicVol, g.ctx.currentTime, 0.1);
+  }
+
+  /**
+   * Silences everything (or lets it sound again), whatever the volume sliders say: for the portal's
+   * own mute switch and for the length of an ad. The game's volumes are untouched underneath.
+   */
+  setMuted(on: boolean): void {
+    this.muted = on;
+    const g = this.graph;
+    if (!g) return;
+    // (A silence drop on its way back up would bring the sound back with it.)
+    g.master.gain.cancelScheduledValues(g.ctx.currentTime);
+    g.master.gain.setTargetAtTime(on ? 0 : MASTER_GAIN, g.ctx.currentTime, 0.03);
+  }
+
+  get isMuted(): boolean {
+    return this.muted;
   }
 
   get sfxVolume(): number {
@@ -335,11 +357,11 @@ class Engine {
   /** Silence drop: everything cut for a beat (right before a big reveal). */
   silenceDrop(seconds = 0.2): void {
     const g = this.live;
-    if (!g) return;
+    if (!g || this.muted) return;
     const now = g.ctx.currentTime;
     g.master.gain.cancelScheduledValues(now);
     g.master.gain.setTargetAtTime(0.03, now, 0.015);
-    g.master.gain.setTargetAtTime(0.9, now + seconds, 0.01);
+    g.master.gain.setTargetAtTime(MASTER_GAIN, now + seconds, 0.01);
   }
 
   // ------------------------------------------------------------------ voices
@@ -440,7 +462,7 @@ class Engine {
     this.probe = probe;
     this.probeBuf = new Float32Array(probe.fftSize);
     const master = ctx.createGain();
-    master.gain.value = 0.9;
+    master.gain.value = this.muted ? 0 : MASTER_GAIN;
     master.connect(comp);
     const sfx = ctx.createGain();
     sfx.gain.value = this.sfxVol * this.sfxVol;

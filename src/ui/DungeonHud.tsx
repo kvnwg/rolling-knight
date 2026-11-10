@@ -31,8 +31,9 @@ import { dashLabel } from '../world/dash';
 import { furious, merchantOf } from '../world/thief';
 import { BAL } from '../core/balance';
 import type { KeySize } from './skin';
+import { touchUi } from '../platform/portal';
+import { keyOf } from '../input/input';
 
-const touch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
 /** How long a key stays down at the least, so a quick tap (or a key on the keyboard) is seen. */
 const MIN_DOWN_MS = 120;
@@ -121,7 +122,7 @@ function Key({
         <span className="face">{children}</span>
       </span>
       <span className="lbl">{label}</span>
-      {hint && !touch && <span className="key">{hint}</span>}
+      {hint && !touchUi() && <span className="key">{hint}</span>}
     </button>
   );
 }
@@ -133,7 +134,7 @@ function useKeyFlash(): Record<string, number> {
     const map: Record<string, string> = { ' ': 'dodge', shift: 'dodge', e: 'skill', q: 'skill', t: 'auto', escape: 'camp' };
     const on = (e: KeyboardEvent) => {
       if (e.repeat) return;
-      const id = map[e.key.toLowerCase()];
+      const id = map[keyOf(e)];
       if (id) setFlash((f) => ({ ...f, [id]: performance.now() }));
     };
     window.addEventListener('keydown', on);
@@ -174,7 +175,7 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
   const flash = useKeyFlash();
   // The big spell reel: 30 art px wide on a phone (its icons 2x), 46 on a desktop (3x); the window
   // is 1.75 cells tall inside a 4 px frame.
-  const reelN = touch ? 30 : 46;
+  const reelN = touchUi() ? 30 : 46;
   const reel = { n: reelN, h: Math.round((reelN - 8) * 1.75) + 8 };
   return (
     <div className={`dhud ${boss ? 'has-boss' : ''}`}>
@@ -236,8 +237,8 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
       </div>
 
       {/* On a phone the squad sits up under the floor's plate, leaving the bottom left free for the thumb that steers. */}
-      <div className={`hud-left ${touch ? 'top' : ''}`}>
-      <div className={`squad ${touch ? 'top' : ''}`}>
+      <div className={`hud-left ${touchUi() ? 'top' : ''}`}>
+      <div className={`squad ${touchUi() ? 'top' : ''}`}>
         {s.squad.map((id, slot) => {
           if (!id || !s.roster[id]) return null;
           const def = knightDef(id);
@@ -286,7 +287,7 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
 
       {/* The big spell reel over the keys: it ticks down onto each skill, which then slams onto the screen. */}
       {me && (
-        <div className={`spell-reel ${touch ? 'touch' : ''}`} data-spell-reel>
+        <div className={`spell-reel ${touchUi() ? 'touch' : ''}`} data-spell-reel>
           <div className="reel-frame" style={{ width: `calc(${reel.n} * var(--px))`, height: `calc(${reel.h} * var(--px))` }}>
             <SkillRoll game={game} sound={false} size={reel.n} well={4} tall rect pop={false} />
           </div>
@@ -294,8 +295,8 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
       )}
       <SpellSlam game={game} />
 
-      <div className={`actions ${touch ? 'touch' : ''}`}>
-        {touch && (
+      <div className={`actions ${touchUi() ? 'touch' : ''}`}>
+        {touchUi() && (
           <Key size="lg" rim={me ? 'brass' : 'iron'} className="k-attack" label="ATTACK" title="Attack" capture onDown={() => hold(true)} onUp={() => hold(false)}>
             <Px icon="swords" s={2} />
           </Key>
@@ -348,7 +349,7 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
         return (
           <div className={`buy-prompt plate ${asking ? 'asking' : ''}`}>
             <span className="buy-icon">
-              <Px icon={it.icon} size="md" s={touch ? 1 : 2} />
+              <Px icon={it.icon} size="md" s={touchUi() ? 1 : 2} />
             </span>
             <span className="buy-what">
               <b>{it.name}</b>
@@ -359,7 +360,7 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
                 className={`btn ${full ? '' : hot ? 'red' : 'gold'} buy-btn steal-btn`}
                 disabled={full}
                 onClick={reach}
-                title={full ? 'You carry as many as you can' : touch ? 'Take it: nobody is minding the stall' : 'Take it: nobody is minding the stall (G, Enter or F)'}
+                title={full ? 'You carry as many as you can' : touchUi() ? 'Take it: nobody is minding the stall' : 'Take it: nobody is minding the stall (G, Enter or F)'}
               >
                 <Px icon="bag" size="sm" />
                 <span>{full ? 'FULL' : hot ? 'GRAB' : 'TAKE'}</span>
@@ -373,7 +374,7 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
                     const r = game.buyWare(ware);
                     uiSound(r === 'ok' ? 'buy' : 'lockTap');
                   }}
-                  title={full ? 'You carry as many as you can' : short ? `You need ${fmt(ware.price - s.gold)} more gold` : touch ? 'Buy it' : 'Buy it (Enter or F)'}
+                  title={full ? 'You carry as many as you can' : short ? `You need ${fmt(ware.price - s.gold)} more gold` : touchUi() ? 'Buy it' : 'Buy it (Enter or F)'}
                 >
                   <Px icon="coin" size="sm" />
                   <span>{full ? 'FULL' : fmt(ware.price)}</span>
@@ -385,10 +386,10 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
                   )}
                 </button>
                 {!full && merchantOf(w) && (
-                  <button className="btn red buy-btn steal-btn" onClick={reach} title={touch ? 'Steal it: the merchant will fight you' : 'Steal it: the merchant will fight you (G, twice)'}>
+                  <button className="btn red buy-btn steal-btn" onClick={reach} title={touchUi() ? 'Steal it: the merchant will fight you' : 'Steal it: the merchant will fight you (G, twice)'}>
                     <Px icon="bag" size="sm" />
                     <span>{asking ? 'SURE?' : 'STEAL'}</span>
-                    {!touch && <kbd>G</kbd>}
+                    {!touchUi() && <kbd>G</kbd>}
                   </button>
                 )}
               </>
@@ -402,7 +403,7 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
             <Px icon="star" size="sm" />
             <span>
               TALK: {npc.def.name}
-              {!touch && <span className="sub">Enter or F</span>}
+              {!touchUi() && <span className="sub">Enter or F</span>}
             </span>
           </button>
         </div>

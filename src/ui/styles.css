@@ -3970,6 +3970,44 @@ body,
 .wb-gain b {
   color: var(--gold);
 }
+/* COLLECT and its double for an ad, side by side and the same size. */
+.wb-collect {
+  display: flex;
+  gap: calc(3 * var(--px));
+}
+.wb-collect > .btn {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.wb-noad {
+  text-align: center;
+}
+/* The way out of the report never scrolls out of sight. */
+.wb-sheet > .btn.big,
+.wb-collect {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  flex: none;
+}
+/* A wide, short screen (a desktop game frame on a portal's page, a phone on its side): the best find
+   stands beside the tally, so the whole report and its buttons fit without scrolling. */
+@media (orientation: landscape) and (max-height: 760px) {
+  .modal > .sheet.wb-sheet {
+    width: min(100%, calc(250 * var(--px)));
+  }
+  .wb-body {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+  .wb-best {
+    flex: none;
+  }
+  .wb-tally {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .wb-tier {
     animation: none;
@@ -4039,4 +4077,14 @@ body,
   grid-template-columns: 1fr 1fr;
   gap: calc(3 * var(--px));
   width: 100%;
+}
+
+/* ------------------------------------------------------------ a portal's ad (ui/App.tsx)
+   From the moment an ad is asked for until it's over, nothing in the game can be pressed. */
+.ad-wait {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  cursor: wait;
+  touch-action: none;
 }

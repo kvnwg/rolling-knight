@@ -30,8 +30,18 @@ import { addKnight } from './core/roster';
 import { Game } from './game';
 import { forceSky, type SkyKind } from './world/sky';
 
+/**
+ * The URL's flags. Published on a portal they're off (the page's address there is the portal's own,
+ * with its own parameters, and a player's save shouldn't be had by typing ?gold=); on localhost they
+ * work in every build.
+ */
+export function devFlags(): URLSearchParams {
+  const local = ['localhost', '127.0.0.1'].includes(location.hostname);
+  return new URLSearchParams(__PORTAL__ && !local ? '' : location.search);
+}
+
 export function devGame(): Game {
-  const q = new URLSearchParams(location.search);
+  const q = devFlags();
   const sky = q.get('sky');
   if (sky === 'clear' || sky === 'overcast' || sky === 'rain') forceSky(sky as SkyKind);
   const game = new Game(q.has('fresh') || q.has('floor'));

@@ -11,7 +11,8 @@ import { isNewKnight, knightStats } from '../core/roster';
 import { knightRating } from '../core/power';
 import type { Game } from '../game';
 import { Chunky, HeroLive, Section, rarityGrad, rarityStyle } from './common';
-import { fmt, oneIn } from './format';
+import { fmt, oneIn, secs } from './format';
+import { portal } from '../platform/portal';
 import { artPx, KnightTile, knightFit, knightOdds, knightPix } from './KnightCard';
 import { backdropStyle } from './backdrop';
 import { Px } from './px';
@@ -309,6 +310,40 @@ export function OddsTable({ game }: { game: Game }) {
 }
 
 
+/**
+ * The Oracle's Favour: on a portal with rewarded ads, a Luck Potion for watching one, every ten
+ * minutes (Game.takeFavour). Offered at the hub only, never over a fight, and nowhere else.
+ */
+function Favour({ game }: { game: Game }) {
+  const [ad, setAd] = useState<'idle' | 'wait' | 'none'>('idle');
+  if (!portal.rewards || game.inDungeon) return null;
+  const wait = game.favourWait();
+  const take = async () => {
+    if (ad === 'wait' || wait > 0) return;
+    setAd('wait');
+    const outcome = await portal.ad('rewarded');
+    if (outcome === 'done') game.takeFavour();
+    setAd(outcome === 'none' ? 'none' : 'idle');
+  };
+  return (
+    <div className="glass setting outlined favour">
+      <span>
+        Oracle's Favour
+        <small>
+          {wait > 0
+            ? `She'll favour you again in ${secs(wait)}`
+            : ad === 'none'
+              ? 'No ad to show right now. Try again in a little while.'
+              : `A Luck Potion for watching an ad: luck ×2 for ${secs(game.potionSeconds())}`}
+        </small>
+      </span>
+      <button className="btn green small" disabled={wait > 0 || ad === 'wait'} onClick={take}>
+        WATCH AD
+      </button>
+    </div>
+  );
+}
+
 export function LuckSheet({ game, onClose }: { game: Game; onClose: () => void }) {
   return (
     <div className="modal" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
@@ -320,6 +355,7 @@ export function LuckSheet({ game, onClose }: { game: Game; onClose: () => void }
           <Px icon="clover" size="lg" s={1} />
           <Chunky text={`LUCK ×${game.luck.toFixed(2)}`} size={10} grad="green" />
         </div>
+        <Favour game={game} />
         <OddsTable game={game} />
       </div>
     </div>

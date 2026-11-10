@@ -8,6 +8,19 @@
  * button calls hold(): held, it auto-aims; its finger dragged off it like a right stick, it aims that
  * way, the drag measured from where that finger went down).
  */
+/**
+ * The key pressed, by where it sits on the board: a letter or digit key answers to the name it has
+ * on a QWERTY board, whatever the player's layout prints on it. So WASD is the same four keys under
+ * the left hand on a French AZERTY board (ZQSD there), and 1 2 3 need no Shift on one. Every other
+ * key (Space, Shift, the arrows, Enter, Esc) goes by its own name.
+ */
+export function keyOf(e: KeyboardEvent): string {
+  const code = e.code ?? '';
+  if (/^Key[A-Z]$/.test(code)) return code.slice(3).toLowerCase();
+  if (/^Digit[0-9]$/.test(code)) return code.slice(5);
+  return e.key.toLowerCase();
+}
+
 export interface Controls {
   mx: number;
   my: number;
@@ -68,7 +81,7 @@ export function createControls(onKey?: (key: string) => void, stickAnywhere?: ()
   };
   const down = (e: KeyboardEvent) => {
     if (typing(e)) return;
-    const k = e.key.toLowerCase();
+    const k = keyOf(e);
     if (k === ' ' || k === 'shift') {
       c.dodge = true;
       e.preventDefault();
@@ -82,7 +95,7 @@ export function createControls(onKey?: (key: string) => void, stickAnywhere?: ()
     onKey?.(k);
   };
   const up = (e: KeyboardEvent) => {
-    keys.delete(e.key.toLowerCase());
+    keys.delete(keyOf(e));
     update();
     attackNow();
   };

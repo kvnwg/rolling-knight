@@ -4,6 +4,7 @@ import type { Game } from '../game';
 import { Bar } from './common';
 import { fmt, secs } from './format';
 import { Px } from './px';
+import { portal } from '../platform/portal';
 
 export function TopBar({ game, onSettings, onLuck, left }: { game: Game; onSettings: () => void; onLuck: () => void; left?: React.ReactNode }) {
   const s = game.state;
@@ -51,6 +52,8 @@ export function TopBar({ game, onSettings, onLuck, left }: { game: Game; onSetti
           <span className="t-muted">Luck</span>
           <span style={{ color: '#9ef06b' }}>×{luck < 100 ? luck.toFixed(2) : fmt(luck)}</span>
           {potion > 0 && <span className="t-muted">potion {secs(potion)}</span>}
+          {/* The Oracle's Favour is there to take (the luck sheet has it): at the hub, on a portal with rewarded ads. */}
+          {potion <= 0 && !game.inDungeon && portal.rewards && game.favourWait() <= 0 && <span className="ktag new">×2</span>}
         </button>
       </div>
     </div>

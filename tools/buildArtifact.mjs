@@ -23,7 +23,7 @@ const css = readFileSync(join(dir, cssRef[1]), 'utf8');
 if (/<\/style/i.test(css)) throw new Error('Stylesheet contains </style>');
 if (/url\((?!["']?(data:|#))/.test(css)) throw new Error('Stylesheet still references external files');
 const page = `<meta charset="utf-8">
-<title>Rolling Knight</title>
+<title>Roll a Knight!: Idle RPG</title>
 <style>
   /* The game keeps its own look in either viewer theme. */
   :root { color-scheme: dark; --gutter-x: 16px; }

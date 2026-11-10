@@ -26,8 +26,8 @@ import type { Renderer } from '../render/renderer';
 import type { StationId } from '../world/hubWorld';
 import s from './Tutorial.module.css';
 import { arrowBuf, gloveBuf, PTR_TIP, ringBuf, type PtrDir } from './tutorialArt';
+import { touchUi } from '../platform/portal';
 
-const touch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
 export interface TutorialProps {
   game: Game;
@@ -611,7 +611,7 @@ export function Tutorial(props: TutorialProps) {
 
       const ctx: TutCtx = {
         where,
-        touch,
+        touch: touchUi(),
         hasKnight: !!playing,
         sealed: !!st.roll.sealed,
         nearWarden: !game.inDungeon && game.hub?.nearStation()?.id === 'gate',
@@ -728,7 +728,7 @@ export function Tutorial(props: TutorialProps) {
       for (const c of domClear(now, z)) if (!el || (c.el !== el && !c.el.contains(el) && !el.contains(c.el))) clear.push(c.r);
       // Nothing goes in the corner the thumb steers from, on a touch screen in a fight (the stick comes
       // up wherever the left of the screen is touched; most often down there).
-      if (touch && game.inDungeon) clear.push({ l: 0, t: H * 0.5, r: W * 0.52, b: H });
+      if (touchUi() && game.inDungeon) clear.push({ l: 0, t: H * 0.5, r: W * 0.52, b: H });
       // The slip never covers your knight out in the world (the pointer may: an arrow over a foe at
       // your side).
       const slipClear: Rect[] = [];

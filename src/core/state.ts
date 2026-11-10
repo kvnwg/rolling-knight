@@ -89,6 +89,8 @@ export interface GameState {
   /** Perk points (from the first rebirth on): one per boss beaten for the first time in a run. */
   sigils: number;
   potionEndsAt: number | null;
+  /** When the Oracle's Favour (a Luck Potion for watching an ad, on a portal that has them) was last taken: one every FAVOUR_EVERY_MS. */
+  favourAt?: number;
 
   roster: Record<string, KnightRec>;
   /** Three squad slots (knight ids) and which one you control. */

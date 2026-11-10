@@ -53,6 +53,8 @@ let campMapCache: FloorMap | null = null;
 export const PORTAL_CUT = 12;
 export const PORTAL_REVEAL = 5;
 const FADE_IN = 1.6;
+/** The Oracle's Favour (a Luck Potion for watching an ad) can be taken this often. */
+export const FAVOUR_EVERY_MS = 10 * 60_000;
 
 export class Game {
   state: GameState;
@@ -75,6 +77,8 @@ export class Game {
   /** What runs once a frame has been drawn (onFrame). */
   private framed = new Set<() => void>();
   private pendingFloor: number | null = null;
+  /** The floor being left through its portal is a boss floor: a `break` is due once the screen is black. */
+  private bossBehind = false;
   /** Walking down the hub's steps: the fade out has begun, the dungeon comes when it's black. */
   private descending = false;
   private wipeT = 0;
@@ -365,6 +369,8 @@ export class Game {
     if (this.bot || s.settings.autoPlay) this.autoReturnT = 5;
     this.save();
     this.version++;
+    // (The hub comes up from black: a pause between two runs.)
+    this.emit({ type: 'break', kind: 'wipe' });
   }
 
   /** Into the dungeon: the floor you left off on, as a fresh map (every trip down is a new one, built to the next design in the deck). */
@@ -417,6 +423,7 @@ export class Game {
     this.state.run.thief = false;
     // (So is a portal's cut to the next floor, if it was under way.)
     this.pendingFloor = null;
+    this.bossBehind = false;
     this.fade = 1;
     this.fadeDir = -1;
     this.fadeIn = FADE_IN;
@@ -603,6 +610,13 @@ export class Game {
         this.enterDungeon();
       }
       if (this.fade >= 1 && this.pendingFloor !== null) {
+        if (this.bossBehind) {
+          // A boss is behind the squad and the screen is black: a pause, before the next floor is made
+          // (it starts on the next tick, or whenever whoever took the pause lets the game go on).
+          this.bossBehind = false;
+          this.emit({ type: 'break', kind: 'boss' });
+          return;
+        }
         const f = this.pendingFloor;
         this.pendingFloor = null;
         this.startFloor(f, true);
@@ -651,6 +665,7 @@ export class Game {
       for (const p of w.pickups) this.collect(p.kind, p.amount);
     }
     this.pendingFloor = floor;
+    this.bossBehind = !!w?.boss;
     this.fadeDir = 1;
   }
 
@@ -663,7 +678,7 @@ export class Game {
     else if (kind === 'hourglass') s.hourglasses += amount;
     else {
       const now = Date.now();
-      const secs = BAL.luck.potionSeconds + (s.upgrades.potionTime ?? 0) * 20;
+      const secs = this.potionSeconds();
       s.potionEndsAt = Math.max(now, s.potionEndsAt ?? 0) + secs * 1000;
       this.emit({ type: 'potion', seconds: secs });
     }
@@ -789,6 +804,40 @@ export class Game {
     if (r.hourglasses) s.hourglasses += r.hourglasses;
     if (r.potion) this.collect('potion', 1);
     if (r.luckSpins) s.roll.bankedLucky = (s.roll.bankedLucky ?? 0) + r.luckSpins;
+  }
+
+  // ---------------------------------------------------------------- rewards for watching an ad
+
+  /** How long a Luck Potion lasts now (Potion Time adds to it). */
+  potionSeconds(): number {
+    return BAL.luck.potionSeconds + (this.state.upgrades.potionTime ?? 0) * 20;
+  }
+
+  /** Seconds until the Oracle's Favour can be taken again (0: now). */
+  favourWait(now = Date.now()): number {
+    return Math.max(0, ((this.state.favourAt ?? 0) + FAVOUR_EVERY_MS - now) / 1000);
+  }
+
+  /** The Oracle's Favour, earned: a Luck Potion, as if one had dropped (it stacks onto one that's running). */
+  takeFavour(now = Date.now()): boolean {
+    if (this.favourWait(now) > 0) return false;
+    this.state.favourAt = now;
+    this.collect('potion', 1);
+    this.save();
+    this.version++;
+    return true;
+  }
+
+  /** The gold a night away brought in, once more (the welcome back's "double" for watching an ad). Once per report. */
+  doubleAway(report: OfflineReport): number {
+    if (report.doubled || !(report.gold > 0)) return 0;
+    report.doubled = true;
+    this.state.gold += report.gold;
+    this.emit({ type: 'gold', amount: report.gold });
+    this.emit({ type: 'toast', text: `Doubled: +${Math.round(report.gold).toLocaleString('en-US')} gold`, tone: 'gold' });
+    this.save();
+    this.version++;
+    return report.gold;
   }
 
   rebirth(): boolean {

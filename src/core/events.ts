@@ -44,6 +44,12 @@ export type CoreEvent =
   | { type: 'wipe'; floor: number; back: number }
   /** Left for camp: the run steps back from `from` to `back` (core/newGame.ts campFloor), and the `revived` knights who had fallen are up again. */
   | { type: 'camp'; from: number; back: number; revived: number }
+  /**
+   * A natural pause between two stretches of play, with the screen black: the squad has just left a
+   * boss floor through its portal ('boss'), or been carried back to the hub after a wipe ('wipe').
+   * Where a portal may show an ad (ui/App.tsx); the game does nothing with it itself.
+   */
+  | { type: 'break'; kind: 'boss' | 'wipe' }
   | { type: 'rebirth'; count: number }
   /** This run just reached the floor a rebirth needs (once a run). */
   | { type: 'rebirthReady'; next: number }
