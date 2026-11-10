@@ -7,6 +7,7 @@
 import type { Biome } from '../world/biomes';
 import { SOLID, TILE, type FloorMap, type Prop } from '../world/mapgen';
 import { artOf } from './art/artOf';
+import { TIER_HEIGHT } from '../world/relief';
 
 /** A point h px above the ground throws its shadow this far right (SX * h) and down (SY * h). */
 const SX = 0.62;
@@ -15,8 +16,9 @@ const SY = 0.34;
 /** Small flat things throw no shadow worth drawing. */
 const FLAT = new Set<string>(['flowers', 'bones', 'skull', 'reeds', 'mushroomSmall', 'cabbage', 'wheat', 'rug']);
 
-export function castShadows(m: FloorMap, biome: Biome, W: number, H: number): Uint8Array {
+export function castShadows(m: FloorMap, biome: Biome, W: number, H: number, relief = 0): Uint8Array {
   const mask = new Uint8Array(W * H);
+  if (relief > 0) reliefShadow(m, mask, W, relief);
   const floorNear = (p: Prop, reach: number) => {
     // Only props whose shadow can land on open floor are worth projecting.
     const tx0 = Math.floor((p.x - 8) / TILE);
@@ -74,4 +76,43 @@ export function castShadows(m: FloorMap, biome: Biome, W: number, H: number): Ui
     }
   }
   return out;
+}
+
+/**
+ * The shadow raised ground throws on the ground beside and below it (the floor under a wall, the
+ * lower lawn under a terrace): a pixel is in it when, going back toward the light, it meets higher
+ * ground before the light has climbed over that ground's top.
+ */
+function reliefShadow(m: FloorMap, mask: Uint8Array, W: number, height: number): void {
+  const tiers = m.tiers;
+  /** How many steps up a tile stands: 0 the floor, 1 raised ground, 2 a terrace on it. */
+  const level = (tx: number, ty: number) => (tx < 0 || ty < 0 || tx >= m.w || ty >= m.h ? 1 : m.tiles[ty * m.w + tx] !== SOLID ? 0 : tiers && tiers[ty * m.w + tx] ? 2 : 1);
+  const top = [0, height, height + TIER_HEIGHT];
+  const reachX = Math.ceil((top[2] * SX) / TILE);
+  const reachY = Math.ceil((top[2] * SY) / TILE);
+  for (let ty = 0; ty < m.h; ty++) {
+    for (let tx = 0; tx < m.w; tx++) {
+      const own = level(tx, ty);
+      if (own === 2 || (own === 1 && !tiers)) continue;
+      let highest = own;
+      for (let oy = -reachY; oy <= 0; oy++) for (let ox = -reachX; ox <= 0; ox++) highest = Math.max(highest, level(tx + ox, ty + oy));
+      if (highest === own) continue;
+      const span = top[highest] - top[own];
+      const steps = Math.ceil(span / 2);
+      for (let ly = 0; ly < TILE; ly++) {
+        for (let lx = 0; lx < TILE; lx++) {
+          const x = tx * TILE + lx;
+          const y = ty * TILE + ly;
+          for (let k = 1; k <= steps; k++) {
+            const h = (k / steps) * span;
+            const l = level(Math.floor((x - h * SX) / TILE), Math.floor((y - h * SY) / TILE));
+            if (l > own && top[l] - top[own] >= h) {
+              mask[y * W + x] = 2;
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
 }

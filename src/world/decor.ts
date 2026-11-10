@@ -18,6 +18,7 @@ import type { Biome, PropKind } from './biomes';
 import { BLOCKED, FLOOR, SOLID, TILE, squeezes, tileAt, type FloorMap, type Room } from './mapgen';
 import { dressDungeon } from './dungeonDecor';
 import { CRYPT_TRAPS, placeTraps } from './traps';
+import { reliefHeight } from './relief';
 
 export interface DecorCtx {
   m: FloorMap;
@@ -57,7 +58,6 @@ export function houseLayout(variant: number): HouseLayout {
 }
 
 export function dressFloor(c: DecorCtx): void {
-  if (c.biome.solid.ledge) standOnLedges(c.m);
   if (c.biome.id === 'hamlet') village(c);
   else if (c.biome.id === 'dungeon') dressDungeon(c);
   else {
@@ -294,7 +294,9 @@ function lotEdges(c: DecorCtx, front: PropKind[], side: PropKind | null): void {
   const lot = (x: number, y: number) => at(m, x, y) === SOLID && !m.reserved?.[y * W + x] && !m.canal?.[y * W + x];
   const street = (x: number, y: number) => at(m, x, y) !== SOLID && !m.canal?.[y * W + x];
   const marked: number[] = [];
-  // Runs along the lots' south edges (the street below them): a picket fence or a hedge.
+  // Runs along the lots' south edges (the street below them): a picket fence or a hedge, standing
+  // on the lot's edge at the top of its retaining wall.
+  const footY = Math.max(1, TILE - reliefHeight(c.biome));
   for (let y = 2; y < m.h - 2; y++) {
     let x = 1;
     while (x < W - 1) {
@@ -308,7 +310,7 @@ function lotEdges(c: DecorCtx, front: PropKind[], side: PropKind | null): void {
       const gate = x - x0 >= 4 ? x0 + rng.int(1, x - x0 - 2) : -1;
       for (let k = x0; k < x; k++) {
         if (k === gate) continue;
-        m.props.push({ kind, x: k * TILE + 8, y: y * TILE + 11, solid: true, seed: rng.int(0, 1 << 30) });
+        m.props.push({ kind, x: k * TILE + 8, y: y * TILE + (reliefHeight(c.biome) ? footY : 11), solid: true, seed: rng.int(0, 1 << 30) });
         marked.push(y * W + k);
       }
     }
@@ -474,16 +476,6 @@ function canalAndBridge(c: DecorCtx, max = 1): void {
 
 // ------------------------------------------------------------------ the wilds
 
-/** On raised ground a tree whose foot would sit on the ledge's face stands on its top instead. */
-function standOnLedges(m: FloorMap): void {
-  for (const p of m.props) {
-    if (p.kind !== 'tree') continue;
-    const tx = Math.floor(p.x / TILE);
-    const ty = Math.floor((p.y - 1) / TILE);
-    if (at(m, tx, ty) === SOLID && at(m, tx, ty + 1) !== SOLID) p.y = ty * TILE + 1;
-  }
-}
-
 /** Lantern posts (or another light) beside a path, one every so often. */
 function pathLights(c: DecorCtx, kind: PropKind, spacing: number, max: number): void {
   const { m, rng } = c;
@@ -585,7 +577,7 @@ interface WildsCfg {
 }
 
 const WILDS: Partial<Record<string, WildsCfg>> = {
-  forest: { ruins: 3, lights: { kind: 'lanternPost', spacing: 9, max: 14 }, strings: 3, camp: true, ring: { kind: 'mushroomSmall', n: 8, solid: false }, fence: 'roughFence', waterfalls: 2, stairs: 3 },
+  forest: { ruins: 3, lights: { kind: 'lanternPost', spacing: 9, max: 14 }, strings: 3, camp: true, ring: { kind: 'mushroomSmall', n: 8, solid: false }, fence: 'roughFence', waterfalls: 2 },
   farmland: { ruins: 0, lights: { kind: 'lantern', spacing: 12, max: 8 }, fence: 'roughFence', camp: false },
   tundra: { ruins: 1, lights: { kind: 'lanternPost', spacing: 12, max: 8 }, camp: true, ring: { kind: 'crystalSmall', n: 6, solid: true }, fence: 'roughFence' },
   swamp: { ruins: 1, lights: { kind: 'lanternPost', spacing: 10, max: 10 }, strings: 1, camp: true, ring: { kind: 'mushroomSmall', n: 9, solid: false }, fence: 'roughFence' },

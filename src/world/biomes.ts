@@ -267,7 +267,7 @@ export const BIOMES: Record<BiomeId, Biome> = {
     layout: 'cave',
     ground: { kind: 'sand', ramp: ['#7a5232', '#9c6c40', '#bc8a52', '#d6a868', '#ecc88a'], accent: ['#a87a4a', '#f4dca4'] },
     path: { kind: 'flagstone', ramp: ['#6a4a34', '#8a6444', '#a88058', '#c49c70', '#dcba8c'] },
-    solid: { kind: 'cliff', top: ['#8a5a36', '#a06c42'], face: ['#4a2e20', '#6a4230', '#8a5a3e', '#a8744e', '#c48e62'] },
+    solid: { kind: 'cliff', top: ['#7c4a32', '#8e563a'], face: ['#4a2e20', '#6a4230', '#8a5a3e', '#a8744e', '#c48e62'] },
     trees: ['cactus'],
     treeRamp: ['#1e3a24', '#2c5430', '#3e703e', '#5a8c4c', '#e8d0a0'],
     liquid: { kind: 'water', ramp: ['#1a3e4a', '#22606a', '#2e8a8a', '#5ab4a8', '#a8e4d0'] },

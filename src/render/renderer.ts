@@ -2655,8 +2655,21 @@ function ambientOf(b: Biome, sky: Sky | null): string {
   if (kind === 'rain') return mixHex(b.light.ambient, day ? '#c4ccd8' : '#7a8496', 0.7);
   if (kind === 'overcast') return mixHex(b.light.ambient, day ? '#dfe4ea' : '#8a94a6', 0.6);
   if (day) return mixHex(b.light.ambient, '#fffaf0', 0.6);
-  // Gloomwood's lanterns and fireflies carry the mood now: its dark can lift a little.
-  return b.id === 'forest' ? mixHex(b.light.ambient, '#a8b8cc', 0.36) : b.light.ambient;
+  // The dark places keep their colour but not their murk: the fill is lifted until the ground, the
+  // walls' faces and the terraces behind them all read (the depth is in the picture, not hidden by
+  // it), and the lanterns, fires and the knights' own light sit on top of that as the warm accents.
+  return liftTo(b.light.ambient, NIGHT_FILL[b.id] ?? 168);
+}
+
+/** How bright the fill gets in each dark biome (its brightest channel, 0..255). */
+const NIGHT_FILL: Readonly<Record<string, number>> = { forest: 190, swamp: 186, graveyard: 172, crypt: 176, ember: 172, crystal: 176, shrine: 184, dungeon: 170 };
+
+/** A colour scaled up until its brightest channel reaches `top` (never down), a little of it let go toward grey. */
+function liftTo(hex: string, top: number): string {
+  const [r, g, b] = rgb(hex);
+  const k = Math.max(1, top / Math.max(1, r, g, b));
+  const to = (v: number) => Math.round(Math.min(255, v * k)).toString(16).padStart(2, '0');
+  return mixHex(`#${to(r)}${to(g)}${to(b)}`, '#b4bccc', 0.12);
 }
 
 /** How dark the drifting cloud shadows get: on sunny days outdoors; faint under a grey sky; none in rain or below ground. */
@@ -2684,7 +2697,7 @@ function gradeOf(b: Biome, sky: Sky | null): Grade {
     highlightTint: grey ? tint('#e8f0ff', 0.12) : tint(b.light.gradeTop, day ? 0.09 : 0.22),
     saturation: wet ? 1.04 : grey ? 1.02 : day ? 1.12 : 1.16,
     contrast: day || grey ? 1.04 : 1.06,
-    vignette: day || grey ? Math.min(0.32, b.light.vignette * 0.7) : Math.min(0.75, b.light.vignette + 0.1),
+    vignette: day || grey ? Math.min(0.32, b.light.vignette * 0.7) : Math.min(0.5, b.light.vignette * 0.85),
     bloom: indoor ? 0.9 : wet ? 0.65 : 0.5,
   };
 }

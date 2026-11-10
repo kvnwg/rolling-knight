@@ -23,6 +23,7 @@ import { frontDecor } from './art/village';
 import { Grass, grassLook, type GrassLook } from './art/grass';
 import { h2, NPAD, VNoise, vnoise } from './noise';
 import { stampDungeon } from './packs/dungeonTiles';
+import { makeRelief } from './relief';
 
 // ------------------------------------------------------------------ colors
 
@@ -613,6 +614,8 @@ export function paintTerrainPixels(m: FloorMap, biome: Biome): Omit<Terrain, 'ca
   const nGrime = biome.solid.kind === 'wall' ? N(6, seed + 61) : null;
   const nCliff = biome.solid.kind !== 'wall' && biome.solid.kind !== 'trees' ? N(5, seed + 62, W * 0.5 + 2, H * 2.2 + 3) : null;
   const nTop = biome.solid.kind !== 'trees' ? N(8, seed + 63) : null;
+  const nTopBig = biome.solid.kind === 'cliff' ? N(26, seed + 163) : null;
+  const topLit = hexI(mixHex(biome.solid.top[1], biome.solid.face[biome.solid.face.length - 1], biome.id === 'desert' ? 0.3 : 0.12));
   const nCanal = m.canal ? N(12, seed + 150) : null;
   const ledgeN = biome.solid.ledge ? [N(7, seed + 92), N(6, seed + 97)] : null;
   const ledgeR = biome.solid.ledge ? rampI(biome.solid.ledge) : null;
@@ -772,6 +775,8 @@ export function paintTerrainPixels(m: FloorMap, biome: Biome): Omit<Terrain, 'ca
   };
   const trees = biome.solid.kind === 'trees';
   const ledge = biome.solid.ledge;
+  // The raised ground's faces and kerbs (relief.ts).
+  const relief = makeRelief(biome, seed, W, H, (tx, ty) => tile(tx, ty) === SOLID && !isCanal(tx, ty), m.tiers);
   const bankable = !!liquid && liquid.kind !== 'lava';
 
   // A tiled biome stamps its ground from a pack's tileset instead (walls, floors, their edges).
@@ -795,6 +800,14 @@ export function paintTerrainPixels(m: FloorMap, biome: Biome): Omit<Terrain, 'ca
           set(i, canalAt(x, y, lx, ly, tx, ty));
           surf[y * W + x] = 3;
           continue;
+        }
+        if (relief) {
+          const rc = relief.at(x, y, tx, ty, lx, ly);
+          if (rc >= 0) {
+            set(i, rc);
+            surf[y * W + x] = 5;
+            continue;
+          }
         }
         if (trees && curbR) {
           // A lot: bright ground for the trees, houses and gardens on it, a stone curb round it.
@@ -860,15 +873,73 @@ export function paintTerrainPixels(m: FloorMap, biome: Biome): Omit<Terrain, 'ca
           }
           continue;
         }
-        // The top of a wall: dark slabs (readable, not a void), a lit cap where it meets the floor.
+        // The top of the raised ground. Round its edge runs a band of it in the light (the wall's
+        // thickness, seen from above): a lit lip, coping slabs on a wall, then the dark beyond.
+        const kT = rowT + tx;
+        // How far in from the edge, and which way that edge faces (the light comes from the top
+        // left: an edge open to the west is lit, one open to the east is in shade).
+        let d = 99;
+        let lit = 0;
+        if (T[kT - GW] !== SOLID) d = ly;
+        if (T[kT - 1] !== SOLID && lx < d) {
+          d = lx;
+          lit = 0.6;
+        }
+        if (T[kT + 1] !== SOLID && TILE - 1 - lx < d) {
+          d = TILE - 1 - lx;
+          lit = -1.2;
+        }
+        if (d > 8) {
+          if (T[kT - GW - 1] !== SOLID) d = Math.min(d, Math.max(lx, ly));
+          if (T[kT - GW + 1] !== SOLID) d = Math.min(d, Math.max(TILE - 1 - lx, ly));
+          const fhT = relief ? Math.min(relief.height, 2 * TILE) : TILE;
+          // Above a face: from the face's top edge.
+          let below = 1;
+          while (below <= 3 && T[kT + below * GW] === SOLID) below++;
+          if (below <= 3) {
+            const dS = below * TILE - 1 - ly - fhT;
+            if (dS < d) {
+              d = dS;
+              lit = 0.3;
+            }
+          } else {
+            // (Its ends, where the floor turns the corner below.)
+            for (let oy = 1; oy <= 2; oy++) {
+              if (T[kT + oy * GW] !== SOLID) break;
+              const dy = oy * TILE - 1 - ly - (fhT - TILE);
+              if (T[kT + oy * GW - 1] !== SOLID) d = Math.min(d, Math.max(lx, dy));
+              if (T[kT + oy * GW + 1] !== SOLID) d = Math.min(d, Math.max(TILE - 1 - lx, dy));
+            }
+          }
+        }
+        if (d < 0) d = 0;
         const n = nTop!.at(x, y);
-        let col = top[n > 0.6 ? 1 : 0];
-        if ((lx === 0 || ly === 0) && (tx + ty) % 2 === 0) col = topSeam;
-        else if (lx === 1 && ly > 0 && h2(tx, ty, seed + 64) < 0.5) col = top[1];
-        const capAbove = T[rowT - GW + tx] !== SOLID ? ly : 99;
-        const capSide = Math.min(T[rowT + tx - 1] !== SOLID ? lx : 99, T[rowT + tx + 1] !== SOLID ? TILE - 1 - lx : 99);
-        const cap = Math.min(capAbove, capSide);
-        if (cap <= 2) col = cap === 0 ? face[4 % face.length] : cap === 1 ? face[3] : face[1];
+        let col: number;
+        if (biome.solid.kind === 'wall') {
+          const BAND = 7;
+          if (d === 0) col = face[clampK(4 + lit, face.length)];
+          else if (d === 1) col = face[clampK(3 + lit * 0.6, face.length)];
+          else if (d < BAND - 1) {
+            // Coping slabs, a joint every so often along the wall.
+            const along = (x + y) % 11 === 0 && h2(Math.floor((x + y) / 11), tx + ty, seed + 64) < 0.7;
+            col = along ? face[0] : face[n > 0.55 ? 2 : 1];
+          } else if (d === BAND - 1) col = face[0];
+          else {
+            col = top[n > 0.6 ? 1 : 0];
+            if ((lx === 0 || ly === 0) && (tx + ty) % 2 === 0) col = topSeam;
+          }
+        } else {
+          // Bare rock: big soft patches of its tones, a pebble here and there, the rim in the light.
+          if (d <= 4) col = face[clampK((d === 0 ? 4 : d === 1 ? 3.4 : d === 2 ? 2.6 : d === 3 ? 2.2 : 1) + lit, face.length)];
+          else if (d === 5) col = topLit;
+          else {
+            const big = nTopBig!.at(x, y);
+            col = big > 0.6 ? topLit : n > 0.58 ? top[1] : top[0];
+            const peb = h2(x, y, seed + 64);
+            if (peb < 0.003) col = topSeam;
+            else if (peb > 0.997) col = topLit;
+          }
+        }
         set(i, col);
         continue;
       }
@@ -1098,7 +1169,7 @@ export function paintTerrainPixels(m: FloorMap, biome: Biome): Omit<Terrain, 'ca
   }
 
   // --- shadows thrown toward the lower right by everything standing
-  const sh = castShadows(m, biome, W, H);
+  const sh = castShadows(m, biome, W, H, relief?.height ?? 0);
   for (let k = 0; k < sh.length; k++) {
     const v = sh[k];
     if (!v) continue;

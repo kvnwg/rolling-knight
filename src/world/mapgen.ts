@@ -12,6 +12,7 @@ import { Rng } from '../core/rng';
 import type { DesignId } from '../core/deck';
 import { BIOMES, type Biome, type PropKind, type TreeKind } from './biomes';
 import { dressFloor } from './decor';
+import { buildTiers, standOnRelief } from './relief';
 import { DESIGNS, Shaper } from './designs';
 import { placeTrees, roomTree, type TreeSize } from './forest';
 
@@ -74,6 +75,8 @@ export interface FloorMap {
   route?: Uint8Array;
   /** A canal through the lots: 1 water (in the lots), and on the street the bridge's deck over it. */
   canal?: Uint8Array;
+  /** Terraces (relief.ts): 1 where the solid ground stands a second step up. */
+  tiers?: Uint8Array;
   /** Water falling over a ledge's face into a pool (world pixels: its left, top, width, height). */
   waterfalls?: Array<{ x: number; y: number; w: number; h: number }>;
   rooms: Room[];
@@ -427,7 +430,9 @@ export function generateFloor(opts: GenOptions): FloorMap {
   // Houses, yards, lamps, squares and set pieces (decor.ts).
   dressFloor({ m, biome, rng: new Rng(Rng.hashSeed(opts.seed ^ Math.imul(floor, 40503) ^ 0xdec0)), rooms, occupied, nearCenter, connected });
   // The woods (forest.ts): clumps of trees on the solid ground, clear of the lots and buildings decor reserved.
+  buildTiers(m, biome);
   if (biome.solid.kind === 'trees') for (const t of placeTrees(m, biome, propRng.fork(7))) m.props.push(t);
+  standOnRelief(m, biome);
   if (biome.fields) plantFields(m, biome, rooms, propRng.fork(3), occupied, nearCenter, connected);
   for (const r of rooms) {
     if (r.kind === 'start') continue;
