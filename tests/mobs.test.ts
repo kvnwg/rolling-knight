@@ -368,9 +368,16 @@ describe('readable bullets (Enter the Gungeon style)', () => {
       m.elite = elite;
       m.atkT = m.gunT = m.lungeT = 99;
       volley(w, m, kind, h.x, h.y);
-      // (A burst fires the rest of its shots over the next moments.)
-      run(w, 0.6);
-      return w.shots.filter((s) => s.team === 'mob').length;
+      // (A burst fires the rest of its shots over the next moments; an archer's darts are quick, and
+      // one may have landed by then: every shot fired counts.)
+      const fired = new Set<number>();
+      const tally = () => {
+        for (const s of w.shots) if (s.team === 'mob') fired.add(s.uid);
+        return false;
+      };
+      tally();
+      run(w, 0.6, tally);
+      return fired.size;
     };
     expect(count(2, false, 'aimed')).toBe(1);
     expect(count(2, false, 'fan')).toBe(3);
@@ -389,7 +396,7 @@ describe('readable bullets (Enter the Gungeon style)', () => {
     expect(m.move).toBe('shoot');
     expect(m.windT).toBeGreaterThan(0.3);
     expect(w.shots.length).toBe(0);
-    run(w, 0.6);
+    run(w, 0.6, () => w.shots.length > 0);
     expect(w.shots.filter((s) => s.team === 'mob').length).toBe(1);
     m.volley = 2;
     w.shots = [];

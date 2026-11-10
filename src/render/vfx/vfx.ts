@@ -19,10 +19,11 @@ import type { SkillId } from '../../core/skillbook';
 import type { DashFx, Fx, Shot, Unit } from '../../world/entities';
 import type { World } from '../../world/world';
 import { toCanvas } from '../art/draw';
+import { FoeBullets } from '../foeBullets';
 import type { PixelBuf } from '../pixel/buf';
 import {
   ARCANE, BOLT_FRAMES, BULLET_FRAMES, CHEST, DUST, FIRE, FIRE_FRAMES, HOLY, IMPACT_FRAMES, IMPACT_FRAME_S, IMPACT_KINDS, ORB_FRAMES, SHOT_DIRS,
-  STEEL, SWING_DIRS, dangerRamp, swingReach, arrowSprite, boltSprite, bulletSprite, dirIndex, fireSprite, impactSprite, lungeSprite, orbSprite, rampFrom,
+  STEEL, SWING_DIRS, dangerRamp, swingReach, arrowSprite, boltSprite, dirIndex, fireSprite, impactSprite, lungeSprite, orbSprite, rampFrom,
   reflectSprite, spearSprite, swingFrameAt, swingSprite, tone, whirlSprite, type ImpactKind, type VfxSprite,
 } from './art';
 import { SWING_STYLES, rainbowStep, swingStyleFor, vfxLook, type Ramp, type SwingStyle, type VfxLook } from './look';
@@ -224,6 +225,8 @@ export class Vfx {
   private lastTime = 0;
   /** Where this frame's clinks are (x, y pairs): the shots they took leave no burst of their own. */
   private clinks: number[] = [];
+  /** The foes' bullets, each kind drawn as what it is (render/foeBullets.ts). */
+  readonly foes = new FoeBullets();
 
   /** What's playing (tests and the dev console). */
   stats(): { swings: number; impacts: number; shots: number; sparks: number; cached: number } {
@@ -666,8 +669,8 @@ export class Vfx {
             this.blit(this.sprite(key(K_BULLET, L.id, dir, f, 2), () => reflectSprite(L, dir, f)), x, y, ctx);
             break;
           }
-          const big = !!w.bossUnit && w.bossUnit.uid === s.from;
-          this.blit(this.sprite(key(K_BULLET, this.idOf(s.color), dir, f, big ? 1 : 0), () => bulletSprite(s.color, dir, f, big)), x, y, ctx);
+          // A foe's: the plain orb or one of the kinds with a way of flying of its own, in the bullets' one color rule.
+          this.foes.draw(ctx, s, x, y, w.time, !!w.bossUnit && w.bossUnit.uid === s.from);
           break;
         }
         default: {

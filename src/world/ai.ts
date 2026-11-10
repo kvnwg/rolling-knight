@@ -12,6 +12,7 @@
  */
 import { CLASSES } from '../core/knights';
 import { signatureSkill } from '../core/skillbook';
+import { HUE, bossPattern, bulletThreat, fire, formVolley, kick, quake, type BulletForm } from './bullets';
 import { dist, inRing, lineOfSight, moveUnit, norm, walkClear, type Unit } from './entities';
 import { flowDist, flowStep, type Flow } from './flow';
 import { TILE } from './mapgen';
@@ -49,6 +50,12 @@ function laneDodge(u: Unit, x: number, y: number, dx: number, dy: number, len: n
 export function threatened(w: World, u: Unit): [number, number] | null {
   for (const s of w.shots) {
     if (s.team === u.team) continue;
+    if (s.b) {
+      // A bullet with a way of flying of its own is followed along it (bullets.ts).
+      const out = bulletThreat(s, u);
+      if (out) return out;
+      continue;
+    }
     const rx = u.x - s.x;
     const ry = u.y - 6 - s.y;
     const sp = Math.hypot(s.vx, s.vy);
@@ -348,13 +355,19 @@ export function bulletSpeed(w: World, m: Unit): number {
 
 /**
  * One bullet of m's from (x, y) along angle `a`: speed `sp`, a hit of `dmg` x its attack, bending `curve`
- * rad/s. (Drawn 7 px across, it hits a little smaller than it looks, as it should.)
+ * rad/s. (Drawn 7 px across, it hits a little smaller than it looks, as it should.) Plain, it's the
+ * slow orb: red, or pink when it curves (the bullets' one color rule: bullets.ts). `form`: one of the
+ * kinds with a way of flying of its own, in the look its thrower's gun gives it; `reach` is how far off
+ * its target is (a blade turns back just past it).
  */
-function bullet(w: World, m: Unit, x: number, y: number, a: number, sp: number, dmg: number, curve = 0): void {
-  const t = m.type!;
+function bullet(w: World, m: Unit, x: number, y: number, a: number, sp: number, dmg: number, curve = 0, form?: BulletForm, reach = 70): void {
+  if (form) {
+    fire(w, m, form, x, y, a, sp, dmg, { reach, ...(curve ? { curve } : {}), ...(m.type?.gun?.form === form && m.type.gun.look ? { look: m.type.gun.look } : {}) });
+    return;
+  }
   w.shots.push({
     uid: uid(), team: 'mob', x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: 2, dmg: m.atk * dmg, life: 3.4, kind: 'bullet',
-    color: t.shot?.color ?? '#ff6a6a', from: m.uid, ...(curve ? { curve } : {}),
+    color: curve ? HUE.pink : HUE.red, from: m.uid, ...(curve ? { curve } : {}),
   });
 }
 
@@ -362,7 +375,9 @@ function bullet(w: World, m: Unit, x: number, y: number, a: number, sp: number, 
  * Fires a volley of `kind` (mobgen's Volley) at (tx, ty): one aimed; a fan of 3 to 5; a burst of 2 to 4
  * aimed one after another; a ring of 6 to 12; a slow wave, a wide arc of 5 to 9; pairs that curve in
  * from either side. Denser deeper down and from elites (density). Each bullet hits for less than a
- * bite; the more in a volley, the less each.
+ * bite; the more in a volley, the less each. The bullets are its gun's own kind (a dart, a blade, a
+ * spore: bullets.ts; the plain orb when it has none); the patterns only those kinds fire are theirs too
+ * (formVolley), and a beam is a quick burst of sparks down one line.
  */
 export function volley(w: World, m: Unit, kind: Volley, tx: number, ty: number): void {
   const d = density(w, m);
@@ -370,52 +385,60 @@ export function volley(w: World, m: Unit, kind: Volley, tx: number, ty: number):
   const ox = m.x;
   const oy = m.y - 6 * (m.type?.size ?? 1);
   const aim = Math.atan2(ty - oy, tx - ox);
+  const form = m.type?.gun?.form;
+  const far = Math.hypot(tx - ox, ty - oy);
   switch (kind) {
     case 'aimed':
-      bullet(w, m, ox, oy, aim, sp, 0.9);
+      bullet(w, m, ox, oy, aim, sp, 0.9, 0, form, far);
       break;
     case 'fan': {
       const n = Math.min(5, 3 + d);
-      for (let i = 0; i < n; i++) bullet(w, m, ox, oy, aim + (i - (n - 1) / 2) * 0.24, sp, 0.65);
+      for (let i = 0; i < n; i++) bullet(w, m, ox, oy, aim + (i - (n - 1) / 2) * 0.24, sp, 0.65, 0, form, far);
       break;
     }
     case 'burst':
       m.burst = { n: Math.min(4, 2 + d), t: 0, tx, ty };
       tickBurst(w, m, 0);
       break;
+    case 'beam':
+      m.burst = { n: 5 + Math.min(3, d), t: 0, tx, ty, every: 0.07, dmg: 0.4, form: 'spark' };
+      tickBurst(w, m, 0);
+      break;
     case 'ring':
-      ringAt(w, m, ox, oy, Math.min(12, 6 + 2 * d), sp * 0.85, 0.55, aim);
+      ringAt(w, m, ox, oy, Math.min(12, 6 + 2 * d), sp * 0.85, 0.55, aim, 0, form);
       break;
     case 'wave': {
       const n = Math.min(9, 5 + 2 * d);
-      for (let i = 0; i < n; i++) bullet(w, m, ox, oy, aim + (i - (n - 1) / 2) * (1.2 / (n - 1)), sp * 0.75, 0.5);
+      for (let i = 0; i < n; i++) bullet(w, m, ox, oy, aim + (i - (n - 1) / 2) * (1.2 / (n - 1)), sp * 0.75, 0.5, 0, form, far);
       break;
     }
     case 'curve': {
       const n = 1 + Math.min(2, d);
-      for (let i = 0; i < n; i++) for (const side of [-1, 1]) bullet(w, m, ox, oy, aim + side * (0.45 + i * 0.2), sp * 0.9, 0.6, -side * 0.85);
+      for (let i = 0; i < n; i++) for (const side of [-1, 1]) bullet(w, m, ox, oy, aim + side * (0.45 + i * 0.2), sp * 0.9, 0.6, -side * 0.85, form, far);
       break;
     }
+    default:
+      formVolley(w, m, kind, form, tx, ty, d, sp);
   }
 }
 
-/** A burst in progress: its next aimed shot every 0.13 s until it's spent. */
+/** A burst in progress: its next aimed shot every 0.13 s until it's spent (a beam's sparks come quicker, and are its own). */
 function tickBurst(w: World, m: Unit, dt: number): void {
   const b = m.burst!;
   b.t -= dt;
   if (b.t > 0) return;
   const oy = m.y - 6 * (m.type?.size ?? 1);
-  bullet(w, m, m.x, oy, Math.atan2(b.ty - oy, b.tx - m.x), bulletSpeed(w, m), 0.65);
+  bullet(w, m, m.x, oy, Math.atan2(b.ty - oy, b.tx - m.x), bulletSpeed(w, m), b.dmg ?? 0.65, 0, b.form ?? m.type?.gun?.form, Math.hypot(b.tx - m.x, b.ty - oy));
   b.n -= 1;
-  b.t = 0.13;
+  b.t = b.every ?? 0.13;
   if (b.n <= 0) m.burst = undefined;
 }
 
 /** `n` bullets all round (x, y) (bullets fly at body height), starting `r0` px out, the first at angle `a0`. */
-function ringAt(w: World, m: Unit, x: number, y: number, n: number, sp: number, dmg: number, a0 = 0, r0 = 0): void {
+function ringAt(w: World, m: Unit, x: number, y: number, n: number, sp: number, dmg: number, a0 = 0, r0 = 0, form?: BulletForm): void {
   for (let i = 0; i < n; i++) {
     const a = a0 + (i / n) * Math.PI * 2;
-    bullet(w, m, x + Math.cos(a) * r0, y + Math.sin(a) * r0, a, sp, dmg);
+    bullet(w, m, x + Math.cos(a) * r0, y + Math.sin(a) * r0, a, sp, dmg, 0, form);
   }
 }
 
@@ -427,7 +450,20 @@ function ringAt(w: World, m: Unit, x: number, y: number, n: number, sp: number, 
  */
 export function quakeRing(w: World, m: Unit, x: number, y: number, n: number, r0 = 10): void {
   if (n <= 0) return;
-  ringAt(w, m, x, y - 6, Math.min(14, n + 2 * density(w, m)), bulletSpeed(w, m) * 0.8, 0.5, w.rng.next() * Math.PI, r0);
+  const a0 = w.rng.next() * Math.PI;
+  // In its own kind when it has one (a slime's globs, a golem's crescents: bullets.ts), else plain orbs.
+  const form = m.type?.quakeForm;
+  if (form) quake(w, m, form, x, y - 6, n, r0, density(w, m), bulletSpeed(w, m), a0);
+  else ringAt(w, m, x, y - 6, Math.min(14, n + 2 * density(w, m)), bulletSpeed(w, m) * 0.8, 0.5, a0, r0);
+}
+
+/**
+ * Does this foe's gun hold its aim? A dart and a beam fly down the line their wind-up showed (the
+ * renderer draws it): it follows you for the first half of the wind-up, then holds, like a lunge's.
+ * Everything else is aimed where you are as it fires.
+ */
+export function aimHolds(m: Unit): boolean {
+  return m.move === 'shoot' && (m.gunKind === 'beam' || (m.type?.gun?.form === 'dart' && (m.gunKind === 'aimed' || m.gunKind === 'fan')));
 }
 
 /**
@@ -437,6 +473,12 @@ export function quakeRing(w: World, m: Unit, x: number, y: number, n: number, r0
  */
 function aimLunge(m: Unit, target: Unit, force = false): void {
   if (!force && (m.windT ?? 0) <= (m.windDur ?? 0) * 0.5) return;
+  if (m.move === 'shoot') {
+    // A gun's aim (only a dart's and a beam's are held to it: aimHolds).
+    m.moveX = target.x;
+    m.moveY = target.y;
+    return;
+  }
   if (m.move === 'throw') {
     // A throw comes down where the target stood when the aim held (its ring shows from the start).
     m.spotX = target.x;
@@ -477,7 +519,8 @@ function tryLunge(w: World, m: Unit, target: Unit, d: number, sight: boolean): b
 /** Winds up a volley of its gun (the tell: the red flash and its "about to fire" pose); every `every`-th volley its alternate. */
 function aimGun(m: Unit, g: Gun): void {
   const n = (m.volley = (m.volley ?? 0) + 1);
-  m.gunKind = g.alt && g.every && n % g.every === 0 ? g.alt : g.kind;
+  // (An elite fires its own pattern when its gun has one: an elite shaman's beam.)
+  m.gunKind = m.elite && g.elite ? g.elite : g.alt && g.every && n % g.every === 0 ? g.alt : g.kind;
   m.windT = m.windDur = g.wind + (m.gunKind !== g.kind ? 0.1 : 0);
   m.move = 'shoot';
   m.moving = false;
@@ -572,6 +615,11 @@ function endRush(w: World, m: Unit, landed: boolean): void {
     w.fx.push({ kind: 'dust', x: m.x, y: m.y });
     if (r.big) w.shakeIt(3, 0.2);
     if (r.move === 'charge' && m.boss) quakeRing(w, m, m.x, m.y, 8, m.r + 6);
+    else if (r.move === 'charge' && m.type!.kick) {
+      // A charger's hooves fling clods on ahead of it as it pulls up.
+      const [dx, dy] = norm(r.x1 - r.x0, r.y1 - r.y0);
+      kick(w, m, dx, dy, density(w, m), bulletSpeed(w, m));
+    }
   }
 }
 
@@ -800,10 +848,12 @@ function doMove(w: World, m: Unit, target: Unit): void {
       }
       break;
     }
-    case 'shoot':
-      // Its volley, aimed where you are as it fires.
-      volley(w, m, m.gunKind ?? 'aimed', target.x, target.y);
+    case 'shoot': {
+      // Its volley, aimed where you are as it fires (a dart or a beam: down the line its wind-up held).
+      const held = aimHolds(m) && m.moveX !== undefined && m.moveY !== undefined;
+      volley(w, m, m.gunKind ?? 'aimed', held ? m.moveX! : target.x, held ? m.moveY! : target.y);
       break;
+    }
     case 'cast':
       w.areas.push({ uid: uid(), team: 'mob', x: target.x, y: target.y, r: 18, delay: 0.9, dur: 0, tick: 1, tickT: 0, dmg: m.atk * 1.4, kind: 'blast', from: m.uid, color: t.ramp[3], t: 0 });
       break;
@@ -885,6 +935,8 @@ function bossMove(w: World, m: Unit, target: Unit, enraged: boolean): void {
   m.swingT = m.swingDur = 0.3;
   switch (m.move) {
     case 'ring': {
+      // (Every other ring and fan is one of its kind's own patterns: bullets.ts.)
+      if (bossPattern(w, m, 'ring', target, enraged, bulletSpeed(w, m))) break;
       const n = enraged ? 20 : 14;
       for (let i = 0; i < n; i++) {
         const a = (i / n) * Math.PI * 2 + w.time;
@@ -893,6 +945,7 @@ function bossMove(w: World, m: Unit, target: Unit, enraged: boolean): void {
       break;
     }
     case 'fan':
+      if (bossPattern(w, m, 'fan', target, enraged, bulletSpeed(w, m))) break;
       mobShoot(w, m, target.x, target.y, 0.22, enraged ? 7 : 5, 1.1);
       break;
     case 'charge':

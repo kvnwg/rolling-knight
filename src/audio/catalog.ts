@@ -59,7 +59,7 @@ const FIGHT = {
   hit_stone: def('Hits', 'A blow lands on a golem or the Stone Warden.', 'A stone knock: a dull thunk, grit and chips.', 1, 4, 28),
   hit_shell: def('Hits', 'A blow lands on a bug.', 'A chitin crunch.', 1, 4, 28),
   hit_wood: def('Hits', 'A blow lands on a plant, a pumpkin or one of the farm’s scarecrows.', 'A hollow wooden knock and a rustle.', 1, 4, 28),
-  hit_ghost: def('Hits', 'A blow passes through a ghost or a wisp.', 'An airy whoosh and a faint wail.', 1, 4, 28),
+  hit_ghost: def('Hits', 'A blow passes through a ghost or a wisp; a ghost lets its homing wisps go (quieter, higher).', 'An airy whoosh and a faint wail.', 1, 4, 28),
   crit: def('Hits', 'A critical hit, on top of the blow’s own sound (one auto attack in ten, most skill hits).', 'A sharp crack, a steel ring and a heavier punch.', 2, 2, 55, { duck: [0.7, 0.1] }),
   lucky_hit: def('Hits', 'A LUCKY hit (the upgrade map’s Lucky Strike).', 'A bright double ping.', 2, 1, 120),
 
@@ -86,10 +86,10 @@ const FIGHT = {
   atk_sword: def('Attacks', 'The Blade’s Cleave.', 'A whoosh and a steel slash.', 1, 3, 40),
   atk_shield: def('Attacks', 'The Guardian’s Shield Sweep.', 'A dull metal thunk on wood.', 1, 3, 40),
   atk_spear: def('Attacks', 'The Lancer’s thrust.', 'A short, sharp fwip and the shaft’s rattle.', 1, 3, 40),
-  atk_bow: def('Attacks', 'The Ranger’s Longshot.', 'A bowstring twang and the arrow’s whistle.', 1, 3, 40),
+  atk_bow: def('Attacks', 'The Ranger’s Longshot; a foe archer’s dart (quieter, higher).', 'A bowstring twang and the arrow’s whistle.', 1, 3, 40),
   arrow_thunk: def('Attacks', 'An arrow or a spear strikes a foe or a wall.', 'A woody thunk.', 0, 3, 30),
-  atk_arcane: def('Attacks', 'The Arcanist’s Arcane Bolt.', 'A sparkly zap.', 1, 3, 40),
-  arcane_pop: def('Attacks', 'An Arcane Bolt or a Magic Missile bursts on impact.', 'A magical pop.', 1, 2, 45),
+  atk_arcane: def('Attacks', 'The Arcanist’s Arcane Bolt; each spark of an elite caster’s beam (quieter, higher).', 'A sparkly zap.', 1, 3, 40),
+  arcane_pop: def('Attacks', 'An Arcane Bolt or a Magic Missile bursts on impact; a foe’s seed or mine bursts into its pips.', 'A magical pop.', 1, 2, 45),
   atk_holy: def('Attacks', 'The Cleric’s Holy Orb.', 'A bright holy chime.', 1, 3, 40),
 
   // --- explosions
@@ -103,7 +103,7 @@ const FIGHT = {
 
   // --- foes
   death_flesh: def('Foes', 'A foe of flesh falls (an elite deeper, a boss deeper still).', 'A thud, a last breath and the body hitting the ground.', 1, 3, 40),
-  death_slime: def('Foes', 'A slime pops.', 'A wet splat and bubbles.', 1, 3, 40),
+  death_slime: def('Foes', 'A slime pops; a slime’s lobbed glob lands (quieter, higher).', 'A wet splat and bubbles.', 1, 3, 40),
   death_bone: def('Foes', 'A skeleton falls apart.', 'Bones clattering down.', 1, 3, 40),
   death_stone: def('Foes', 'A golem or the Stone Warden crumbles.', 'A deep thump and rocks tumbling.', 1, 3, 40),
   death_shell: def('Foes', 'A bug is squashed.', 'A crunch and a squeak.', 1, 3, 40),
@@ -111,8 +111,8 @@ const FIGHT = {
   death_ghost: def('Foes', 'A ghost fades away.', 'A fading wail.', 1, 3, 40),
   kill_chime: def('Foes', 'Each kill after the first in a wave (2.5 s or less since the last): a step up the scale each time.', 'A bell climbing the scale.', 0, 2, 60),
   mob_bite: def('Foes', 'A beast, a slime, a bug, a bat or a farm animal bites (hit or miss), or pounces or hops at a knight.', 'A snapping bite.', 0, 3, 45),
-  mob_swipe: def('Foes', 'A goblin, a skeleton, an orc or a ghost swings at a knight; any foe dashes at one (a goblin’s stab, an orc’s shoulder charge, a bat’s swoop); an ogre hurls a boulder (and any new kind of attack without a sound of its own).', 'A weapon whoosh.', 0, 3, 45),
-  mob_shot: def('Foes', 'A foe shoots or spits: a volley’s aimed shot, fan, burst, ring or curving pair (bigger for three or more); a boss’s ring or fan of shots (bigger).', 'A spit and a puff.', 0, 3, 50),
+  mob_swipe: def('Foes', 'A goblin, a skeleton, an orc or a ghost swings at a knight; any foe dashes at one (a goblin’s stab, an orc’s shoulder charge, a bat’s swoop); an ogre hurls a boulder; a goblin’s knife, a skeleton’s bone or an orc’s axe is thrown (and any new kind of attack without a sound of its own).', 'A weapon whoosh.', 0, 3, 45),
+  mob_shot: def('Foes', 'A foe shoots or spits: a volley’s aimed shot, fan, burst, ring or curving pair, and its spit, spores, seeds, globs, mines and pellets (bigger for three or more); a boss’s ring or fan of shots (bigger).', 'A spit and a puff.', 0, 3, 50),
   mob_cast: def('Foes', 'A caster raises its circle (its 0.5 s wind-up; the circle bursts later, as boom_small).', 'A rising magic hum ending in a whomp.', 1, 2, 120),
   mob_charge_windup: def('Foes', 'A charger (a boar, a rhino, a ram, a hog) paws the ground before it charges.', 'A snort, hooves scraping, a growl.', 1, 2, 150),
   mob_charge: def('Foes', 'A charger, or a boss, charges; a boss leaps.', 'Galloping thuds and rushing air.', 1, 2, 120),

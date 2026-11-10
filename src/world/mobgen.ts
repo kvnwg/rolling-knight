@@ -8,6 +8,7 @@
  */
 import { Rng } from '../core/rng';
 import type { Biome, BodyPlan, Ramp } from './biomes';
+import type { BulletForm } from './bullets';
 
 export type Behavior = 'chaser' | 'ranged' | 'charger' | 'bomber' | 'caster' | 'tank' | 'swarm';
 export type BossMove = 'ring' | 'fan' | 'charge' | 'slam' | 'summon' | 'rain' | 'leap';
@@ -123,14 +124,23 @@ export function lungeFor(biome: string, plan: BodyPlan, behavior: Behavior, horn
  * and high-contrast, in a pattern each kind of foe is known by. 'aimed' one at you; 'fan' 3 to 5 spread
  * out; 'burst' 2 to 4 aimed one after another; 'ring' all round; 'wave' a wide slow arc; 'curve' a few
  * that bend in toward you. Later floors and elites fire denser patterns (ai.ts volley).
+ *
+ * And the patterns only some kinds of bullet fire (bullets.ts): 'lob' a glob onto where you stand, or a
+ * mine tossed your way; 'pods' seeds that burst into pips; 'spray' a short cone of pellets; 'drift' a
+ * loose fan of weaving spores; 'wisps' a few wisps let go wide of you; 'beam' a stream of sparks down
+ * one line.
  */
-export type Volley = 'aimed' | 'fan' | 'burst' | 'ring' | 'wave' | 'curve';
+export type Volley = 'aimed' | 'fan' | 'burst' | 'ring' | 'wave' | 'curve' | 'lob' | 'pods' | 'spray' | 'drift' | 'wisps' | 'beam';
 
 export interface Gun {
-  /** Its pattern; every `every`-th volley `alt` instead (an archer's fan). */
+  /** Its pattern; every `every`-th volley `alt` instead (an archer's fan); an elite's own pattern, when it has one. */
   kind: Volley;
   alt?: Volley;
   every?: number;
+  elite?: Volley;
+  /** The bullets it fires (bullets.ts), and which of their looks; left out: the plain slow orb. */
+  form?: BulletForm;
+  look?: number;
   /** Seconds between volleys, and the distances it fires from. */
   cd: number;
   min: number;
@@ -140,37 +150,75 @@ export interface Gun {
 }
 
 /**
- * Each kind's gun: archers aim and fan out every third volley, spitters burst, spore pods ring, thorns
- * and spiders fan, shamans and wraiths curve theirs in, goblins and ghouls fire single aimed shots (and
- * skeletons short bursts, orcs fans), swarms the odd slow shot. Beasts, slimes, chargers, bombers and
- * ogres have no gun: they come at you (slimes, pumpkins, bombers and ogres shake bullets loose as they land,
- * slam or go off: quakeFor).
+ * Each kind's gun, and the bullets that are its family's own:
+ *   humanoids  archers loose darts down a line they show you (one, and every third volley a fan);
+ *              goblins throw a knife that loops out and back, skeletons a burst of bones, orcs a fan
+ *              of axes; shamans curve slow orbs in (an elite: a beam of sparks)
+ *   flyers     spit that brakes and hangs in the air (spitters a burst, bats the odd one)
+ *   plants     spore pods lob seeds that burst into pips; blooms drift weaving spores
+ *   bugs       weaving spores: spiders a fan, mites the odd one
+ *   ghosts     wisps that turn after you (wraiths a few, spirits one)
+ *   slimes     lob a glob onto where you stand
+ *   pumpkins   toss a mine that sits, then pops; the farm's hens lay theirs as eggs
+ *   beasts     a short spray of pellets when you're close
+ * Chargers, bombers and ogres have no gun: they come at you, and what they shake loose as they land,
+ * slam, go off or end a charge is in their kind too (quakeFormFor, kickFor).
  */
 export function gunFor(plan: BodyPlan, behavior: Behavior, lunge: Lunge | undefined, atkCd: number, range: number): Gun | undefined {
   switch (behavior) {
     case 'ranged':
-      if (plan === 'plant') return { kind: 'ring', cd: atkCd * 1.5, min: 0, max: range, wind: 0.6 };
-      if (plan === 'flyer') return { kind: 'burst', cd: atkCd * 1.3, min: 0, max: range, wind: 0.5 };
-      return { kind: 'aimed', alt: 'fan', every: 3, cd: atkCd, min: 0, max: range, wind: 0.45 };
+      if (plan === 'plant') return { kind: 'pods', form: 'seed', cd: atkCd * 1.5, min: 0, max: range, wind: 0.6 };
+      if (plan === 'flyer') return { kind: 'burst', form: 'spit', cd: atkCd * 1.3, min: 0, max: range, wind: 0.5 };
+      return { kind: 'aimed', alt: 'fan', every: 3, form: 'dart', cd: atkCd, min: 0, max: range, wind: 0.55 };
     case 'caster':
-      return { kind: 'curve', cd: atkCd * 0.9, min: 0, max: range, wind: 0.55 };
+      if (plan === 'plant') return { kind: 'drift', form: 'spore', cd: atkCd * 0.9, min: 0, max: range, wind: 0.55 };
+      if (plan === 'ghost') return { kind: 'wisps', form: 'wisp', cd: atkCd * 0.9, min: 0, max: range, wind: 0.55 };
+      return { kind: 'curve', elite: 'beam', cd: atkCd * 0.9, min: 0, max: range, wind: 0.55 };
     case 'chaser':
-      if (plan === 'humanoid') return { kind: lunge?.name === 'thrust' ? 'burst' : lunge?.name === 'shoulder' ? 'fan' : 'aimed', cd: 2.4, min: 34, max: 110, wind: 0.45 };
-      if (plan === 'bug') return { kind: 'fan', cd: 2.8, min: 30, max: 100, wind: 0.5 };
+      if (plan === 'humanoid') {
+        const [kind, look]: [Volley, number] = lunge?.name === 'thrust' ? ['burst', 1] : lunge?.name === 'shoulder' ? ['fan', 2] : ['aimed', 0];
+        return { kind, form: 'blade', look, cd: 2.4, min: 34, max: 110, wind: 0.45 };
+      }
+      if (plan === 'bug') return { kind: 'fan', form: 'spore', cd: 2.8, min: 30, max: 100, wind: 0.5 };
+      if (plan === 'slime') return { kind: 'lob', form: 'glob', cd: 3.4, min: 40, max: 112, wind: 0.55 };
+      if (plan === 'pumpkin') return { kind: 'lob', form: 'mine', cd: 3.4, min: 30, max: 100, wind: 0.5 };
+      if (plan === 'beast') return { kind: 'spray', form: 'pellet', cd: 3.6, min: 22, max: 52, wind: 0.45 };
       return undefined;
     case 'swarm':
-      return plan === 'ghost' ? { kind: 'curve', cd: 3.6, min: 30, max: 100, wind: 0.5 } : { kind: 'aimed', cd: 3.6, min: 30, max: 100, wind: 0.45 };
+      if (plan === 'ghost') return { kind: 'wisps', form: 'wisp', cd: 3.6, min: 30, max: 100, wind: 0.5 };
+      if (plan === 'chicken') return { kind: 'lob', form: 'mine', cd: 3.6, min: 30, max: 100, wind: 0.45 };
+      return { kind: 'aimed', form: plan === 'bug' ? 'spore' : 'spit', cd: 3.6, min: 30, max: 100, wind: 0.45 };
     default:
       return undefined;
   }
 }
 
-/** Bullets a heavy mover shakes loose in a ring when it lands a leap, slams or goes off (0: none; a charger's charge is its whole attack). */
+/**
+ * Bullets a heavy mover shakes loose in a ring when it lands a leap, slams or goes off (0: none; a
+ * charger's charge is its whole attack, but for the clods it kicks up: kickFor). Slimes and pumpkins
+ * that hop shake fewer than they did, now that they lob and toss as well.
+ */
 export function quakeFor(plan: BodyPlan, behavior: Behavior): number {
   if (behavior === 'tank') return 8;
   if (behavior === 'bomber') return 8;
-  if (plan === 'slime' || plan === 'pumpkin') return 6;
+  if (plan === 'slime' || plan === 'pumpkin') return 4;
   return 0;
+}
+
+/** What those are (bullets.ts quake): a slime's globs, a golem's crescents, a pumpkin's pips, a bomber's shrapnel. */
+export function quakeFormFor(plan: BodyPlan, behavior: Behavior): BulletForm | undefined {
+  if (behavior === 'tank') return 'wave';
+  if (behavior === 'bomber') return plan === 'slime' ? 'glob' : 'pellet';
+  if (plan === 'slime') return 'glob';
+  if (plan === 'pumpkin') return 'pip';
+  // (A boss of these kinds shakes its own loose as it lands or ends a charge.)
+  if (plan === 'beast' || plan === 'pig' || plan === 'ram') return 'pellet';
+  return undefined;
+}
+
+/** Clods a charger kicks on ahead of it as its charge ends (0: none). */
+export function kickFor(behavior: Behavior): number {
+  return behavior === 'charger' ? 3 : 0;
 }
 
 export interface MobType {
@@ -201,6 +249,9 @@ export interface MobType {
   gun?: Gun;
   /** Bullets it shakes loose in a ring when it lands, slams, goes off or ends a charge (quakeFor). */
   quake?: number;
+  /** What those are (quakeFormFor; left out: plain orbs), and the clods its charge kicks up as it ends (kickFor). */
+  quakeForm?: BulletForm;
+  kick?: number;
 }
 
 const BEHAVIORS: Record<BodyPlan, Behavior[]> = {
@@ -337,6 +388,8 @@ function design(biome: Biome, plan: BodyPlan, behavior: Behavior, rng: Rng, id: 
   const lunge = lungeFor(biome.id, plan, behavior, features.horns);
   const gun = gunFor(plan, behavior, lunge, atkCd, base.range);
   const quake = quakeFor(plan, behavior);
+  const quakeForm = quakeFormFor(plan, behavior);
+  const kick = kickFor(behavior);
   return {
     id,
     name,
@@ -358,6 +411,8 @@ function design(biome: Biome, plan: BodyPlan, behavior: Behavior, rng: Rng, id: 
     ...(plan === 'golem' ? { lob: OGRE_LOB } : {}),
     ...(gun ? { gun } : {}),
     ...(quake ? { quake } : {}),
+    ...(quakeForm ? { quakeForm } : {}),
+    ...(kick ? { kick } : {}),
     // (Every foe's bullets get a speed: slow, readable, slower than any knight's shot.)
     ...(behavior === 'ranged' || behavior === 'caster' || !gun ? {} : { shot: { speed: 70, color: shotColor, radius: 3 } }),
   };
