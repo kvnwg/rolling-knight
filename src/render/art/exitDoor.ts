@@ -30,8 +30,8 @@ export const DOOR_AY = T + 1;
 /** Animation frames of the open doorway, and steps of the portcullis winding up. */
 export const DOOR_FRAMES = 8;
 export const BAR_STEPS = 12;
-/** Stones of the inner ring lit while you stand in the doorway: from both ends toward the keystone. */
-export const LIT_STEPS = 5;
+/** The vortex's eye, straight up from the anchor (px): where the squad is pulled in, going through. */
+export const DOOR_EYE = VY - T;
 
 /** Dusk stone: purple-black shadow up to a warm lilac. */
 const DUSK: Ramp = ['#170c1b', '#24142b', '#341f3c', '#462c4e', '#5a3a5e', '#704a6c', '#8a5e78', '#a47684'];
@@ -446,18 +446,22 @@ function paintRim(frame: Layer): Layer {
   return L;
 }
 
-/** The inner ring's stones lit, `n` of LIT_STEPS: both ends first, the keystone last. */
-function paintLit(frame: Layer, n: number): Layer {
+/**
+ * The inner ring's stones all lit, while the squad goes through the doorway: the stone's own light
+ * and dark kept, pulled `t` of the way to `hot` (the flare as the swirl takes the squad is nearly
+ * white, its runes white-hot).
+ */
+function paintLit(frame: Layer, hot: string, t: number): Layer {
   const L = newLayer();
   for (let y = 0; y < S; y++) {
     for (let x = 0; x < DOOR_W; x++) {
-      const k = innerStone(x, y);
-      if (k < 0 || Math.min(k, 8 - k) >= n) continue;
+      if (innerStone(x, y) < 0) continue;
       const c = frame.get(x, y);
       if (!c) continue;
-      L.gl(x, y, mixTo(c, '#fff4c8', 0.45));
+      L.gl(x, y, mixTo(c, hot, t));
     }
   }
+  if (t > 0.6) for (const [x, y] of runePixels()) L.gl(x, y, '#fffdf0');
   return L;
 }
 
@@ -473,7 +477,9 @@ export interface DoorArt {
   sealed: Layer;
   bars: Layer[];
   rim: Layer;
-  lit: Layer[];
+  /** The inner ring lit while the squad goes through, and flaring as the swirl takes it. */
+  lit: Layer;
+  flare: Layer;
 }
 
 let art: DoorArt | null = null;
@@ -488,7 +494,8 @@ export function doorArt(): DoorArt {
     sealed: paintSealed(),
     bars: Array.from({ length: BAR_STEPS + 1 }, (_, k) => paintBars(k / BAR_STEPS)),
     rim: paintRim(frame),
-    lit: Array.from({ length: LIT_STEPS + 1 }, (_, n) => paintLit(frame, n)),
+    lit: paintLit(frame, '#fff4c8', 0.45),
+    flare: paintLit(frame, '#fffdf0', 0.8),
   };
   return art;
 }

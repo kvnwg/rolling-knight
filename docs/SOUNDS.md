@@ -180,7 +180,7 @@ Older sounds (from Dumpster Legend), played as they always were.
 | `potion` | A Luck Potion picked up. | Three gulps, then the long jingle. | — |
 | `xp` | XP reaching a bar. (Not played by the game yet.) | A soft upward blip. | — |
 | `level_up` | A knight levels up (its hero sheet). | The jingle, the music dipping under it. | — |
-| `portal` | A floor is cleared: the portal opens. | Rising bells and a swirling whoosh. | — |
+| `portal` | A floor is cleared: the portal opens; and the squad swirling into it, on its way down. | Rising bells and a swirling whoosh. | — |
 | `floor_start` | A new floor starts. | A whoosh in and a horn call. | — |
 | `boss_warn` | A boss telegraphs an attack. (Not played by the game yet.) The fight plays boss_windup. | Two low warning blips. | — |
 | `boss_roar` | A boss floor starts. | A deep boom, a low brass growl and a roar. | — |
