@@ -7,7 +7,8 @@
 .layer {
   position: fixed;
   inset: 0;
-  z-index: 30;
+  /* (Over the tinker's upgrade tree too, which covers the screen at 32.) */
+  z-index: 34;
   pointer-events: none;
   /* The keepers' paper and ink. */
   --ink: #2b170c;

@@ -763,6 +763,8 @@ export function UpgradeMap({ game, onClose, closeText = 'CLOSE', onCombat, onCar
     <div className={s.overlay} ref={overlayRef} data-wide={wide || undefined} data-calm={calm || undefined}>
       <div className={s.viewport} ref={viewportRef}>
         <div className={s.grid} ref={gridRef} style={{ backgroundImage: GRID_URL }} aria-hidden />
+        {/* (The tutorial's pointer: the middle of the tree.) */}
+        <i data-tut="tree" aria-hidden style={{ position: 'absolute', left: '50%', top: '46%', width: 'calc(44 * var(--px))', height: 'calc(44 * var(--px))', transform: 'translate(-50%, -50%)', pointerEvents: 'none' }} />
       </div>
       <canvas ref={canvasRef} className={s.canvas} aria-hidden />
 
@@ -776,7 +778,7 @@ export function UpgradeMap({ game, onClose, closeText = 'CLOSE', onCombat, onCar
                   LUCK
                 </button>
                 {onCombat && (
-                  <button className="btn small" onClick={() => (uiSound('tap'), onCombat())} title="Roll for combat upgrades">
+                  <button className="btn small" data-tut="treeCombat" onClick={() => (uiSound('tap'), onCombat())} title="Roll for combat upgrades">
                     <Px icon="swords" size="sm" />
                     COMBAT
                   </button>

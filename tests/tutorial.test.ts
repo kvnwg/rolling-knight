@@ -5,11 +5,13 @@ import {
   AUTO_ASK,
   AUTO_READ,
   AUTO_TRIES,
+  COMBAT_READ,
   EXTRAS_TIP,
   SKILLS_READ,
   TIP_MIN,
   TIP_REST,
   TIP_SECONDS,
+  TREE_READ,
   TUT_STEPS,
   TUT_TIPS,
   currentStep,
@@ -49,6 +51,9 @@ function at(where: TutCtx['where'], o: Partial<TutCtx> = {}): TutCtx {
     soloShown: false,
     autoOn: false,
     extras: 0,
+    nearTinker: false,
+    treeShown: false,
+    combatShown: false,
     ...o,
   };
 }
@@ -197,6 +202,20 @@ describe('the tutorial: one step at a time', () => {
     expect(g.key(at('warden', { canLevel: true, levelShown: false }))).toBe('spend:tab');
     g.did('leveled');
     expect(g.key(at('warden'))).toBeNull();
+    // Then on to the tinker: his upgrade tree, then his combat upgrades.
+    expect(currentStep(g.t)).toBe('tree');
+    expect(g.key(at('hub'))).toBe('tree:walk');
+    expect(g.key(at('hub', { nearTinker: true }))).toBe('tree:talk');
+    // (From his cards, the way back to the tree.)
+    expect(g.key(at('tinker'))).toBe('tree:open');
+    expect(g.key(at('tinker', { treeShown: true }))).toBe('tree:map');
+    // The tree's line stays up long enough to take it in, then the combat tab's turn.
+    expect(g.wait(at('tinker', { treeShown: true }), TREE_READ - 1)).toBe('tree:map');
+    expect(g.wait(at('tinker', { treeShown: true }), 1.5)).toBe('combat:open');
+    expect(g.t.done).toContain('tree');
+    expect(g.key(at('hub'))).toBe('combat:walk');
+    expect(g.key(at('tinker', { combatShown: true }))).toBe('combat:roll');
+    expect(g.wait(at('tinker', { combatShown: true }), COMBAT_READ + 0.5)).toBeNull();
     expect(currentStep(g.t)).toBeNull();
     expect([...g.t.done].sort()).toEqual([...TUT_STEPS].sort());
   });
@@ -342,6 +361,43 @@ describe('the tutorial: one step at a time', () => {
     ]);
     // Every line short: one thing at a time.
     for (const text of [...phone, ...desk]) expect(text.replace(/[[\]]/g, '').length).toBeLessThanOrEqual(48);
+  });
+});
+
+describe('the tutorial: the tinker', () => {
+  const after = (): TutorialSave => ({ done: TUT_STEPS.filter((x) => x !== 'tree' && x !== 'combat'), tips: [], skipped: false });
+
+  it('buying off the tree finishes its step, and a combat roll the combat one, whenever they happen', () => {
+    const g = play(after());
+    expect(g.key(at('tinker', { treeShown: true }))).toBe('tree:map');
+    g.did('upgraded');
+    expect(g.key(at('tinker', { treeShown: true }))).toBe('combat:open');
+    g.did('combatRolled');
+    expect(g.key(at('tinker', { combatShown: true }))).toBeNull();
+    expect(currentStep(g.t)).toBeNull();
+    // Rolled for combat before ever looking at the tree: the tree still gets its turn.
+    const h = play(after());
+    h.did('combatRolled');
+    expect(h.key(at('tinker', { combatShown: true }))).toBeNull();
+    expect(h.key(at('tinker', { treeShown: true }))).toBe('tree:map');
+  });
+
+  it('waits for the level up before it sends you to him, and keeps its lines short', () => {
+    const g = play({ done: TUT_STEPS.filter((x) => x !== 'spend' && x !== 'tree' && x !== 'combat'), tips: [], skipped: false });
+    expect(g.key(at('hub'))).toBeNull();
+    expect(g.key(at('tinker', { treeShown: true }))).toBeNull();
+    const t = play(after());
+    const lines = [
+      t.see(at('hub'))!.text,
+      t.see(at('tinker'))!.text,
+      t.see(at('tinker', { treeShown: true }))!.text,
+      t.see(at('tinker', { treeShown: true, touch: true }))!.text,
+    ];
+    t.did('upgraded');
+    lines.push(t.see(at('hub'))!.text, t.see(at('tinker', { treeShown: true }))!.text, t.see(at('tinker', { treeShown: true, touch: true }))!.text, t.see(at('tinker', { combatShown: true }))!.text);
+    for (const text of lines) expect(text.replace(/[[\]]/g, '').length).toBeLessThanOrEqual(48);
+    expect(lines[2]).toContain('[upgrade tree]');
+    expect(lines[7]).toContain('[Combat upgrades]');
   });
 });
 

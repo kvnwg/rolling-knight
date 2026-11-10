@@ -514,7 +514,7 @@ export function App() {
         controls={ctl.controls}
         station={station && !inDungeon ? station.id : null}
         choosing={choosing}
-        blocked={intro || detail !== null || settings || luck || talking !== null || reveals.length > 0 || offline !== null}
+        blocked={intro || detail !== null || settings || luck || talking !== null || reveals.length > 0 || offline !== null || campAsk}
       />
       {intro && <div className="intro-fade" onAnimationEnd={() => setIntro(false)} aria-hidden />}
       {detail && <HeroDetail game={game} id={detail} onClose={() => setDetail(null)} />}

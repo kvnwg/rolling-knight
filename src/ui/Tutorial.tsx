@@ -16,6 +16,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import { canRebirth } from '../core/newGame';
 import { canLevel, extrasCount } from '../core/roster';
+import { combatTiers } from '../core/combatRoll';
 import { newTutRun, skipTutorial, tutorialDid, tutorialProgress, tutorialView, TUT_STEPS, type TutAction, type TutCtx, type TutTarget, type TutView, type TutWhere } from '../core/tutorial';
 import type { Game } from '../game';
 import type { Controls } from '../input/input';
@@ -158,6 +159,16 @@ function uiTarget(game: Game, id: Extract<TutTarget, { kind: 'ui' }>['id']): Ele
       return document.querySelector('.dhud .floor-pill');
     case 'solo':
       return document.querySelector('[data-keeper="gate"] [data-tut="solo"]');
+    // Tinker Pell's: the middle of his upgrade tree, the way back to it from his cards, the way to
+    // his combat rolls (the tree's own COMBAT button, or his tab), and the roll.
+    case 'tree':
+      return document.querySelector('[data-tut="tree"]');
+    case 'mapBtn':
+      return document.querySelector('[data-keeper="upgrades"] [data-tut="mapBtn"]');
+    case 'combatBtn':
+      return document.querySelector('[data-tut="treeCombat"]') ?? [...document.querySelectorAll('[data-keeper="upgrades"] [role="tab"]')].find((el) => /combat/i.test(el.textContent ?? '')) ?? null;
+    case 'combatRoll':
+      return document.querySelector('[data-keeper="upgrades"] [data-tut="combatRoll"]');
   }
 }
 
@@ -197,9 +208,10 @@ function worldSpot(game: Game, r: Renderer, id: Extract<TutTarget, { kind: 'worl
       return lead ? at(lead.x, lead.y, 24, 9) : null;
     case 'warden':
     case 'shrine':
+    case 'tinker':
     case 'broker': {
       // (Just over his helmet, her hood or his cap: they're a head shorter than a knight.)
-      const st = w.stations.find((x) => x.id === (id === 'warden' ? 'gate' : id === 'shrine' ? 'rebirth' : 'scrap'));
+      const st = w.stations.find((x) => x.id === (id === 'warden' ? 'gate' : id === 'shrine' ? 'rebirth' : id === 'tinker' ? 'upgrades' : 'scrap'));
       return st ? at(st.x, st.y, id === 'shrine' ? 19 : 17, 9) : null;
     }
     case 'steps':
@@ -446,6 +458,9 @@ export function Tutorial(props: TutorialProps) {
       floorAt: -10,
       auto: game.state.settings.autoPlay,
       doorIn: false,
+      /** Tiers bought off the tinker's tree, and tiers his combat reel has rolled, as last seen. */
+      upgrades: -1,
+      combatRolls: -1,
     };
     // The pieces' last places, kept while they still work (and which line they were for).
     const prev = {
@@ -513,6 +528,8 @@ export function Tutorial(props: TutorialProps) {
         state = st;
         run.current = newTutRun();
         mem.kills = -1;
+        mem.upgrades = -1;
+        mem.combatRolls = -1;
         mem.levels = null;
         mem.attackT = 0;
         mem.castAt = -Infinity;
@@ -524,7 +541,7 @@ export function Tutorial(props: TutorialProps) {
       let where: TutWhere;
       if (p.blocked || game.fade > 0.25) where = 'busy';
       else if (game.inDungeon) where = !game.world || now - mem.floorAt < 2.2 || game.world.livingHeroes().length === 0 ? 'busy' : 'dungeon';
-      else if (p.station) where = p.station === 'altar' ? 'altar' : p.station === 'gate' ? 'warden' : 'keeper';
+      else if (p.station) where = p.station === 'altar' ? 'altar' : p.station === 'gate' ? 'warden' : p.station === 'upgrades' ? 'tinker' : 'keeper';
       else if (p.choosing) where = 'select';
       else where = 'hub';
       const lead = w?.leader() ?? null;
@@ -543,6 +560,13 @@ export function Tutorial(props: TutorialProps) {
         if (was !== rec.level) levels.set(rec.id, rec.level);
       }
       if (up && !game.inDungeon) did('leveled');
+      // An upgrade off the tinker's tree, a roll at his combat reel.
+      const rolled = combatTiers(st);
+      const bought = Object.values(st.upgrades).reduce((a, b) => a + b, 0) - rolled;
+      if (mem.upgrades >= 0 && bought > mem.upgrades) did('upgraded');
+      if (mem.combatRolls >= 0 && rolled > mem.combatRolls) did('combatRolled');
+      mem.upgrades = bought;
+      mem.combatRolls = rolled;
       if (game.inDungeon && mem.inDungeon && st.run.floor > mem.floor) did('exited');
       mem.inDungeon = game.inDungeon;
       mem.floor = st.run.floor;
@@ -604,6 +628,9 @@ export function Tutorial(props: TutorialProps) {
         soloShown: where === 'warden' && !!document.querySelector('[data-keeper="gate"] [data-tut="solo"]'),
         autoOn: st.settings.autoPlay,
         extras: extrasCount(st),
+        nearTinker: !game.inDungeon && game.hub?.nearStation()?.id === 'upgrades',
+        treeShown: where === 'tinker' && !!document.querySelector('[data-tut="tree"]'),
+        combatShown: where === 'tinker' && !!document.querySelector('[data-keeper="upgrades"] [data-tut="combatRoll"]'),
       };
       const v = game.bot ? null : tutorialView(t, run.current, ctx, now);
       const key = v?.key ?? null;

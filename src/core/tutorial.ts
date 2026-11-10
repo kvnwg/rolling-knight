@@ -15,7 +15,11 @@
  *  - skills:  your knight's skills roll and cast on their own (the line stays up a few seconds);
  *  - exit:    the door to the next floor (auto battle goes through it by itself);
  *  - camp:    once there's gold enough to level your knight up, head back up;
- *  - spend:   level a knight up at Warden Tobb's counter.
+ *  - spend:   level a knight up at Warden Tobb's counter;
+ *  - tree:    then on to Tinker Pell: his upgrade tree (the map of every upgrade the gold buys),
+ *             pointed out and left up long enough to take in (or until one is bought);
+ *  - combat:  and his COMBAT tab, where gold rolls for stronger knights: the way to it, then the
+ *             roll itself (done once it's been looked at, or rolled).
  *
  * Each step waits for the one before it (TUT_AFTER) and shows when its moment comes: the line on the
  * screen is the first step not done whose moment is now. So a fight that ends before a skill rolls
@@ -36,7 +40,7 @@
  */
 import { BAL } from './balance';
 
-export const TUT_STEPS = ['seal', 'altar', 'descend', 'attack', 'auto', 'skills', 'exit', 'camp', 'spend'] as const;
+export const TUT_STEPS = ['seal', 'altar', 'descend', 'attack', 'auto', 'skills', 'exit', 'camp', 'spend', 'tree', 'combat'] as const;
 export type TutStepId = (typeof TUT_STEPS)[number];
 export const TUT_TIPS = ['shop', 'checkpoint', 'rebirth', 'solo', 'auto', 'extras'] as const;
 export type TutTipId = (typeof TUT_TIPS)[number];
@@ -52,6 +56,8 @@ export const TUT_AFTER: Record<TutStepId, TutStepId | null> = {
   exit: 'attack',
   camp: 'exit',
   spend: 'camp',
+  tree: 'spend',
+  combat: 'tree',
 };
 
 /** What the save keeps (GameState.seen.tutorial). */
@@ -70,6 +76,8 @@ export type TutWhere =
   | 'altar'
   /** At the hub, Warden Tobb's counter open. */
   | 'warden'
+  /** At the hub, Tinker Pell's counter open (the upgrade tree, the combat rolls). */
+  | 'tinker'
   /** At the hub, another keeper's counter open. */
   | 'keeper'
   /** Choosing who to play as. */
@@ -118,12 +126,18 @@ export interface TutCtx {
   autoOn: boolean;
   /** Extras (repeat pulls) waiting for Bram the Broker to sell them. */
   extras: number;
+  /** At the hub, standing by Tinker Pell (his button is up). */
+  nearTinker: boolean;
+  /** At Tinker Pell's counter: his upgrade tree (the map) is on the screen. */
+  treeShown: boolean;
+  /** At Tinker Pell's counter: his COMBAT tab is open. */
+  combatShown: boolean;
 }
 
 /** What a line points at: a part of the screen, or a spot in the world. */
 export type TutTarget =
-  | { kind: 'ui'; id: 'seal' | 'close' | 'talk' | 'descend' | 'level' | 'squadTab' | 'attack' | 'reel' | 'camp' | 'auto' | 'floor' | 'solo' }
-  | { kind: 'world'; id: 'knight' | 'warden' | 'steps' | 'foe' | 'door' | 'shop' | 'shrine' | 'broker' };
+  | { kind: 'ui'; id: 'seal' | 'close' | 'talk' | 'descend' | 'level' | 'squadTab' | 'attack' | 'reel' | 'camp' | 'auto' | 'floor' | 'solo' | 'tree' | 'mapBtn' | 'combatBtn' | 'combatRoll' }
+  | { kind: 'world'; id: 'knight' | 'warden' | 'steps' | 'foe' | 'door' | 'shop' | 'shrine' | 'broker' | 'tinker' };
 
 /** The line on the screen. */
 export interface TutView {
@@ -166,7 +180,11 @@ export type TutAction =
   /** Turned auto battle on. */
   | 'autoOn'
   /** Opened Bram the Broker's counter (where extras are sold). */
-  | 'broker';
+  | 'broker'
+  /** Bought an upgrade off Tinker Pell's tree. */
+  | 'upgraded'
+  /** Rolled for a combat upgrade at Tinker Pell's. */
+  | 'combatRolled';
 
 /** Seconds the skills line stays up (it shows as a reel spins; a roll takes 1.8 s to cast). */
 export const SKILLS_READ = 4;
@@ -179,6 +197,9 @@ export const SKILLS_LATE = 2;
 export const AUTO_ASK = 25;
 export const AUTO_TRIES = 3;
 export const AUTO_READ = 5;
+/** Seconds the upgrade tree's line, and the combat roll's, stay up: long enough to take the screen in. */
+export const TREE_READ = 6;
+export const COMBAT_READ = 5;
 /** Seconds a tip stays up at most, and at least (unless the player leaves for somewhere else). */
 export const TIP_SECONDS = 7;
 export const TIP_MIN = 2.5;
@@ -271,7 +292,7 @@ function isCheckpoint(floor: number): boolean {
   return floor >= k && floor % k === 0;
 }
 
-const AT_HUB: readonly TutWhere[] = ['hub', 'warden', 'keeper'];
+const AT_HUB: readonly TutWhere[] = ['hub', 'warden', 'keeper', 'tinker'];
 
 /** The step is behind the player now: they did it, or went on past it. */
 function settled(step: TutStepId, ctx: TutCtx, run: TutRun, now: number): boolean {
@@ -294,6 +315,10 @@ function settled(step: TutStepId, ctx: TutCtx, run: TutRun, now: number): boolea
     case 'camp':
       // Back up with gold to spend (whichever way: CAMP, or a wipe).
       return ctx.canLevel && AT_HUB.includes(w);
+    case 'tree':
+      return run.key === 'tree:map' && now - run.since >= TREE_READ;
+    case 'combat':
+      return run.key === 'combat:roll' && now - run.since >= COMBAT_READ;
     default:
       return false;
   }
@@ -342,6 +367,21 @@ function stepView(step: TutStepId, ctx: TutCtx, run: TutRun): TutView | null {
       if (where !== 'hub') return null;
       // The same line all the way to him: walking up, then on his button.
       return line(ctx.nearWarden ? 'spend:open' : 'spend:walk', 'Take your gold to [Warden Tobb].', ctx.nearWarden ? ui('talk') : world('warden'));
+    case 'tree':
+      if (where === 'tinker') {
+        // His counter opens on the tree; from his cards (or the combat tab) it's a button away.
+        if (ctx.treeShown) return line('tree:map', touch ? 'Your [upgrade tree]: tap a hex, then buy it.' : 'Your [upgrade tree]: click a hex, then buy it.', ui('tree'));
+        return ctx.combatShown ? null : line('tree:open', 'Open the [MAP]: every upgrade is on it.', ui('mapBtn'));
+      }
+      if (where !== 'hub') return null;
+      return line(ctx.nearTinker ? 'tree:talk' : 'tree:walk', 'Now see [Tinker Pell] for upgrades.', ctx.nearTinker ? ui('talk') : world('tinker'));
+    case 'combat':
+      if (where === 'tinker') {
+        if (ctx.combatShown) return line('combat:roll', '[Combat upgrades]: roll for stronger knights.', ui('combatRoll'));
+        return line('combat:open', touch ? 'Now tap [COMBAT].' : 'Now click [COMBAT].', ui('combatBtn'));
+      }
+      if (where !== 'hub') return null;
+      return line(ctx.nearTinker ? 'combat:talk' : 'combat:walk', '[Tinker Pell] has combat upgrades too.', ctx.nearTinker ? ui('talk') : world('tinker'));
   }
 }
 
@@ -470,6 +510,12 @@ export function tutorialDid(t: TutorialSave, run: TutRun, action: TutAction): vo
       break;
     case 'autoOn':
       if (run.tip === 'auto') run.tipUntil = 0;
+      break;
+    case 'upgraded':
+      finish('tree');
+      break;
+    case 'combatRolled':
+      finish('combat');
       break;
     case 'broker':
       // Found him already: the tip has nothing left to say.

@@ -138,7 +138,9 @@ export type RollButtonState = 'ready' | 'short' | 'spinning' | 'done' | 'locked'
  * head and floats how much is missing). SKIP while the reel spins; grey with a word when it can't
  * roll at all.
  */
-export function RollButton({ state, price, icon, onPress, short, doneText, lockedText }: {
+export function RollButton({ state, price, icon, onPress, short, doneText, lockedText, tut }: {
+  /** A name the tutorial's pointer finds it by (data-tut). */
+  tut?: string;
   state: RollButtonState;
   price: string;
   icon: IconName;
@@ -156,7 +158,7 @@ export function RollButton({ state, price, icon, onPress, short, doneText, locke
   }, [nope]);
   if (state === 'done' || state === 'locked')
     return (
-      <button className={`btn ${s.roll}`} data-kind="off" disabled>
+      <button className={`btn ${s.roll}`} data-kind="off" data-tut={tut} disabled>
         <Px icon={state === 'done' ? 'check' : 'lock'} size="sm" />
         <span>{state === 'done' ? doneText : lockedText}</span>
       </button>
@@ -168,7 +170,7 @@ export function RollButton({ state, price, icon, onPress, short, doneText, locke
   };
   return (
     <span className={s.rollWrap}>
-      <button key={nope ? `n${nope}` : 'r'} className={`btn ${s.roll}`} data-kind={state} data-nope={nope > 0 || undefined} onClick={press}>
+      <button key={nope ? `n${nope}` : 'r'} className={`btn ${s.roll}`} data-kind={state} data-nope={nope > 0 || undefined} data-tut={tut} onClick={press}>
         {state === 'spinning' ? (
           <span>SKIP</span>
         ) : (

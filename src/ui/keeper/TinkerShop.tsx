@@ -112,7 +112,7 @@ function LuckTab({ game, onMap }: { game: Game; onMap: () => void }) {
           </Stat>
         }
         right={
-          <button className={`btn ${s.smallBtn}`} onClick={onMap} title="The upgrade map">
+          <button className={`btn ${s.smallBtn}`} data-tut="mapBtn" onClick={onMap} title="The upgrade map">
             <Px icon="target" size="sm" />
             MAP
           </button>
@@ -373,6 +373,7 @@ function CombatTab({ game }: { game: Game }) {
           label={label}
           button={
             <RollButton
+              tut="combatRoll"
               state={!open ? 'done' : spinning ? 'spinning' : canRollCombat(st) ? 'ready' : 'short'}
               price={fmt(price)}
               icon="coin"
