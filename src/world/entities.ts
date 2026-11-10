@@ -73,8 +73,6 @@ export interface Unit {
   specialT?: number;
   /** A skill roll's spin, as a share of ROLL_TIME (Quick Roll shortens it; 1 when left out). */
   rollTimeMult?: number;
-  /** Tag Team: seconds left hitting harder after being switched to. */
-  tagBoostT?: number;
   /**
    * An active dodge (or a skill's leap): direction, time left, speed; untouchable while it lasts.
    * `land`: a dodge's landing comes after it, this long (s). A dash's own (dash.ts): `struck`, the

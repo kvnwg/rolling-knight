@@ -37,29 +37,30 @@ export const PERK_TREES: Array<{ id: PerkTree; name: string; text: string; color
 
 export const PERKS: PerkDef[] = [
   // Underdogs
-  { id: 'humbleBeginnings', tree: 'underdog', name: 'Humble Beginnings', rarity: 'common', icon: 'pitchfork', short: 'Commons level up 3x better', text: 'Common and Uncommon knights get 3× as much from every level-up.' },
-  { id: 'peasantLevy', tree: 'underdog', name: 'Peasant Levy', rarity: 'uncommon', icon: 'scroll', short: 'More Commons, 3x gold each', text: 'Every 4th spin rolls at luck 1, so Commons keep coming. Common and Uncommon duplicates turn into 3x the gold.' },
+  // (Rarest for the strongest: half-price levels are a Common find, a low-tier squad at double damage an Epic one.)
+  { id: 'handMeDowns', tree: 'underdog', name: 'Hand-Me-Downs', rarity: 'common', icon: 'chest', short: 'Common level-ups cost half', text: 'Common and Uncommon knights cost half the gold to level up.' },
+  { id: 'peasantLevy', tree: 'underdog', name: 'Peasant Levy', rarity: 'uncommon', icon: 'scroll', short: 'Common extras worth 3x gold', text: 'Extras of Common and Uncommon knights are worth 3× the gold.' },
   { id: 'ragsToRiches', tree: 'underdog', name: 'Rags to Riches', rarity: 'uncommon', icon: 'coin', short: 'Low-tier knights +25% stats a tier', text: 'Knights below Legendary get +25% stats for each tier they are below it.' },
-  { id: 'peasantRevolt', tree: 'underdog', name: 'Peasant Revolt', rarity: 'rare', icon: 'torch', short: 'Low-tier squad: 2x damage', text: 'A squad of only Common, Uncommon and Rare knights deals double damage and dodges twice as often.' },
-  { id: 'handMeDowns', tree: 'underdog', name: 'Hand-Me-Downs', rarity: 'epic', icon: 'chest', short: 'Common level-ups cost half', text: 'Common and Uncommon knights cost half the gold to level up.' },
+  { id: 'humbleBeginnings', tree: 'underdog', name: 'Humble Beginnings', rarity: 'rare', icon: 'pitchfork', short: 'Commons level up 3x better', text: 'Common and Uncommon knights get 3× as much from every level-up.' },
+  { id: 'peasantRevolt', tree: 'underdog', name: 'Peasant Revolt', rarity: 'epic', icon: 'torch', short: 'Low-tier squad: 2x damage', text: 'A squad of only Common, Uncommon and Rare knights deals double damage, and its dodge rolls recharge twice as fast.' },
   // Command
-  { id: 'tagTeam', tree: 'command', name: 'Tag Team', rarity: 'common', icon: 'swap', short: 'Switch in: +30% damage for 4 s', text: 'The knight you switch to hits 30% harder for 4 seconds (at most once every 10 s).' },
-  { id: 'loneWolf', tree: 'command', name: 'Lone Wolf', rarity: 'uncommon', icon: 'wolf', short: 'Go alone: x3 HP, x2.5 damage', text: 'Go down alone (leave the other squad slots empty) and your knight gets ×3 HP, ×2.5 damage and 30% faster specials. With a squad, nothing changes.' },
+  { id: 'vanguard', tree: 'command', name: 'Vanguard', rarity: 'common', icon: 'swap', short: 'Your leader hits 25% harder', text: 'The knight you lead (the one you play, on Auto or not) hits 25% harder. Switch leaders and it goes with you.' },
+  { id: 'loneWolf', tree: 'command', name: 'Lone Wolf', rarity: 'uncommon', icon: 'wolf', short: 'Go alone: x3 HP, x2.5 damage', text: 'Go down alone (leave the other squad slots empty) and your knight gets ×3 HP, ×2.5 damage and skill rolls that spin 30% faster. With a squad, nothing changes.' },
   { id: 'hiveMind', tree: 'command', name: 'Hive Mind', rarity: 'uncommon', icon: 'eye', short: 'The squad dodges with you', text: 'When you dodge, your whole squad dodges with you. Allies\' skill rolls spin twice as fast.' },
   { id: 'warBanner', tree: 'command', name: 'War Banner', rarity: 'rare', icon: 'banner', short: 'Your hits speed up the squad', text: 'Each hit by the knight you control gives the squad +4% attack speed for 3 s, stacking to +40%.' },
   { id: 'shieldWall', tree: 'command', name: 'Shield Wall', rarity: 'epic', icon: 'shield', short: 'Squad +35% HP', text: 'Every knight in the squad has 35% more HP.' },
   // Rigged Reels
-  { id: 'fourLeafLitter', tree: 'reels', name: 'Four-Leaf Litter', rarity: 'common', icon: 'clover', short: '3x luck tokens, half sell price', text: 'Luck tokens land 3× as often. Duplicates sell for half.' },
+  { id: 'fourLeafLitter', tree: 'reels', name: 'Four-Leaf Litter', rarity: 'common', icon: 'clover', short: '3x luck tokens, extras worth half', text: 'Luck tokens land 3× as often. Extras are worth half the gold.' },
   { id: 'bootlegReel', tree: 'reels', name: 'Bootleg Reel', rarity: 'uncommon', icon: 'reel', short: '+1 reel, slower spins', text: '+1 reel, but every spin is 50% slower.' },
   { id: 'greasedGears', tree: 'reels', name: 'Greased Gears', rarity: 'uncommon', icon: 'gear', short: 'Spins twice as fast', text: 'Spins run twice as fast, past the usual limit.' },
-  { id: 'pawnShop', tree: 'reels', name: 'Pawn Shop', rarity: 'rare', icon: 'coin', short: 'Copies sell for 4x gold', text: 'Selling duplicates pays 4× the gold.' },
+  { id: 'pawnShop', tree: 'reels', name: 'Pawn Shop', rarity: 'rare', icon: 'coin', short: 'Extras worth 4x gold', text: 'Extras are worth 4× the gold.' },
   { id: 'riggedJackpot', tree: 'reels', name: 'Rigged Jackpot', rarity: 'epic', icon: 'star', short: 'Every 25th spin: Legendary+', text: 'Every 25th spin, every reel lands Legendary or better.' },
   // Bad Ideas
   { id: 'glassCannon', tree: 'chaos', name: 'Glass Cannon', rarity: 'common', icon: 'skull', short: '2x damage, half HP', text: 'Double damage, half HP.' },
-  { id: 'rollDancer', tree: 'chaos', name: 'Roll Dancer', rarity: 'uncommon', icon: 'boot', short: 'Dodge rolls cut through foes', text: 'Dodge rolls slice everything they pass through and recharge 50% faster. Auto attacks are 20% slower.' },
-  { id: 'bloodPact', tree: 'chaos', name: 'Blood Pact', rarity: 'uncommon', icon: 'drop', short: 'Hits heal you; no Cleric heals', text: 'Every hit heals for 5% of its damage, but healing from Clerics does nothing.' },
+  { id: 'rollDancer', tree: 'chaos', name: 'Roll Dancer', rarity: 'uncommon', icon: 'boot', short: 'Dodge rolls cut through foes', text: 'Dodge rolls slice everything they pass through and recharge twice as fast. Attacks are 20% slower.' },
+  { id: 'bloodPact', tree: 'chaos', name: 'Blood Pact', rarity: 'uncommon', icon: 'drop', short: 'Hits heal you; no Cleric heals', text: "Every hit heals for 5% of its damage, but Clerics' healing does nothing (they can still raise the fallen)." },
   { id: 'berserker', tree: 'chaos', name: 'Berserker', rarity: 'rare', icon: 'axe', short: 'More damage at low HP', text: 'Up to +150% damage the lower a knight\'s HP.' },
-  { id: 'kamikaze', tree: 'chaos', name: 'Kamikaze', rarity: 'epic', icon: 'bomb', short: 'Dodge rolls drop bombs', text: 'Every dodge roll leaves a bomb that blows up for 300% damage.' },
+  { id: 'kamikaze', tree: 'chaos', name: 'Powder Trail', rarity: 'epic', icon: 'bomb', short: 'Dodge rolls drop bombs', text: 'Every dodge roll leaves a bomb that blows up for 300% damage.' },
 ];
 
 export const PERKS_BY_ID = new Map(PERKS.map((p) => [p.id, p]));

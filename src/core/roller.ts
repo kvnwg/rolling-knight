@@ -113,8 +113,6 @@ export function startSpin(state: GameState, rng: Rng, nowMs: number, emit: Event
   const n = reelCount(state);
   const classes = unlockedClasses(state.rebirths);
   let luck = currentLuck(state, nowMs);
-  // Peasant Levy: every 4th spin rolls at luck 1 so Commons keep coming.
-  if (hasPerk(state, 'peasantLevy') && r.spinCount % 4 === 3) luck = 1;
   let lucky = false;
   let golden = false;
   // The start: quick spins (ordinary rolls, no luck tricks) until there's a squad.

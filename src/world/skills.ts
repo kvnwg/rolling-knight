@@ -846,7 +846,7 @@ function effect(w: World, h: Unit, sk: SkillDef, at?: { x: number; y: number }):
     case 'guardianAngel': {
       const n = SKILLS.guardianAngel.n;
       for (const o of w.livingHeroes()) w.clericHeal(o, o.maxHp * n.heal);
-      if (!w.perks.has('bloodPact')) for (const o of w.heroes) if (o.downed) w.revive(o, n.revive);
+      for (const o of w.heroes) if (o.downed) w.revive(o, n.revive);
       for (const o of w.livingHeroes()) {
         o.invuln = Math.max(o.invuln, n.invuln);
         w.fx.push({ kind: 'revive', x: o.x, y: o.y, color: c });
@@ -857,7 +857,7 @@ function effect(w: World, h: Unit, sk: SkillDef, at?: { x: number; y: number }):
     case 'miracle': {
       const n = SKILLS.miracle.n;
       for (const o of w.livingHeroes()) w.clericHeal(o, o.maxHp);
-      if (!w.perks.has('bloodPact')) for (const o of w.heroes) if (o.downed) w.revive(o, 1);
+      for (const o of w.heroes) if (o.downed) w.revive(o, 1);
       for (const o of w.livingHeroes()) {
         o.invuln = Math.max(o.invuln, n.invuln);
         w.fx.push({ kind: 'revive', x: o.x, y: o.y, color: c });

@@ -503,8 +503,8 @@ describe('allies', () => {
     expect(got.filter((e) => e.phase === 'land' && e.hero === me).length).toBeGreaterThanOrEqual(1);
   });
 
-  it('includes your knight, Auto attack or not, and Tag Team makes the knight switched to hit harder for a while', () => {
-    const w = world([knightId('rare', 'arcanist'), knightId('rare', 'cleric')], ['tagTeam']);
+  it('includes your knight, Auto attack or not, and Vanguard makes the knight you lead hit harder', () => {
+    const w = world([knightId('rare', 'arcanist'), knightId('rare', 'cleric')], ['vanguard']);
     const [mage, cleric] = w.heroes;
     // (A fight that lasts: foes that don't fall or hurt anyone, so both knights are still up to switch to.)
     for (const m of fightAt(w, 4, 50)) {
@@ -519,14 +519,19 @@ describe('allies', () => {
     expect(mage.lastSkill?.n ?? 0).toBeGreaterThan(was);
     w.auto = false;
     expect(w.switchControl(1)).toBe(true);
-    // No free spell on switching (switching has no cooldown): a few seconds of harder hits instead.
-    expect(cleric.tagBoostT).toBeGreaterThan(3.9);
-    // (A little over 4 s: the fight's hit-stops hold the world's clock back a touch.)
-    run(w, 4.6);
-    expect(cleric.tagBoostT ?? 0).toBeLessThanOrEqual(0);
-    // At most once every 10 s.
+    // Vanguard goes with the lead: the knight you play hits 25% harder, the other as it did.
+    const foe = w.livingMobs()[0];
+    foe.armor = 0;
+    const hit = (from: typeof mage) => {
+      const before = foe.hp;
+      w.damage(foe, 100, from, { silent: true });
+      return before - foe.hp;
+    };
+    expect(hit(cleric)).toBeCloseTo(125, 5);
+    expect(hit(mage)).toBeCloseTo(100, 5);
     expect(w.switchControl(0)).toBe(true);
-    expect(mage.tagBoostT ?? 0).toBeLessThanOrEqual(0);
+    expect(hit(mage)).toBeCloseTo(125, 5);
+    expect(hit(cleric)).toBeCloseTo(100, 5);
   });
 
   it('keep rolling through a fight, every knight: roll, fire, roll, fire', () => {

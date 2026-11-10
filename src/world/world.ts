@@ -182,7 +182,6 @@ export class World {
   /** War Banner stacks (attack speed). */
   banner = 0;
   bannerT = 0;
-  tagTeamT = 0;
   /** The player's luck right now (Loaded Dice included); Game sets it every tick, and skill rolls lean rarer with it. */
   luck = 1;
   /** What this floor's foes are built for, in Squad Power (see power.ts). */
@@ -346,7 +345,8 @@ export class World {
       specialCd: h.stats.specialCd * (this.lone ? 0.7 : 1),
       // (Skill rolls have no cooldown now: in a fight the next starts as soon as the last skill is done.)
       specialT: 0,
-      rollTimeMult: h.stats.rollTimeMult,
+      // (Lone Wolf: its skill rolls spin faster.)
+      rollTimeMult: h.stats.rollTimeMult * (this.lone ? 0.7 : 1),
       downed: h.hpShare <= 0,
       ai: { target: null, think: 0, dodgeThink: 0, wanderX: 0, wanderY: 0, stuck: 0 },
     };
@@ -575,8 +575,8 @@ export class World {
       // Berserker: up to +150% damage the lower the knight's HP.
       if (this.perks.has('berserker')) amount *= 1 + 1.5 * (1 - from.hp / from.maxHp);
       if (this.perks.has('peasantRevolt') && this.underdogSquad()) amount *= 2;
-      // Tag Team: the knight just switched to hits harder for a few seconds.
-      if ((from.tagBoostT ?? 0) > 0) amount *= 1.3;
+      // Vanguard: the knight you lead hits harder.
+      if (from.slot === this.controlled && this.perks.has('vanguard')) amount *= 1.25;
     }
     amount *= 1 - target.armor;
     if (target.team === 'hero') amount *= this.guard;
@@ -700,7 +700,7 @@ export class World {
     this.events.push({ type: 'heroDown', slot: h.slot! });
     if (h.slot === this.controlled) {
       const next = this.heroes.find((x) => !x.downed);
-      if (next) this.switchControl(next.slot!, true);
+      if (next) this.switchControl(next.slot!);
     }
     if (this.heroes.every((x) => x.downed) && !this.wiped) {
       this.wiped = true;
@@ -708,18 +708,13 @@ export class World {
     }
   }
 
-  switchControl(slot: number, forced = false): boolean {
+  switchControl(slot: number): boolean {
     const h = this.heroes.find((x) => x.slot === slot);
     // (Not in a portal's warp: the leader the view follows stays the one that stepped in.)
     if (!h || h.downed || slot === this.controlled || this.warping()) return false;
     this.controlled = slot;
     this.events.push({ type: 'switch', slot });
     this.fx.push({ kind: 'spark', x: h.x, y: h.y - 10, color: '#ffe27a' });
-    // Tag Team: the incoming knight hits harder for a few seconds (at most once every 10 s).
-    if (!forced && this.perks.has('tagTeam') && this.tagTeamT <= 0) {
-      this.tagTeamT = 10;
-      h.tagBoostT = 4;
-    }
     return true;
   }
 
@@ -924,8 +919,6 @@ export class World {
       this.flowT = 0.3;
       this.refreshFlows();
     }
-    if (this.tagTeamT > 0) this.tagTeamT -= dt;
-    for (const h of this.heroes) if ((h.tagBoostT ?? 0) > 0) h.tagBoostT! -= dt;
     if (this.bannerT > 0) {
       this.bannerT -= dt;
       if (this.bannerT <= 0) this.banner = 0;

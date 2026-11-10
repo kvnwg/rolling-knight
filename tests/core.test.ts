@@ -190,8 +190,9 @@ describe('roster', () => {
     const before = levelMult(s, 'common', 11) - 1;
     s.rebirths = 1;
     s.sigils = 5;
-    // (The first perk in the roll: a draw of 0 lands on it.)
-    expect(rollPerk(s, () => 0)?.perk.id).toBe('humbleBeginnings');
+    // (The first perk in the roll, a draw of 0, is Hand-Me-Downs; this one's a Rare find.)
+    expect(rollPerk(s, () => 0)?.perk.id).toBe('handMeDowns');
+    s.perks.push('humbleBeginnings');
     expect(levelMult(s, 'common', 11) - 1).toBeCloseTo(before * 3, 9);
     expect(levelMult(s, 'legendary', 11) - 1).toBeCloseTo(before, 9);
   });
