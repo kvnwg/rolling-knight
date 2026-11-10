@@ -138,7 +138,7 @@ function uiTarget(game: Game, id: Extract<TutTarget, { kind: 'ui' }>['id']): Ele
     case 'close':
       return document.querySelector('[data-keeper="altar"] button[aria-label="Close"]');
     case 'talk':
-      return document.querySelector('.hub-hud .talk-prompt .btn');
+      return document.querySelector('.hub-hud .talk-prompt .talk-plaque');
     case 'descend':
       return document.querySelector('[data-keeper="gate"] [data-tut="descend"]');
     case 'level':

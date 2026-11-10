@@ -2550,6 +2550,113 @@ body,
   color: var(--gold);
 }
 
+/* A keeper's plaque when you walk up (Hub.tsx): what they're for in one word, big, in their colours;
+   their name small under it; their sign in a medallion. A dark plate in a double rim of the keeper's
+   colour with gold studs at its corners; the whole plaque is the button. */
+.talk-plaque {
+  --kc: #e3a93a;
+  --kh: #ffe7a0;
+  --kl: #b9791f;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: calc(3 * var(--px));
+  padding: calc(2 * var(--px)) calc(6 * var(--px)) calc(2 * var(--px)) calc(2 * var(--px));
+  background: #1b1118;
+  cursor: pointer;
+  pointer-events: auto;
+  box-shadow:
+    inset 0 var(--px) 0 0 rgba(255, 255, 255, 0.09),
+    inset 0 calc(-1 * var(--px)) 0 0 rgba(0, 0, 0, 0.5),
+    0 0 0 var(--px) var(--ink),
+    0 0 0 calc(2 * var(--px)) var(--kh),
+    0 0 0 calc(3 * var(--px)) var(--kc),
+    0 0 0 calc(4 * var(--px)) var(--kl),
+    0 0 0 calc(5 * var(--px)) var(--ink),
+    0 calc(8 * var(--px)) 0 0 rgba(8, 4, 2, 0.5);
+  animation: plaqueBeat 1.4s steps(1) infinite;
+}
+@keyframes plaqueBeat {
+  50% {
+    filter: brightness(1.14);
+  }
+}
+.talk-plaque:active {
+  transform: translateY(calc(1 * var(--px)));
+}
+/* Gold studs on the rim's corners. */
+.talk-plaque::before,
+.talk-plaque::after {
+  content: '';
+  position: absolute;
+  width: calc(2 * var(--px));
+  height: calc(2 * var(--px));
+  background: #fff0a8;
+  top: calc(-4 * var(--px));
+  box-shadow:
+    inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 0 #b8862a,
+    0 0 0 var(--px) var(--ink);
+}
+.talk-plaque::before {
+  left: calc(-4 * var(--px));
+  box-shadow:
+    inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 0 #b8862a,
+    0 0 0 var(--px) var(--ink);
+}
+.talk-plaque::after {
+  right: calc(-4 * var(--px));
+}
+.tp-medal {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: calc(20 * var(--px));
+  height: calc(20 * var(--px));
+  background: var(--kc);
+  box-shadow:
+    inset 0 calc(2 * var(--px)) 0 0 var(--kh),
+    inset 0 calc(-2 * var(--px)) 0 0 var(--kl),
+    inset 0 0 0 var(--px) rgba(0, 0, 0, 0.35),
+    0 0 0 var(--px) var(--ink);
+}
+.tp-medal .px {
+  filter: drop-shadow(0 var(--px) 0 rgba(0, 0, 0, 0.45));
+}
+.tp-words {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: calc(1 * var(--px));
+}
+.tp-name {
+  font-size: calc(3.8 * var(--fpx, var(--px)));
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--kh);
+  text-shadow: 0 var(--px) 0 rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+}
+.tp-key {
+  align-self: flex-start;
+  margin-left: calc(2 * var(--px));
+  padding: 0 calc(2 * var(--px));
+  font: inherit;
+  font-size: calc(4 * var(--fpx, var(--px)));
+  font-weight: 700;
+  line-height: calc(7 * var(--px));
+  color: #2b170c;
+  background: #f2e2bf;
+  box-shadow:
+    inset 0 calc(-1 * var(--px)) 0 0 #c8a878,
+    0 0 0 var(--px) var(--ink);
+}
+@media (prefers-reduced-motion: reduce) {
+  .talk-plaque {
+    animation: none;
+  }
+}
+
 /* A keeper's counter: their portrait and words on top, their wares below. */
 .station-sheet {
   display: flex;

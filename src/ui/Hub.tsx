@@ -9,13 +9,12 @@
  *  - TitleScreen: the game's name and PLAY, over the camp at dusk, when the game opens.
  * In the dungeon none of this is reachable: to change your squad or spend anything you leave, or fall.
  */
-import { useEffect, useMemo } from 'react';
+import { useEffect, type CSSProperties } from 'react';
 import { sfx } from '../audio/sfx';
 import { CHALLENGE, floorDifficulty, squadPower } from '../core/power';
 import { squadSize } from '../core/roster';
 import type { Game } from '../game';
-import { npcFrame } from '../render/art/npcs';
-import { toCanvas } from '../render/art/draw';
+import { keeperDress } from '../render/art/keepers/frames';
 import { biomeForFloor } from '../world/biomes';
 import { type HubStation, type StationId } from '../world/hubWorld';
 import { Chunky } from './common';
@@ -41,21 +40,37 @@ const STATION_ICON: Record<StationId, IconName> = {
   quests: 'star',
 };
 
-/** A keeper's portrait (their idle frame, facing you), as an image. */
-function usePortrait(st: HubStation | null): string | null {
-  return useMemo(() => {
-    if (!st?.def) return null;
-    const f = npcFrame(st.def, 'idle', 'down', 0);
-    return toCanvas(f.buf).toDataURL();
-  }, [st]);
-}
+/** What each keeper is for, in a word (their plaque when you walk up). */
+const STATION_WORD: Record<StationId, string> = {
+  altar: 'SUMMON',
+  smith: 'FORGE',
+  scrap: 'EXTRAS',
+  squad: 'SQUAD',
+  upgrades: 'UPGRADES',
+  perks: 'PERKS',
+  rebirth: 'REBIRTH',
+  gate: 'SQUAD',
+  quests: 'JOBS',
+};
+
+/** The word's colours on the plaque (light, mid, deep), in the keeper's own. */
+const STATION_GRAD: Record<StationId, readonly [string, string, string]> = {
+  altar: ['#f6e6ff', '#c79cff', '#8a52e0'],
+  smith: ['#fff7b0', '#ffc233', '#ff8a00'],
+  scrap: ['#eaffd8', '#8ae07a', '#3a9a4a'],
+  squad: ['#ffffff', '#c8d4e8', '#8090b0'],
+  upgrades: ['#fff7b0', '#ffc233', '#ff8a00'],
+  perks: ['#dcfff6', '#7af0e0', '#2aa894'],
+  rebirth: ['#fff2ea', '#ffb4a2', '#e0705a'],
+  gate: ['#ffffff', '#c8d4e8', '#8090b0'],
+  quests: ['#fff7b0', '#ffc233', '#ff8a00'],
+};
 
 // ------------------------------------------------------------------ the HUD at the hub
 
 export function HubHud({ game, onTalk, onSettings, onLuck }: { game: Game; onTalk: (s: HubStation) => void; onSettings: () => void; onLuck: () => void }) {
   const s = game.state;
   const near = game.hub?.nearStation() ?? null;
-  const portrait = usePortrait(near);
   // Out of the way once you're going down the steps (it sits over them).
   const floor = s.run.floor;
   const diff = floorDifficulty(floor, squadPower(s), squadSize(s));
@@ -109,19 +124,21 @@ export function HubHud({ game, onTalk, onSettings, onLuck }: { game: Game; onTal
 
       {near ? (
         <div className="talk-prompt">
-          <div className="talk-card plate outlined">
-            {portrait ? <img className="px face" src={portrait} alt="" /> : <Px icon={STATION_ICON[near.id]} size="md" s={1.5} />}
-            <div className="who">
-              <b>{near.name}</b>
-              <span>{near.job}</span>
-            </div>
-          </div>
-          <button className="btn gold big" onClick={() => (uiSound('open'), onTalk(near))}>
-            <Px icon={STATION_ICON[near.id]} size="md" />
-            <span>
-              {near.id === 'gate' ? 'SQUAD' : near.def ? 'TALK' : 'READ'}
-              {!touch && <span className="sub">E or Enter</span>}
+          {/* One word says what they're for (the keeper is standing right there): their plaque, in their colours, and it's the button. */}
+          <button
+            className="talk-plaque"
+            style={{ ['--kc' as string]: keeperDress(near.id).tab.face, ['--kh' as string]: keeperDress(near.id).tab.hi, ['--kl' as string]: keeperDress(near.id).tab.lo } as CSSProperties}
+            onClick={() => (uiSound('open'), onTalk(near))}
+            aria-label={`${near.name}: ${STATION_WORD[near.id]}`}
+          >
+            <span className="tp-medal">
+              <Px icon={STATION_ICON[near.id]} size="md" s={1.5} />
             </span>
+            <span className="tp-words">
+              <Chunky text={STATION_WORD[near.id]} size={9} grad={STATION_GRAD[near.id]} />
+              <span className="tp-name">{near.name}</span>
+            </span>
+            {!touch && <kbd className="tp-key">E</kbd>}
           </button>
         </div>
       ) : null}
