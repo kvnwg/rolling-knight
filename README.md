@@ -121,6 +121,18 @@ recording: [`docs/SOUNDS.md`](docs/SOUNDS.md).
   painted and lit in code (`src/render/art/keepers/`: the keeper's bust from their hub look, their
   trade round them, lamps, candles, coals and glowing glass in stepped pools of warm light), at a
   whole number of screen pixels per art pixel; `keepers-preview.html` shows them all.
+- Every keeper's counter sits in a frame of their own (`src/render/art/keepers/frames.ts`, painted to
+  the screen's exact size, nothing tiled): the Oracle's velvet and night sky, the tinker's brass and
+  gauges, the sage's mossy stone and flowers, the priestess's marble and roses, the board's cork and
+  pinned notes, the warden's dungeon stone and iron, the broker's mahogany and coins; each tints its
+  paper and colours its tab. `frames-preview.html` shows them all.
+- Behind a knight's picture (its card, its sheet, its face in the HUD) is a little lit pixel scene
+  for its rarity (`src/render/art/backdrops.ts`), at the knight's own pixel size: a stone cellar for
+  a Common up through a banner hall, a velvet stage, a gilded hall, a crystal grotto, the moonlit
+  sky, an aurora and a rune void to a prism for the Absolute. `backdrops-preview.html` shows them.
+- Back after time away the game opens on its title; after PLAY the welcome back (`WelcomeBack.tsx`)
+  lays out what the altar rolled tier by tier, each tier with its own icon
+  (`src/render/art/tierGems.ts`), and the best find.
 - Up close at their counters the keepers are drawn in an anime pixel style of their own
   (`src/render/art/keepers/bust.ts`): natural proportions, big eyes with a lash line and a glint, hair
   in locks with a band of shine, cloth in soft folds, a few hue-shifted cel steps per material and a
