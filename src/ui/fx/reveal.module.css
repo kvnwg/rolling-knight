@@ -79,10 +79,12 @@
   from { opacity: 0.5; }
   to { opacity: 1; }
 }
+/* A wide pool of the rarity's light over the screen: a pixel halo (halo.ts), rings stepped and dithered. */
 .rareGlow {
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at var(--ix) var(--iy), color-mix(in srgb, var(--c) 50%, transparent) 0%, transparent 58%);
+  background: var(--halo-wide) no-repeat calc(var(--ix) - var(--halo-wide-d) / 2) calc(var(--iy) - var(--halo-wide-d) / 2) / var(--halo-wide-d) var(--halo-wide-d);
+  image-rendering: pixelated;
 }
 /* Rays drawn once into a small image (rays.ts), fade baked in, turning round the knight. */
 .rays {
@@ -171,7 +173,8 @@
 
 /*
  * The knight rises out of the dark as a silhouette in front of its rarity's light, one art pixel at a
- * time; the light is a plain gradient disc behind it (not a blur filter, which is heavy on phones).
+ * time; the light is a pixel halo behind it (halo.ts: stepped, dithered rings; no blur filter, which
+ * is heavy on phones).
  */
 .rareItem {
   position: relative;
@@ -189,9 +192,8 @@
   width: var(--glowd);
   height: var(--glowd);
   margin: calc(var(--glowd) / -2) 0 0 calc(var(--glowd) / -2);
-  border-radius: 50%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--c) 70%, #fff) 0%, color-mix(in srgb, var(--c) 45%, transparent) 30%, transparent 68%);
-  opacity: 0.55;
+  background: var(--halo) center / 100% 100% no-repeat;
+  image-rendering: pixelated;
   pointer-events: none;
   z-index: -1;
 }
