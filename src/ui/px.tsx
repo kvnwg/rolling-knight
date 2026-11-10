@@ -5,6 +5,8 @@
  */
 import type { CSSProperties } from 'react';
 import { isItemIcon, itemBuf, type ItemIcon } from '../render/art/items';
+import { tierGem } from '../render/art/tierGems';
+import type { Rarity } from '../core/rarity';
 import { fromRows, type PixelBuf, type Rows } from '../render/pixel/buf';
 import { LUCK_TOKENS, UI_MD, UI_SM, UI_SPRITES, UI_XS, type UiIcon } from '../render/pixel/ui';
 
@@ -92,7 +94,10 @@ const EXTRA_XS: Partial<Record<keyof typeof EXTRA, Rows>> = {
   copies: ['..kkkkk', '..k554k', 'kkkkk4k', 'kWWTk4k', 'kWWTkkk', 'kTTTk..', 'kkkkk..'],
 };
 
-export type IconName = UiIcon | keyof typeof EXTRA | `token${2 | 3 | 5 | 10}` | ItemIcon;
+/** A rarity's own icon (render/art/tierGems.ts): `tier:legendary`. */
+export type TierIcon = `tier:${Rarity}`;
+
+export type IconName = UiIcon | keyof typeof EXTRA | `token${2 | 3 | 5 | 10}` | ItemIcon | TierIcon;
 export type IconSize = 'xs' | 'sm' | 'md' | 'lg';
 
 const urls = new Map<string, { url: string; w: number; h: number }>();
@@ -111,7 +116,7 @@ export function iconArt(icon: IconName, size: IconSize = 'md'): { url: string; w
   const key = `${icon}|${size}`;
   let a = urls.get(key);
   if (a) return a;
-  let b: PixelBuf | null = isItemIcon(icon) ? itemBuf(icon) : null;
+  let b: PixelBuf | null = isItemIcon(icon) ? itemBuf(icon) : icon.startsWith('tier:') ? tierGem(icon.slice(5) as Rarity) : null;
   if (!b) {
     const rows = rowsFor(icon, size) ?? UI_SPRITES.star;
     const w = Math.max(...rows.map((r) => r.length));

@@ -43,8 +43,10 @@ class RainSound {
     if (this.bed && this.bed.graph !== g) this.bed = null;
     const now = g.ctx.currentTime;
     if (this.level > 0) {
+      const fresh = !this.bed;
       this.bed ??= this.build(g, now);
-      this.bed.gain.gain.cancelScheduledValues(now);
+      // (A bed just built has nothing scheduled, and nothing to cancel.)
+      if (!fresh) this.bed.gain.gain.cancelScheduledValues(now);
       this.bed.gain.gain.setTargetAtTime(RAIN_GAIN * this.level, now, 0.9);
       this.timer ??= setInterval(() => this.patter(), 70);
     } else {
@@ -65,7 +67,10 @@ class RainSound {
   private build(g: Graph, now: number): Bed {
     const ctx = g.ctx;
     const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0, now);
+    // Silent from the start, as its own value: a scheduled "0 at now" is cancelled by sync's
+    // cancelScheduledValues a line later, which left the bed at a gain of 1 (thirty times too
+    // loud) fading down to its level, a blast of rain as a rainy floor loaded.
+    gain.gain.value = 0;
     gain.connect(g.sfx);
     const loop = (from: number, filters: Array<[BiquadFilterType, number, number]>, level: number) => {
       const src = ctx.createBufferSource();

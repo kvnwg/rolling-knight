@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BAL } from '../src/core/balance';
 import { KNIGHTS, knightId } from '../src/core/knights';
 import { currentLuck, oneInFor } from '../src/core/luck';
-import { canRebirth, checkpointFor, newGame, rebirth } from '../src/core/newGame';
+import { canRebirth, checkpointFor, newGame, rebirth, rebirthFloor } from '../src/core/newGame';
 import { rollPerk } from '../src/core/perks';
 import { RARITIES, RARITY_ODDS, RARITY_STAT, rarityAtLeast, rarityChances, rollRarity } from '../src/core/rarity';
 import { Rng } from '../src/core/rng';
@@ -324,12 +324,15 @@ describe('roster', () => {
 });
 
 describe('rebirth', () => {
-  it('needs floor 15, wipes the run and keeps the codex', () => {
+  it('needs floor 30, wipes the run and keeps the codex', () => {
     const s = done();
     addKnight(s, knightId('epic', 'blade'), null);
     s.gold = 999;
     expect(canRebirth(s)).toBe(false);
-    s.run.bestFloor = 15;
+    // (Not after a few minutes' play: floor 15 used to open it.)
+    s.run.bestFloor = 29;
+    expect(canRebirth(s)).toBe(false);
+    s.run.bestFloor = 30;
     const luck = currentLuck(s, Date.now());
     expect(rebirth(s)).toBe(true);
     expect(s.rebirths).toBe(1);
@@ -347,7 +350,7 @@ describe('rebirth', () => {
     addKnight(s, id, null);
     addKnight(s, id, null);
     expect(extrasCount(s)).toBe(2);
-    s.run.bestFloor = 15;
+    s.run.bestFloor = rebirthFloor(0);
     expect(rebirth(s)).toBe(true);
     expect(s.gold).toBe(0);
     expect(extrasCount(s)).toBe(0);

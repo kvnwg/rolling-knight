@@ -44,6 +44,15 @@ export interface Summoned {
 
 let campMapCache: FloorMap | null = null;
 
+/**
+ * Through a portal: once the squad has swirled in (World.warp) the screen cuts to black in a blink
+ * (this much a second; the hub's steps fade out at 2.2), and the next floor comes up fast while the
+ * squad pops out (World.arrive). Every other fade in clears at FADE_IN.
+ */
+export const PORTAL_CUT = 12;
+export const PORTAL_REVEAL = 5;
+const FADE_IN = 1.6;
+
 export class Game {
   state: GameState;
   rng: Rng;
@@ -55,6 +64,8 @@ export class Game {
   /** Seconds of the floor's fade in or out (the renderer draws it). */
   fade = 1;
   fadeDir: -1 | 1 = -1;
+  /** How fast the fade in under way clears (a second): quicker after a portal. */
+  private fadeIn = FADE_IN;
   /**
    * The world as the canvas showed it last frame (the renderer sets it): where a world point is on the
    * page, for the HUD's overlays (render/view.ts toScreen). Null before the first frame.
@@ -164,7 +175,8 @@ export class Game {
     return out;
   }
 
-  startFloor(floor: number): void {
+  /** Starts `floor` as a fresh map. `portal`: the squad came down through the way down (it pops out of the warp, and the floor comes up quickly). */
+  startFloor(floor: number, portal = false): void {
     const s = this.state;
     s.run.floor = floor;
     s.run.bestFloor = Math.max(s.run.bestFloor, floor);
@@ -217,11 +229,13 @@ export class Game {
     this.questEvent({ type: 'floor', floor });
     this.world.auto = s.settings.autoPlay;
     this.world.bot = this.bot || s.settings.autoPlay;
+    if (portal) this.world.arriveFromPortal(s.settings.reduceMotion);
     // The upgrade map's chance lines play on this floor.
     onFloorStart(this.world, s);
     s.controlled = this.world.controlled;
     this.fade = 1;
     this.fadeDir = -1;
+    this.fadeIn = portal ? PORTAL_REVEAL : FADE_IN;
     // Saved now, so the card just dealt stays dealt even if the game closes straight away.
     saveGame(s);
     this.emit({ type: 'floorStart', floor, biome: biome.name, boss });
@@ -337,6 +351,7 @@ export class Game {
     this.inDungeon = false;
     this.fade = 1;
     this.fadeDir = -1;
+    this.fadeIn = FADE_IN;
     this.syncHub(true);
     if (this.bot || s.settings.autoPlay) this.autoReturnT = 5;
     this.save();
@@ -378,8 +393,11 @@ export class Game {
     this.inDungeon = false;
     // A merchant's goods are for one run: heading back to camp ends it.
     this.state.run.items = {};
+    // (So is a portal's cut to the next floor, if it was under way: the floor waits as it is.)
+    this.pendingFloor = null;
     this.fade = 1;
     this.fadeDir = -1;
+    this.fadeIn = FADE_IN;
     this.save();
     this.version++;
   }
@@ -506,12 +524,14 @@ export class Game {
     } else {
       // The squad is locked in the dungeon: new knights wait at the hub.
       this.world.luck = this.luck * skillRollLuck(s);
+      this.world.calm = s.settings.reduceMotion;
       this.world.update(dt);
       this.handleWorldEvents();
     }
-    if (this.fade > 0 && this.fadeDir < 0) this.fade = Math.max(0, this.fade - dt * 1.6);
+    if (this.fade > 0 && this.fadeDir < 0) this.fade = Math.max(0, this.fade - dt * this.fadeIn);
     if (this.fadeDir > 0) {
-      this.fade = Math.min(1, this.fade + dt * 2.2);
+      // (Through a portal it's a cut, black in a blink; down the hub's steps, a fade.)
+      this.fade = Math.min(1, this.fade + dt * (this.pendingFloor !== null ? PORTAL_CUT : 2.2));
       if (this.fade >= 1 && this.descending) {
         this.descending = false;
         this.enterDungeon();
@@ -519,7 +539,7 @@ export class Game {
       if (this.fade >= 1 && this.pendingFloor !== null) {
         const f = this.pendingFloor;
         this.pendingFloor = null;
-        this.startFloor(f);
+        this.startFloor(f, true);
       }
     }
     if (this.wipeT > 0) {
@@ -611,6 +631,9 @@ export class Game {
           break;
         case 'portal':
           this.emit({ type: 'portalOpen', floor: w.floor });
+          break;
+        case 'warp':
+          this.emit({ type: 'warp', floor: w.floor });
           break;
         case 'exit':
           this.goToFloor(w.floor + 1, false);

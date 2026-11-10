@@ -7,7 +7,7 @@ import { BIOME_ORDER, BIOMES, biomeForFloor, isBossFloor } from '../src/world/bi
 import { BLOCKED, FLOOR, SOLID, TILE, bfs, generateFloor, tileAt } from '../src/world/mapgen';
 import { floorBoss, floorMobs, isRook } from '../src/world/mobgen';
 import { CAST_TIME, rigSkill } from '../src/world/skills';
-import { EXIT_HOLD, World, type HeroSpec } from '../src/world/world';
+import { WARP_TIME, World, type HeroSpec } from '../src/world/world';
 
 function squad(ids: string[]): HeroSpec[] {
   const s = newGame(1);
@@ -204,7 +204,7 @@ describe('the squad in a fight', () => {
     expect(w.exited).toBe(true);
   });
 
-  it('leaves a floor through its open exit any time, foes or not (a moment standing in the portal)', () => {
+  it('leaves a floor through its open exit any time, foes or not (touching the portal swirls the squad in)', () => {
     const w = world([knightId('rare', 'ranger')]);
     expect(w.portalOpen).toBe(true);
     expect(w.livingMobs().length).toBeGreaterThan(5);
@@ -212,14 +212,11 @@ describe('the squad in a fight', () => {
     h.x = w.map.exit.x;
     h.y = w.map.exit.y;
     w.update(1 / 30);
-    // Passing over it isn't enough...
+    // Touching it starts the swirl at once...
+    expect(w.warp).not.toBeNull();
     expect(w.exited).toBe(false);
-    for (let t = 0; t < EXIT_HOLD + 0.1 && !w.exited; t += 1 / 30) {
-      h.x = w.map.exit.x;
-      h.y = w.map.exit.y;
-      w.update(1 / 30);
-    }
-    // ...standing in it is.
+    for (let t = 0; t < WARP_TIME + 0.1 && !w.exited; t += 1 / 30) w.update(1 / 30);
+    // ...and once the squad is through, down it goes.
     expect(w.exited).toBe(true);
     expect(w.cleared).toBe(false);
   });

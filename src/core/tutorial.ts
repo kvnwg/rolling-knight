@@ -5,21 +5,23 @@
  *
  *  - seal:    a new game opens on the Oracle's altar, sealed: break the seal to summon;
  *  - altar:   your first knight lands at the Oracle's altar: close it;
- *  - move:    walk (drag on a phone; WASD or the arrows on a computer);
- *  - talk:    walk up to Warden Tobb and open his counter (he keeps your squad);
- *  - descend: DESCEND at his counter (or walk down the steps);
+ *  - descend: straight to the fight: how to walk and where to (down the steps), in one line (the
+ *             warden and his counter wait until there's gold to spend with him);
  *  - attack:  with a foe close, attack;
+ *  - auto:    auto battle, the heart of the game, as soon as the first blow has landed: tap AUTO
+ *             and your knight fights, explores and goes down on its own. The line stays on the
+ *             button, foes or no foes, until it's tapped (it lets the floor be after a good while,
+ *             and asks again on the next, three floors running); once it's on, how to take over;
  *  - skills:  your knight's skills roll and cast on their own (the line stays up a few seconds);
- *  - exit:    the door to the next floor;
- *  - auto:    auto battle: tap AUTO and your knight fights and goes down on its own; once it's on,
- *             how to take over (steer or attack); the line goes after a while either way;
+ *  - exit:    the door to the next floor (auto battle goes through it by itself);
  *  - camp:    once there's gold enough to level your knight up, head back up;
  *  - spend:   level a knight up at Warden Tobb's counter.
  *
  * Each step waits for the one before it (TUT_AFTER) and shows when its moment comes: the line on the
  * screen is the first step not done whose moment is now. So a fight that ends before a skill rolls
  * doesn't hold up the door: the skills line waits for the next fight. A step the player gets past on
- * their own (walking down the steps without asking the warden) is done as they pass it.
+ * their own (the door before a fight) is done as they pass it. The screen shows how far along the
+ * walk-through is (tutorialProgress), so it reads as one short path, not a string of interruptions.
  *
  * After that, a single one-off tip the first time each later thing comes up: a merchant on a floor,
  * the first checkpoint, rebirth (stronger for good), going down short-handed, auto battle, and extras
@@ -34,7 +36,7 @@
  */
 import { BAL } from './balance';
 
-export const TUT_STEPS = ['seal', 'altar', 'move', 'talk', 'descend', 'attack', 'skills', 'exit', 'auto', 'camp', 'spend'] as const;
+export const TUT_STEPS = ['seal', 'altar', 'descend', 'attack', 'auto', 'skills', 'exit', 'camp', 'spend'] as const;
 export type TutStepId = (typeof TUT_STEPS)[number];
 export const TUT_TIPS = ['shop', 'checkpoint', 'rebirth', 'solo', 'auto', 'extras'] as const;
 export type TutTipId = (typeof TUT_TIPS)[number];
@@ -43,13 +45,11 @@ export type TutTipId = (typeof TUT_TIPS)[number];
 export const TUT_AFTER: Record<TutStepId, TutStepId | null> = {
   seal: null,
   altar: 'seal',
-  move: 'altar',
-  talk: 'move',
-  descend: 'talk',
+  descend: 'altar',
   attack: 'descend',
+  auto: 'attack',
   skills: 'attack',
   exit: 'attack',
-  auto: 'exit',
   camp: 'exit',
   spend: 'camp',
 };
@@ -146,12 +146,13 @@ export interface TutRun {
   tipUntil: number;
   /** No new tip before this (a breather after the last one). */
   restUntil: number;
+  /** Auto battle: the floor its line last gave up on (it lets that floor be), and how many times it has. */
+  autoLetBe: number;
+  autoAsks: number;
 }
 
 /** Things the player does that finish a step or put a tip away (the screen reports them). */
 export type TutAction =
-  /** Walked a little way at the hub. */
-  | 'moved'
   /** Held attack with a foe close. */
   | 'attacked'
   /** A foe fell. */
@@ -171,8 +172,12 @@ export type TutAction =
 export const SKILLS_READ = 4;
 /** The skills line comes up this long after a cast too (the fight may be over before the next roll). */
 export const SKILLS_LATE = 2;
-/** Seconds the auto battle line waits to be tapped, and stays up once it's on (how to take over). */
-export const AUTO_ASK = 9;
+/**
+ * Auto battle: seconds its line waits on the button before it lets the floor be (it asks again on
+ * the next floor, AUTO_TRIES floors in all), and seconds it stays up once it's on (how to take over).
+ */
+export const AUTO_ASK = 25;
+export const AUTO_TRIES = 3;
 export const AUTO_READ = 5;
 /** Seconds a tip stays up at most, and at least (unless the player leaves for somewhere else). */
 export const TIP_SECONDS = 7;
@@ -187,7 +192,7 @@ export function freshTutorial(): TutorialSave {
 }
 
 export function newTutRun(): TutRun {
-  return { key: null, since: 0, tip: null, tipAt: 0, tipUntil: 0, restUntil: 0 };
+  return { key: null, since: 0, tip: null, tipAt: 0, tipUntil: 0, restUntil: 0, autoLetBe: -1, autoAsks: 0 };
 }
 
 const isStep = (x: unknown): x is TutStepId => typeof x === 'string' && (TUT_STEPS as readonly string[]).includes(x);
@@ -239,6 +244,11 @@ export function currentStep(t: TutorialSave): TutStepId | null {
   return TUT_STEPS.find((s) => !t.done.includes(s)) ?? null;
 }
 
+/** How far along the walk-through is: steps done and steps in all. */
+export function tutorialProgress(t: TutorialSave): { done: number; of: number } {
+  return { done: TUT_STEPS.filter((s) => t.done.includes(s)).length, of: TUT_STEPS.length };
+}
+
 /** Still something to show: steps left or tips to come, and not skipped. */
 export function tutorialOn(t: TutorialSave): boolean {
   return !t.skipped && (currentStep(t) !== null || t.tips.length < TUT_TIPS.length);
@@ -271,10 +281,6 @@ function settled(step: TutStepId, ctx: TutCtx, run: TutRun, now: number): boolea
       return !ctx.sealed;
     case 'altar':
       return ctx.hasKnight && w !== 'altar' && w !== 'busy';
-    case 'move':
-      return w === 'dungeon' || w === 'warden';
-    case 'talk':
-      return w === 'warden' || w === 'dungeon';
     case 'descend':
       return w === 'dungeon';
     case 'attack':
@@ -283,8 +289,8 @@ function settled(step: TutStepId, ctx: TutCtx, run: TutRun, now: number): boolea
     case 'skills':
       return run.key === 'skills' && now - run.since >= SKILLS_READ;
     case 'auto':
-      // Read once it's on (how to take over), or let be: the line asks for a while, then goes.
-      return (run.key === 'auto:on' && now - run.since >= AUTO_READ) || (run.key === 'auto:ask' && now - run.since >= AUTO_ASK);
+      // Read once it's on (how to take over); or asked on enough floors and never wanted.
+      return (run.key === 'auto:on' && now - run.since >= AUTO_READ) || run.autoAsks >= AUTO_TRIES;
     case 'camp':
       // Back up with gold to spend (whichever way: CAMP, or a wipe).
       return ctx.canLevel && AT_HUB.includes(w);
@@ -306,17 +312,10 @@ function stepView(step: TutStepId, ctx: TutCtx, run: TutRun): TutView | null {
       return where === 'altar' && ctx.sealed ? line('seal', touch ? 'Tap the [seal] to summon your first knight!' : 'Click the [seal] to summon your first knight!', ui('seal')) : null;
     case 'altar':
       return where === 'altar' && ctx.hasKnight ? line('altar', 'Your first knight! Now close the altar.', ui('close')) : null;
-    case 'move':
-      return where === 'hub' ? line('move', touch ? 'Drag anywhere to walk.' : 'Walk with [WASD] or the arrows.', world('knight')) : null;
-    case 'talk':
-      if (where !== 'hub') return null;
-      // (His button at the hub says SQUAD: it opens his counter, where your squad is and DESCEND goes down.)
-      return ctx.nearWarden
-        ? line('talk:open', touch ? 'Tap [SQUAD] to see your squad.' : 'Press [E] to see your squad.', ui('talk'))
-        : line('talk:walk', 'Walk up to [Warden Tobb].', world('warden'));
     case 'descend':
       if (where === 'warden') return line('descend:warden', touch ? 'Your squad is set. Tap [DESCEND]!' : 'Your squad is set. Click [DESCEND]!', ui('descend'));
-      return where === 'hub' ? line('descend:steps', 'Walk down the [steps].', world('steps')) : null;
+      // How to walk and where to, in one: the fight is down the steps.
+      return where === 'hub' ? line('descend:steps', touch ? '[Drag] to walk. Head down the [steps]!' : 'Walk with [WASD]. Head down the [steps]!', world('steps')) : null;
     case 'attack':
       if (where !== 'dungeon' || !ctx.foeNear || ctx.autoOn) return null;
       return touch ? line('attack', 'Hold [ATTACK] to fight.', ui('attack')) : line('attack', 'Hold [left click] to attack.', world('foe'));
@@ -324,8 +323,10 @@ function stepView(step: TutStepId, ctx: TutCtx, run: TutRun): TutView | null {
       return where === 'dungeon' && (ctx.rolling || ctx.castAgo < SKILLS_LATE || run.key === 'skills') ? line('skills', 'Skills roll and cast on their own!', ui('reel')) : null;
     case 'auto':
       if (where !== 'dungeon') return null;
-      if (ctx.autoOn) return line('auto:on', touch ? 'Auto is on! Drag, or hold [ATTACK], to take over.' : 'Auto is on! Move or attack to take over.', ui('auto'));
-      return ctx.foeNear && run.key !== 'auto:ask' ? null : line('auto:ask', touch ? 'Tap [AUTO] and your knight plays on its own.' : 'Press [T] for [AUTO]: your knight plays itself.', ui('auto'));
+      if (ctx.autoOn) return line('auto:on', touch ? '[AUTO] is on! Drag any time to take over.' : '[AUTO] is on! Move any time to take over.', ui('auto'));
+      // On the button, foes or no foes, until it's tapped (this floor, unless it has let it be).
+      if (run.autoLetBe === ctx.floor) return null;
+      return line('auto:ask', touch ? 'Tap [AUTO] and your knight fights by itself!' : 'Press [T] for [AUTO]: it fights by itself!', ui('auto'));
     case 'exit':
       if (where !== 'dungeon' || ctx.foeNear || !ctx.exitOpen) return null;
       return ctx.doorInView ? line('exit:near', 'Step into the [door] to go deeper.', world('door')) : line('exit:far', 'Find the [door] to go deeper.', world('door'));
@@ -420,6 +421,12 @@ export function tutorialView(t: TutorialSave, run: TutRun, ctx: TutCtx, now: num
     run.tip = null;
     run.restUntil = now + TIP_REST;
   }
+  // Auto battle asked long enough on this floor: it lets the floor be (the door's line can come).
+  if (run.key === 'auto:ask' && now - run.since >= AUTO_ASK && run.autoLetBe !== ctx.floor) {
+    run.autoLetBe = ctx.floor;
+    run.autoAsks += 1;
+    if (run.autoAsks >= AUTO_TRIES && !t.done.includes('auto')) t.done.push('auto');
+  }
   // The first step not done whose turn has come (the one before it done) and whose moment is now.
   for (const s of TUT_STEPS) {
     if (t.done.includes(s)) continue;
@@ -448,9 +455,6 @@ export function tutorialDid(t: TutorialSave, run: TutRun, action: TutAction): vo
     if (!t.done.includes(s)) t.done.push(s);
   };
   switch (action) {
-    case 'moved':
-      finish('move');
-      break;
     case 'attacked':
     case 'killed':
       finish('attack');

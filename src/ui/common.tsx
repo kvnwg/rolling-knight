@@ -20,8 +20,9 @@ export const GRADIENTS = {
 export type Grad = keyof typeof GRADIENTS;
 
 /** Big outlined display text in hard color bands (titles, banners, stamps). Size in art pixels. */
-export function Chunky({ text, size = 10, grad = 'white', className, style }: { text: string; size?: number; grad?: Grad; className?: string; style?: CSSProperties }) {
-  const stops = GRADIENTS[grad];
+export function Chunky({ text, size = 10, grad = 'white', className, style }: { text: string; size?: number; grad?: Grad | readonly [string, string, string]; className?: string; style?: CSSProperties }) {
+  // (A named set of bands, or three colours of your own: light, mid, deep.)
+  const stops: readonly string[] = typeof grad === 'string' ? GRADIENTS[grad] : grad;
   const fill =
     grad === 'rainbow'
       ? `linear-gradient(90deg, ${stops.map((c, i) => `${c} ${(i * 100) / stops.length}% ${((i + 1) * 100) / stops.length}%`).join(', ')})`

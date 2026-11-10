@@ -41,6 +41,8 @@ export type WorldEvent =
   | { type: 'cleared' }
   /** A boss floor's way down opened (its boss fell). */
   | { type: 'portal' }
+  /** The leader touched the open portal: the squad swirls into it ('exit' follows once it's through). */
+  | { type: 'warp' }
   | { type: 'exit' }
   | { type: 'wipe' }
   | { type: 'heroDown'; slot: number }
@@ -109,8 +111,15 @@ export function uid(): number {
 /** Seconds a foe takes to rise into a fight once it wakes (or is summoned), before it may attack. */
 export const SPAWN_IN = 0.6;
 
-/** Seconds the leader stands in the open portal to go down a floor. */
-export const EXIT_HOLD = 0.6;
+/**
+ * Seconds the squad takes to swirl into the open portal, from the moment the leader touches it to
+ * the next floor (World.warp); with reduce motion (a flash where it stands, no swirl), WARP_CALM.
+ */
+export const WARP_TIME = 0.6;
+export const WARP_CALM = 0.25;
+
+/** Seconds the squad takes to pop back out of the warp at the next floor's start (World.arrive). */
+export const ARRIVE_TIME = 0.5;
 
 export class World {
   map: FloorMap;
@@ -141,8 +150,15 @@ export class World {
    */
   bot = false;
   portalOpen = false;
-  /** Seconds the leader has stood in the open portal (it takes EXIT_HOLD to go down). */
-  exitHold = 0;
+  /**
+   * The squad going down through the open portal: seconds in, of its whole swirl. It starts the
+   * moment the leader touches the portal; once it's through comes 'exit' (Game cuts to the next floor).
+   */
+  warp: { t: number; dur: number } | null = null;
+  /** The squad popping out of the warp at this floor's start (arriveFromPortal): seconds in, of its length. */
+  arrive: { t: number; dur: number } | null = null;
+  /** Reduce motion (Game sets it): a portal's warp is a quick flash where the squad stands, no swirl. */
+  calm = false;
   cleared = false;
   exited = false;
   wiped = false;
@@ -158,7 +174,6 @@ export class World {
   hitStop = 0;
   heroFlow: Flow | null = null;
   heroFlowFly: Flow | null = null;
-  leaderFlow: Flow | null = null;
   goalFlow: Flow | null = null;
   private flowT = 0;
   bossUnit: Unit | null = null;
@@ -444,21 +459,46 @@ export class World {
     return list.filter((e) => !e.dead && !e.downed && inRing(e.x, e.y, e.r, x, y, r));
   }
 
-  /** Can't `u` be touched right now (untouchable, or mid-roll)? Asks only: marks nothing. */
+  /** Can't `u` be touched right now (untouchable, mid-roll, or a knight in a portal's warp)? Asks only: marks nothing. */
   untouchable(u: Unit): boolean {
-    return u.invuln > 0 || !!u.rolling;
+    return u.invuln > 0 || !!u.rolling || (u.team === 'hero' && this.warping());
+  }
+
+  /** The squad is in a portal's warp (swirling in, or popping out at the next floor's start): the portal has it. */
+  warping(): boolean {
+    return this.warp !== null || this.arrive !== null;
+  }
+
+  /**
+   * The leader touched the open portal: the whole squad (the fallen too) swirls into it over
+   * WARP_TIME (WARP_CALM with reduce motion), out of reach and deaf to input meanwhile; then 'exit'.
+   */
+  private startWarp(): void {
+    this.warp = { t: 0, dur: this.calm ? WARP_CALM : WARP_TIME };
+    // A knockback still sliding a knight stops: each stays where the portal caught it.
+    for (const h of this.heroes) h.shove = undefined;
+    this.events.push({ type: 'warp' });
+  }
+
+  /**
+   * The squad came down through a portal (Game.startFloor): it pops out where it starts over
+   * ARRIVE_TIME, out of reach and deaf to input meanwhile. With reduce motion it's simply there.
+   */
+  arriveFromPortal(calm: boolean): void {
+    this.calm = calm;
+    if (!calm) this.arrive = { t: 0, dur: ARRIVE_TIME };
   }
 
   /**
    * A hit that would land on knight `h` now: does it miss? (It's untouchable, or rolling.) When it's
-   * the knight's dodge roll that makes it miss, that's a perfect roll, marked once per roll. Call it
-   * only for a hit that really would have landed (a shot touching, a bite in reach, a knight inside a
-   * ring as it goes off).
+   * the knight's dodge roll that makes it miss, that's a perfect roll, marked once per roll (never in
+   * a portal's warp: the portal saved it, not the roll). Call it only for a hit that really would have
+   * landed (a shot touching, a bite in reach, a knight inside a ring as it goes off).
    */
   evades(h: Unit): boolean {
     if (!this.untouchable(h)) return false;
     const d = h.dodge;
-    if (h.team === 'hero' && d && !d.perfect && this.time <= d.until) {
+    if (h.team === 'hero' && d && !d.perfect && this.time <= d.until && !this.warping()) {
       d.perfect = true;
       this.perfectRoll(h);
     }
@@ -499,7 +539,8 @@ export class World {
   }
 
   heal(target: Unit, amount: number): void {
-    if (target.downed || target.dead || amount <= 0) return;
+    // (Not a knight in a portal's warp: it isn't where its number would float.)
+    if (target.downed || target.dead || amount <= 0 || (target.team === 'hero' && this.warping())) return;
     const before = target.hp;
     target.hp = Math.min(target.maxHp, target.hp + amount);
     const got = target.hp - before;
@@ -527,6 +568,8 @@ export class World {
   /** Deals damage. Returns the amount dealt. */
   damage(target: Unit, raw: number, from: Unit | null, opts: { crit?: boolean; knock?: number; kx?: number; ky?: number; color?: string; silent?: boolean } = {}): number {
     if (target.dead || target.downed || target.invuln > 0 || raw <= 0) return 0;
+    // (A knight in a portal's warp is out of reach: whatever comes at it misses.)
+    if (target.team === 'hero' && this.warping()) return 0;
     let amount = raw;
     if (from && from.team === 'hero') {
       // Berserker: up to +150% damage the lower the knight's HP.
@@ -581,6 +624,8 @@ export class World {
   }
 
   wake(m: Unit): void {
+    // (Nothing new joins a fight the squad is leaving through a portal, or arriving from one.)
+    if (this.warping()) return;
     // Its roommates hear it. Each one that wakes rises into the fight (a puff, a moment before it attacks).
     const rouse = (o: Unit) => {
       if (o.awake || o.dead) return;
@@ -665,7 +710,8 @@ export class World {
 
   switchControl(slot: number, forced = false): boolean {
     const h = this.heroes.find((x) => x.slot === slot);
-    if (!h || h.downed || slot === this.controlled) return false;
+    // (Not in a portal's warp: the leader the view follows stays the one that stepped in.)
+    if (!h || h.downed || slot === this.controlled || this.warping()) return false;
     this.controlled = slot;
     this.events.push({ type: 'switch', slot });
     this.fx.push({ kind: 'spark', x: h.x, y: h.y - 10, color: '#ffe27a' });
@@ -681,8 +727,6 @@ export class World {
     const alive = this.livingHeroes();
     this.heroFlow = flowFrom(this.map, alive);
     this.heroFlowFly = flowFrom(this.map, alive, true);
-    const lead = this.leader();
-    this.leaderFlow = lead ? flowFrom(this.map, [lead]) : null;
     // Squad AI (and the bot) hunts foes until the floor is clear, or its boss is down; then the way out.
     const goals = this.cleared || (this.boss && this.portalOpen) ? [this.map.exit] : this.livingMobs();
     this.goalFlow = goals.length ? flowFrom(this.map, goals) : null;
@@ -760,10 +804,10 @@ export class World {
     this.refreshFlows();
   }
 
-  /** The ware on display the knight you play stands at (not yet sold), or null. */
+  /** The ware on display the knight you play stands at (not yet sold), or null (always, in a portal's warp). */
   nearWare(): Ware | null {
     const h = this.leader();
-    if (!h || this.hub) return null;
+    if (!h || this.hub || this.warping()) return null;
     let best: Ware | null = null;
     let bd = 15;
     for (const w of this.wares) {
@@ -777,10 +821,10 @@ export class World {
     return best;
   }
 
-  /** The person on this floor you're close enough to talk to (or to the spot before their set-up), or null. */
+  /** The person on this floor you're close enough to talk to (or to the spot before their set-up), or null (always, in a portal's warp). */
   nearNpc(): Npc | null {
     const h = this.leader();
-    if (!h || this.hub) return null;
+    if (!h || this.hub || this.warping()) return null;
     let best: Npc | null = null;
     let bd = TALK_RANGE;
     for (const n of this.npcs) {
@@ -866,6 +910,8 @@ export class World {
       this.history.push(this.snapshot());
       if (this.history.length > 50) this.history.shift();
     }
+    // (A portal's warp keeps to the clock: a hit-stop doesn't stretch it.)
+    const clock = dt;
     if (this.hitStop > 0) {
       // Only the part of the frame inside the freeze is slowed, so a freeze is as long at any frame rate.
       const stop = Math.min(this.hitStop, dt);
@@ -908,8 +954,9 @@ export class World {
         this.shakeIt(3, 0.3);
       }
     }
-    // --- heroes
-    for (const h of this.heroes) {
+    // --- heroes (none of it in a portal's warp: the squad holds still where the portal caught it,
+    // its input and its AI waiting until it's out, its burns and timers too)
+    for (const h of this.warping() ? [] : this.heroes) {
       tickStatus(this, h, dt);
       if (h.downed) continue;
       const mine = h.slot === this.controlled && !this.bot;
@@ -968,16 +1015,23 @@ export class World {
       this.events.push({ type: 'cleared' });
       this.refreshFlows();
     }
-    // Down you go after standing in the open portal a moment (so passing over it mid-fight doesn't).
-    // A squad playing itself (the dev bot) clears the floor (or its boss) first.
-    const mayLeave = !this.bot || this.cleared || (this.boss && this.portalOpen);
-    if (this.portalOpen && mayLeave && !this.exited && lead && dist(lead.x, lead.y, this.map.exit.x, this.map.exit.y) < 14) {
-      this.exitHold += dt;
-      if (this.exitHold >= EXIT_HOLD) {
+    // --- the way down: the leader touching the open portal swirls the whole squad into it at once,
+    // and once it's through, down it goes. A squad playing itself (the dev bot) clears the floor (or
+    // its boss) first.
+    if (this.warp) {
+      this.warp.t += clock;
+      if (this.warp.t >= this.warp.dur && !this.exited) {
         this.exited = true;
         this.events.push({ type: 'exit' });
       }
-    } else this.exitHold = 0;
+    } else {
+      const mayLeave = !this.bot || this.cleared || (this.boss && this.portalOpen);
+      if (this.portalOpen && mayLeave && !this.exited && lead && dist(lead.x, lead.y, this.map.exit.x, this.map.exit.y) < 14) this.startWarp();
+    }
+    if (this.arrive) {
+      this.arrive.t += clock;
+      if (this.arrive.t >= this.arrive.dur) this.arrive = null;
+    }
   }
 }
 
@@ -1010,7 +1064,8 @@ function tickStatus(w: World, u: Unit, dt: number): void {
  * for its Legendary (its slam) stands its ground: whatever crowds it is pushed off instead.
  */
 function separate(w: World): void {
-  const all = [...w.heroes.filter((h) => !h.downed && !h.rolling), ...w.mobs.filter((m) => !m.dead && !m.rush)];
+  // (A squad in a portal's warp is the portal's: nothing shoulders it about meanwhile.)
+  const all = [...(w.warping() ? [] : w.heroes.filter((h) => !h.downed && !h.rolling)), ...w.mobs.filter((m) => !m.dead && !m.rush)];
   const lead = w.leader();
   const give = (u: Unit, other: Unit) => (u.skillSlam ? 0 : u.boss ? 0.1 : u === lead && other.team === 'hero' ? 0.15 : 1);
   for (let i = 0; i < all.length; i++) {

@@ -1,7 +1,8 @@
 /**
  * A keeper's screen, the same for every counter at the hub (the gun shop's layout, in the light beige
  * "Pixel Art GUI" style): the keeper big at their counter in a lamplit scene across the top
- * (SceneView); tabs under it with a small square close button; then a sheet of paper with your purse
+ * (SceneView); tabs under it with a small square close button; then a sheet of paper in the keeper's
+ * own frame (FrameArt: the Oracle's velvet and stars, the sage's mossy stone...) with your purse
  * at the top, a category list down the left when there are categories, the offers as icon cards
  * (OfferCard), and any do-it-all buttons along the foot. Every number says what it is, every button
  * says what it does, and a line under the purse says what the counter is for (ShopHint); an offer's
@@ -24,6 +25,7 @@ import { Px, type IconName } from '../px';
 import { uiSound } from '../sound';
 import { hexIcon } from '../upgrades/icons';
 import { UPGRADE_ICON_ROWS } from '../upgrades/iconRows';
+import { FrameArt, keeperDressStyle } from './FrameArt';
 import { SceneView } from './SceneView';
 import s from './keeper.module.css';
 
@@ -104,7 +106,7 @@ export function KeeperScreen({
 }) {
   const calm = !!game.state.settings.reduceMotion;
   return (
-    <div className={s.screen} onPointerDown={(e) => !locked && e.target === e.currentTarget && (uiSound('close'), onClose())} data-keeper={station.id}>
+    <div className={s.screen} style={keeperDressStyle(station.id)} onPointerDown={(e) => !locked && e.target === e.currentTarget && (uiSound('close'), onClose())} data-keeper={station.id}>
       <div className={s.col}>
         <SceneView id={station.id} calm={calm} title={station.name} />
         <div className={s.tabs} role="tablist">
@@ -132,7 +134,11 @@ export function KeeperScreen({
             </button>
           )}
         </div>
-        <div className={s.panel}>{children}</div>
+        <div className={s.panel}>
+          {children}
+          {/* The keeper's own frame, over the paper's border (last: over the paper's edge, under the tabs). */}
+          <FrameArt id={station.id} />
+        </div>
       </div>
     </div>
   );

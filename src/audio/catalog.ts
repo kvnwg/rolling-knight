@@ -233,7 +233,7 @@ const LEGACY = {
   potion: legacy('Dungeon', 'A Luck Potion picked up.', 'Three gulps, then the long jingle.'),
   xp: legacy('Dungeon', 'XP reaching a bar.' + UNUSED, 'A soft upward blip.'),
   level_up: legacy('Dungeon', 'A knight levels up (its hero sheet).', 'The jingle, the music dipping under it.'),
-  portal: legacy('Dungeon', 'A floor is cleared: the portal opens.', 'Rising bells and a swirling whoosh.'),
+  portal: legacy('Dungeon', 'A floor is cleared: the portal opens; and the squad swirling into it, on its way down.', 'Rising bells and a swirling whoosh.'),
   floor_start: legacy('Dungeon', 'A new floor starts.', 'A whoosh in and a horn call.'),
   boss_warn: legacy('Dungeon', 'A boss telegraphs an attack.' + UNUSED + ' The fight plays boss_windup.', 'Two low warning blips.'),
   boss_roar: legacy('Dungeon', 'A boss floor starts.', 'A deep boom, a low brass growl and a roar.'),

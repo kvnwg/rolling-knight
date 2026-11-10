@@ -8,12 +8,12 @@ import { RARITY_COLOR } from '../core/rarity';
 import { BIOMES, type Biome } from '../world/biomes';
 import { norm, type Area, type FloatText, type Fx, type Shot, type Unit } from '../world/entities';
 import { TILE, type FloorMap, type Prop } from '../world/mapgen';
-import { EXIT_HOLD, type World } from '../world/world';
+import type { World } from '../world/world';
 import { flash, makeCanvas, mixHex, shade, toCanvas } from './art/draw';
 import { CLASS_HAS_SHIELD, KNIGHT_ANCHOR, knightFrame, knightGlow, knightLook, shieldArt, weaponArt, type KnightLook, type View } from './art/knights';
 import { mobFrame, poseFrames, type MobPose } from './art/mobs';
 import { flameArt, type PropArt } from './art/props';
-import { BAR_STEPS, DOOR_AX, DOOR_AY, DOOR_FRAMES, DOOR_OPENING, LIT_STEPS, doorArt } from './art/exitDoor';
+import { BAR_STEPS, DOOR_AX, DOOR_AY, DOOR_FRAMES, DOOR_OPENING, doorArt } from './art/exitDoor';
 import { tagCoin, wareIcon, wareTable } from './art/wares';
 import { RUN_ITEMS } from '../core/runItems';
 import type { Ware } from '../world/shop';
@@ -50,6 +50,7 @@ import { facing, type Dir } from './pf/sheet';
 import { Vfx } from './vfx/vfx';
 import { Spells } from './spells';
 import { CastFx } from './castFx';
+import { WarpFx } from './warpFx';
 import { screenView } from './view';
 import { boulderAt, isStill, mobMotion, type MobMotion } from './mobMotion';
 import { BOMB_R, BOSS_SLAM_R, SLAM_R, lobRadius, lungeOf } from '../world/ai';
@@ -394,6 +395,10 @@ export class Renderer {
   private spells = new Spells();
   /** A Legendary's cast round its caster: the dark and its pool of light, the power-up's glow, the flare (castFx.ts). */
   private castFx = new CastFx();
+  /** Going through a portal: the squad swirling into the way down, and popping out at the next floor (warpFx.ts). */
+  private warpFx = new WarpFx();
+  /** How far the open doorway's vortex has turned, in its frames (it turns faster while it takes the squad). */
+  private doorTurn = 0;
   /** Body boxes of PixelForge frames (for squash and stretch), by sheet and frame. */
   private boxes = new Map<string, Box>();
   /**
@@ -556,9 +561,9 @@ export class Renderer {
     this.prepareFloor(w);
     const biome = w.biome;
     const lead = w.leader();
-    // The knight you steer (none while the dev bot plays it), and where it aims: the mouse, else
-    // (touch or Auto attack, attacking) the foe the auto-aim is on, or the way it's dragged.
-    const me = w.hub || w.camp || w.bot ? null : (w.heroes.find((h) => h.slot === w.controlled && !h.downed) ?? null);
+    // The knight you steer (none while the dev bot plays it, or a portal has it), and where it aims:
+    // the mouse, else (touch or Auto attack, attacking) the foe the auto-aim is on, or the way it's dragged.
+    const me = w.hub || w.camp || w.bot || w.warping() ? null : (w.heroes.find((h) => h.slot === w.controlled && !h.downed) ?? null);
     let aimPt: { x: number; y: number } | null = null;
     if (me && this.cursor) aimPt = this.screenToWorld(this.cursor.x, this.cursor.y);
     else if (me && (me.aiming ?? 0) > 0) {
@@ -674,6 +679,9 @@ export class Renderer {
       this.corpses = this.corpses.filter((c) => c.world === w && w.time - c.at < 4);
       pruneMobs(new Set(w.mobs.filter((m) => !m.dead).map((m) => m.uid)));
     }
+    // A portal's warp: the squad swirling into the way down, or popping out at a floor's start (its
+    // knights are drawn there, not with everyone standing; with reduce motion it flashes the screen).
+    this.flashT = Math.max(this.flashT, this.warpFx.update(w, dt, this.time, (h) => this.heroPoses.get(h.uid)?.dir));
 
     // --- shadows (soft ovals under everything standing; PixelForge sprites bring their own)
     g.fillStyle = 'rgba(8,6,16,0.38)';
@@ -689,7 +697,7 @@ export class Renderer {
     }
     for (const u of [...w.heroes, ...w.mobs]) {
       if (u.dead && u.hurtT < -0.3) continue;
-      if (!visible(u.x, u.y)) continue;
+      if (!visible(u.x, u.y) || (u.team === 'hero' && this.warpFx.draws(w, u))) continue;
       // A PixelForge mob in the air: its own soft shadow goes with it (drawMob), and a firm one here marks the ground under it.
       const air = pf && u.team === 'mob' && !u.dead && (u.rush?.kind === 'leap' || (u.rush && u.flying)) ? mobMotion(u, w.time) : null;
       if (air && air.lift > 0) {
@@ -747,6 +755,7 @@ export class Renderer {
       });
     }
     // (The hub paints its own way down: its steps, and the glow at their foot.)
+    this.doorTurn += dt * 10 * this.warpFx.doorSpin(w);
     if (!hub && visible(w.map.exit.x, w.map.exit.y, 80)) list.push({ y: w.map.exit.y - 7, draw: () => this.drawDoor(st, em, w, sx, sy, lead ?? null) });
     // A merchant's wares on their tables, price tags underneath.
     const atWare = hub ? null : w.nearWare();
@@ -763,7 +772,7 @@ export class Renderer {
       list.push({ y: c.y, draw: () => this.drawCorpse(st, w, c, sx, sy) });
     }
     for (const h of w.heroes) {
-      if (!visible(h.x, h.y)) continue;
+      if (!visible(h.x, h.y) || this.warpFx.draws(w, h)) continue;
       list.push({
         y: h.y,
         draw: () => {
@@ -840,6 +849,8 @@ export class Renderer {
     list.sort((a, b) => a.y - b.y);
     for (const d of list) d.draw();
     this.drawPfFx(st, w, sx, sy);
+    // The squad in a portal's warp, over everything standing (it's on its way into the vortex).
+    this.warpFx.draw(st, em, this.layers.cap.x, ui, w, sx, sy);
     // --- swings: their own pass, over the units, on the unlit top layer like every attack effect
     // (read before the Fx below are turned into effects: a stroke's own marks replace their sparks)
     this.vfx.update(w);
@@ -2017,7 +2028,7 @@ export class Renderer {
     ctx.globalAlpha = 1;
   }
 
-  /** The way down's archway: the doorway (vortex, or dark behind the portcullis), the frame, its rim light and the stones you light by standing in it. */
+  /** The way down's archway: the doorway (vortex, or dark behind the portcullis), the frame, its rim light, and its stones flaring as the squad goes through. */
   private doorAnim: { world: World | null; open: boolean; at: number } = { world: null, open: false, at: -1 };
   private doorCanvas(key: string, buf: PixelBuf): HTMLCanvasElement {
     return this.cached(`door|${key}`, () => toCanvas(buf));
@@ -2041,7 +2052,7 @@ export class Renderer {
     // Your knight behind it: the arch turns see-through.
     const behind = !!lead && lead.y < w.map.exit.y - 8 && lead.y > w.map.exit.y - 70 && Math.abs(lead.x - w.map.exit.x) < 30;
     st.globalAlpha = behind ? 0.45 : 1;
-    const fr = Math.floor(this.time * 10) % DOOR_FRAMES;
+    const fr = Math.floor(this.doorTurn) % DOOR_FRAMES;
     const vortex = Math.max(0, Math.min(1, (lift - 0.35) / 0.65));
     if (vortex < 1) st.drawImage(this.doorCanvas('sealed', art.sealed.buf), x, y);
     if (vortex > 0) {
@@ -2064,14 +2075,19 @@ export class Renderer {
       em.globalAlpha = vortex;
       em.drawImage(this.doorCanvas('rimg', art.rim.glow), x, y);
       em.globalAlpha = 1;
-      // Standing in it: the inner ring's stones light up from both ends to the keystone, then down you go.
-      const n = Math.min(LIT_STEPS, Math.ceil((w.exitHold / EXIT_HOLD) * LIT_STEPS));
-      if (n > 0) {
-        st.drawImage(this.doorCanvas(`lit${n}`, art.lit[n].buf), x, y);
-        em.drawImage(this.doorCanvas(`lit${n}g`, art.lit[n].glow), x, y);
+      // Going through it: the inner ring's stones all flare at once as the portal takes the squad,
+      // stay lit while it swirls in, and flare again as the eye bursts (warpFx.ts).
+      const glow = this.warpFx.doorGlow(w);
+      if (glow) {
+        const piece = art[glow];
+        st.drawImage(this.doorCanvas(glow, piece.buf), x, y);
+        // (The flare glows less than it shines, so the white-hot stones stay crisp.)
+        em.globalAlpha = glow === 'flare' ? 0.55 : 1;
+        em.drawImage(this.doorCanvas(`${glow}g`, piece.glow), x, y);
+        em.globalAlpha = 1;
       }
-      // Sparks drifting out of the doorway.
-      if (Math.random() < 0.35 * vortex) {
+      // Sparks drifting out of the doorway (while it pulls the squad in, they stream in instead).
+      if (!w.warp && Math.random() < 0.35 * vortex) {
         const px = w.map.exit.x - DOOR_AX + DOOR_OPENING.x + 2 + Math.random() * (DOOR_OPENING.w - 4);
         const py = w.map.exit.y + 8 - DOOR_AY + DOOR_OPENING.y + DOOR_OPENING.h * (0.35 + Math.random() * 0.6);
         this.particles.push(this.p('mote', px, py, Math.random() < 0.5 ? '#ffe484' : '#ffc040', 1.3, -14));
@@ -2195,7 +2211,8 @@ export class Renderer {
     const ambLum = (ar * 0.299 + ag * 0.587 + ab * 0.114) / 255;
     // (At the hub the shop lights the court: a knight there carries less.)
     const carry = Math.max(0.06, Math.min(0.75, (0.72 - ambLum) * 1.5)) * (w.hub ? 0.55 : 1);
-    for (const h of w.heroes) {
+    // (Not while a portal pulls the squad in: the portal's light is theirs then.)
+    for (const h of w.warp ? [] : w.heroes) {
       if (h.downed) continue;
       const mine = h.slot === w.controlled;
       out.push({ x: sx(h.x), y: sy(h.y) - 6, r: biome.light.heroRadius * (mine ? 1.2 : 0.9), color: biome.light.hero, intensity: carry * (mine ? 1 : 0.7) });
@@ -2234,7 +2251,9 @@ export class Renderer {
       }
     }
     if (!w.hub) {
-      if (w.portalOpen) out.push({ x: sx(w.map.exit.x), y: sy(w.map.exit.y) - 14, r: 78, color: '#ffc45a', intensity: 1.05, bloom: true });
+      // (Brighter while it takes the squad, brightest as it flares.)
+      const k = this.warpFx.doorLight(w);
+      if (w.portalOpen) out.push({ x: sx(w.map.exit.x), y: sy(w.map.exit.y) - 14, r: 78 * (0.85 + 0.15 * k), color: '#ffc45a', intensity: 1.05 * k, bloom: true });
       else out.push({ x: sx(w.map.exit.x), y: sy(w.map.exit.y) - 14, r: 30, color: '#8a7aa8', intensity: 0.3 });
     }
     // Traps: a red glow on one about to strike (the game's telegraph color), and a fire vent lights

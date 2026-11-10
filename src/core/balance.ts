@@ -151,7 +151,7 @@ export const BAL = {
     reviveHpPct: 0.35,
     drops: { potionMob: 0.003, potionElite: 0.05, potionBoss: 0.3, hourglassElite: 0.25, hourglassBoss: 5 },
   },
-  rebirth: { baseFloor: 15, floorPer: 10, luckPer: 0.25, goldMultPer: 0.5, statPctPer: 30 },
+  rebirth: { baseFloor: 30, floorPer: 10, luckPer: 0.25, goldMultPer: 0.5, statPctPer: 30 },
   perks: { unlockRebirths: 1, sigilsPerBoss: 1 },
 } as const;
 

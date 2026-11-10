@@ -124,6 +124,18 @@ recording: [`docs/SOUNDS.md`](docs/SOUNDS.md).
   painted and lit in code (`src/render/art/keepers/`: the keeper's bust from their hub look, their
   trade round them, lamps, candles, coals and glowing glass in stepped pools of warm light), at a
   whole number of screen pixels per art pixel; `keepers-preview.html` shows them all.
+- Every keeper's counter sits in a frame of their own (`src/render/art/keepers/frames.ts`, painted to
+  the screen's exact size, nothing tiled): the Oracle's velvet and night sky, the tinker's brass and
+  gauges, the sage's mossy stone and flowers, the priestess's marble and roses, the board's cork and
+  pinned notes, the warden's dungeon stone and iron, the broker's mahogany and coins; each tints its
+  paper and colours its tab. `frames-preview.html` shows them all.
+- Behind a knight's picture (its card, its sheet, its face in the HUD) is a little lit pixel scene
+  for its rarity (`src/render/art/backdrops.ts`), at the knight's own pixel size: a stone cellar for
+  a Common up through a banner hall, a velvet stage, a gilded hall, a crystal grotto, the moonlit
+  sky, an aurora and a rune void to a prism for the Absolute. `backdrops-preview.html` shows them.
+- Back after time away the game opens on its title; after PLAY the welcome back (`WelcomeBack.tsx`)
+  lays out what the altar rolled tier by tier, each tier with its own icon
+  (`src/render/art/tierGems.ts`), and the best find.
 - Up close at their counters the keepers are drawn in an anime pixel style of their own
   (`src/render/art/keepers/bust.ts`): natural proportions, big eyes with a lash line and a glint, hair
   in locks with a band of shine, cloth in soft folds, a few hue-shifted cel steps per material and a
@@ -188,7 +200,7 @@ as usual). `?fresh` starts a new game. The game is on
 npm test
 ```
 
-427 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
+460 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
 timing, extra reels, the start's ordinary quick spins, bad-luck protection, Lucky Spins, repeat pulls
 kept as extras at the worth they landed with and sold (one knight's, all at once, or with the knight
 at the Warden's) without touching the knight, old saves' spares cashed in and extras mended,
@@ -241,9 +253,9 @@ npm run sim -- --minutes 40
 
 The real game logic with a dev bot at the controls (it moves, aims and dodges too) that levels,
 buys Luck upgrades, rolls combat upgrades and perks, and rebirths. Current result over seeds 1 to 8
-(`--seed N`): floor 5 at about 4 minutes (3 to 4.5), floor 10 at about 8 (7 to 9.5), the first
-rebirth at about 13 (11 to 15) and the second at about 32 (29 to 34), with one wipe in the eight runs
-and about 60 perfect rolls in 40 minutes.
+(`--seed N`): floor 5 at about 4 minutes (3 to 4.5), floor 10 at about 8 (7 to 9.5), and the first
+rebirth (floor 30) at about 34 minutes (32 to 36 over seeds 1 to 4), the second (floor 40) some 40
+to 50 minutes after it.
 
 ```bash
 npx tsx tools/preview.ts knights shots/knights.png

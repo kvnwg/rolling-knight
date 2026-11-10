@@ -30,6 +30,7 @@ import { sparklePic } from './pixelArt';
 import { RAINBOW, raysUrl } from './rays';
 import { Rays } from './Rays';
 import { DRAMA_LEVEL, HYPER_LOCK_MS, revealPhases } from './revealTiming';
+import { haloUrl } from './halo';
 import { CONFETTI_COLORS, fmtOdds, mixHex, rarityBands, readU, tierColor } from './util';
 import s from './reveal.module.css';
 
@@ -48,6 +49,8 @@ type Phase = 'black' | 'dark' | 'appear' | 'count' | 'landed';
 
 /** The reveal's light starts no higher than Rare's blue, so it never gives the ceiling away. */
 const GLOW_START = RARITIES.indexOf('rare');
+/** The wide pool of light over the whole screen behind a reveal: its size in art pixels. */
+const WIDE_HALO = 240;
 
 const SLAM_SOUND = { big: 'revealBig', huge: 'revealHuge', insane: 'revealInsane', hyper: 'revealHyper' } as const;
 
@@ -253,6 +256,7 @@ function RareReveal({ item, onDone, calm }: { item: RevealItem; onDone: () => vo
   const skip = useRef(false);
   const phaseRef = useRef<Phase>('black');
   const rootRef = useRef<HTMLDivElement>(null);
+  const haloN = useRef(93);
   const itemRef = useRef<HTMLDivElement>(null);
   const raysRefs = useRef<(HTMLImageElement | null)[]>([]);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -346,6 +350,8 @@ function RareReveal({ item, onDone, calm }: { item: RevealItem; onDone: () => vo
       if (lightTier !== glowShown) {
         glowShown = lightTier;
         rootRef.current?.style.setProperty('--c', tierColor(lightTier));
+        rootRef.current?.style.setProperty('--halo', `url(${haloUrl(tierColor(lightTier), haloN.current)})`);
+        rootRef.current?.style.setProperty('--halo-wide', `url(${haloUrl(tierColor(lightTier), WIDE_HALO, 0.45, 6)})`);
       }
       if (el - glowAt >= 180 && raysTierRef.current !== glow) {
         raysTierRef.current = glow;
@@ -426,6 +432,9 @@ function RareReveal({ item, onDone, calm }: { item: RevealItem; onDone: () => vo
   const raysNow = raysFor(raysTierRef.current);
   const raysPx = Math.round(Math.max(250 * u, 1.15 * Math.max(vp.w, vp.h)));
   const mut = item.mutation ? MUTATION_LOOK[item.mutation] : null;
+  // The knight's halo, in art pixels across (the effect re-tints it as the light steps up the tiers).
+  const glowN = Math.round(Math.max(93, half * 3.4));
+  haloN.current = glowN;
   const rootStyle = {
     ['--u' as string]: `${u}px`,
     ['--c' as string]: tierColor(Math.min(itemTier, GLOW_START)),
@@ -434,7 +443,10 @@ function RareReveal({ item, onDone, calm }: { item: RevealItem; onDone: () => vo
     ['--iy' as string]: pos ? `${pos.iy}px` : '45%',
     ['--kw' as string]: `${KNIGHT_PIC_W * ks * u}px`,
     ['--kh' as string]: `${KNIGHT_PIC_H * ks * u}px`,
-    ['--glowd' as string]: `${Math.round(Math.max(93, half * 3.4)) * u}px`,
+    ['--glowd' as string]: `${glowN * u}px`,
+    ['--halo' as string]: `url(${haloUrl(tierColor(Math.min(itemTier, GLOW_START)), glowN)})`,
+    ['--halo-wide' as string]: `url(${haloUrl(tierColor(Math.min(itemTier, GLOW_START)), WIDE_HALO, 0.45, 6)})`,
+    ['--halo-wide-d' as string]: `${WIDE_HALO * u}px`,
     ['--rays' as string]: `${raysPx}px`,
   } as CSSProperties;
   return (

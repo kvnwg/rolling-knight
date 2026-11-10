@@ -19,9 +19,8 @@ import { createControls } from '../input/input';
 import { Renderer } from '../render/renderer';
 import { Chunky, HeroArt, type Grad } from './common';
 import { DungeonHud } from './DungeonHud';
-import { fmt, secs } from './format';
+import { secs } from './format';
 import { HubHud, StationSheet, TitleScreen } from './Hub';
-import { KnightTile } from './KnightCard';
 import { HeroDetail, LuckSheet, SettingsSheet } from './panels';
 import { hubLayout, type HubStation } from '../world/hubWorld';
 import type { Npc } from '../world/npcs';
@@ -33,6 +32,7 @@ import { uiSound } from './sound';
 import { rebirthPitch } from './RebirthPill';
 import { VistaCanvas } from './VistaCanvas';
 import { Tutorial } from './Tutorial';
+import { WelcomeBack } from './WelcomeBack';
 
 export interface Toast {
   id: number;
@@ -463,36 +463,8 @@ export function App() {
       )}
       {luck && <LuckSheet game={game} onClose={() => setLuck(false)} />}
       {reveals.length > 0 && <Reveal key={reveals.length + ':' + reveals[0].knightId} item={reveals[0]} calm={game.state.settings.reduceMotion} onDone={() => (uiSound('tap'), setReveals((r) => r.slice(1)))} />}
-      {offline && (
-        <div className="modal" onPointerDown={(e) => e.target === e.currentTarget && setOffline(null)}>
-          <div className="sheet">
-            <div className="hero-banner">
-              <Chunky text="WELCOME BACK" size={10} grad="gold" />
-              <p className="lead">
-                {secs(offline.seconds)} away. The altar rolled {offline.rolls} times and your squad brought back {fmt(offline.gold)} gold.
-              </p>
-            </div>
-            {offline.kept.length > 0 && (
-              <div className="heroes-grid">
-                {offline.kept.slice(0, 12).map((k, i) => (
-                  <KnightTile
-                    key={i}
-                    id={k.knightId}
-                    mutation={k.mutation}
-                    rarity={k.rarity}
-                    name={knightDef(k.knightId).name}
-                    top={k.isNew ? <span className="ktag new">NEW</span> : undefined}
-                    tl={k.isNew ? undefined : <span className="ktag spare num" title="Already yours: it turned into gold">GOLD</span>}
-                  />
-                ))}
-              </div>
-            )}
-            <button className="btn gold big" onClick={() => setOffline(null)}>
-              COLLECT
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Back after time away: not over the title (that opens the game), but once you've pressed PLAY. */}
+      {offline && picked && !intro && <WelcomeBack report={offline} onClose={() => setOffline(null)} />}
     </>
   );
 }
