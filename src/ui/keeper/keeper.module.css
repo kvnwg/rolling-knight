@@ -83,8 +83,9 @@
 }
 .tab[data-on] {
   height: calc(14 * var(--px));
-  border-image-source: var(--sk-pa-tab-on);
-  color: #13280c;
+  /* (The keeper's own colour: FrameArt.tsx.) */
+  border-image-source: var(--kf-tab-on, var(--sk-pa-tab-on));
+  color: var(--kf-tab-text, #13280c);
 }
 .tab .badge {
   min-width: calc(6 * var(--px));
@@ -130,10 +131,23 @@
   display: flex;
   flex-direction: column;
   gap: calc(2 * var(--px));
-  border: calc(4 * var(--px)) solid transparent;
-  border-image: var(--sk-pa-panel) 8 fill / calc(8 * var(--px)) repeat;
+  /* The keeper's frame (FrameArt.tsx paints it over this border: a band 5 px wide all round, and the
+     plaque 8 px deep under its top), their paper inside it. */
+  border: solid transparent;
+  border-width: calc(13 * var(--px)) calc(5 * var(--px)) calc(5 * var(--px));
+  background: var(--kf-paper-fill, #f2e2bf) var(--kf-paper) 0 0 / calc(24 * var(--px)) calc(24 * var(--px));
+  background-clip: padding-box;
   image-rendering: pixelated;
-  padding: calc(1 * var(--px)) calc(1 * var(--px)) calc(1 * var(--px) + env(safe-area-inset-bottom, 0px));
+  padding: calc(1.5 * var(--px)) calc(1 * var(--px)) calc(1 * var(--px) + env(safe-area-inset-bottom, 0px));
+}
+.frameArt {
+  position: absolute;
+  left: calc((-5 - var(--over)) * var(--px));
+  top: calc((-13 - var(--over)) * var(--px));
+  width: calc(100% + (10 + 2 * var(--over)) * var(--px));
+  height: calc(100% + (18 + 2 * var(--over)) * var(--px));
+  image-rendering: pixelated;
+  pointer-events: none;
 }
 .top {
   flex: none;

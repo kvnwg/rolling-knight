@@ -525,7 +525,7 @@ function paperCard(face: Hex, hi: Hex, lo: Hex, ink: Hex): string {
  * A tab on top of a panel: rounded top corners, outlined on the top and sides, a light top edge, and
  * no line along the bottom (it sits on the panel). 16 x 14, sliced 5 5 2 5.
  */
-function tab(m: Mat): string {
+export function tab(m: Mat): string {
   const p = new Pix(16, 14);
   for (let y = 0; y < 14; y++) {
     for (let x = 0; x < 16; x++) {
