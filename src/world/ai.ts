@@ -16,71 +16,9 @@ import { dist, inRing, lineOfSight, moveUnit, norm, walkClear, type Unit } from 
 import { flowDist, flowStep, type Flow } from './flow';
 import { TILE } from './mapgen';
 import type { Gun, Lunge, Volley } from './mobgen';
+import { besideLeader, kiteDir, navCommit, navFlow, navNudge, navOf, navTo, navWatch } from './nav';
 import { heroDodge, heroSpecial } from './skills';
 import { uid, type World } from './world';
-
-/** Steering toward a point: straight when in sight, else along a flow field. */
-function steer(w: World, u: Unit, tx: number, ty: number, flow: Flow | null): [number, number] {
-  // Straight there only when the way is really open (trees and props block a body, not sight), and
-  // not while taking a detour round something it got caught on.
-  const detour = (u.ai?.detourT ?? 0) > 0;
-  if (!detour && walkClear(w.map, u.x, u.y, tx, ty, u.r, u.flying)) return norm(tx - u.x, ty - u.y);
-  if (flow) {
-    const s = flowStep(flow, u.x, u.y);
-    if (s) return s;
-  }
-  return norm(tx - u.x, ty - u.y);
-}
-
-/**
- * Keeps a squadmate from getting pinned on a tree or a corner: every half second, if it wanted to
- * move and barely did, it takes the long way round (the flow field) for a while; still pinned after
- * a couple of seconds and away from the leader, it hops to a free spot at the leader's side.
- */
-function unstick(w: World, h: Unit, lead: Unit | undefined, want: [number, number], dt: number): void {
-  const ai = h.ai!;
-  if ((ai.detourT ?? 0) > 0) ai.detourT! -= dt;
-  ai.checkT = (ai.checkT ?? 0.5) - dt;
-  if (ai.checkT > 0) return;
-  ai.checkT = 0.5;
-  const moved = dist(h.x, h.y, ai.lastX ?? h.x, ai.lastY ?? h.y);
-  ai.lastX = h.x;
-  ai.lastY = h.y;
-  const trying = Math.hypot(want[0], want[1]) > 0.3 && !h.rolling && h.stunT <= 0 && !h.channel;
-  if (!trying || moved > 4) {
-    ai.stuck = 0;
-    return;
-  }
-  ai.stuck += 1;
-  if (ai.stuck >= 2) ai.detourT = 1.6;
-  if (ai.stuck >= 5 && lead && lead !== h && dist(h.x, h.y, lead.x, lead.y) > 36) {
-    const spot = freeSpotNear(w, lead.x - lead.aimX * 12, lead.y + 8, h.r);
-    if (spot) {
-      w.fx.push({ kind: 'dust', x: h.x, y: h.y });
-      h.x = spot[0];
-      h.y = spot[1];
-      w.fx.push({ kind: 'spark', x: h.x, y: h.y - 8, color: '#e8f0ff' });
-    }
-    ai.stuck = 0;
-    ai.detourT = 0;
-    ai.lastX = h.x;
-    ai.lastY = h.y;
-  }
-}
-
-/** A spot a body of radius r can stand on, as close to (x, y) as possible (null if none nearby). */
-function freeSpotNear(w: World, x: number, y: number, r: number): [number, number] | null {
-  for (let ring = 0; ring <= 5; ring++) {
-    const n = ring === 0 ? 1 : ring * 8;
-    for (let k = 0; k < n; k++) {
-      const a = (k / n) * Math.PI * 2;
-      const px = x + Math.cos(a) * ring * 6;
-      const py = y + Math.sin(a) * ring * 6;
-      if (walkClear(w.map, px, py, px, py + 0.1, r)) return [px, py];
-    }
-  }
-  return null;
-}
 
 /** Away from (x, y) (or sideways when right on it). */
 function away(u: Unit, x: number, y: number): [number, number] {
@@ -236,11 +174,20 @@ function closeFoes(foes: readonly Unit[], h: Unit): Unit[] {
   return foes.filter((m) => m.awake && dist(m.x, m.y, h.x, h.y) < 140);
 }
 
-/** One knight's decision for this frame: where to move (and maybe a dodge or a skill roll). */
+/**
+ * One knight's decision for this frame: where to move (and maybe a dodge or a skill roll). Every move
+ * goes through the nav layer (nav.ts), whose watch first looks at how the last one went: no headway
+ * for a moment and it plans again, steps aside, or at last hops the knight back to its leader.
+ */
 export function heroAi(w: World, h: Unit, lead: Unit | undefined, dt: number): [number, number] {
-  const want = heroAiMove(w, h, lead, dt);
-  unstick(w, h, lead, want, dt);
-  return want;
+  navWatch(w, h, lead, dt);
+  return navCommit(w, h, heroAiMove(w, h, lead, dt), dt);
+}
+
+/** The foes close enough to back off from: awake ones nearby, and the one right on top of it. */
+function pressing(w: World, h: Unit, close: Unit): Unit[] {
+  const near = w.enemiesIn('hero', h.x, h.y, 90).filter((m) => m.awake);
+  return near.includes(close) ? near : [...near, close];
 }
 
 function heroAiMove(w: World, h: Unit, lead: Unit | undefined, dt: number): [number, number] {
@@ -272,31 +219,42 @@ function heroAiMove(w: World, h: Unit, lead: Unit | undefined, dt: number): [num
     ai.lastHp = target.hp;
     if ((ai.noHitT ?? 0) > 2.5 && (!lead || isLead || dist(h.x, h.y, lead.x, lead.y) < 150)) {
       if (ai.noHitT! > 6) ai.noHitT = 0;
-      return steer(w, h, target.x, target.y, w.goalFlow && isLead ? w.goalFlow : null);
+      return navTo(w, h, target.x, target.y, h.r + target.r + 2);
     }
   }
   const follow = (): [number, number] => {
     if (!lead || isLead) return [0, 0];
-    const d = dist(h.x, h.y, lead.x, lead.y);
-    // Formation: trail the leader a little to the side.
+    const nav = navOf(h);
+    // Settled close by with no way nearer (another squadmate in the way): it stays till the leader moves on.
+    if (nav.settled) {
+      if (dist(lead.x, lead.y, nav.setX, nav.setY) < 10) return [0, 0];
+      nav.settled = false;
+    }
+    // Formation: trail the leader a little to the side (or the nearest spot there the leader could
+    // walk straight to, when that falls in a tree, a wall or the water).
     const side = h.slot! % 2 === 0 ? -1 : 1;
-    const fx = lead.x + side * 14 - lead.aimX * 8;
-    const fy = lead.y + 10;
-    if (d < 22 && dist(h.x, h.y, fx, fy) < 8) return [0, 0];
-    return steer(w, h, fx, fy, w.leaderFlow);
+    const [fx, fy] = besideLeader(w, h, lead, lead.x + side * 14 - lead.aimX * 8, lead.y + 10);
+    if (dist(h.x, h.y, fx, fy) < 6) return [0, 0];
+    if (nav.noProg >= 0.5 && dist(h.x, h.y, lead.x, lead.y) < 28) {
+      nav.settled = true;
+      nav.setX = lead.x;
+      nav.setY = lead.y;
+      return [0, 0];
+    }
+    return navTo(w, h, fx, fy, 5);
   };
   // The leader on Auto explores: toward the nearest mob, then, once the floor is clear (or its boss
   // is down), the portal. (The way down is open from the start, but the bot clears before it leaves.)
   if (isLead && !target) {
     const goal = w.goalFlow;
-    if (goal && flowDist(goal, h.x, h.y) > 0) return flowStep(goal, h.x, h.y) ?? [0, 0];
-    if (w.cleared || (w.boss && w.portalOpen)) return steer(w, h, w.map.exit.x, w.map.exit.y, w.goalFlow);
+    if (goal && flowDist(goal, h.x, h.y) > 0) return navFlow(w, h, goal);
+    if (w.cleared || (w.boss && w.portalOpen)) return navTo(w, h, w.map.exit.x, w.map.exit.y, 3);
     return [0, 0];
   }
   if (!target) {
     // Allies stay with the leader, but go help if a fight is close by.
     const fight = w.nearestEnemy(h, 140, false);
-    if (fight && fight.awake && lead && dist(fight.x, fight.y, lead.x, lead.y) < 140) return steer(w, h, fight.x, fight.y, w.heroFlow);
+    if (fight && fight.awake && lead && dist(fight.x, fight.y, lead.x, lead.y) < 140) return navTo(w, h, fight.x, fight.y, 24);
     return follow();
   }
   // Allies don't wander too far from the leader.
@@ -305,25 +263,26 @@ function heroAiMove(w: World, h: Unit, lead: Unit | undefined, dt: number): [num
   switch (cls.role) {
     case 'tank':
     case 'melee': {
-      if (d > h.range! * 0.8) return steer(w, h, target.x, target.y, null);
-      // Circle a little so the squad doesn't stack.
-      return [Math.sin(w.time * 1.3 + h.slot!) * 0.25, Math.cos(w.time * 1.7 + h.slot!) * 0.25];
+      if (d > h.range! * 0.8) return navTo(w, h, target.x, target.y, h.range! * 0.75);
+      // Circle a little so the squad doesn't stack (never into a wall).
+      return navNudge(w, h, Math.sin(w.time * 1.3 + h.slot!) * 0.25, Math.cos(w.time * 1.7 + h.slot!) * 0.25);
     }
     case 'ranged':
     case 'caster': {
       const want = h.range! * 0.7;
+      // Too close: back off toward open ground (never into a corner).
       const close = w.nearestEnemy(h, 46, false);
-      if (close) return norm(h.x - close.x + Math.sin(w.time + h.slot!) * 6, h.y - close.y);
-      if (d > h.range! * 0.95) return steer(w, h, target.x, target.y, null);
-      if (d < want * 0.7) return norm(h.x - target.x, h.y - target.y);
+      if (close) return kiteDir(w, h, pressing(w, h, close), lead);
+      if (d > h.range! * 0.95) return navTo(w, h, target.x, target.y, h.range! * 0.9);
+      if (d < want * 0.7) return kiteDir(w, h, [target], lead);
       return [0, 0];
     }
     case 'healer': {
       const hurt = w.heroes.filter((o) => !o.downed && o !== h).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
       const close = w.nearestEnemy(h, 40, false);
-      if (close) return norm(h.x - close.x, h.y - close.y);
-      if (hurt && dist(h.x, h.y, hurt.x, hurt.y) > 40) return steer(w, h, hurt.x, hurt.y, w.leaderFlow);
-      if (d > h.range! * 0.95) return steer(w, h, target.x, target.y, null);
+      if (close) return kiteDir(w, h, pressing(w, h, close), lead);
+      if (hurt && dist(h.x, h.y, hurt.x, hurt.y) > 40) return navTo(w, h, hurt.x, hurt.y, 36);
+      if (d > h.range! * 0.95) return navTo(w, h, target.x, target.y, h.range! * 0.9);
       return [0, 0];
     }
   }
