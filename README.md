@@ -13,14 +13,17 @@ you walk round the hub, a lamplit square before the Gilded Reel, where each keep
 the Oracle's altar (summons, the odds and the Codex), the tinker's upgrades on two tabs (Luck,
 bought on a honeycomb map, and Combat, rolled for gold on a reel: Strength, Vitality, Attack Speed,
 Move Speed, Quick Roll for faster skill rolls, chance upgrades like Ricochet and Double or Nothing,
-and rare one-offs), the sage's perks (rolled for sigils), the rebirth shrine, the notice board, and Warden Tobb by the steps down,
+and rare one-offs), the sage's perks (rolled for sigils), the rebirth shrine, the notice board,
+Bram the Broker at the curio cabinet, who sells your extras, and Warden Tobb by the steps down,
 who picks the three you send down, levels them up and reforges them: one job each, nothing twice. Talk to a keeper and their screen opens with them big at their counter, lamplit
 among the things of their trade, and their wares below as cards on beige paper: a picture, a level,
 a number or two and a price, the details a tap away. Above all of them, at 1 in 2.5 billion, sits the Absolute tier and its one knight: Kevin, a
-black-haired normal guy and the strongest in the game by far. A knight you already have turns
-straight into gold; gold levels your knights. A new game opens from black on the Oracle's altar,
-sealed under runic bands: she asks you to break the seal, a tap cracks it (Dumpster Legend's padlocked
-dumpster, made magic: the same jolt, launch and fall, with a flash, a ring of light and sparks) and
+black-haired normal guy and the strongest in the game by far. Pull a knight you already have and
+the copy is kept as an extra: Bram the Broker sells it for you, for what it was worth when it landed,
+and your knight stays exactly as it was (only the copy goes); gold levels your knights. A new game
+opens from black on the Oracle's altar, sealed under runic bands: she asks you to break the seal, a
+tap cracks it (Dumpster Legend's padlocked dumpster, made magic: the same jolt, launch and fall,
+with a flash, a ring of light and sparks) and
 the altar starts to roll. You start on ordinary rolls: no scripted finds. Rebirth
 for permanent luck and power; perks from the first rebirth change how a run plays. Folk on the floors
 keep a set-up of their own off the fighting (a market stall, a tent by a campfire, a candlelit shrine)
@@ -197,9 +200,11 @@ as usual). `?fresh` starts a new game. The game is on
 npm test
 ```
 
-368 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
-timing, extra reels, the start's ordinary quick spins, bad-luck protection, Lucky Spins, duplicates
-turning into gold, gold-only levels and reforging, old saves' spares cashed in, Humble Beginnings' 3x,
+460 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
+timing, extra reels, the start's ordinary quick spins, bad-luck protection, Lucky Spins, repeat pulls
+kept as extras at the worth they landed with and sold (one knight's, all at once, or with the knight
+at the Warden's) without touching the knight, old saves' spares cashed in and extras mended,
+gold-only levels and reforging, Humble Beginnings' 3x,
 rebirth; every biome's floors fully
 connected with spawns reachable and deterministic by seed, mob and boss design, a squad clearing a
 floor on its own, the fighting (attacks along the aim, melee arcs that only hit in front, foes'
@@ -226,7 +231,8 @@ floor, each one's file, credit and loop points, the 5 MB budget; the Dungeon: it
 both stones, every prop drawn from the packs, its traps warning before they strike, rolled through
 untouched, hurting mobs; the packs' monsters having every animation the sim asks for, striking on
 the frame their smear lands, facing the way the sim says; the economy: every price scaling per
-rebirth, a night away paying about an hour of the fights' gold, duplicates worth a few kills.
+rebirth, a night away paying about an hour of the fights' gold and landing every pull (repeats as
+extras at a share of their worth), a repeat's extra worth a few kills.
 
 ```bash
 npx tsx tools/music.ts

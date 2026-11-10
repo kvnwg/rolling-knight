@@ -3,9 +3,9 @@
  * is what sits on top of it:
  *  - HubHud: the top bar, the little altar (the rolling never stops), and the prompt to talk to the
  *    keeper you're standing by;
- *  - StationSheet: a keeper's counter, opened by talking to them: the altar, the smith, the scrapper,
- *    the quartermaster, the tinker, the sage, the shrine, the notice board, the gate; each one the
- *    shared keeper screen (src/ui/keeper/: the keeper at their counter, tabs, offers as cards);
+ *  - StationSheet: a keeper's counter, opened by talking to them: the altar, the broker (your
+ *    extras), the tinker, the sage, the shrine, the notice board, the gate; each one the shared
+ *    keeper screen (src/ui/keeper/: the keeper at their counter, tabs, offers as cards);
  *  - TitleScreen: the game's name and PLAY, over the camp at dusk, when the game opens.
  * In the dungeon none of this is reachable: to change your squad or spend anything you leave, or fall.
  */
@@ -19,6 +19,7 @@ import { biomeForFloor } from '../world/biomes';
 import { type HubStation, type StationId } from '../world/hubWorld';
 import { Chunky } from './common';
 import { AltarReels } from './fx/AltarReels';
+import { BrokerShop } from './keeper/BrokerShop';
 import { BoardShop, OracleShop, SageShop, ShrineShop, WardenShop } from './keeper/Shops';
 import { TinkerShop } from './keeper/TinkerShop';
 import { Px, type IconName } from './px';
@@ -31,7 +32,7 @@ const touch = typeof window !== 'undefined' && ('ontouchstart' in window || navi
 const STATION_ICON: Record<StationId, IconName> = {
   altar: 'reelGold',
   smith: 'arrowUp',
-  scrap: 'shard',
+  scrap: 'copies',
   squad: 'helm',
   upgrades: 'coin',
   perks: 'sigil',
@@ -169,8 +170,9 @@ export function StationSheet({ game, station, onOpen, onClose }: { game: Game; s
       return <BoardShop {...p} />;
     case 'gate':
       return <WardenShop {...p} onOpen={onOpen} />;
-    // (The quartermaster, the smith and the scrap dealer are gone: the Warden does their jobs, and
-    // duplicates turn into gold as they're rolled.)
+    case 'scrap':
+      return <BrokerShop {...p} onOpen={onOpen} />;
+    // (The quartermaster and the smith are gone: the Warden does their jobs.)
     default:
       return null;
   }

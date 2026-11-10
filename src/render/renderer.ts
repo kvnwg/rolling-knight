@@ -37,7 +37,8 @@ import { HUB_H, HUB_W } from '../world/hub';
 import { HUB_CX, HUB_STEPS_Y } from './art/hubScene';
 import type { Sky } from '../world/sky';
 import { canRebirth } from '../core/newGame';
-import { npcFrame, questMarker } from './art/npcs';
+import { coinMarker, npcFrame, questMarker } from './art/npcs';
+import { extrasCount } from '../core/roster';
 import { npcMarker } from '../world/npcs';
 import { pfReady, SHEETS, type SheetName } from './pf/assets';
 import { frameBuf as pfFrameBuf, frameCanvas, frameMask, haloCanvas, haloSpot, haloWidth, headTop, type Paint } from './pf/frames';
@@ -813,6 +814,11 @@ export class Renderer {
           // The Shrine calls once a rebirth is ready (from anywhere at camp, not just up close).
           const calls = k.id === 'rebirth' && canRebirth(game.state);
           if (near === k || !k.def || calls) ui.drawImage(calls && near !== k ? this.cached('qmark|offer', () => toCanvas(questMarker('offer'))) : mark, sx(k.x) - Math.floor(mark.width / 2), sy(k.y) - (k.def ? 34 : 22) + bob);
+          else if (k.id === 'scrap' && extrasCount(game.state) > 0) {
+            // The broker, while extras wait for him to sell: a small coin bobbing gently over him.
+            const coin = this.cached('qmark|coin', () => toCanvas(coinMarker()));
+            ui.drawImage(coin, sx(k.x) - Math.floor(coin.width / 2), sy(k.y) - 24 + Math.round(Math.sin(this.time * 2.5)));
+          }
         },
       });
     }

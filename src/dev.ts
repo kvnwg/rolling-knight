@@ -9,7 +9,9 @@
  *   ?camp             stay at camp (the home screen) after ?floor's setup
  *   ?sky=rain         every floor's weather (clear, overcast, rain)
  *   ?design=maze      the next floor's design (world/designs.ts), then the deck as usual
- *   ?bench=common,rare  extra knights on the bench (not in the squad), one per rarity listed
+ *   ?bench=common,rare  more knights on the bench (not in the squad), one per rarity listed
+ *   ?extras=12        that many repeat pulls of the knights you have (round the roster, after
+ *                     ?floor and ?bench), kept as extras for Bram the Broker to sell
  *   ?rebirths=2       that many rebirths (squad slots: one more per rebirth); ?floor sets enough for its classes
  *   ?tut=attack       the tutorial from that step on (core/tutorial.ts; ?tut alone: from the top;
  *                     ?tut=tips: every step done, the one-off tips to come); without it, ?floor's
@@ -57,6 +59,11 @@ export function devGame(): Game {
       if (RARITIES.includes(r as Rarity)) addKnight(s, knightId(r as Rarity, all[(i * 3 + 1) % all.length]), null);
     });
   }
+  // Repeats of the knights you have, one round the roster after another (the first knights get one
+  // more when it doesn't go round evenly), each kept as an extra like any repeat pull.
+  const extras = Math.min(500, Math.max(0, Math.floor(Number(q.get('extras')) || 0)));
+  const owned = Object.keys(s.roster).sort();
+  if (owned.length) for (let i = 0; i < extras; i++) addKnight(s, owned[i % owned.length], null);
   const design = q.get('design');
   if (isDesign(design)) s.run.designDeck = [design, ...s.run.designDeck.filter((d) => d !== design)];
   // A ready-made squad has seen it all; ?tut plays the tutorial anyway (from the step it names).

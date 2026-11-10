@@ -17,6 +17,13 @@ export interface KnightRec {
   mutation: MutationId | null;
   /** Copies rolled in total (this run). */
   copies: number;
+  /**
+   * Extras: repeat pulls of this knight, waiting for Bram the Broker to sell them. Each one is only
+   * gold to be: selling them never touches the knight itself. `extrasGold` is what they'll fetch, each
+   * locked in at what a repeat was worth the moment it landed.
+   */
+  extras: number;
+  extrasGold: number;
   /** When it was first rolled (play time, ms). */
   firstAt: number;
   /**

@@ -67,8 +67,8 @@ export function canRebirth(state: GameState): boolean {
 
 /**
  * Rebirth: start over from Floor 1 with permanently more luck, gold and stats, and new classes to
- * roll. Gold, upgrades, every knight (with its levels), perks and sigils go: no knight ever comes
- * through. The Codex, records and settings stay.
+ * roll. Gold, upgrades, every knight (with its levels and its extras), perks and sigils go: no knight
+ * ever comes through. The Codex, records and settings stay.
  */
 export function rebirth(state: GameState): boolean {
   if (!canRebirth(state)) return false;
@@ -78,6 +78,12 @@ export function rebirth(state: GameState): boolean {
   state.upgrades = {};
   state.perks = [];
   state.sigils = state.rebirths; // one per rebirth to start each run
+  // Extras go with the knights they belong to. They are gold not yet collected (the broker pays what
+  // each was locked in at), and a rebirth takes all your gold: cashing them in here would only fill a
+  // purse that was just emptied, and carrying them over would bring the last run's prices into a
+  // fresh one (no gold ever comes through). So they go the way of the gold, never silently: the
+  // Shrine's YOU LOSE list shows how many are waiting and what they'd fetch, while there's still time
+  // to sell them and spend it.
   state.roster = {};
   state.squad = [null, null, null];
   state.leftEmpty = [false, false, false];

@@ -237,11 +237,11 @@ Knights, the hub’s counters and the buttons.
 | --- | --- | --- | --- |
 | `jingle` | A new knight joins; a lucky spin; a double roll at the tinker’s; the signature three notes. Recorded (`jingle.mp3`, gain 0.198). | Three bells up the chord. | — |
 | `jingle_long` | Bigger wins: a token combo, a Luck Potion, a boss down without the music’s sting. Recorded (`jingle_long.mp3`, gain 0.217). | Five bells up the chord. | — |
-| `dupe` | A duplicate lands at the altar (on screen), and the hero sheet’s mutate button. | A small soft pop and a swish. | — |
+| `dupe` | A repeat lands at the altar (on screen) and is kept as an extra, and the hero sheet’s mutate button. | A small soft pop and a swish. | — |
 | `mutation` | A better mutation. | A shimmer up and a sparkle. | — |
 | `break_down` | Duplicates broken into shards. | A crunch, glass flying, crystals tinkling down. | — |
-| `sell` | Duplicates sold. | A ka-ching and coins. | — |
-| `haul` | A big haul of gold. (Not played by the game yet.) Recorded (`haul.mp3`, gain 0.136). | A ka-ching and coins pouring in. | — |
+| `sell` | A knight’s extras sold at Bram the Broker’s (more coins for more of them), or a knight sold at the Warden’s. | A ka-ching and coins. | — |
+| `haul` | A big haul of gold: every extra sold at once at Bram the Broker’s (longer for more of them). Recorded (`haul.mp3`, gain 0.136). | A ka-ching and coins pouring in. | — |
 | `buy` | An upgrade bought. | A coin, a bright arpeggio up and a sparkle. | — |
 | `equip` | A knight takes its place in the squad (Best squad, choosing your knight). | A thump and a clank, a chime climbing with its rarity. | — |
 | `perk` | A perk rolled at the sage’s (fuller for a Rare or Epic one). | A sweep up into a chord. | — |

@@ -1,14 +1,15 @@
 /**
  * Headless balance run: the real game logic with the dev bot (every knight played by its class AI), with a
- * simple bot that levels the squad, spends on upgrades (the cheaper of the cheapest Luck tier and a
- * combat roll), rolls perks and rebirths when it can (duplicates turn into gold by themselves).
+ * simple bot that sells its extras (as a player would at Bram the Broker's: the gold comes to what
+ * repeats paid as they landed, a few seconds later), levels the squad, spends on upgrades (the
+ * cheaper of the cheapest Luck tier and a combat roll), rolls perks and rebirths when it can.
  *   npm run sim -- --minutes 60 --seed 3
  */
 import { Game } from '../src/game';
 import { RARITIES } from '../src/core/rarity';
 import { UPGRADES, buyUpgrade, canBuy, upgradeCost } from '../src/core/upgrades';
 import { canRollCombat, combatRollPrice, combatTiers, rollCombat } from '../src/core/combatRoll';
-import { bestSquad, canLevel, levelUp } from '../src/core/roster';
+import { bestSquad, canLevel, levelUp, sellAllExtras } from '../src/core/roster';
 import { canRebirth } from '../src/core/newGame';
 import { canRollPerk, rollPerk } from '../src/core/perks';
 import { squadPower } from '../src/core/power';
@@ -63,7 +64,8 @@ for (let t = 0; t < minutes * 60; t += dt) {
   if (botT > 5) {
     botT = 0;
     const s = g.state;
-    // Level the squad, then the cheaper of the cheapest Luck tier and a combat roll; roll every perk the sigils cover.
+    // Sell the extras; level the squad, then the cheaper of the cheapest Luck tier and a combat roll; roll every perk the sigils cover.
+    sellAllExtras(s);
     for (const id of s.squad) while (id && canLevel(s, id)) levelUp(s, id);
     const luck = UPGRADES.filter((u) => canBuy(s, u.id)).sort((a, b) => upgradeCost(s, a.id) - upgradeCost(s, b.id))[0];
     const roll = canRollCombat(s) ? combatRollPrice(s) : Infinity;

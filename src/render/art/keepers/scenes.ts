@@ -7,7 +7,7 @@
  *  - the Oracle at her altar under the glowing reel of the Gilded Reel, a crystal orb before her;
  *  - the tinker among bottles that glow, brass gears and the slate of upgrades;
  *  - the smith at his anvil, the forge roaring behind him, tools on the wall;
- *  - the junk dealer among shelves of curios, her balance and her magnifying glass;
+ *  - the broker among shelves of curios he's priced, his balance and his magnifying glass;
  *  - the sage in his velvet chair between drapes, sigil stones glowing;
  *  - the priestess at her candles before the rose-gold rising sun;
  *  - the quartermaster at her table with her ledger, maps and banners behind;
@@ -60,7 +60,8 @@ export const KEEPER_BUSTS: Partial<Record<Keeper, Omit<BustSpec, 'look'>>> = {
   rebirth: { tool: 'candle', lashes: true, mouth: 'smile', iris: '#d8962a' },
   gate: { tool: 'spear', mouth: 'flat', brows: 'stern', iris: '#b8742a' },
   smith: { tool: 'hammer', mouth: 'grin', iris: '#5a9a4a' },
-  scrap: { tool: 'magnifier', old: true, lashes: true, mouth: 'smile', iris: '#7a9a3a' },
+  // (A man: no lashes, a broad build; a knowing smile and brows up, weighing what a knight is worth.)
+  scrap: { tool: 'magnifier', mouth: 'smile', brows: 'raised', iris: '#b8862a' },
   squad: { tool: 'quill', lashes: true, mouth: 'smile', look2: -1, iris: '#3a7ad8' },
 };
 
@@ -209,7 +210,9 @@ const SCENES: Record<StationId, Painter> = {
     return { L, ambient: [0.3, 0.22, 0.23], bloom: 1, vignette: 0.34, blink: bust.blink };
   },
 
-  // ---------------------------------------------------------------- the junk dealer
+  // ---------------------------------------------------------------- the broker
+  // Bram among shelves of curios he's priced (helms, clocks, a skull, an owl), the balance he weighs
+  // coins on and the glass he reads a knight's worth through, a ring of keys and price tags at hand.
   scrap: (L, f) => {
     const { w, h, cx, base } = f;
     wallPlanks(L, 0, 0, w, h, 21, WALL_PLANK, 'h');

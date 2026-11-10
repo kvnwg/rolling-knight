@@ -1,11 +1,12 @@
 /**
  * Puts the hub together: one cozy shop front at night, painted to fill a phone held upright. The
  * Gilded Reel's timber front under its dark roof across the top (the reel sign glowing in the gable,
- * the lit window, the open door with the Oracle in it, the curio cabinet, the notice board, the
- * tinker's shelves); a short court of big warm flagstones in front of it with the quartermaster at
- * her round table, the sage in his chair, the priestess at her candle shrine and the smith at his
- * anvil and coals, every bit of floor next to something; the dark stone steps going down at the foot
- * of the court, the warden beside them; lush leaves framing it all, going dark toward the edges.
+ * the lit window, the open door with the Oracle in it, the curio cabinet with the broker before it,
+ * the notice board, the tinker's shelves); a short court of big warm flagstones in front of it with
+ * the quartermaster's round table, the sage in his chair, the priestess at her candle shrine and the
+ * smith's anvil and coals, every bit of floor next to something; the dark stone steps going down at
+ * the foot of the court, the warden beside them; lush leaves framing it all, going dark toward the
+ * edges.
  *
  * It paints the ground, every standing piece (with its glowing parts and the lights it carries), the
  * framing leaves, and places the keepers; world/hub.ts wraps this with the collision grid and caches
@@ -176,9 +177,12 @@ function edgeDist(x: number, y: number): number {
 
 /**
  * The keepers: where each stands (or sits), where you stand to talk, and what says what they do.
- * One job each: the Oracle summons, the board has jobs, the tinker sells upgrades, the sage perks,
- * the sister rebirth, and the warden picks who goes down and makes them stronger. (The junk dealer's
- * cabinet, the quartermaster's table and the smith's anvil stay as the court's furniture.)
+ * One job each: the Oracle summons, the board has jobs, the broker sells your extras, the tinker
+ * sells upgrades, the sage perks, the sister rebirth, and the warden picks who goes down and makes
+ * them stronger. (The quartermaster's table and the smith's anvil stay as the court's furniture.)
+ * The broker stands before the curio cabinet in the left wing, his crate of odds and ends at his
+ * side, the tinker's twin across the court: his talk spot is a tile of its own left of the board's,
+ * out of the board's and the Oracle's reach.
  */
 const STATIONS: HubStation[] = [
   {
@@ -192,6 +196,12 @@ const STATIONS: HubStation[] = [
     greeting: 'Help wanted. Some of it urgent. Some of it about a chicken.',
     x: (SHOP.board.x0 + SHOP.board.x1) >> 1, y: FRONT + 2, dir: 1, view: 'down', def: null, pose: 'stand', talk: { x: 99, y: FRONT + 22 },
     sign: 'The board by the door: chalked jobs, pinned notes, a gold exclamation mark over it.',
+  },
+  {
+    id: 'scrap', name: 'Bram the Broker', job: 'Sells your extras',
+    greeting: 'Pulled a knight you already have? That\'s an extra. I sell those for you, and your knight stays just as it is.',
+    x: 70, y: FRONT + 9, dir: 1, view: 'down', def: HUB_CAST.scrap, pose: 'stand', tool: 'book', talk: { x: 73, y: FRONT + 26 },
+    sign: 'The lit curio cabinet in the shop\'s left wing, his crate of odds and ends beside it, a coin over him while extras wait.',
   },
   {
     id: 'upgrades', name: 'Tinker Pell', job: 'Upgrades: spend gold on better everything',
@@ -256,8 +266,8 @@ export function buildHub(): HubArt {
   edgeGreens(out);
   frontLeaves(out);
   fireflies(out);
-  // Along the shop front: the junk dealer's scrap, a round bush by the board, a leafy plant by the
-  // door, the tinker's crates.
+  // Along the shop front: the broker's crate of odds and ends, a round bush by the board, a leafy
+  // plant by the door, the tinker's crates.
   courtGreens(out);
   scrapCrate(out, 55, FRONT + 12);
   pottedBush(out, 86, FRONT + 10, 3, 5);

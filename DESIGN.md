@@ -68,15 +68,21 @@ and Mythic or better.
 
 - **78 knights**: one of each of the 6 classes in every tier, each with a name and its own colors.
 - **Mutations** (a second roll, independent of luck; Alchemy raises it): Gilded (1 in 25, +20%),
-  Shadow (1 in 150, +45%), Radiant (1 in 1,000, +90%), Void (1 in 10,000, +200%). A duplicate with a
+  Shadow (1 in 150, +45%), Radiant (1 in 1,000, +90%), Void (1 in 10,000, +200%). A repeat with a
   better mutation upgrades the knight you have.
 - **"1 in X"** on a knight: its tier at luck 1 times its mutation's odds.
 - **Stats**: class base × rarity (Common 1 … Primordial 30) × level × mutation × rebirths × upgrades.
-- **Duplicates**: every copy after the first turns straight into gold as it lands (kills' worth by
-  rarity; 3x for Commons and Uncommons with Peasant Levy); a better mutation it rolled sticks to the
-  knight. **Levels** cost gold only: 40 x 1.32^(L-1), times 1.9 per rarity tier (half for Commons
-  and Uncommons with Hand-Me-Downs); each adds 10% of base stats (30% for Commons and Uncommons with
-  Humble Beginnings). Old saves' spare copies and shards were cashed in as gold.
+- **Extras**: every copy after the first is kept on that knight's record as an extra, worth what a
+  repeat was worth the moment it landed (kills' worth by rarity at your best floor; 3x for Commons and
+  Uncommons with Peasant Levy), until Bram the Broker sells it for you at the curio cabinet (one
+  knight's extras, or all of them at once). Selling extras never touches the knight: its level,
+  mutation and place in the squad stay; a better mutation a repeat rolled with still sticks to the
+  knight as it lands. Selling a knight at the Warden's sells its extras with it, and a rebirth takes
+  them with the knights, like the rest of the gold (the Shrine lists them first). Old saves' spare
+  copies and shards were cashed in as gold.
+- **Levels** cost gold only: 40 x 1.32^(L-1), times 1.9 per rarity tier (half for Commons and
+  Uncommons with Hand-Me-Downs); each adds 10% of base stats (30% for Commons and Uncommons with
+  Humble Beginnings).
 - **Classes** (the kit is the same for every knight of a class):
 
 | Class | Role | Attack | Dash (the dodge) |
@@ -290,7 +296,7 @@ Uncommon 1/2, Rare 1/3, Epic 1/4), and a roll costs a sigil, plus one for every 
 for all twenty). A rebirth clears them all. The four trees only sort them:
 
 - **Underdogs**: Humble Beginnings (Common and Uncommon level-ups ×3), Peasant Levy (every 4th spin at
-  luck 1; low duplicates pay 3x), Rags to Riches (+25% stats per tier below Legendary), Peasant Revolt
+  luck 1; low extras fetch 3x), Rags to Riches (+25% stats per tier below Legendary), Peasant Revolt
   (a low-rarity squad deals double damage and dodges twice as often), Hand-Me-Downs (Common and
   Uncommon level-ups cost half).
 - **Command**: Tag Team (the knight you switch to hits 30% harder for 4 s, once every 10 s), Lone Wolf (solo: ×3 HP, ×2.5 damage), Hive Mind
@@ -310,8 +316,9 @@ Build-ups use 30-second and 2-minute windows, and nothing is judged in a new gam
 
 ## 10. Away, and the first minute
 
-Offline rolling uses the same rules at 1/10 speed and 75% efficiency (Night Watch +40% a tier), up to
-1,000 rolls or 8 hours, keeping only Epic or better; the squad's gold income runs on too.
+Offline rolling uses the same rules at 1/10 speed, up to 300 rolls or 8 hours, and every pull lands:
+new knights join, repeats wait as extras worth 15% of their usual (docs/ECONOMY.md); the squad's
+fight income runs on too.
 
 The start: ordinary rolls, no scripted finds and no gift to hook you; the first spins are just quick
 (1.6 s) until you have three knights for a squad.

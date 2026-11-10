@@ -54,12 +54,15 @@ export function Bar({ value, kind = 'hp', style, children }: { value: number; ki
   );
 }
 
-/** A knight at s art pixels per sprite pixel (on var(--px)). The sprite image is KNIGHT_PIC_W x KNIGHT_PIC_H. */
-export function HeroArt({ id, mutation = null, s = 1, frame, silhouette, style }: { id: string; mutation?: MutationId | null; s?: number; frame?: number; silhouette?: string; style?: CSSProperties }) {
+/**
+ * A knight at s art pixels per sprite pixel (on var(--px)). The sprite image is KNIGHT_PIC_W x
+ * KNIGHT_PIC_H. `ghost`: drawn as one of its extras (a lilac copy).
+ */
+export function HeroArt({ id, mutation = null, s = 1, frame, silhouette, ghost, style }: { id: string; mutation?: MutationId | null; s?: number; frame?: number; silhouette?: string; ghost?: boolean; style?: CSSProperties }) {
   return (
     <img
       className="px"
-      src={knightUrl(id, mutation, { frame, silhouette })}
+      src={knightUrl(id, mutation, { frame, silhouette, ghost })}
       alt={knightDef(id).name}
       draggable={false}
       style={{ width: `calc(${KNIGHT_PIC_W * s} * var(--px))`, height: `calc(${KNIGHT_PIC_H * s} * var(--px))`, flex: 'none', ...style }}

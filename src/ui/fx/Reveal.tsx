@@ -517,17 +517,17 @@ function RareReveal({ item, onDone, calm }: { item: RevealItem; onDone: () => vo
           <span className={s.sub}>
             <b style={{ color }}>{RARITY_NAME[item.rarity]}</b> {CLASSES[def.cls].name}
           </span>
-          {(item.isNew || mut || item.mult > 1) && (
-            <div className={s.tags}>
-              {item.isNew && <span className={`${s.tag} ${s.tagNew}`}>NEW!</span>}
-              {mut && (
-                <span className={`${s.tag} ${s.tagMut}`} style={{ ['--m' as string]: mut.color } as CSSProperties}>
-                  {mut.name}
-                </span>
-              )}
-              {item.mult > 1 && <span className={`${s.tag} ${s.tagLuck}`}>LUCK ×{item.mult.toLocaleString('en-US')}</span>}
-            </div>
-          )}
+          {/* NEW, or (one you already had) EXTRA: its copy waits for Bram the Broker to sell it. */}
+          <div className={s.tags}>
+            {item.isNew && <span className={`${s.tag} ${s.tagNew}`}>NEW!</span>}
+            {!item.isNew && <span className={`${s.tag} ${s.tagExtra}`}>EXTRA</span>}
+            {mut && (
+              <span className={`${s.tag} ${s.tagMut}`} style={{ ['--m' as string]: mut.color } as CSSProperties}>
+                {mut.name}
+              </span>
+            )}
+            {item.mult > 1 && <span className={`${s.tag} ${s.tagLuck}`}>LUCK ×{item.mult.toLocaleString('en-US')}</span>}
+          </div>
           {hyper && <span className={s.hyperSub}>The rarest knight you've ever summoned!</span>}
           {item.scripted === 'beginner' && <span className={s.note}>A scripted roll to start you off: real ones are this rare.</span>}
         </div>

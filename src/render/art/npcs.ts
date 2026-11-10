@@ -8,7 +8,8 @@
  * Same ink outline and light from the top left as the knights. Side frames face right.
  */
 import type { HatKind, NpcDef, NpcItem, NpcLook } from '../../world/npcs';
-import { blank, type PixelBuf } from '../pixel/buf';
+import { blank, fromRows, type PixelBuf } from '../pixel/buf';
+import { UI_SM } from '../pixel/ui';
 import { BODY_ANCHOR, BODY_ANIMS, BODY_FRAMES, BODY_H, BODY_W, type BodyFrame } from '../packs/mannequin';
 import { inkOutline, mixHex, setRGB } from './draw';
 import { OUTLINE, type View } from './knights';
@@ -560,4 +561,13 @@ export function questMarker(kind: 'offer' | 'turnIn'): PixelBuf {
   bubble.forEach((r, y) => [...r].forEach((ch, x) => ch !== '.' && setRGB(b, x, y, col[ch])));
   glyph.forEach((r, y) => [...r].forEach((ch, x) => ch === '#' && setRGB(b, x + 2, y + 2, col['#'])));
   return b;
+}
+
+/**
+ * The coin over Bram the Broker while extras wait for him to sell: smaller and quieter than a job's
+ * bubble (there's no job to take, only gold to collect). It's the UI's own coin, the one in the purse
+ * his sales fly into.
+ */
+export function coinMarker(): PixelBuf {
+  return fromRows(UI_SM.coin!);
 }

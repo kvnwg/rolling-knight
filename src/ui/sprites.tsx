@@ -41,7 +41,10 @@ export function measureKnightPics(): void {
 
 const cache = new Map<string, string>();
 
-function bufToUrl(b: PixelBuf, silhouette?: string): string {
+/** An extra's pale lilac, darkest first: its outline in the purple of an EXTRA tag, the rest lighter. */
+const GHOST_RAMP = ['#5a4a86', '#8a7cb8', '#b4a8dc', '#d8d0f0', '#f4f0fe'].map((h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)));
+
+function bufToUrl(b: PixelBuf, silhouette?: string, ghost = false): string {
   const c = document.createElement('canvas');
   c.width = b.w;
   c.height = b.h;
@@ -51,6 +54,30 @@ function bufToUrl(b: PixelBuf, silhouette?: string): string {
   if (silhouette) {
     const [r, g, bl] = [1, 3, 5].map((i) => parseInt(silhouette.slice(i, i + 2), 16));
     for (let i = 0; i < img.data.length; i += 4) if (img.data[i + 3]) [img.data[i], img.data[i + 1], img.data[i + 2]] = [r, g, bl];
+  }
+  if (ghost) {
+    // A copy of the knight in the extras' lilac: each pixel's lightness picks a step of the ramp
+    // (spread over the knight's own darkest to lightest), so it's the same knight, plainly a copy.
+    // The soft ground shadow goes (a stack of copies doesn't stand on the ground).
+    const d = img.data;
+    const lum = (i: number) => d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11;
+    let lo = 255;
+    let hi = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] < 160) continue;
+      lo = Math.min(lo, lum(i));
+      hi = Math.max(hi, lum(i));
+    }
+    const n = GHOST_RAMP.length;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] < 160) {
+        d[i + 3] = 0;
+        continue;
+      }
+      const k = Math.min(n - 1, Math.floor(((lum(i) - lo) / Math.max(1, hi - lo)) * n));
+      [d[i], d[i + 1], d[i + 2]] = GHOST_RAMP[k];
+      d[i + 3] = 255;
+    }
   }
   ctx.putImageData(img, 0, 0);
   return c.toDataURL();
@@ -85,9 +112,12 @@ function legacyBuf(id: string, mutation: MutationId | null, view: View, frame: n
 
 const DIR_OF: Record<View, Dir> = { down: 's', side: 'e', up: 'n' };
 
-/** A knight standing (PixelForge's idle, in its rarity's colors, cape and halo and all), as a data URL. */
-export function knightUrl(id: string, mutation: MutationId | null, opts: { view?: View; frame?: number; silhouette?: string } = {}): string {
-  const key = `${id}|${mutation}|${opts.view ?? 'down'}|${opts.frame ?? 0}|${opts.silhouette ?? ''}|${pfReady() ? 'pf' : ''}`;
+/**
+ * A knight standing (PixelForge's idle, in its rarity's colors, cape and halo and all), as a data URL.
+ * `silhouette`: in one flat color instead; `ghost`: as one of its extras, a copy in lilac.
+ */
+export function knightUrl(id: string, mutation: MutationId | null, opts: { view?: View; frame?: number; silhouette?: string; ghost?: boolean } = {}): string {
+  const key = `${id}|${mutation}|${opts.view ?? 'down'}|${opts.frame ?? 0}|${opts.silhouette ?? ''}|${opts.ghost ? 'g' : ''}|${pfReady() ? 'pf' : ''}`;
   let url = cache.get(key);
   if (url) return url;
   const view = opts.view ?? 'down';
@@ -97,7 +127,7 @@ export function knightUrl(id: string, mutation: MutationId | null, opts: { view?
     const top = tallTop.get(still.paint.sheet) ?? picTop;
     buf = cut(still.buf, still.pivot[0] + picLeft, still.pivot[1] + top, KNIGHT_PIC_W, KNIGHT_PIC_H);
   } else buf = legacyBuf(id, mutation, view, opts.frame ?? 0);
-  url = bufToUrl(buf, opts.silhouette);
+  url = bufToUrl(buf, opts.silhouette, opts.ghost);
   cache.set(key, url);
   return url;
 }

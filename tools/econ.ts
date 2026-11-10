@@ -2,13 +2,16 @@
  * Economy pacing: plays the real game headless (the dev bot fights every floor) the way a player
  * would, and reports how fast it all goes.
  *
- * The player: spends as it goes, every few seconds, spreading its gold over the squad's next levels,
- * the luck tab's next tiers and combat rolls (the kind it has spent least on this run first, the
- * cheapest of that kind); rolls its perks; rebirths once
- * the push says it can (after `--farm` more minutes); and every `--every` minutes of play it's away
- * for `--away` hours (the offline earnings, against what an hour of play earns).
+ * The player: spends as it goes, every few seconds, first selling its extras (the repeat pulls Bram
+ * the Broker sells, as a player would on the way past him), then spreading its gold over the squad's
+ * next levels, the luck tab's next tiers and combat rolls (the kind it has spent least on this run
+ * first, the cheapest of that kind); rolls its perks; rebirths once the push says it can (after
+ * `--farm` more minutes); and every `--every` minutes of play it's away for `--away` hours (the
+ * offline earnings, against what an hour of play earns; the extras found while away are sold as it
+ * comes back, and count as offline earnings). Selling every few seconds keeps the gold the same as
+ * when repeats paid as they landed.
  *
- * Per run it reports: how long it took and how deep it went, the gold it earned (kills, duplicates,
+ * Per run it reports: how long it took and how deep it went, the gold it earned (kills, extras sold,
  * the rest) and spent (levels, the luck tab, combat rolls), how much of the luck and combat tabs it
  * owned at the end, the knights' levels, and the pace: minutes between purchases.
  *
@@ -21,7 +24,7 @@ import { canRebirth, rebirthFloor } from '../src/core/newGame';
 import { runOffline } from '../src/core/offline';
 import { canRollPerk, rollPerk } from '../src/core/perks';
 import { squadPower } from '../src/core/power';
-import { bestSquad, canLevel, levelCost, levelUp } from '../src/core/roster';
+import { bestSquad, canLevel, levelCost, levelUp, sellAllExtras } from '../src/core/roster';
 import { UPGRADES, buyUpgrade, canBuy, tier, upgradeCost, upgradeCostAt, upgradeTab } from '../src/core/upgrades';
 
 const arg = (k: string, d: number) => {
@@ -72,10 +75,6 @@ interface Run {
 const runs: Run[] = [];
 const fresh = (n: number, t: number): Run => ({ n, t0: t, t1: t, floor: 1, readyAt: null, kill: 0, dupe: 0, other: 0, offline: 0, spentLevels: 0, spentLuck: 0, spentCombat: 0, buys: [], luckFrac: 0, combatFrac: 0, levels: '', power: 0 });
 let run = fresh(0, 0);
-let dupeTick = 0;
-g.on((e) => {
-  if (e.type === 'land' && e.result.kind === 'dupe') dupeTick += e.result.gold;
-});
 const mins = () => g.state.playTimeMs / 60000;
 const offline: Array<{ at: number; gold: number; perActiveMin: number; rolls: number; kept: number; rate: number }> = [];
 let sessionT = 0;
@@ -96,14 +95,12 @@ for (let t = 0; t < hours * 3600; t += dt) {
   clock += dt * 1000;
   if (!g.inDungeon && g.state.squad.some(Boolean)) g.enterDungeon();
   const before = g.state.gold;
-  dupeTick = 0;
   g.tick(dt);
+  // (Repeats pay nothing as they land: their gold comes when the extras are sold, below.)
   const gained = g.state.gold - before;
   if (gained > 0) {
-    const dupe = Math.min(gained, dupeTick);
-    run.dupe += dupe;
-    run.kill += gained - dupe;
-    sessionKill += gained - dupe;
+    run.kill += gained;
+    sessionKill += gained;
   }
   run.floor = Math.max(run.floor, g.state.run.bestFloor);
   if (run.readyAt === null && canRebirth(g.state)) run.readyAt = mins();
@@ -111,6 +108,8 @@ for (let t = 0; t < hours * 3600; t += dt) {
   if (botT > 3) {
     botT = 0;
     const s = g.state;
+    // The extras first, to Bram the Broker: what they were locked in at as they landed.
+    run.dupe += sellAllExtras(s);
     // Spend: the cheapest thing affordable, again and again.
     for (let guard = 0; guard < 200; guard++) {
       const opts: Array<{ cost: number; buy: () => void; kind: 'lv' | 'luck' | 'combat' }> = [];
@@ -146,9 +145,12 @@ for (let t = 0; t < hours * 3600; t += dt) {
     // Against the fights' rate as the player left (what the game pays from).
     const activeRate = g.state.stats.combatPerMinute ?? sessionKill / Math.max(1, mins() - sessionT);
     const awayS = awayHours * 3600;
+    run.dupe += sellAllExtras(g.state);
     const gold0 = g.state.gold;
     const rep = runOffline(g.state, g.rng, awayS, clock);
     clock += awayS * 1000;
+    // Back: the extras the altar found while it was away are sold with the night's gold.
+    sellAllExtras(g.state);
     const gold = g.state.gold - gold0;
     run.offline += gold;
     offline.push({ at: mins(), gold, perActiveMin: activeRate > 0 ? gold / activeRate : 0, rolls: rep?.rolls ?? 0, kept: rep?.kept.length ?? 0, rate: activeRate });

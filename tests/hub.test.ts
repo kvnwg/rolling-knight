@@ -51,8 +51,8 @@ describe('hub', () => {
   it('has one keeper per job (or a board), each with a sign and a greeting', () => {
     const s = hubScene();
     const ids = s.stations.map((st) => st.id).sort();
-    // (No quartermaster, smith or scrap dealer: the warden picks and levels the squad, duplicates turn into gold.)
-    expect(ids).toEqual(['altar', 'gate', 'perks', 'quests', 'rebirth', 'upgrades']);
+    // (No quartermaster or smith: the warden picks and levels the squad. The broker sells your extras.)
+    expect(ids).toEqual(['altar', 'gate', 'perks', 'quests', 'rebirth', 'scrap', 'upgrades']);
     for (const st of s.stations) {
       expect(st.name.length).toBeGreaterThan(0);
       expect(st.job.length).toBeGreaterThan(0);
@@ -93,6 +93,35 @@ describe('hub', () => {
     }
     // Arriving at the hub, nobody is in talking range yet (the hint shows first).
     for (const st of s.stations) expect(talkDist(st, s.spawn.x, s.spawn.y), st.id).toBeGreaterThanOrEqual(TALK_RANGE);
+  });
+
+  it('has Bram the Broker before the curio cabinet, talked to from a spot of his own', () => {
+    const s = hubScene();
+    const bram = s.stations.find((st) => st.id === 'scrap')!;
+    expect(bram.name).toBe('Bram the Broker');
+    expect(bram.def).not.toBeNull();
+    // On the left of the shop front, by his crate (x 55) and in front of the cabinet (x 40 to 86).
+    expect(bram.x).toBeGreaterThan(55);
+    expect(bram.x).toBeLessThan(86);
+    expect(bram.y).toBeLessThan(hubScene().spawn.y);
+    // His talk spot is floor you can walk to, and standing on it the hub offers him, nobody else.
+    const tx = Math.floor(bram.talk.x / TILE);
+    const ty = Math.floor(bram.talk.y / TILE);
+    expect(tileAt(s.map, tx, ty)).toBe(FLOOR);
+    expect(bfs(s.map, Math.floor(s.spawn.x / TILE), Math.floor(s.spawn.y / TILE))[ty * s.map.w + tx]).toBeGreaterThanOrEqual(0);
+    const g = new Game(true);
+    for (let t = 0; t < 3; t += 1 / 30) g.tick(1 / 30);
+    const l = g.hub!.leader()!;
+    l.x = bram.talk.x;
+    l.y = bram.talk.y;
+    expect(g.hub!.nearStation()?.id).toBe('scrap');
+    // From the board's and the Oracle's own spots, it's still them.
+    for (const id of ['quests', 'altar'] as const) {
+      const st = s.stations.find((x) => x.id === id)!;
+      l.x = st.talk.x;
+      l.y = st.talk.y;
+      expect(g.hub!.nearStation()?.id, id).toBe(id);
+    }
   });
 
   it('is a compact court: a phone-sized core with leaves and roof round it', () => {
