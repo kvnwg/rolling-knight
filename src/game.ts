@@ -406,20 +406,24 @@ export class Game {
     const from = this.state.run.floor;
     const back = campFloor(from, this.state.run.checkpoint);
     const revived = this.world ? this.world.heroes.filter((h) => h.downed).length : 0;
+    // Everything about being at the hub first, all of it together: nothing after this can leave the
+    // game half way (in the dungeon with no floor draws nothing at all).
+    this.inDungeon = false;
+    this.world = null;
     this.state.run.floor = back;
     this.hpShare.clear();
-    this.world = null;
-    this.syncHub(true);
-    this.emit({ type: 'camp', from, back, revived });
-    this.inDungeon = false;
     // A merchant's goods are for one run: heading back to camp ends it (and what the merchants say of you).
     this.state.run.items = {};
     this.state.run.thief = false;
-    // (So is a portal's cut to the next floor, if it was under way.)
+    // (So is a portal's cut to the next floor, a wipe's walk home or a step down the stairs, if one was under way.)
     this.pendingFloor = null;
+    this.descending = false;
+    this.wipeT = 0;
     this.fade = 1;
     this.fadeDir = -1;
     this.fadeIn = FADE_IN;
+    this.syncHub(true);
+    this.emit({ type: 'camp', from, back, revived });
     this.save();
     this.version++;
   }
@@ -585,6 +589,8 @@ export class Game {
       // No floor until the squad has someone in it.
       fillSquad(s);
       if (s.squad.some(Boolean)) this.startFloor(s.run.floor);
+      // (Nobody to send down: back at the hub, not in a dungeon with no floor, which draws nothing.)
+      else this.inDungeon = false;
     } else {
       // The squad is locked in the dungeon: new knights wait at the hub.
       this.world.luck = this.luck * skillRollLuck(s);
@@ -595,6 +601,9 @@ export class Game {
       this.handleWorldEvents();
     }
     if (this.fade > 0 && this.fadeDir < 0) this.fade = Math.max(0, this.fade - dt * this.fadeIn);
+    // A fade to black is always on its way somewhere (down the steps, through a portal): one with
+    // nowhere to go would leave the screen black for good, so it turns back.
+    if (this.fadeDir > 0 && !this.descending && this.pendingFloor === null) this.fadeDir = -1;
     if (this.fadeDir > 0) {
       // (Through a portal it's a cut, black in a blink; down the hub's steps, a fade.)
       this.fade = Math.min(1, this.fade + dt * (this.pendingFloor !== null ? PORTAL_CUT : 2.2));

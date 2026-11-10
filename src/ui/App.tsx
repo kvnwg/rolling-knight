@@ -86,6 +86,19 @@ export function App() {
   const [luck, setLuck] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [banner, setBanner] = useState<Banner | null>(null);
+  // The browser took the GPU away and gave it back (a driver reset, the tab starved): the game's own
+  // picture rebuilds itself (render/post.ts), and the HUD's little canvases (the corner altar's frame,
+  // a keeper's frame) were wiped with it, so the HUD is mounted afresh to draw them again.
+  const [gpu, setGpu] = useState(0);
+  useEffect(() => {
+    const back = () => setGpu((n) => n + 1);
+    document.addEventListener('contextrestored', back, true);
+    document.addEventListener('webglcontextrestored', back, true);
+    return () => {
+      document.removeEventListener('contextrestored', back, true);
+      document.removeEventListener('webglcontextrestored', back, true);
+    };
+  }, []);
   // CAMP asks first (leaving costs floors): the fight waits while it's up.
   const [campAsk, setCampAsk] = useState(false);
   const campAskRef = useRef(campAsk);
@@ -277,13 +290,19 @@ export function App() {
       if (!game.inDungeon && game.autoReturnT > 0 && (c.mx || c.my)) game.autoReturnT = 0;
       if (game.inDungeon !== wasIn) {
         wasIn = game.inDungeon;
-        if (!wasIn) music.setScene('camp');
+        if (!wasIn) {
+          music.setScene('camp');
+          // What was open over the fight goes with it.
+          setTalking(null);
+          setCampAsk(false);
+        }
       }
       // A reveal pauses the fight (the altar keeps its own pace). Auto battle (the setting) plays your
       // knight outright in a fight: it moves, dodges, fights and goes down when the floor is done;
       // steering or attacking yourself takes over for as long as you do. A sheet open only aims and
       // attacks for you. The dev bot (?auto, the sim) never lets go.
-      game.paused = revealRef.current.length > 0 || talkRef.current !== null || titleRef.current || campAskRef.current;
+      // (A talk and CAMP's question are only ever on the screen in the dungeon: they hold nothing up at the hub.)
+      game.paused = revealRef.current.length > 0 || titleRef.current || (game.inDungeon && (talkRef.current !== null || campAskRef.current));
       if (w) {
         const autoBattle = game.inDungeon && game.state.settings.autoPlay && !(c.mx || c.my || c.attack);
         w.auto = game.state.settings.autoPlay || sheetRef.current;
@@ -429,7 +448,7 @@ export function App() {
       <canvas ref={canvasRef} className={aiming ? 'game aiming' : 'game'} data-play="1" />
       {choosing && <VistaCanvas game={game} wide={wide} pick={csPick} />}
       {inDungeon ? (
-        <DungeonHud
+        <DungeonHud key={`DungeonHud${gpu}`}
           game={game}
           controls={ctl.controls}
           press={ctl.press}
@@ -447,7 +466,7 @@ export function App() {
           onTalk={(n) => (uiSound('open'), setTalking(n))}
         />
       ) : (
-        !choosing && <HubHud game={game} onTalk={setStation} onSettings={() => setSettings(true)} onLuck={() => setLuck(true)} />
+        !choosing && <HubHud key={`HubHud${gpu}`} game={game} onTalk={setStation} onSettings={() => setSettings(true)} onLuck={() => setLuck(true)} />
       )}
       {!inDungeon && ctl.controls.stick.active && (
         <div className="stick" style={{ left: ctl.controls.stick.ox, top: ctl.controls.stick.oy }}>
@@ -472,7 +491,7 @@ export function App() {
           }}
         />
       )}
-      {station && !inDungeon && <StationSheet game={game} station={station} onOpen={setDetail} onClose={() => setStation(null)} />}
+      {station && !inDungeon && <StationSheet key={`StationSheet${gpu}`} game={game} station={station} onOpen={setDetail} onClose={() => setStation(null)} />}
       {talking && inDungeon && <DialogBox game={game} npc={talking} onClose={() => setTalking(null)} />}
       <div className="toasts">
         {toasts.map((t) => (

@@ -288,7 +288,10 @@ interface Target {
 }
 
 export class Post {
-  readonly ok: boolean;
+  /** The pipeline is up (false: no WebGL2, or its shaders failed; the renderer draws on a 2D canvas instead). */
+  ok: boolean;
+  /** The browser took the GPU context away (a driver reset, the tab starved of GPU memory); it comes back with 'webglcontextrestored'. */
+  private lost = false;
   private gl: WebGL2RenderingContext | null;
   private progs: Record<'blur' | 'bright' | 'composite' | 'final', WebGLProgram> | null = null;
   private tex: Record<keyof PostLayers, WebGLTexture> | null = null;
@@ -308,6 +311,21 @@ export class Post {
     }
     this.gl = gl;
     this.ok = !!gl && this.init();
+    if (!this.ok) return;
+    // A lost context draws nothing: the game would sit there black for good. Ask for it back (the
+    // default is to never restore it), draw nothing meanwhile, and when it returns build everything
+    // that lived on the GPU again (programs, textures, samplers, the targets at the next frame).
+    canvas.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      this.lost = true;
+    });
+    canvas.addEventListener('webglcontextrestored', () => {
+      this.targets = null;
+      this.w = 0;
+      this.h = 0;
+      this.ok = this.init();
+      this.lost = false;
+    });
   }
 
   private compile(vs: string, fs: string): WebGLProgram {
@@ -453,7 +471,7 @@ export class Post {
 
   render(layers: PostLayers, p: PostParams): void {
     const gl = this.gl;
-    if (!gl || !this.ok) return;
+    if (!gl || !this.ok || this.lost || gl.isContextLost()) return;
     const W = this.canvas.width;
     const H = this.canvas.height;
     this.ensureTargets(W, H);
