@@ -16,7 +16,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import { canRebirth } from '../core/newGame';
 import { canLevel } from '../core/roster';
-import { newTutRun, skipTutorial, tutorialDid, tutorialView, type TutAction, type TutCtx, type TutTarget, type TutView, type TutWhere } from '../core/tutorial';
+import { newTutRun, skipTutorial, tutorialDid, tutorialProgress, tutorialView, TUT_STEPS, type TutAction, type TutCtx, type TutTarget, type TutView, type TutWhere } from '../core/tutorial';
 import type { Game } from '../game';
 import type { Controls } from '../input/input';
 import { toCanvas } from '../render/art/draw';
@@ -407,8 +407,6 @@ function layout(o: LayoutIn): Placed {
 
 // ------------------------------------------------------------------ the tutorial
 
-/** World px of walking at the hub that counts as having walked. */
-const WALK = 24;
 /** Seconds of holding attack with a foe close that count as having attacked. */
 const ATTACK_HOLD = 0.6;
 
@@ -435,8 +433,6 @@ export function Tutorial(props: TutorialProps) {
     let last = performance.now();
     // What the last frames saw, to tell what the player just did.
     const mem = {
-      pos: null as { x: number; y: number } | null,
-      walked: 0,
       kills: -1,
       /** Each knight's level as last seen (a new knight isn't a level up). */
       levels: null as Map<string, number> | null,
@@ -514,8 +510,6 @@ export function Tutorial(props: TutorialProps) {
       if (st !== state || (sig >= 0 && (tutSig < 0 || sig < tutSig))) {
         state = st;
         run.current = newTutRun();
-        mem.pos = null;
-        mem.walked = 0;
         mem.kills = -1;
         mem.levels = null;
         mem.attackT = 0;
@@ -537,11 +531,6 @@ export function Tutorial(props: TutorialProps) {
       const playing = st.squad[st.controlled] ?? st.squad.find(Boolean) ?? null;
 
       // What the player just did.
-      if (where === 'hub' && lead) {
-        if (mem.pos) mem.walked += Math.hypot(lead.x - mem.pos.x, lead.y - mem.pos.y);
-        mem.pos = { x: lead.x, y: lead.y };
-        if (mem.walked >= WALK) did('moved');
-      } else mem.pos = null;
       if (mem.kills >= 0 && st.records.kills > mem.kills && game.inDungeon) did('killed');
       mem.kills = st.records.kills;
       let up = false;
@@ -785,6 +774,9 @@ export function Tutorial(props: TutorialProps) {
   if (!view) return null;
   const a = tutArt();
   const world = view.target.kind === 'world';
+  const prog = tutorialProgress(game.state.seen.tutorial);
+  // Auto battle is the one to learn: its line and its ring stand out more.
+  const big = view.key === 'auto:ask';
   const skip = () => {
     skipTutorial(game.state.seen.tutorial);
     game.save();
@@ -799,21 +791,31 @@ export function Tutorial(props: TutorialProps) {
       data-calm={game.state.settings.reduceMotion || undefined}
       style={{ visibility: 'hidden', ['--ring' as string]: `url(${a.ring})`, ['--ring-hi' as string]: `url(${a.ringHi})` } as CSSProperties}
     >
-      {!world && <div ref={ringRef} key={`ring:${view.key}`} className={s.ring} />}
+      {!world && <div ref={ringRef} key={`ring:${view.key}`} className={s.ring} data-big={big || undefined} />}
       <div ref={ptrRef} key={`ptr:${view.key}`} className={s.ptr} data-dir="down">
         <div className={s.pop}>
           <img ref={picRef} className={s.pic} alt="" draggable={false} />
         </div>
       </div>
       {/* (Keyed by its words: a line that only moves its pointer, walking up to the warden and then on his button, stays put.) */}
-      <div ref={slipRef} key={`slip:${view.text}`} className={s.slip} data-text={view.text} data-tut-slip data-tip={view.tip || undefined}>
+      <div ref={slipRef} key={`slip:${view.text}`} className={s.slip} data-text={view.text} data-tut-slip data-tip={view.tip || undefined} data-big={big || undefined}>
         <div className={s.paper}>
           <p className={s.text} role="status" aria-live="polite">
             {words(view.text)}
           </p>
-          <button className={s.skip} onClick={skip}>
-            Skip tutorial
-          </button>
+          <div className={s.foot}>
+            {/* How far along the walk-through is: a pip a step, the one you're on lit (a tip has none). */}
+            {!view.tip && (
+              <span className={s.pips} aria-label={`Step ${Math.min(prog.done + 1, prog.of)} of ${prog.of}`}>
+                {TUT_STEPS.map((id, i) => (
+                  <i key={id} data-done={i < prog.done || undefined} data-now={i === prog.done || undefined} />
+                ))}
+              </span>
+            )}
+            <button className={s.skip} onClick={skip}>
+              Skip tutorial
+            </button>
+          </div>
         </div>
       </div>
     </div>

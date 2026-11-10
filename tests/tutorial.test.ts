@@ -4,6 +4,7 @@ import { mend } from '../src/core/save';
 import {
   AUTO_ASK,
   AUTO_READ,
+  AUTO_TRIES,
   SKILLS_READ,
   TIP_MIN,
   TIP_REST,
@@ -19,6 +20,7 @@ import {
   skipTutorial,
   tutorialDid,
   tutorialOn,
+  tutorialProgress,
   tutorialView,
   type TutCtx,
   type TutorialSave,
@@ -124,12 +126,13 @@ describe('the tutorial: who gets it', () => {
 
   it('keeps its place in a save, cleaned up', () => {
     const s = newGame(4);
-    s.seen.tutorial = { done: ['seal', 'altar', 'move'], tips: ['shop'], skipped: false };
+    s.seen.tutorial = { done: ['seal', 'altar', 'descend'], tips: ['shop'], skipped: false };
     s.gold = 50;
     const back = mend(JSON.parse(JSON.stringify(s)));
-    expect(back.seen.tutorial).toEqual({ done: ['seal', 'altar', 'move'], tips: ['shop'], skipped: false });
+    expect(back.seen.tutorial).toEqual({ done: ['seal', 'altar', 'descend'], tips: ['shop'], skipped: false });
     // Junk and repeats go; a skip stays skipped.
-    expect(mendTutorial({ done: ['seal', 'altar', 'nope', 'altar', 3, 'talk'], tips: ['auto', 'auto', null], skipped: true }, {})).toEqual({ done: ['seal', 'altar', 'talk'], tips: ['auto'], skipped: true });
+    // (So do steps the walk-through no longer has: an older save's 'move' and 'talk'.)
+    expect(mendTutorial({ done: ['seal', 'altar', 'nope', 'altar', 3, 'talk', 'move', 'exit'], tips: ['auto', 'auto', null], skipped: true }, {})).toEqual({ done: ['seal', 'altar', 'exit'], tips: ['auto'], skipped: true });
     // Something that isn't a tutorial at all: as if there were none.
     expect(mendTutorial('yes', { gold: 5 }).skipped).toBe(true);
     expect(mendTutorial([1, 2], {})).toEqual(freshTutorial());
@@ -147,44 +150,38 @@ describe('the tutorial: one step at a time', () => {
     // Broken, the altar spins: nothing until the first knight lands.
     expect(g.key(at('altar', { hasKnight: false }))).toBeNull();
     expect(g.key(at('altar'))).toBe('altar');
-    // Closed: choosing who to play as says nothing; the hub says walk.
+    // Closed: straight to the fight. How to walk and where to, in one line, pointing at the steps.
     expect(g.key(at('select'))).toBeNull();
     expect(g.t.done).toEqual(['seal', 'altar']);
-    expect(g.key(at('hub'))).toBe('move');
-    // Not done until you walk.
-    expect(g.wait(at('hub'), 5)).toBe('move');
-    g.did('moved');
-    expect(g.key(at('hub'))).toBe('talk:walk');
-    expect(g.see(at('hub'))!.target).toEqual({ kind: 'world', id: 'warden' });
-    expect(g.key(at('hub', { nearWarden: true }))).toBe('talk:open');
-    expect(g.see(at('hub', { nearWarden: true }))!.target).toEqual({ kind: 'ui', id: 'talk' });
-    // His counter open: DESCEND.
-    expect(g.key(at('warden'))).toBe('descend:warden');
-    expect(g.t.done).toEqual(['seal', 'altar', 'move', 'talk']);
-    // Closed it without going down: the steps.
     expect(g.key(at('hub'))).toBe('descend:steps');
+    expect(g.see(at('hub'))!.target).toEqual({ kind: 'world', id: 'steps' });
+    expect(g.wait(at('hub'), 5)).toBe('descend:steps');
+    // (The warden's counter, if they open it on the way: DESCEND.)
+    expect(g.key(at('warden'))).toBe('descend:warden');
     // Down: nothing until a foe is close.
     expect(g.key(at('busy'))).toBeNull();
     expect(g.key(at('dungeon'))).toBeNull();
-    expect(g.t.done).toContain('descend');
+    expect(g.t.done).toEqual(['seal', 'altar', 'descend']);
     expect(g.key(at('dungeon', { foeNear: true }))).toBe('attack');
     expect(g.wait(at('dungeon', { foeNear: true, rolling: true }), 3)).toBe('attack');
     g.did('attacked');
+    // The first blow landed: auto battle, on its button, foes or no foes, until it's tapped.
+    expect(g.key(at('dungeon', { foeNear: true, rolling: true }))).toBe('auto:ask');
+    expect(g.see(at('dungeon', { foeNear: true }))!.target).toEqual({ kind: 'ui', id: 'auto' });
+    expect(g.wait(at('dungeon'), 10)).toBe('auto:ask');
+    // On: how to take over, a few seconds; then it's done.
+    expect(g.key(at('dungeon', { autoOn: true }))).toBe('auto:on');
+    expect(g.wait(at('dungeon', { foeNear: true, autoOn: true }), AUTO_READ + 0.2)).toBeNull();
+    expect(g.t.done).toContain('auto');
     // The skill reel: up a few seconds, then done.
-    expect(g.key(at('dungeon', { foeNear: true, rolling: true }))).toBe('skills');
-    expect(g.wait(at('dungeon', { foeNear: true }), SKILLS_READ - 0.5)).toBe('skills');
-    expect(g.wait(at('dungeon', { foeNear: true }), 1)).toBeNull();
+    expect(g.key(at('dungeon', { foeNear: true, rolling: true, autoOn: true }))).toBe('skills');
+    expect(g.wait(at('dungeon', { foeNear: true, autoOn: true }), SKILLS_READ - 0.5)).toBe('skills');
+    expect(g.wait(at('dungeon', { foeNear: true, autoOn: true }), 1)).toBeNull();
     expect(g.t.done).toContain('skills');
-    // The fight over: the door.
+    // The fight over: the door (auto battle walks through it by itself).
     expect(g.key(at('dungeon'))).toBe('exit:far');
     expect(g.key(at('dungeon', { doorInView: true }))).toBe('exit:near');
     g.did('exited');
-    // Auto battle: tap AUTO; once it's on, how to take over; then the line goes.
-    expect(g.key(at('dungeon', { floor: 2 }))).toBe('auto:ask');
-    expect(g.see(at('dungeon', { floor: 2 }))!.target).toEqual({ kind: 'ui', id: 'auto' });
-    expect(g.key(at('dungeon', { floor: 2, autoOn: true }))).toBe('auto:on');
-    expect(g.wait(at('dungeon', { floor: 2, autoOn: true }), AUTO_READ + 0.2)).toBeNull();
-    expect(g.t.done).toContain('auto');
     // Gold enough to level up: head back up, then to the warden, then LEVEL UP.
     expect(g.key(at('dungeon', { floor: 2, canLevel: true }))).toBe('camp');
     expect(g.key(at('dungeon', { floor: 2, canLevel: true, foeNear: true }))).toBeNull();
@@ -199,75 +196,102 @@ describe('the tutorial: one step at a time', () => {
     g.did('leveled');
     expect(g.key(at('warden'))).toBeNull();
     expect(currentStep(g.t)).toBeNull();
-    expect(g.t.done).toEqual([...TUT_STEPS]);
+    expect([...g.t.done].sort()).toEqual([...TUT_STEPS].sort());
+  });
+
+  it('says how far along it is', () => {
+    const g = play();
+    expect(tutorialProgress(g.t)).toEqual({ done: 0, of: TUT_STEPS.length });
+    g.t.done = ['seal', 'altar', 'descend'];
+    expect(tutorialProgress(g.t)).toEqual({ done: 3, of: TUT_STEPS.length });
   });
 
   it('shows nothing while something else has the screen', () => {
     const g = play();
     for (const where of ['busy', 'select', 'keeper'] as const) expect(g.key(at(where))).toBeNull();
-    g.t.done = ['seal', 'altar', 'move', 'talk', 'descend'];
+    g.t.done = ['seal', 'altar', 'descend'];
     expect(g.key(at('busy', { foeNear: true }))).toBeNull();
   });
 
   it('never shows a step before the one it waits for', () => {
-    const g = play({ done: ['seal', 'altar', 'move', 'talk', 'descend'], tips: [], skipped: false });
-    // In the dungeon, no foe yet: not the door (fight first).
+    const g = play({ done: ['seal', 'altar', 'descend'], tips: [], skipped: false });
+    // In the dungeon, no foe yet: not the door, not auto battle (fight first).
     expect(g.key(at('dungeon'))).toBeNull();
     expect(g.key(at('dungeon', { canLevel: true }))).toBeNull();
     // At the hub with gold: not the warden yet either (the fight and the door come first).
     expect(g.key(at('hub', { canLevel: true }))).toBeNull();
     expect(g.t.done).not.toContain('camp');
-    // Gold from duplicates before the first trip down: still the walk, and "go back up" isn't done.
+    // Gold before the first trip down: still the steps, and "go back up" isn't done.
     const h = play({ done: ['seal', 'altar'], tips: [], skipped: false });
-    expect(h.key(at('hub', { canLevel: true }))).toBe('move');
+    expect(h.key(at('hub', { canLevel: true }))).toBe('descend:steps');
     expect(h.key(at('warden', { canLevel: true }))).toBe('descend:warden');
-    expect(h.t.done).toEqual(['seal', 'altar', 'move', 'talk']);
+    expect(h.t.done).toEqual(['seal', 'altar']);
   });
 
   it("doesn't hold the door up for a skill roll it didn't see", () => {
-    const g = play({ done: ['seal', 'altar', 'move', 'talk', 'descend'], tips: [], skipped: false });
+    const g = play({ done: ['seal', 'altar', 'descend', 'auto'], tips: [], skipped: false });
     expect(g.key(at('dungeon', { foeNear: true }))).toBe('attack');
     g.did('killed');
     // The fight's over and no roll came: the door's next, and the skills line waits for a fight.
     expect(g.key(at('dungeon'))).toBe('exit:far');
     g.did('exited');
-    // (Auto battle's line asks meanwhile; a roll's line comes first when one spins.)
-    expect(g.key(at('dungeon', { floor: 2 }))).toBe('auto:ask');
     expect(g.key(at('dungeon', { floor: 2, foeNear: true, rolling: true }))).toBe('skills');
     // A cast just now brings it up too (the fight may be over before the next roll).
-    const h = play({ done: ['seal', 'altar', 'move', 'talk', 'descend', 'attack'], tips: [], skipped: false });
+    const h = play({ done: ['seal', 'altar', 'descend', 'attack', 'auto'], tips: [], skipped: false });
     expect(h.key(at('dungeon', { castAgo: 0.5, doorInView: true }))).toBe('skills');
     expect(h.wait(at('dungeon', { doorInView: true }), SKILLS_READ + 0.2)).toBe('exit:near');
   });
 
   it('marks a step done when the player gets past it on their own', () => {
     const g = play({ done: ['seal', 'altar'], tips: [], skipped: false });
-    // Straight down the steps without a word to the warden: move, talk and descend are all done.
+    // Down the steps (or DESCEND at the warden's): done either way.
     g.key(at('dungeon'));
-    expect(g.t.done).toEqual(['seal', 'altar', 'move', 'talk', 'descend']);
+    expect(g.t.done).toEqual(['seal', 'altar', 'descend']);
     // Back up with gold (a wipe, say): no need to say go back up.
-    const h = play({ done: ['seal', 'altar', 'move', 'talk', 'descend', 'attack', 'skills', 'exit'], tips: [], skipped: false });
+    const h = play({ done: ['seal', 'altar', 'descend', 'attack', 'auto', 'skills', 'exit'], tips: [], skipped: false });
     expect(h.key(at('hub', { canLevel: true }))).toBe('spend:walk');
     expect(h.t.done).toContain('camp');
   });
 
-  it("shows auto battle, and lets it be if it isn't wanted", () => {
-    const g = play({ done: ['seal', 'altar', 'move', 'talk', 'descend', 'attack', 'skills', 'exit'], tips: [], skipped: false });
+  it("keeps auto battle's line on its button until it's tapped, floor after floor, then lets it be", () => {
+    const g = play({ done: ['seal', 'altar', 'descend', 'attack'], tips: [], skipped: false });
+    // Up straight away, in the middle of a fight too: it's the one to learn.
+    expect(g.key(at('dungeon', { foeNear: true }))).toBe('auto:ask');
+    expect(g.wait(at('dungeon', { foeNear: true }), AUTO_ASK - 1)).toBe('auto:ask');
+    // Not tapped for a good while: it lets this floor be (the door's line can come)...
+    expect(g.wait(at('dungeon'), 1.5)).toBe('exit:far');
+    expect(g.t.done).not.toContain('auto');
+    g.did('exited');
+    // ...and asks again on the next floor, and the one after.
     expect(g.key(at('dungeon', { floor: 2 }))).toBe('auto:ask');
-    // Not tapped: the line asks a while, then goes, and the walk-through carries on.
-    expect(g.wait(at('dungeon', { floor: 2 }), AUTO_ASK + 0.2)).toBeNull();
+    g.wait(at('dungeon', { floor: 2 }), AUTO_ASK + 0.3);
+    expect(g.key(at('dungeon', { floor: 2 }))).toBeNull();
+    expect(g.key(at('dungeon', { floor: 3 }))).toBe('auto:ask');
+    g.wait(at('dungeon', { floor: 3 }), AUTO_ASK + 0.3);
+    // Asked on AUTO_TRIES floors and never wanted: done, and the walk-through carries on.
+    expect(AUTO_TRIES).toBe(3);
     expect(g.t.done).toContain('auto');
-    expect(g.key(at('dungeon', { floor: 2, canLevel: true }))).toBe('camp');
+    expect(g.key(at('dungeon', { floor: 4, canLevel: true }))).toBe('camp');
+  });
+
+  it('is done with auto battle the moment it is on and read, whenever that is', () => {
+    const g = play({ done: ['seal', 'altar', 'descend', 'attack'], tips: [], skipped: false });
+    g.wait(at('dungeon'), AUTO_ASK + 0.3);
+    // Let be on this floor; turned on anyway: the take-over line, then done.
+    expect(g.key(at('dungeon', { autoOn: true }))).toBe('auto:on');
+    expect(g.wait(at('dungeon', { autoOn: true }), AUTO_READ + 0.2)).toBe('exit:far');
+    expect(g.t.done).toContain('auto');
   });
 
   it('lets auto battle do the fighting', () => {
-    const g = play({ done: ['seal', 'altar', 'move', 'talk', 'descend'], tips: [], skipped: false });
-    expect(g.key(at('dungeon', { foeNear: true, autoOn: true }))).toBeNull();
+    const g = play({ done: ['seal', 'altar', 'descend'], tips: [], skipped: false });
+    // On before the first blow (they found the button themselves): fighting's done, and auto's line is how to take over.
+    expect(g.key(at('dungeon', { foeNear: true, autoOn: true }))).toBe('auto:on');
     expect(g.t.done).toContain('attack');
   });
 
   it('only says the door when the door is open', () => {
-    const g = play({ done: ['seal', 'altar', 'move', 'talk', 'descend', 'attack', 'skills'], tips: [], skipped: false });
+    const g = play({ done: ['seal', 'altar', 'descend', 'attack', 'auto', 'skills'], tips: [], skipped: false });
     expect(g.key(at('dungeon', { exitOpen: false }))).toBeNull();
     expect(g.key(at('dungeon'))).toBe('exit:far');
   });
@@ -280,17 +304,14 @@ describe('the tutorial: one step at a time', () => {
       see(at('altar'));
       g.key(at('select'));
       see(at('hub'));
-      g.did('moved');
-      see(at('hub', { nearWarden: true }));
       see(at('warden'));
       g.key(at('dungeon'));
       see(at('dungeon', { foeNear: true }));
       g.did('attacked');
-      g.did('exited');
-      g.t.done.push('skills');
       see(at('dungeon'));
       see(at('dungeon', { autoOn: true }));
-      g.t.done.push('auto');
+      g.t.done.push('auto', 'skills');
+      g.did('exited');
       see(at('dungeon', { canLevel: true }));
       see(at('warden', { canLevel: true }));
       return out;
@@ -299,23 +320,21 @@ describe('the tutorial: one step at a time', () => {
     const desk = lines(false);
     expect(phone).toEqual([
       'Your first knight! Now close the altar.',
-      'Drag anywhere to walk.',
-      'Tap [SQUAD] to see your squad.',
+      '[Drag] to walk. Head down the [steps]!',
       'Your squad is set. Tap [DESCEND]!',
       'Hold [ATTACK] to fight.',
-      'Tap [AUTO] and your knight plays on its own.',
-      'Auto is on! Drag, or hold [ATTACK], to take over.',
+      'Tap [AUTO] and your knight fights by itself!',
+      '[AUTO] is on! Drag any time to take over.',
       'Tap [CAMP] to go spend your gold.',
       'Tap [LEVEL UP] for a stronger knight.',
     ]);
     expect(desk).toEqual([
       'Your first knight! Now close the altar.',
-      'Walk with [WASD] or the arrows.',
-      'Press [E] to see your squad.',
+      'Walk with [WASD]. Head down the [steps]!',
       'Your squad is set. Click [DESCEND]!',
       'Hold [left click] to attack.',
-      'Press [T] for [AUTO]: your knight plays itself.',
-      'Auto is on! Move or attack to take over.',
+      'Press [T] for [AUTO]: it fights by itself!',
+      '[AUTO] is on! Move any time to take over.',
       'Press [Esc] to go spend your gold.',
       'Click [LEVEL UP] for a stronger knight.',
     ]);
@@ -331,7 +350,7 @@ describe('the tutorial: skipping and replaying', () => {
     skipTutorial(g.t);
     expect(g.key(at('altar'))).toBeNull();
     expect(g.key(at('dungeon', { shopInView: true, floor: 10 }))).toBeNull();
-    g.did('moved');
+    g.did('attacked');
     // (Only the seal, broken before it was skipped.)
     expect(g.t.done).toEqual(['seal']);
     expect(tutorialOn(g.t)).toBe(false);
@@ -405,10 +424,10 @@ describe('the tutorial: one-off tips', () => {
   });
 
   it('keeps the auto tip until the walk-through is done, and steps come before tips', () => {
-    const g = play({ done: ['seal', 'altar', 'move', 'talk', 'descend', 'attack', 'skills'], tips: [], skipped: false });
+    const g = play({ done: ['seal', 'altar', 'descend', 'attack', 'auto', 'skills'], tips: [], skipped: false });
     // (Floor 3, the door open: the door's line, not the tip.)
     expect(g.key(at('dungeon', { floor: 3 }))).toBe('exit:far');
-    const h = play({ done: ['seal', 'altar', 'move', 'talk', 'descend', 'attack', 'skills', 'exit', 'auto'], tips: [], skipped: false });
+    const h = play({ done: ['seal', 'altar', 'descend', 'attack', 'auto', 'skills', 'exit'], tips: [], skipped: false });
     expect(h.key(at('dungeon', { floor: 3 }))).toBeNull();
     // Other tips don't wait: a merchant on floor 4 before the warden's been visited.
     expect(h.key(at('dungeon', { floor: 4, shopInView: true }))).toBe('tip:shop');

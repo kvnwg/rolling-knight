@@ -203,12 +203,15 @@ describe('roster', () => {
 });
 
 describe('rebirth', () => {
-  it('needs floor 15, wipes the run and keeps the codex', () => {
+  it('needs floor 30, wipes the run and keeps the codex', () => {
     const s = done();
     addKnight(s, knightId('epic', 'blade'), null);
     s.gold = 999;
     expect(canRebirth(s)).toBe(false);
-    s.run.bestFloor = 15;
+    // (Not after a few minutes' play: floor 15 used to open it.)
+    s.run.bestFloor = 29;
+    expect(canRebirth(s)).toBe(false);
+    s.run.bestFloor = 30;
     const luck = currentLuck(s, Date.now());
     expect(rebirth(s)).toBe(true);
     expect(s.rebirths).toBe(1);

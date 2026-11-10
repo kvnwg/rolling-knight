@@ -247,9 +247,9 @@ npm run sim -- --minutes 40
 
 The real game logic with a dev bot at the controls (it moves, aims and dodges too) that levels,
 buys Luck upgrades, rolls combat upgrades and perks, and rebirths. Current result over seeds 1 to 8
-(`--seed N`): floor 5 at about 4 minutes (3 to 4.5), floor 10 at about 8 (7 to 9.5), the first
-rebirth at about 13 (11 to 15) and the second at about 32 (29 to 34), with one wipe in the eight runs
-and about 60 perfect rolls in 40 minutes.
+(`--seed N`): floor 5 at about 4 minutes (3 to 4.5), floor 10 at about 8 (7 to 9.5), and the first
+rebirth (floor 30) at about 34 minutes (32 to 36 over seeds 1 to 4), the second (floor 40) some 40
+to 50 minutes after it.
 
 ```bash
 npx tsx tools/preview.ts knights shots/knights.png
