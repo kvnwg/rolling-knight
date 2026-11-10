@@ -7,7 +7,11 @@
  * button. Every number on a card says what it is and its button says what it does; the full story
  * (what it does, what opens it) waits in the popup its picture or name opens.
  */
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { RARITY_COLOR, type Rarity } from '../../core/rarity';
+import type { MutationId } from '../../core/state';
+import { backdropStyle } from '../backdrop';
+import { artPx, OddsChip } from '../KnightCard';
 import { useHoldRepeat } from '../upgrades/parts';
 import { Px, type IconName } from '../px';
 import { Glyph } from './KeeperScreen';
@@ -56,6 +60,8 @@ export interface OfferCardProps {
   button?: CardButton;
   /** A taller picture slot (a knight). */
   tall?: boolean;
+  /** A knight's card: the picture stands in its rarity's little scene (ui/backdrop.ts), its odds on a plate in the corner. */
+  knight?: { rarity: Rarity; mutation: MutationId | null };
   /** Under the button: what opens it, or how much is missing. */
   note?: ReactNode;
   /** A second, smaller button under the main one (the Warden's "ADD TO SQUAD"); `on` shows it pressed in. */
@@ -123,8 +129,20 @@ export function OfferCard(p: OfferCardProps) {
           {p.levelRight !== undefined && <small>{p.levelRight}</small>}
         </div>
       )}
-      <div className={s.well} onClick={p.onArt} role={p.onArt ? 'button' : undefined} data-tall={p.tall || undefined}>
+      <div
+        className={s.well}
+        onClick={p.onArt}
+        role={p.onArt ? 'button' : undefined}
+        data-tall={p.tall || undefined}
+        data-scene={p.knight ? '' : undefined}
+        style={p.knight ? ({ ...backdropStyle(p.knight.rarity, artPx(), 32 * artPx(), 5, 128), ['--rc' as string]: RARITY_COLOR[p.knight.rarity] } as CSSProperties) : undefined}
+      >
         {p.art}
+        {p.knight && (
+          <span className={s.wellOdds}>
+            <OddsChip rarity={p.knight.rarity} mutation={p.knight.mutation} />
+          </span>
+        )}
         {p.tag && (
           <span
             className={s.tag}

@@ -193,6 +193,7 @@ export function BrokerShop({ game, station, onClose, onOpen }: { game: Game; sta
                       level={`Lv ${rec.level}`}
                       levelRight={<ClassTag cls={def.cls} short />}
                       art={<HeroArt id={id} mutation={rec.mutation} s={1} />}
+                      knight={{ rarity: def.rarity, mutation: rec.mutation }}
                       tall
                       tag={{ text: 'KEPT', kind: 'new', title: 'Your knight: still yours, just as it was' }}
                       name={def.name}
@@ -213,6 +214,7 @@ export function BrokerShop({ game, station, onClose, onOpen }: { game: Game; sta
                     level={`Lv ${rec.level}`}
                     levelRight={<ClassTag cls={def.cls} short />}
                     art={<ExtraStack id={id} mutation={rec.mutation} n={rec.extras} />}
+                    knight={{ rarity: def.rarity, mutation: rec.mutation }}
                     tall
                     tag={{ text: `EXTRA ×${rec.extras}`, kind: 'dupe', title: `${extrasText(rec.extras)} of ${def.name}: copies to sell, not the knight` }}
                     name={def.name}

@@ -6,7 +6,9 @@
  * picture's top left corner, the spare copies chip in its top right, NEW on the card's top edge.
  */
 import { useRef, type CSSProperties, type ReactNode } from 'react';
-import { RARITY_NAME, RARITY_ODDS, type Rarity } from '../core/rarity';
+import { knightDef } from '../core/knights';
+import { oneInFor } from '../core/luck';
+import { RARITY_COLOR, RARITY_NAME, RARITY_ODDS, type Rarity } from '../core/rarity';
 import type { MutationId } from '../core/state';
 import { backdropStyle } from './backdrop';
 import { HeroArt, rarityStyle } from './common';
@@ -46,6 +48,23 @@ const CARD_ART_H = 40;
 /** A rarity's odds as the altar's odds table has them, short ("1 in 1K", "1 in 2.5B"); Common is just Common. */
 export function rarityOdds(r: Rarity): string {
   return RARITY_ODDS[r] <= 1 ? RARITY_NAME[r] : oneInShort(RARITY_ODDS[r]);
+}
+
+/**
+ * A knight's own odds, as its reveal counts them up: its tier at luck 1 times its mutation's
+ * ("1 in 2", "1 in 1K", "1 in 2.5B"). Every knight has them, the Commons too.
+ */
+export function knightOdds(rarity: Rarity, mutation: MutationId | null = null): string {
+  return oneInShort(oneInFor(rarity, mutation));
+}
+
+/** Those odds on a little dark plate in the tier's colour: every card of a knight carries one. */
+export function OddsChip({ rarity, mutation = null }: { rarity: Rarity; mutation?: MutationId | null }) {
+  return (
+    <span className="odds-chip num" style={{ ['--rc' as string]: RARITY_COLOR[rarity] } as CSSProperties} title="Its odds at the altar">
+      {knightOdds(rarity, mutation)}
+    </span>
+  );
 }
 
 /** A value that pops (a quick bump) whenever it changes; not when it first shows. */
@@ -114,12 +133,11 @@ export function KnightTile(p: TileProps) {
       <div className="kc-info">
         <div className="kc-name">{p.name}</div>
         {p.meta !== undefined && <div className="kc-meta">{p.meta}</div>}
-        {(p.left !== undefined || p.right !== undefined) && (
-          <div className="kc-foot">
-            <span className="l">{p.left}</span>
-            <span className="r">{p.right}</span>
-          </div>
-        )}
+        {/* Line three: whatever the card was given, and always the knight's own odds. */}
+        <div className="kc-foot">
+          <span className="l">{p.left}</span>
+          <span className="r">{p.right ?? <OddsChip rarity={knightDef(p.id).rarity} mutation={p.mutation ?? null} />}</span>
+        </div>
       </div>
     </>
   );

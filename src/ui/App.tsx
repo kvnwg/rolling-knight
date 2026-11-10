@@ -33,6 +33,9 @@ import { rebirthPitch } from './RebirthPill';
 import { VistaCanvas } from './VistaCanvas';
 import { Tutorial } from './Tutorial';
 import { WelcomeBack } from './WelcomeBack';
+import { FloorRewind } from './fx/FloorRewind';
+import { CampAsk } from './CampAsk';
+import { campFloor } from '../core/newGame';
 
 export interface Toast {
   id: number;
@@ -83,6 +86,12 @@ export function App() {
   const [luck, setLuck] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [banner, setBanner] = useState<Banner | null>(null);
+  // CAMP asks first (leaving costs floors): the fight waits while it's up.
+  const [campAsk, setCampAsk] = useState(false);
+  const campAskRef = useRef(campAsk);
+  campAskRef.current = campAsk;
+  // The floor ticking back on the way to camp (one at a time: a new trip replaces it).
+  const [rewind, setRewind] = useState<{ id: number; from: number; back: number; revived: number } | null>(null);
   const [reveals, setReveals] = useState<RevealItem[]>([]);
   const [offline, setOffline] = useState(game.offline);
   const [wide, setWide] = useState(false);
@@ -213,6 +222,10 @@ export function App() {
         case 'wipe':
           show({ title: 'SQUAD DOWN', sub: `Back to floor ${e.back}`, grad: 'red' });
           break;
+        case 'camp':
+          // (Nothing to show when the run keeps its floor and nobody had fallen.)
+          if (e.from > e.back || e.revived > 0) setRewind({ id: nextId++, from: e.from, back: e.back, revived: e.revived });
+          break;
         case 'potion':
           toast({ text: `Luck Potion: luck ×2 for ${secs(e.seconds)}`, color: '#8af07a' });
           break;
@@ -270,7 +283,7 @@ export function App() {
       // knight outright in a fight: it moves, dodges, fights and goes down when the floor is done;
       // steering or attacking yourself takes over for as long as you do. A sheet open only aims and
       // attacks for you. The dev bot (?auto, the sim) never lets go.
-      game.paused = revealRef.current.length > 0 || talkRef.current !== null || titleRef.current;
+      game.paused = revealRef.current.length > 0 || talkRef.current !== null || titleRef.current || campAskRef.current;
       if (w) {
         const autoBattle = game.inDungeon && game.state.settings.autoPlay && !(c.mx || c.my || c.attack);
         w.auto = game.state.settings.autoPlay || sheetRef.current;
@@ -356,7 +369,16 @@ export function App() {
           setLuck(false);
           // (The Oracle's sealed altar stays: a new game's first screen, until the seal is broken.)
           setStation((st) => (st?.id === 'altar' && game.state.roll.sealed ? st : null));
-        } else if (game.inDungeon) game.leaveDungeon();
+        } else if (game.inDungeon) {
+          // Esc asks to leave, and Esc again takes the question back.
+          uiSound(campAskRef.current ? 'close' : 'open');
+          setCampAsk(!campAskRef.current);
+        }
+      }
+      if (campAskRef.current && k === 'enter') {
+        setCampAsk(false);
+        if (game.inDungeon) game.leaveDungeon();
+        return;
       }
       // At the hub, E or Enter talks to the keeper you're standing by; in the dungeon (where E is
       // your skill) it's Enter or F.
@@ -412,7 +434,7 @@ export function App() {
           controls={ctl.controls}
           press={ctl.press}
           hold={ctl.hold}
-          onCamp={() => game.leaveDungeon()}
+          onCamp={() => setCampAsk(true)}
           onRebirth={() => {
             // Back to camp, the Shrine's screen open there.
             game.leaveDungeon();
@@ -467,6 +489,19 @@ export function App() {
           </div>
         ))}
       </div>
+      {campAsk && inDungeon && (
+        <CampAsk
+          floor={game.state.run.floor}
+          back={campFloor(game.state.run.floor, game.state.run.checkpoint)}
+          fallen={game.world ? game.world.heroes.filter((h) => h.downed).length : 0}
+          onStay={() => (uiSound('close'), setCampAsk(false))}
+          onGo={() => {
+            setCampAsk(false);
+            game.leaveDungeon();
+          }}
+        />
+      )}
+      {rewind && <FloorRewind key={rewind.id} from={rewind.from} back={rewind.back} revived={rewind.revived} onDone={() => setRewind(null)} />}
       {banner && (
         <div key={banner.id} className="banner">
           <Chunky text={banner.title} size={14} grad={banner.grad} />

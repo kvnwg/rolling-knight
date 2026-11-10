@@ -57,6 +57,8 @@ const EXTRA: Record<string, Rows> = {
   boot: ['....kkk...', '...kNtNk..', '...kNtNk..', '...kNtNk..', '..kNNtNk..', '.kNNNNtkk.', 'knNNNNNttk', 'knnnnnnnnk', 'kkkkkkkkkk'],
   shard: ['...k...', '..kCk..', '.kCwck.', '.kCcck.', 'kCCcUck', '.kCcUk.', '..kUk..', '...k...'],
   sigil: ['...kkk...', '..kMmVk..', '.kMmmmVk.', 'kMmkkkmVk', 'kmmkMkmvk', 'kVmkkkmvk', '.kVmmmvk.', '..kVvvk..', '...kkk...'],
+  // The Lancer's: a lance on the slant, steel at its tip, a red pennant under it.
+  lance: ['......kkk', '.....kWWk', '....kW5kk', '.kkky5k..', 'kRRykk...', 'kRRyk....', '.kykk....', 'kyk......', 'kk.......'],
   swords: [
     'kk......kk',
     'k5k....k5k',
@@ -92,6 +94,7 @@ const EXTRA: Record<string, Rows> = {
 /** Smaller cuts of a few of them, for the tiny size (beside a card's line of text). */
 const EXTRA_XS: Partial<Record<keyof typeof EXTRA, Rows>> = {
   copies: ['..kkkkk', '..k554k', 'kkkkk4k', 'kWWTk4k', 'kWWTkkk', 'kTTTk..', 'kkkkk..'],
+  lance: ['...kkk', '.kkWWk', 'kRRy5k', 'kRykkk', 'kykk..', 'kk....'],
 };
 
 /** A rarity's own icon (render/art/tierGems.ts): `tier:legendary`. */

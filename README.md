@@ -37,6 +37,14 @@ recording: [`docs/SOUNDS.md`](docs/SOUNDS.md).
 
 ## The look
 
+- Leaving for camp costs floors, so CAMP (or Esc) asks first (`src/ui/CampAsk.tsx`; the fight waits
+  while it's up): the run steps back to the floor after the last boss you beat, never further than
+  the checkpoint (`campFloor` in `src/core/newGame.ts`), the squad rests (the fallen are up again,
+  everyone healed), and at the hub the floor number ticks back in the middle of the screen
+  (`src/ui/fx/FloorRewind.tsx`).
+- Every card of a knight carries its own odds on a little plate in its tier's colour ("1 in 12",
+  "1 in 25K": its tier at luck 1 times its mutation's), and on the keepers' counters and in the
+  Warden's squad slots the knight stands in its rarity's pixel scene.
 - Every floor has real height. The solid ground round a floor (the woods round a clearing, a town's
   lots, a cave's rock, a crypt's walls) stands a storey above the floor you walk on, and in the 3/4
   view that shows as a face wherever it has open floor to its south (`src/world/relief.ts` for the

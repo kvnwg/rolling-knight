@@ -2,8 +2,8 @@
  * Dressing the Dungeon's rooms with the packs' things (render/packs/dungeonProps.ts draws them):
  * on the north walls' faces, torches, banners, rings and a cell door; torches leaning out of the side
  * walls; cobwebs in the corners; barrels, crates, pots and chests heaped against the walls; a cabinet
- * or a suit of armor against the back wall; a pedestal or a great skull in a big room; candles and
- * candlesticks that light the floor; flasks, coins, a sword, rubble and bones scattered about. Then
+ * or a suit of armor against the back wall; a pedestal in a big room; candles and
+ * candlesticks that light the floor; coins, rubble and bones scattered about. Then
  * the traps (traps.ts). Things on the floor never cut it in two (decor.ts checks), and keep off the
  * halls' middle line and the start and the exit; the boss's arena gets only its torches and banners.
  */
@@ -132,12 +132,13 @@ function dressRoom(c: DecorCtx, r: Room, blue: boolean, wallTaken: ReadonlySet<n
       const x = r.cx + rng.int(-r.rx + 2, r.rx - 2);
       const y = r.cy + rng.int(-r.ry + 2, r.ry - 1);
       if (route(x, y) || byWall(x, y)) continue;
-      if (solidProp(c, rng.chance(0.25) ? 'dragonSkull' : 'pedestal', x, y, 0, 0, undefined, true)) break;
+      if (solidProp(c, 'pedestal', x, y, 0, 0, undefined, true)) break;
     }
   }
   // --- lights on the floor, and the small things
-  // (No flasks on the floor: they read as potions to pick up. Coins on the floor are real gold: world.ts.)
-  const loose: Array<[PropKind, number]> = [['candles', 3], ['candlestick', 2], ['coins', 1], ['bones', 2], ['rubble', 2], ['sword', 1]];
+  // (No flasks on the floor: they read as potions to pick up. Coins on the floor are real gold: world.ts.
+  // No loose swords and no dragon skulls either: with nothing round them they looked dropped there by mistake.)
+  const loose: Array<[PropKind, number]> = [['candles', 3], ['candlestick', 2], ['coins', 1], ['bones', 2], ['rubble', 2]];
   let lights = 0;
   let things = start ? 2 : rng.int(3, 6);
   const once = new Set<PropKind>();
@@ -150,8 +151,8 @@ function dressRoom(c: DecorCtx, r: Room, blue: boolean, wallTaken: ReadonlySet<n
     if (lights < 1 && byWall(x, y)) kind = rng.chance(0.5) ? 'candles' : 'candlestick';
     const light = kind === 'candles' || kind === 'candlestick';
     if (light && (route(x, y) || lights >= 2)) continue;
-    // A sword or a few coins on the floor are a find: one of each in a room at most.
-    if ((kind === 'sword' || kind === 'coins') && once.has(kind)) continue;
+    // A few coins on the floor are a find: once in a room at most.
+    if (kind === 'coins' && once.has(kind)) continue;
     once.add(kind);
     if (light) lights++;
     c.occupied.add(y * m.w + x);

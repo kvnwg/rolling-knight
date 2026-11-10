@@ -61,6 +61,19 @@ export function checkpointFor(floor: number): number {
   return Math.max(1, floor - (floor % k));
 }
 
+/** A boss guards every fifth floor. */
+const BOSS_EVERY = 5;
+
+/**
+ * The floor a trip back to camp sets the run to: the one after the last boss you beat on the way
+ * down (from 13, back to 11; from 15, where the boss still stands, back to 11; from 16, 16), or the
+ * first. Never further back than the run's `checkpoint` (a wipe goes there, and a walk to camp is
+ * never worse than a wipe): standing on a checkpoint floor with its boss still up, you keep it.
+ */
+export function campFloor(floor: number, checkpoint = 1): number {
+  return Math.max(1, Math.min(floor, checkpoint), floor - ((floor - 1) % BOSS_EVERY));
+}
+
 export function canRebirth(state: GameState): boolean {
   return state.run.bestFloor >= rebirthFloor(state.rebirths);
 }

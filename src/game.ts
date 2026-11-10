@@ -7,7 +7,7 @@ import { drawDesign } from './core/deck';
 import type { CoreEvent } from './core/events';
 import { knightDef } from './core/knights';
 import { currentLuck } from './core/luck';
-import { canRebirth, checkpointFor, newGame, rebirth as doRebirth } from './core/newGame';
+import { campFloor, canRebirth, checkpointFor, newGame, rebirth as doRebirth } from './core/newGame';
 import { runOffline, type OfflineReport } from './core/offline';
 import { perksOpen } from './core/perks';
 import { floorDifficulty, squadPower, type Difficulty } from './core/power';
@@ -397,13 +397,25 @@ export class Game {
     if (depth > 0) this.fade = Math.max(this.fade, Math.min(0.7, depth * 0.7));
   }
 
-  /** Back to camp: the floor waits as it is. */
+  /**
+   * Back to camp. The run steps back to the floor after the last boss you beat (campFloor), and the
+   * squad rests: the fallen are up again and everyone is whole for the next trip down.
+   */
   leaveDungeon(): void {
+    if (!this.inDungeon) return;
+    const from = this.state.run.floor;
+    const back = campFloor(from, this.state.run.checkpoint);
+    const revived = this.world ? this.world.heroes.filter((h) => h.downed).length : 0;
+    this.state.run.floor = back;
+    this.hpShare.clear();
+    this.world = null;
+    this.syncHub(true);
+    this.emit({ type: 'camp', from, back, revived });
     this.inDungeon = false;
     // A merchant's goods are for one run: heading back to camp ends it (and what the merchants say of you).
     this.state.run.items = {};
     this.state.run.thief = false;
-    // (So is a portal's cut to the next floor, if it was under way: the floor waits as it is.)
+    // (So is a portal's cut to the next floor, if it was under way.)
     this.pendingFloor = null;
     this.fade = 1;
     this.fadeDir = -1;

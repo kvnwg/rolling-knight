@@ -8,5 +8,5 @@ export const CLASS_ICON: Record<ClassId, IconName> = {
   ranger: 'target',
   cleric: 'heart',
   arcanist: 'bolt',
-  lancer: 'swords',
+  lancer: 'lance',
 };

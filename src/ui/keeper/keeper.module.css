@@ -391,6 +391,23 @@
   place-items: end center;
   padding-bottom: calc(1 * var(--px));
 }
+/* A knight's picture: it stands in its rarity's scene, a ring of the tier's colour round it, its odds
+   on a plate in the corner. */
+.well[data-scene] {
+  border: 0;
+  border-image: none;
+  background-color: #150e11;
+  box-shadow: inset 0 0 0 var(--px) #140c14, inset 0 0 0 calc(2 * var(--px)) var(--rc), 0 0 0 calc(0.5 * var(--px)) #140c14;
+}
+.well[data-scene] img {
+  filter: none;
+}
+.wellOdds {
+  position: absolute;
+  right: calc(2.5 * var(--px));
+  bottom: calc(2.5 * var(--px));
+  line-height: 0;
+}
 .well img {
   position: relative;
   filter: drop-shadow(0 var(--px) 0 rgba(90, 56, 28, 0.35));
@@ -958,10 +975,55 @@
   place-items: end center;
   width: 100%;
   height: calc(30 * var(--px));
-  border: 0 solid transparent;
-  border-image: var(--sk-pa-inset) 3 fill / calc(3 * var(--px)) stretch;
+  /* The knight's rarity scene (Shops.tsx sets it), ringed in the tier's colour. */
+  background-color: #150e11;
+  box-shadow: inset 0 0 0 var(--px) #140c14, inset 0 0 0 calc(2 * var(--px)) var(--rc, #6a5a4a), 0 0 0 calc(0.5 * var(--px)) #140c14;
   image-rendering: pixelated;
   padding-bottom: calc(1 * var(--px));
+  overflow: hidden;
+}
+/* The tier's name on a ribbon across the foot of the picture, under the knight's feet. */
+.slotTier {
+  position: absolute;
+  left: calc(2 * var(--px));
+  right: calc(2 * var(--px));
+  bottom: calc(2 * var(--px));
+  z-index: 1;
+  display: none;
+}
+/* An open slot: an alcove in the wall waiting for a knight. */
+.slotEmpty {
+  background:
+    linear-gradient(#0000 0 0) padding-box,
+    repeating-linear-gradient(0deg, #2a2230 0 calc(5 * var(--px)), #231c29 calc(5 * var(--px)) calc(6 * var(--px)));
+  box-shadow: inset 0 0 0 var(--px) #140c14, inset 0 0 0 calc(2 * var(--px)) #5a4a66, inset 0 calc(8 * var(--px)) calc(8 * var(--px)) rgba(0, 0, 0, 0.45);
+}
+.slotEmpty small {
+  color: #cdbfe0 !important;
+}
+/* The knight's name on a dark ribbon in its tier's colour, right under its picture. */
+.slotName {
+  display: block;
+  width: 100%;
+  padding: calc(0.8 * var(--px)) calc(1 * var(--px));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: calc(4.4 * var(--px));
+  color: var(--rc, #fff);
+  background: #1e1420;
+  box-shadow: 0 0 0 calc(0.5 * var(--px)) #140c14, inset 0 calc(-0.5 * var(--px)) 0 rgba(0, 0, 0, 0.4);
+  text-shadow: 0 calc(0.5 * var(--px)) 0 #000;
+}
+/* Its odds, then its level and power, on one line. */
+.slotMeta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: calc(0.8 * var(--px)) calc(1.5 * var(--px));
+  width: 100%;
+  min-height: calc(6 * var(--px));
 }
 .slotCrown {
   position: absolute;
@@ -971,8 +1033,12 @@
   filter: drop-shadow(0 var(--px) 0 var(--ink));
 }
 .youTag {
-  display: block;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
   width: 100%;
+  min-height: calc(10 * var(--px));
+  margin-top: auto;
   padding: calc(1 * var(--px)) 0;
   font-size: calc(3.8 * var(--px));
   font-weight: 700;
@@ -993,6 +1059,7 @@
   opacity: 0.8;
 }
 .slot .second {
+  margin-top: auto;
   min-height: calc(10 * var(--px)) !important;
   font-size: calc(3.8 * var(--px)) !important;
 }
@@ -1230,6 +1297,9 @@
   }
   .slot .second {
     min-height: calc(8.5 * var(--px)) !important;
+  }
+  .youTag {
+    min-height: calc(8.5 * var(--px));
   }
   .panel {
     gap: calc(1.5 * var(--px));

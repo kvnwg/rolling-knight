@@ -36,6 +36,8 @@ import { extrasText } from './BrokerShop';
 import { RollBody, RollButton, RollHead, RollLabel, RollList, RollReel, RollRow, RollStage, pctShort, rarityInk, type ReelSpin } from './RollMachine';
 import { Icon } from './TinkerShop';
 import { ClassTag } from '../ClassTag';
+import { backdropStyle } from '../backdrop';
+import { artPx, OddsChip } from '../KnightCard';
 import { Codex } from '../panels';
 import { coinFly } from '../fx/coinFly';
 import { DragKnight } from './DragKnight';
@@ -563,13 +565,11 @@ export function OracleShop({ game, station, onClose, onOpen }: { game: Game; sta
                     key={`${r.at}-${i}`}
                     level={r.mult > 1 ? `x${r.mult}` : undefined}
                     art={<HeroArt id={r.knightId} mutation={r.mutation} s={1} />}
+                    knight={{ rarity: def.rarity, mutation: r.mutation }}
                     tall
                     tag={r.isNew ? { text: 'NEW', kind: 'new' } : { text: 'EXTRA', kind: 'dupe', title: 'A knight you already have: kept as an extra for Bram the Broker to sell (your knight stays as it is)' }}
                     name={def.name}
-                    lines={[
-                      { text: RARITY_NAME[def.rarity], tone: 'muted' },
-                      { icon: 'dice', text: oneIn(r.oneIn) },
-                    ]}
+                    lines={[{ text: RARITY_NAME[def.rarity], tone: 'muted' }]}
                     onArt={st.roster[r.knightId] ? () => (uiSound('tap'), onOpen(r.knightId)) : undefined}
                   />
                 );
@@ -772,7 +772,7 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
                       <i />
                     </button>
                   )}
-                  <div className={s.slotArt}>
+                  <div className={s.slotArt} style={{ ...backdropStyle(knightDef(id).rarity, artPx(), 30 * artPx(), 5, 96), ['--rc' as string]: RARITY_COLOR[knightDef(id).rarity] } as CSSProperties}>
                     <DragKnight onDrop={(to) => putAt(id, to)} onDropOut={filled > 1 ? () => bench(slot) : undefined} title={filled > 1 ? 'Drag onto another slot to swap, or off the slots to take out of the squad' : 'Drag onto another slot to move'}>
                       <HeroArt id={id} mutation={st.roster[id]?.mutation ?? null} s={1} />
                     </DragKnight>
@@ -782,11 +782,16 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
                       </span>
                     )}
                   </div>
-                  <b>{knightDef(id).name}</b>
+                  <b className={s.slotName} style={{ ['--rc' as string]: RARITY_COLOR[knightDef(id).rarity] } as CSSProperties}>
+                    {knightDef(id).name}
+                  </b>
                   <ClassTag cls={knightDef(id).cls} short />
-                  <small>
-                    Lv {st.roster[id]?.level ?? 1} · <Px icon="sword" size="xs" /> {fmt(knightRating(st, id))}
-                  </small>
+                  <span className={s.slotMeta}>
+                    <OddsChip rarity={knightDef(id).rarity} mutation={st.roster[id]?.mutation ?? null} />
+                    <small>
+                      Lv {st.roster[id]?.level ?? 1} · <Px icon="sword" size="xs" /> {fmt(knightRating(st, id))}
+                    </small>
+                  </span>
                   {slot !== st.controlled ? (
                     <button className={`btn ${s.second}`} onClick={(e) => (e.stopPropagation(), lead(slot))}>
                       <Px icon="crown" size="xs" /> LEAD
@@ -911,6 +916,7 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
                     level={`Lv ${rec.level}`}
                     levelRight={<ClassTag cls={def.cls} short />}
                     art={<HeroArt id={id} mutation={rec.mutation} s={1} />}
+                    knight={{ rarity: def.rarity, mutation: rec.mutation }}
                     tall
                     tag={rarityTag(id)}
                     name={def.name}
@@ -953,6 +959,7 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
                         <HeroArt id={id} mutation={rec.mutation} s={1} />
                       </DragKnight>
                     }
+                    knight={{ rarity: def.rarity, mutation: rec.mutation }}
                     tall
                     tag={rarityTag(id)}
                     name={def.name}
@@ -989,6 +996,7 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
                   level={rec.mutation ? rec.mutation.toUpperCase() : 'No mutation'}
                   levelRight={<ClassTag cls={def.cls} short />}
                   art={<HeroArt id={id} mutation={rec.mutation} s={1} />}
+                  knight={{ rarity: def.rarity, mutation: rec.mutation }}
                   tall
                   tag={rarityTag(id)}
                   name={def.name}

@@ -42,6 +42,8 @@ export type CoreEvent =
   /** She's beaten: what's left on her stall is yours. */
   | { type: 'merchantDown'; name: string }
   | { type: 'wipe'; floor: number; back: number }
+  /** Left for camp: the run steps back from `from` to `back` (core/newGame.ts campFloor), and the `revived` knights who had fallen are up again. */
+  | { type: 'camp'; from: number; back: number; revived: number }
   | { type: 'rebirth'; count: number }
   /** This run just reached the floor a rebirth needs (once a run). */
   | { type: 'rebirthReady'; next: number }

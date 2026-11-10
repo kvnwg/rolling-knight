@@ -12,7 +12,7 @@ import { knightRating } from '../core/power';
 import type { Game } from '../game';
 import { Chunky, HeroLive, Section, rarityGrad, rarityStyle } from './common';
 import { fmt, oneIn } from './format';
-import { artPx, KnightTile, knightFit, knightPix, rarityOdds } from './KnightCard';
+import { artPx, KnightTile, knightFit, knightOdds, knightPix } from './KnightCard';
 import { backdropStyle } from './backdrop';
 import { Px } from './px';
 import { SkillTable } from './SkillRoll';
@@ -132,11 +132,11 @@ export function HeroDetail({ game, id, onClose }: { game: Game; id: string; onCl
                 {fmt(st.atk)}
               </i>
             </span>
-            <span title={RARITY_ODDS[def.rarity] <= 1 ? 'Odds at the altar: the everyday find' : `Odds at the altar: ${oneIn(RARITY_ODDS[def.rarity])}`}>
+            <span title="Its odds at the altar (its tier's, times its mutation's)">
               <small>ODDS</small>
               <i>
                 <Px icon="dice" size="sm" />
-                <b style={{ color: RARITY_COLOR[def.rarity] }}>{rarityOdds(def.rarity)}</b>
+                <b style={{ color: RARITY_COLOR[def.rarity] }}>{knightOdds(def.rarity, rec?.mutation ?? null)}</b>
               </i>
             </span>
           </div>
