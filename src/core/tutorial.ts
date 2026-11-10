@@ -349,7 +349,7 @@ function stepView(step: TutStepId, ctx: TutCtx, run: TutRun): TutView | null {
 function tipView(tip: TutTipId): TutView {
   switch (tip) {
     case 'shop':
-      return line('tip:shop', 'A merchant! Walk up to her wares.', world('shop'), true);
+      return line('tip:shop', 'A merchant! Walk up to her wares: buy or steal.', world('shop'), true);
     case 'checkpoint':
       return line('tip:checkpoint', "Checkpoint! If you fall, you'll come back here.", ui('floor'), true);
     case 'rebirth':

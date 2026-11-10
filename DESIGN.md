@@ -288,6 +288,34 @@ much; a tap for the words), and the replies that lead to it carry the "!" from o
 About one floor in eight hides a demon in disguise. Ask the wrong questions and it drops the act: it
 fights like a boss, with its own bar and banter, but the floor's other foes don't fall with it.
 
+Merchants (`src/world/shop.ts`, `src/core/runItems.ts`): now and then a room of a floor is Madame
+Thrift's (40% of floors, 85% on the one before a boss; never floor 1 or a boss floor), nothing
+spawning in it. Three wares stand on little tables in front of her stall, each for this run only
+(a heal, a revive, tonics, charms and gear that last until you head back to camp), priced in kills'
+worth of the floor's gold. Stand at one and the HUD offers it: the price, and beside it, in crimson,
+STEAL (G on a keyboard). The first press only asks ("Steal? She'll fight you."); a second, still
+standing there, takes it for nothing.
+
+Stealing (`src/world/thief.ts`): the ware works like a bought one, and the merchant turns on you.
+A warning of 0.9 s (she shouts, a red "!" over her head, the light goes red-ish, the boss's music
+starts), then she vaults her counter and is a foe: the Furious Merchant, with a boss's bar. She has
+3x the HP and 3x the hit of the boss this floor would have had: the floor's own boss generator at
+this floor's difficulty, as if it were a boss floor (so about 54 s of the squad's damage at par,
+and close to half a knight's HP a hit). She is herself, not a monster: her own chibi, red in the
+face, steam coming off her, at twice the size. Her moves are a merchant's: a fistful of coins (a
+fan), coins all round (a ring), her wares raining down, and a shoulder-first barge; she summons no
+one. She never fights unless she's stolen from, and only the player steals: the squad's AI and Auto
+see her only once she's a foe (then they target her like any other, and Auto won't leave the floor
+while she stands).
+
+While she's after you nobody minds the stall: every ware left on it is free for the grabbing (the
+tags say FREE; no more buying), in the middle of the fight or after it. The way down is as open as
+it was: you can run, and she chases across the floor. Beating her pays 60 kills' worth of gold (a
+few wares' price) and leaves her dazed where she fell; the squad going down to her is a wipe like
+any other. A thief is remembered for the rest of the run: every later merchant charges half again
+(a red +50% tag on the price) and says so when you talk to her. Heading back to camp, a wipe or a
+rebirth clears it, like the run's items.
+
 ## 7b. Balance: power, par and difficulty
 
 `src/core/power.ts`. Every knight is rated from its real stats: damage per second and HP, each

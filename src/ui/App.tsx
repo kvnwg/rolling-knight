@@ -188,6 +188,25 @@ export function App() {
         case 'bought':
           toast({ text: `Bought ${RUN_ITEMS[e.item].name}: ${RUN_ITEMS[e.item].short.toLowerCase()}`, color: '#ffcf4a' });
           break;
+        case 'stolen':
+          // (The theft that turns her needs no toast: she says it herself, and her bar follows.)
+          if (!e.first) toast({ text: `Taken: ${RUN_ITEMS[e.item].name}, ${RUN_ITEMS[e.item].short.toLowerCase()}`, color: '#ffcf4a' });
+          break;
+        case 'merchantFury':
+          // She comes for you like a boss, to the boss's music until she's down (or you've left). (No
+          // banner: it would cover her vaulting the counter, and her bar and her shouting say it all.)
+          music.setScene('boss');
+          break;
+        case 'merchantDown': {
+          show({ title: 'MERCHANT DOWN', sub: 'Her stall is yours', grad: 'gold' });
+          // (What it cost you, once the banner has gone: the two would sit on each other on a phone.)
+          const world = game.world;
+          setTimeout(() => game.world === world && game.inDungeon && toast({ text: 'Merchants will remember: +50% this run', color: '#ff7a6b' }), 2600);
+          // (The victory sting takes the music home; without it, back it goes anyway.)
+          const calm = music.sceneFor(game.biome.name);
+          if (calm) setTimeout(() => game.world === world && game.inDungeon && music.current() === 'boss' && music.setScene(calm), 5000);
+          break;
+        }
         case 'checkpoint':
           toast({ text: `Checkpoint: floor ${e.floor} saved`, color: '#ffcf4a' });
           break;
@@ -349,10 +368,11 @@ export function App() {
         }
       }
       if ((k === 'f' || k === 'enter') && game.inDungeon && !sheetRef.current && !talkRef.current && !e.repeat) {
-        // At a merchant's ware: buy it.
+        // At a merchant's ware: buy it (or, at a stall you've robbed, where nobody's selling, take it).
         const ware = game.world?.nearWare();
         if (ware) {
-          uiSound(game.buyWare(ware) === 'ok' ? 'buy' : 'lockTap');
+          const r = game.world?.fury ? game.reachForWare(ware) : game.buyWare(ware);
+          uiSound(r === 'ok' ? 'buy' : 'lockTap');
           return;
         }
         const npc = game.world?.nearNpc();
@@ -361,6 +381,19 @@ export function App() {
           setTalking(npc);
         }
       }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [game]);
+
+  // G at a merchant's ware: steal it (the first press asks, the second does it; world/thief.ts).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== 'g' || e.repeat || !game.inDungeon || sheetRef.current || talkRef.current) return;
+      const ware = game.world?.nearWare();
+      if (!ware) return;
+      const r = game.reachForWare(ware);
+      uiSound(r === 'ok' ? 'buy' : r === 'ask' ? 'tap' : 'lockTap');
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

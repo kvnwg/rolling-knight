@@ -27,6 +27,8 @@ import { Glyph } from './keeper/KeeperScreen';
 import { goalName, questIcon } from './keeper/Shops';
 import { TopBar } from './TopBar';
 import { dashLabel } from '../world/dash';
+import { furious, merchantOf } from '../world/thief';
+import { BAL } from '../core/balance';
 import type { KeySize } from './skin';
 
 const touch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
@@ -202,7 +204,8 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
 
       {boss && (
         <div className="bossbar">
-          <Chunky text={boss.type!.name.toUpperCase()} size={8} grad={boss.bossPhase ? 'red' : 'gold'} />
+          {/* (A robbed merchant's name is red from the start: she's furious already.) */}
+          <Chunky text={boss.type!.name.toUpperCase()} size={8} grad={boss.bossPhase || w?.fury?.unit === boss ? 'red' : 'gold'} />
           <div className="daggers" style={{ ['--dagger' as string]: `url(${daggerUrl})` }}>
             <div className={`bar boss ${boss.bossPhase ? 'enraged' : ''}`}>
               <i style={{ width: `calc((100% - 4 * var(--px)) * ${Math.max(0, boss.hp) / boss.maxHp})` }} />
@@ -328,31 +331,67 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
         </Key>
       </div>
 
-      {ware && (() => {
+      {ware && w && (() => {
         const it = RUN_ITEMS[ware.item];
         const full = !canStack(s.run.items, ware.item);
         const short = s.gold < ware.price;
+        // Stolen from here already: nobody's minding the stall, and what's left is free (she's after
+        // you, or beaten). Otherwise the price, and beside it the other way to get it.
+        const robbed = !!w.fury;
+        const hot = furious(w) || (robbed && !w.fury!.unit);
+        const asking = game.stealAsked === ware.uid;
+        const reach = () => {
+          const r = game.reachForWare(ware);
+          uiSound(r === 'ok' ? 'buy' : r === 'ask' ? 'tap' : 'lockTap');
+        };
         return (
-          <div className="buy-prompt plate">
+          <div className={`buy-prompt plate ${asking ? 'asking' : ''}`}>
             <span className="buy-icon">
               <Px icon={it.icon} size="md" s={touch ? 1 : 2} />
             </span>
             <span className="buy-what">
               <b>{it.name}</b>
-              <small>{it.short}</small>
+              {asking ? <small className="warn">Steal? She'll fight you.</small> : <small>{it.short}</small>}
             </span>
-            <button
-              className={`btn ${full || short ? '' : 'gold'} buy-btn`}
-              disabled={full}
-              onClick={() => {
-                const r = game.buyWare(ware);
-                uiSound(r === 'ok' ? 'buy' : 'lockTap');
-              }}
-              title={full ? 'You carry as many as you can' : short ? `You need ${fmt(ware.price - s.gold)} more gold` : touch ? 'Buy it' : 'Buy it (Enter or F)'}
-            >
-              <Px icon="coin" size="sm" />
-              <span>{full ? 'FULL' : fmt(ware.price)}</span>
-            </button>
+            {robbed ? (
+              <button
+                className={`btn ${full ? '' : hot ? 'red' : 'gold'} buy-btn steal-btn`}
+                disabled={full}
+                onClick={reach}
+                title={full ? 'You carry as many as you can' : touch ? 'Take it: nobody is minding the stall' : 'Take it: nobody is minding the stall (G, Enter or F)'}
+              >
+                <Px icon="bag" size="sm" />
+                <span>{full ? 'FULL' : hot ? 'GRAB' : 'TAKE'}</span>
+              </button>
+            ) : (
+              <>
+                <button
+                  className={`btn ${full || short ? '' : 'gold'} buy-btn`}
+                  disabled={full}
+                  onClick={() => {
+                    const r = game.buyWare(ware);
+                    uiSound(r === 'ok' ? 'buy' : 'lockTap');
+                  }}
+                  title={full ? 'You carry as many as you can' : short ? `You need ${fmt(ware.price - s.gold)} more gold` : touch ? 'Buy it' : 'Buy it (Enter or F)'}
+                >
+                  <Px icon="coin" size="sm" />
+                  <span>{full ? 'FULL' : fmt(ware.price)}</span>
+                  {/* Word of a theft got round: this merchant charges you half again. */}
+                  {!full && s.run.thief && (
+                    <i className="markup" title="A thief's price: you stole from a merchant this run">
+                      +{Math.round((BAL.shop.thief.markup - 1) * 100)}%
+                    </i>
+                  )}
+                </button>
+                {!full && merchantOf(w) && (
+                  <button className="btn red buy-btn steal-btn" onClick={reach} title={touch ? 'Steal it: the merchant will fight you' : 'Steal it: the merchant will fight you (G, twice)'}>
+                    <Px icon="bag" size="sm" />
+                    <span>{asking ? 'SURE?' : 'STEAL'}</span>
+                    {!touch && <kbd>G</kbd>}
+                  </button>
+                )}
+              </>
+            )}
           </div>
         );
       })()}

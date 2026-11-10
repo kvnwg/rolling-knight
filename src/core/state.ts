@@ -139,6 +139,8 @@ export interface GameState {
     checkpoint: number;
     /** What you bought from merchants this run (core/runItems.ts): gone when you head back to camp. */
     items?: Partial<Record<import('./runItems').RunItemId, number>>;
+    /** You stole from a merchant this run (world/thief.ts): the others charge more. Forgotten when you head back to camp, like the items. */
+    thief?: boolean;
     biomeSeed: number;
     deaths: number;
     /**

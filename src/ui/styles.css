@@ -3211,6 +3211,58 @@ body,
   font-size: calc(5.6 * var(--fpx, var(--px))) !important;
   gap: calc(1 * var(--px)) !important;
 }
+/* Beside the price, the other way to have it: STEAL, in crimson, a gap away from the price so a
+   thumb doesn't land on it by mistake. The first press only asks (the plate says what will happen,
+   the button throbs); a second, still standing there, does it. */
+.steal-btn {
+  margin-left: calc(2 * var(--px));
+  color: #ffe9d8 !important;
+}
+.steal-btn kbd {
+  font: inherit;
+  font-size: 0.7em;
+  margin-left: calc(1 * var(--px));
+  padding: 0 calc(1.2 * var(--px));
+  color: #ffd0b8;
+  background: rgba(20, 4, 4, 0.5);
+  box-shadow: 0 0 0 var(--px) rgba(20, 4, 4, 0.5);
+}
+.buy-what small.warn {
+  color: #ff8a70;
+}
+/* A thief's price: a little red tag on the corner of the price. */
+.buy-btn {
+  position: relative;
+}
+.buy-btn .markup {
+  position: absolute;
+  top: auto !important;
+  bottom: calc(100% - 1.5 * var(--px));
+  right: calc(-2 * var(--px));
+  text-shadow: none;
+  -webkit-text-stroke: 0;
+  white-space: nowrap;
+  padding: 0 calc(1 * var(--px));
+  font-style: normal;
+  font-size: calc(3.4 * var(--fpx, var(--px)));
+  line-height: 1.35;
+  color: #fff1e6;
+  background: #b3261e;
+  box-shadow: 0 0 0 var(--px) #1a0a0c;
+}
+.buy-prompt.asking .steal-btn {
+  animation: stealAsk 0.5s steps(2) infinite;
+}
+@keyframes stealAsk {
+  50% {
+    filter: brightness(1.35) drop-shadow(0 var(--px) 0 rgba(12, 5, 2, 0.55));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .buy-prompt.asking .steal-btn {
+    animation: none;
+  }
+}
 /* What you bought from merchants this run, under the squad. */
 .run-items {
   display: flex;

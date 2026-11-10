@@ -17,6 +17,7 @@ import { fillSquad, goldMult, killGold, knightStats, soloBonus, squadSize } from
 import { RUN_ITEMS, canStack, runMults, type RunItemId } from './core/runItems';
 import { CLASS_SKILLS, SKILLS, tierStep } from './core/skillbook';
 import { placeShop, type Ware } from './world/shop';
+import { merchantOf, provoke } from './world/thief';
 import { rigSkill } from './world/skills';
 import { clearSave, loadGame, saveGame } from './core/save';
 import type { GameState } from './core/state';
@@ -101,6 +102,11 @@ export class Game {
   bot = false;
   /** The latest summons, newest first (the Summon tab's log). */
   recent: Summoned[] = [];
+  /**
+   * The ware (its uid) a steal has been asked of once (reachForWare): the HUD asks "Steal? She'll
+   * fight you." and a second ask does it. Stepping away from the ware forgets it.
+   */
+  stealAsked: number | null = null;
 
   /** No save behind this game: a brand-new player (or ?fresh). */
   readonly isNew: boolean;
@@ -205,8 +211,9 @@ export class Game {
     this.difficulty = floorDifficulty(floor, squadPower(s), squadSize(s));
     s.quests ??= [];
     const npcs = placeNpcs(map, floor, biome.id, seed, s.quests);
-    // Now and then a room is a merchant's (world/shop.ts): her wares priced by this floor's gold.
-    const shop = placeShop(map, floor, biome.id, seed, killGold(floor) * goldMult(s), npcs.flatMap((n) => (n.camp ? [n.camp] : [])));
+    // Now and then a room is a merchant's (world/shop.ts): her wares priced by this floor's gold (a
+    // thief's price if you stole from one earlier this run).
+    const shop = placeShop(map, floor, biome.id, seed, killGold(floor) * goldMult(s), npcs.flatMap((n) => (n.camp ? [n.camp] : [])), !!s.run.thief);
     if (shop) npcs.push(shop.merchant);
     this.world = new World({
       map,
@@ -225,6 +232,7 @@ export class Game {
       npcs,
     });
     this.world.wares = shop?.wares ?? [];
+    this.stealAsked = null;
     this.applyRunItems();
     this.questEvent({ type: 'floor', floor });
     this.world.auto = s.settings.autoPlay;
@@ -346,6 +354,7 @@ export class Game {
     const s = this.state;
     s.run.floor = s.run.checkpoint;
     s.run.items = {};
+    s.run.thief = false;
     this.hpShare.clear();
     this.world = null;
     this.inDungeon = false;
@@ -391,8 +400,9 @@ export class Game {
   /** Back to camp: the floor waits as it is. */
   leaveDungeon(): void {
     this.inDungeon = false;
-    // A merchant's goods are for one run: heading back to camp ends it.
+    // A merchant's goods are for one run: heading back to camp ends it (and what the merchants say of you).
     this.state.run.items = {};
+    this.state.run.thief = false;
     // (So is a portal's cut to the next floor, if it was under way: the floor waits as it is.)
     this.pendingFloor = null;
     this.fade = 1;
@@ -415,21 +425,63 @@ export class Game {
 
   /**
    * Buys a ware off a merchant's display: 'ok' (paid; heals and scrolls work at once, the rest stay
-   * with the squad for the run), 'short' (not enough gold), 'max' (that one stacks no higher), or
-   * 'gone' (sold, or not on this floor).
+   * with the squad for the run), 'short' (not enough gold), 'max' (that one stacks no higher),
+   * 'gone' (sold, or not on this floor), or 'closed' (you stole from her: there's no one to pay, and
+   * what's left is for the taking: stealWare).
    */
-  buyWare(ware: Ware): 'ok' | 'short' | 'max' | 'gone' {
+  buyWare(ware: Ware): 'ok' | 'short' | 'max' | 'gone' | 'closed' {
     const w = this.world;
     const s = this.state;
     if (!w || ware.sold || !w.wares.includes(ware)) return 'gone';
+    if (w.fury) return 'closed';
     if (!canStack(s.run.items, ware.item)) return 'max';
     if (s.gold < ware.price) return 'short';
     s.gold -= ware.price;
     ware.sold = true;
+    this.stealAsked = null;
     this.useRunItem(ware.item);
     this.emit({ type: 'bought', item: ware.item, price: ware.price });
     this.version++;
     return 'ok';
+  }
+
+  /**
+   * Takes a ware off a merchant's display without paying (world/thief.ts): 'ok' (it's yours, working
+   * like a bought one), 'max' (that one stacks no higher) or 'gone'. The first one taken turns the
+   * merchant on the squad and marks you a thief for the rest of the run; after that the rest of her
+   * stall is free for the grabbing, while she's after you and once she's beaten. Only the player
+   * ever calls this: nothing the squad's AI, Auto or the dev bot does steals.
+   */
+  stealWare(ware: Ware): 'ok' | 'max' | 'gone' {
+    const w = this.world;
+    const s = this.state;
+    if (!w || ware.sold || !w.wares.includes(ware)) return 'gone';
+    if (!canStack(s.run.items, ware.item)) return 'max';
+    ware.sold = true;
+    this.stealAsked = null;
+    this.useRunItem(ware.item);
+    const first = provoke(w);
+    if (first) s.run.thief = true;
+    this.emit({ type: 'stolen', item: ware.item, first });
+    this.version++;
+    return 'ok';
+  }
+
+  /**
+   * The player reaches for a ware without paying (the HUD's STEAL button, its key). With the merchant
+   * still at her stall the first reach only asks ('ask': the HUD says what will happen) and a second,
+   * still standing at the same ware, steals it; once she's been robbed there's nothing left to ask.
+   */
+  reachForWare(ware: Ware): 'ask' | 'ok' | 'max' | 'gone' {
+    const w = this.world;
+    if (!w || ware.sold || !w.wares.includes(ware)) return 'gone';
+    if (!canStack(this.state.run.items, ware.item)) return 'max';
+    if (!w.fury && merchantOf(w) && this.stealAsked !== ware.uid) {
+      this.stealAsked = ware.uid;
+      this.version++;
+      return 'ask';
+    }
+    return this.stealWare(ware);
   }
 
   private useRunItem(id: RunItemId): void {
@@ -525,6 +577,8 @@ export class Game {
       // The squad is locked in the dungeon: new knights wait at the hub.
       this.world.luck = this.luck * skillRollLuck(s);
       this.world.calm = s.settings.reduceMotion;
+      // (A steal asked of a ware is forgotten once you step away from it.)
+      if (this.stealAsked !== null && this.world.nearWare()?.uid !== this.stealAsked) this.stealAsked = null;
       this.world.update(dt);
       this.handleWorldEvents();
     }
@@ -611,8 +665,11 @@ export class Game {
         case 'kill':
           s.stats.killsThisRun += 1;
           s.records.kills += 1;
-          this.questEvent({ type: 'kill', elite: e.elite, boss: e.boss, mobName: e.name });
-          if (e.boss) {
+          this.questEvent({ type: 'kill', elite: e.elite, boss: e.boss && !e.robbed, mobName: e.name });
+          if (e.robbed) {
+            // The merchant you robbed: no floor's boss (no sigil, no boss count), but a win all the same.
+            this.emit({ type: 'merchantDown', name: e.name });
+          } else if (e.boss) {
             const first = w.floor / 5 > s.run.bosses;
             if (first) {
               s.run.bosses = w.floor / 5;
@@ -625,6 +682,9 @@ export class Game {
           this.collect(e.kind, e.amount);
           this.questEvent({ type: 'pickup', kind: e.kind });
           if (e.kind === 'gold') this.emit({ type: 'gold', amount: e.amount });
+          break;
+        case 'fury':
+          this.emit({ type: 'merchantFury', name: e.name });
           break;
         case 'cleared':
           this.emit({ type: 'floorClear', floor: w.floor });
@@ -688,6 +748,7 @@ export class Game {
       mobNames: w.mobTypes.map((t) => t.name),
       cleared: w.cleared,
       heroName: w.leader()?.knightId ? knightDef(w.leader()!.knightId!).name : undefined,
+      thief: !!s.run.thief,
     });
   }
 

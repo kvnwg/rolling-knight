@@ -252,7 +252,7 @@ class Sfx {
   /** The sounds for a core event. */
   event(e: CoreEvent): void {
     // (Music first: it has its own volume. Its victory sting carries the fanfare; without it, the jingle does.)
-    const sting = e.type === 'bossDown' && music.victory();
+    const sting = (e.type === 'bossDown' || e.type === 'merchantDown') && music.victory();
     if (engine.sfxVolume <= 0 || !engine.live) return;
     switch (e.type) {
       case 'spinStart':
@@ -283,7 +283,13 @@ class Sfx {
         this.portal();
         break;
       case 'bossDown':
+      // (A robbed merchant, beaten: a boss's fall.)
+      case 'merchantDown':
         this.bossDown(!sting);
+        break;
+      // The merchant you stole from turns on you: a boss's roar.
+      case 'merchantFury':
+        this.sound('bossRoar', 0);
         break;
       case 'wipe':
         this.heistLose();

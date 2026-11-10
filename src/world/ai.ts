@@ -655,6 +655,8 @@ function throwBoulder(w: World, m: Unit, target: Unit): void {
 
 export function mobAi(w: World, m: Unit, dt: number): void {
   const t = m.type!;
+  // (Mid-vault it's in the air: thief.ts carries it.)
+  if (m.vault) return;
   if (m.tauntT && m.tauntT > 0) m.tauntT -= dt;
   // (Only awake: a room that wakes as you walk in doesn't all lunge at once.)
   if (m.awake) {

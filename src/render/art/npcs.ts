@@ -424,6 +424,16 @@ function frameOf(anim: 'idle' | 'walk', view: View, frame: number): BodyFrame {
 }
 
 /**
+ * Where things are in an NPC frame (frame pixels), for art that adds to one (art/furious.ts): the
+ * head overlays' origin (see "Head overlays" above: the eyes are on its row 10), the body's top-left
+ * corner, and the two hands.
+ */
+export function npcRig(anim: 'idle' | 'walk', view: View, frame: number): { hx: number; hy: number; ox: number; oy: number; handR: [number, number]; handL: [number, number] } {
+  const f = frameOf(anim, view, frame);
+  return { hx: OX + f.head[0] - 3, hy: OY + f.head[1] - 6, ox: OX, oy: OY, handR: [OX + f.handR[0], OY + f.handR[1]], handL: [OX + f.handL[0], OY + f.handL[1]] };
+}
+
+/**
  * One NPC frame, facing right in side view (flip it for left). `frame` counts up freely: the body
  * cycles through its animation and the tail and smoke drift with it. The feet are at (ax, ay).
  */
