@@ -145,6 +145,10 @@ Three slots. You control one (switch any time); the other two run their role's A
 taunt when the squad is pressed, fighters chase, archers and mages kite, healers stay by whoever is
 hurt and save Sanctuary for when it counts. Everyone dodges what they see coming, most of the time
 (shots, blasts and boulders about to land, a lunge's lane or landing ring once its aim has locked).
+They find their own way about (world/nav.ts): round trees, props and walls on paths planned over the
+floor, to the nearest free spot beside you when their place in the formation falls in a tree or a
+wall, backing off into open ground rather than into a corner, and should anything still hold one
+up, it steps aside, and at last hops back to your side: no knight is left pushing into a wall.
 Auto attack aims and fires for your knight too (and it is on while a menu is open); moving and
 dodging stay yours. (A dev bot, `&auto` and `npm run sim`, plays your knight outright.) Empty slots fill with your
 strongest free knight; anything else is your call (or Best squad), at the Warden's by the steps down.

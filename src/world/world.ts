@@ -174,7 +174,6 @@ export class World {
   hitStop = 0;
   heroFlow: Flow | null = null;
   heroFlowFly: Flow | null = null;
-  leaderFlow: Flow | null = null;
   goalFlow: Flow | null = null;
   private flowT = 0;
   bossUnit: Unit | null = null;
@@ -728,8 +727,6 @@ export class World {
     const alive = this.livingHeroes();
     this.heroFlow = flowFrom(this.map, alive);
     this.heroFlowFly = flowFrom(this.map, alive, true);
-    const lead = this.leader();
-    this.leaderFlow = lead ? flowFrom(this.map, [lead]) : null;
     // Squad AI (and the bot) hunts foes until the floor is clear, or its boss is down; then the way out.
     const goals = this.cleared || (this.boss && this.portalOpen) ? [this.map.exit] : this.livingMobs();
     this.goalFlow = goals.length ? flowFrom(this.map, goals) : null;

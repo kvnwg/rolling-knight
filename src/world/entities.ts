@@ -5,6 +5,7 @@ import type { SkillId } from '../core/skillbook';
 import type { MutationId } from '../core/state';
 import { BLOCKED, FLOOR, LIQUID, TILE, tileAt, type FloorMap } from './mapgen';
 import type { MobType, Volley } from './mobgen';
+import type { NavState } from './nav';
 
 export type Team = 'hero' | 'mob';
 export type View = 'down' | 'up' | 'side';
@@ -143,11 +144,8 @@ export interface Unit {
     noHitT?: number;
     /** Heroes: seconds the skill roll has been ready in this fight without a good moment to roll. */
     rollWait?: number;
-    /** Heroes: where it was at the last progress check, the next check, and seconds left on a detour. */
-    lastX?: number;
-    lastY?: number;
-    checkT?: number;
-    detourT?: number;
+    /** Heroes: the way about (nav.ts): its path, its place by the leader, the watch on its headway. */
+    nav?: NavState;
     /** Mobs: whether a body its size can walk straight to its target (checked every `think` seconds). */
     direct?: boolean;
   };
@@ -356,7 +354,8 @@ export function passable(m: FloorMap, x: number, y: number, flying: boolean): bo
   return t === FLOOR || (flying && t === LIQUID) || (flying && t === BLOCKED);
 }
 
-function clear(m: FloorMap, x: number, y: number, r: number, flying: boolean): boolean {
+/** Can a body of radius r stand at (x, y)? */
+export function clear(m: FloorMap, x: number, y: number, r: number, flying: boolean): boolean {
   // The body is a box r wide each side and r/2 deep: feet, not the head, bump walls (3/4 view).
   const ry = r * 0.6;
   return passable(m, x - r, y - ry, flying) && passable(m, x + r, y - ry, flying) && passable(m, x - r, y + ry, flying) && passable(m, x + r, y + ry, flying);
