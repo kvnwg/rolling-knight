@@ -213,15 +213,39 @@ outline, and big moves add a red ! over its head. Every kind has a lunge or a gu
   rams charge, bombers hop in before they go off, ogres leap and slam. On the ground a red lane (a dash)
   or a red ring (a leap) fills up over the wind-up, following you for its first half and then holding;
   then one hit, and the monster stands spent for a moment. A roll goes straight through any of them.
-- Bullets, slow (60 to 100 px/s, slower than any knight's shot), big and high-contrast (the effects'
-  danger balls: a glossy ball in danger red or orange with a white-hot heart and an ink outline,
-  throbbing and dragging a short tail; `src/render/vfx/art.ts`), in a pattern each kind is known by
-  (`gunFor`): archers aim and fan out every third volley, flying shooters spit bursts, spore pods
-  ring, casters curve theirs in; chasers shoot between lunges (goblins aimed shots, skeletons short
-  bursts, orcs and spiders fans), swarms the odd slow shot (spirits curving ones). Slimes, pumpkins,
-  bombers and ogres shake a ring loose as they land, slam or go off, from the edge of the ring that
-  came down. The first ten floors fire the plain patterns (and a little slower); from floor 11 and
-  again from 21, and from elites and bosses, they're denser.
+- Bullets come in kinds, each family of monster with its own (`src/world/bullets.ts`, fired in the
+  patterns of `gunFor`), and ONE rule for their colors: every foe's bullet has the same dark ink
+  outline and a white-hot heart (nothing of the squad's has both, nor has a pickup), and its hue says
+  what it does. **Red flies straight, pink bends, orange bursts.**
+  - the plain **orb**: slow (60 to 100 px/s, slower than any knight's shot), a big glossy ball; red,
+    or pink when it curves in (shamans: pairs from either side; an elite shaman a **beam** instead, a
+    quick stream of **sparks** down one line);
+  - **dart** (archers): fast and thin, down a dashed line the archer shows through a longer wind-up;
+    the line follows you for the first half, then holds and turns white (one, and every third volley
+    a fan);
+  - **blade** (goblins a knife, skeletons a burst of bones, orcs a fan of axes): thrown straight out
+    to just past you, it loops back to where it was thrown from, bulging to one side;
+  - **spit** (bats, spitters): leaves fast, brakes hard and hangs in the air a while;
+  - **spore** (blooms, spiders, mites): drifts slowly, weaving side to side;
+  - **seed** (spore pods): a fat pod that swells white-hot, then bursts into a fan of **pips**;
+  - **glob** (slimes): lobbed in an arc onto a marked spot (its ring shows from the throw, its shadow
+    under it); it only hits where it lands;
+  - **mine** (pumpkins; the farm's hens lay theirs): tossed a little way, it sits blinking faster
+    and faster, then pops into a ring of pips: get clear, or smash it first;
+  - **pellets** (beasts): a short spray when you're close, soon spent; a charger's hooves fling
+    clods on ahead as its charge ends; a bomber's shrapnel;
+  - **wisp** (ghosts): slow, turns after you (its eye is on you), and can be cut or shot down;
+  - **wave** (golems): crescents rolling out along the ground from a slam: step between them or roll
+    through, a swing won't stop one.
+  Slimes, pumpkins, bombers and ogres shake theirs loose as they land, slam or go off, from the edge
+  of the ring that just came down. Every gun has its wind-up; a swing cuts everything but a glob in
+  its arc and a wave; a roll through any of them is a PERFECT roll; knights on Auto see each kind
+  coming along its real path (`bulletThreat`). A boss's every other ring and fan is one of its
+  kind's own patterns (globs onto every knight, rings of crescents, blades that all come back, wisps,
+  mines), never heavier than the plain one. More bullets in a pattern means less each: a floor's
+  incoming damage is what it was (`tests/bullets.test.ts`). The first ten floors fire the plain
+  patterns (and a little slower); from floor 11 and again from 21, and from elites and bosses, they're
+  denser. `bullets-preview.html` shows the art (`npx tsx tools/bulletsPreview.ts` writes it as PNGs).
 - Ogres that can't get to you (no way round, the way round far longer than straight across, or kited
   for a few seconds) tear up a chunk of the floor and throw it: a red ring where it will land from the
   start of the throw, its shadow growing as it falls, shards flying off as it breaks.

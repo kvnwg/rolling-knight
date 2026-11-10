@@ -3,6 +3,7 @@ import type { ClassId } from '../core/knights';
 import type { Rarity } from '../core/rarity';
 import type { SkillId } from '../core/skillbook';
 import type { MutationId } from '../core/state';
+import type { Bullet, BulletForm } from './bullets';
 import { BLOCKED, FLOOR, LIQUID, TILE, tileAt, type FloorMap } from './mapgen';
 import type { MobType, Volley } from './mobgen';
 import type { NavState } from './nav';
@@ -176,7 +177,8 @@ export interface Unit {
   volley?: number;
   gunKind?: Volley;
   gunT?: number;
-  burst?: { n: number; t: number; tx: number; ty: number };
+  /** (A burst of its own kind: seconds between its shots, each one's hit, the bullets it fires: a beam's sparks.) */
+  burst?: { n: number; t: number; tx: number; ty: number; every?: number; dmg?: number; form?: BulletForm };
   tauntBy?: number | null;
   tauntT?: number;
   bossT?: number;
@@ -252,6 +254,8 @@ export interface Shot {
   hit?: Set<number>;
   /** A foe's bullet that bends as it flies (radians a second; a 'curve' volley). */
   curve?: number;
+  /** A foe's bullet of a kind of its own (bullets.ts): what it is, and where it is along its own path. */
+  b?: Bullet;
 }
 
 export interface Area {

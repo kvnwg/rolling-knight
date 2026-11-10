@@ -660,6 +660,10 @@ export class Renderer {
     for (const a of w.areas) this.drawArea(g, ui, a, sx, sy);
     // Lunges' tells on the ground: a dash's lane, a leap's landing ring.
     for (const m of w.mobs) if (!m.dead && visible(m.x, m.y, 160)) this.drawTell(g, m, sx, sy);
+    // The foes' bullets on the ground: the ring where each lobbed glob comes down and its shadow, and
+    // the lines darts and beams will fly down (render/foeBullets.ts).
+    this.vfx.foes.drawGround(g, w, cx, cy, this.LW, this.LH, this.time);
+    for (const m of w.mobs) if (!m.dead && m.move === 'shoot' && visible(m.x, m.y, 160)) this.vfx.foes.drawAim(g, w, m, sx, sy, this.time);
 
     // --- PixelForge: knight poses for this frame, and mobs that just died start their deaths
     const pf = pfReady();
@@ -1860,7 +1864,8 @@ export class Renderer {
 
   /** What this shot is, if a PixelForge boss threw it: the Stone Warden's shard, the Cinderwyrm's fireball, Rook's blood crescent (else null). */
   private bossShot(w: World, s: Shot): BossShotFx | null {
-    if (s.team !== 'mob' || s.kind !== 'bullet') return null;
+    // (Its plain shots: one of the kinds with a way of flying of its own is drawn as that kind.)
+    if (s.team !== 'mob' || s.kind !== 'bullet' || s.b) return null;
     const m = w.bossUnit && w.bossUnit.uid === s.from ? w.bossUnit : null;
     const monster = m ? mobPaint(m.type!, !!m.elite, true)?.monster : undefined;
     return monster === 'stone_warden' ? 'fx_rock_shard' : monster === 'cinderwyrm' ? 'fx_fireball' : monster === 'rook' ? 'fx_blood_crescent' : null;
@@ -2230,6 +2235,8 @@ export class Renderer {
       else if (a.kind === 'sanctuary') out.push({ x: sx(a.x), y: sy(a.y), r: a.r * 1.4, color: '#fff0a0', intensity: 0.7, bloom: true });
       else if (a.delay > 0 && a.team === 'mob') out.push({ x: sx(a.x), y: sy(a.y), r: a.r * 1.2, color: '#ff4a3a', intensity: 0.5 });
     }
+    // (A glob's landing ring lights its spot a little, as a lunge's does: it reads in the dark.)
+    for (const s of w.shots) if (s.b && s.b.form === 'glob') out.push({ x: sx(s.b.tx), y: sy(s.b.ty), r: s.b.ring * 1.8, color: '#ff4a3a', intensity: 0.4 });
     for (const m of w.mobs) {
       if (m.dead) continue;
       // PixelForge monsters light the dark with their glow eyes' color (a Stone Warden's core).

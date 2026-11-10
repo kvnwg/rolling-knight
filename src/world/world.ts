@@ -10,6 +10,7 @@ import type { KnightStats } from '../core/roster';
 import type { MutationId } from '../core/state';
 import { heroAi, heroAutoRoll, mobAi, quakeRing } from './ai';
 import type { Biome } from './biomes';
+import { tickBullet } from './bullets';
 import { dist, inRing, lineOfSight, moveUnit, norm, type Area, type FloatText, type Fx, type Pickup, type Shot, type Unit, type View } from './entities';
 import { flowFrom, type Flow } from './flow';
 import { FLOOR, TILE, tileAt, type FloorMap } from './mapgen';
@@ -1085,6 +1086,8 @@ function separate(w: World): void {
 function updateShots(w: World, dt: number): void {
   for (const s of w.shots) {
     s.life -= dt;
+    // A foe's bullet of a kind of its own flies its own way (bullets.ts); some see to all of it themselves.
+    if (s.b && tickBullet(w, s, dt)) continue;
     if (s.homing) {
       const foes = s.team === 'hero' ? w.mobs.filter((m) => !m.dead) : w.heroes.filter((h) => !h.downed);
       let best: Unit | null = null;

@@ -16,6 +16,7 @@
  */
 import type { ClassId } from '../core/knights';
 import { BODY_Y } from './aim';
+import { cuttable } from './bullets';
 import { dist, lineOfSight, type MeleeSwing, type Shot, type Unit } from './entities';
 import { hitStop, shove, steered } from './feel';
 import { uid, type World } from './world';
@@ -139,7 +140,8 @@ function land(w: World, h: Unit, s: MeleeSwing, def: SwingDef): void {
   // --- foes' shots inside: cut out of the air
   let cut: Shot[] | null = null;
   for (const b of w.shots) {
-    if (b.team !== 'mob' || b.life <= 0) continue;
+    // (Not what a blade can't reach or stop: a glob up in its arc, a wave along the ground.)
+    if (b.team !== 'mob' || b.life <= 0 || !cuttable(b)) continue;
     if (!inSwing(s, b.x - h.x, b.y - (h.y - BODY_Y), b.r)) continue;
     (cut ??= []).push(b);
   }
@@ -154,7 +156,7 @@ function land(w: World, h: Unit, s: MeleeSwing, def: SwingDef): void {
  * is gone with a clink. Returns how many.
  */
 export function blockShots(w: World, h: Unit, r: number): number {
-  const hit = w.shots.filter((b) => b.team === 'mob' && b.life > 0 && dist(b.x, b.y, h.x, h.y - BODY_Y) <= r + b.r);
+  const hit = w.shots.filter((b) => b.team === 'mob' && b.life > 0 && cuttable(b) && dist(b.x, b.y, h.x, h.y - BODY_Y) <= r + b.r);
   if (!hit.length) return 0;
   const gone = new Set(hit);
   w.shots = w.shots.filter((b) => !gone.has(b));

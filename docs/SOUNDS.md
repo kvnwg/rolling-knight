@@ -28,7 +28,7 @@ A foe being hit, by what it is made of (as the art draws it), and the crits on t
 | `hit_stone` | A blow lands on a golem or the Stone Warden. | A stone knock: a dull thunk, grit and chips. | fight, 4 at once, 28 ms apart |
 | `hit_shell` | A blow lands on a bug. | A chitin crunch. | fight, 4 at once, 28 ms apart |
 | `hit_wood` | A blow lands on a plant, a pumpkin or one of the farm’s scarecrows. | A hollow wooden knock and a rustle. | fight, 4 at once, 28 ms apart |
-| `hit_ghost` | A blow passes through a ghost or a wisp. | An airy whoosh and a faint wail. | fight, 4 at once, 28 ms apart |
+| `hit_ghost` | A blow passes through a ghost or a wisp; a ghost lets its homing wisps go (quieter, higher). | An airy whoosh and a faint wail. | fight, 4 at once, 28 ms apart |
 | `crit` | A critical hit, on top of the blow’s own sound (one auto attack in ten, most skill hits). | A sharp crack, a steel ring and a heavier punch. | key, 2 at once, 55 ms apart, ducks the fight to 70% |
 | `lucky_hit` | A LUCKY hit (the upgrade map’s Lucky Strike). | A bright double ping. | key, 1 at once, 120 ms apart |
 
@@ -64,10 +64,10 @@ Each class’s auto attack, and where its shots land.
 | `atk_sword` | The Blade’s Cleave. | A whoosh and a steel slash. | fight, 3 at once, 40 ms apart |
 | `atk_shield` | The Guardian’s Shield Sweep. | A dull metal thunk on wood. | fight, 3 at once, 40 ms apart |
 | `atk_spear` | The Lancer’s thrust. | A short, sharp fwip and the shaft’s rattle. | fight, 3 at once, 40 ms apart |
-| `atk_bow` | The Ranger’s Longshot. | A bowstring twang and the arrow’s whistle. | fight, 3 at once, 40 ms apart |
+| `atk_bow` | The Ranger’s Longshot; a foe archer’s dart (quieter, higher). | A bowstring twang and the arrow’s whistle. | fight, 3 at once, 40 ms apart |
 | `arrow_thunk` | An arrow or a spear strikes a foe or a wall. | A woody thunk. | background, 3 at once, 30 ms apart |
-| `atk_arcane` | The Arcanist’s Arcane Bolt. | A sparkly zap. | fight, 3 at once, 40 ms apart |
-| `arcane_pop` | An Arcane Bolt or a Magic Missile bursts on impact. | A magical pop. | fight, 2 at once, 45 ms apart |
+| `atk_arcane` | The Arcanist’s Arcane Bolt; each spark of an elite caster’s beam (quieter, higher). | A sparkly zap. | fight, 3 at once, 40 ms apart |
+| `arcane_pop` | An Arcane Bolt or a Magic Missile bursts on impact; a foe’s seed or mine bursts into its pips. | A magical pop. | fight, 2 at once, 45 ms apart |
 | `atk_holy` | The Cleric’s Holy Orb. | A bright holy chime. | fight, 3 at once, 40 ms apart |
 
 ## Explosions
@@ -91,7 +91,7 @@ Foes falling and attacking: their wind-ups (the telegraph to dodge by) and their
 | Sound | When it plays | Placeholder | Mix |
 | --- | --- | --- | --- |
 | `death_flesh` | A foe of flesh falls (an elite deeper, a boss deeper still). | A thud, a last breath and the body hitting the ground. | fight, 3 at once, 40 ms apart |
-| `death_slime` | A slime pops. | A wet splat and bubbles. | fight, 3 at once, 40 ms apart |
+| `death_slime` | A slime pops; a slime’s lobbed glob lands (quieter, higher). | A wet splat and bubbles. | fight, 3 at once, 40 ms apart |
 | `death_bone` | A skeleton falls apart. | Bones clattering down. | fight, 3 at once, 40 ms apart |
 | `death_stone` | A golem or the Stone Warden crumbles. | A deep thump and rocks tumbling. | fight, 3 at once, 40 ms apart |
 | `death_shell` | A bug is squashed. | A crunch and a squeak. | fight, 3 at once, 40 ms apart |
@@ -99,8 +99,8 @@ Foes falling and attacking: their wind-ups (the telegraph to dodge by) and their
 | `death_ghost` | A ghost fades away. | A fading wail. | fight, 3 at once, 40 ms apart |
 | `kill_chime` | Each kill after the first in a wave (2.5 s or less since the last): a step up the scale each time. | A bell climbing the scale. | background, 2 at once, 60 ms apart |
 | `mob_bite` | A beast, a slime, a bug, a bat or a farm animal bites (hit or miss), or pounces or hops at a knight. | A snapping bite. | background, 3 at once, 45 ms apart |
-| `mob_swipe` | A goblin, a skeleton, an orc or a ghost swings at a knight; any foe dashes at one (a goblin’s stab, an orc’s shoulder charge, a bat’s swoop); an ogre hurls a boulder (and any new kind of attack without a sound of its own). | A weapon whoosh. | background, 3 at once, 45 ms apart |
-| `mob_shot` | A foe shoots or spits: a volley’s aimed shot, fan, burst, ring or curving pair (bigger for three or more); a boss’s ring or fan of shots (bigger). | A spit and a puff. | background, 3 at once, 50 ms apart |
+| `mob_swipe` | A goblin, a skeleton, an orc or a ghost swings at a knight; any foe dashes at one (a goblin’s stab, an orc’s shoulder charge, a bat’s swoop); an ogre hurls a boulder; a goblin’s knife, a skeleton’s bone or an orc’s axe is thrown (and any new kind of attack without a sound of its own). | A weapon whoosh. | background, 3 at once, 45 ms apart |
+| `mob_shot` | A foe shoots or spits: a volley’s aimed shot, fan, burst, ring or curving pair, and its spit, spores, seeds, globs, mines and pellets (bigger for three or more); a boss’s ring or fan of shots (bigger). | A spit and a puff. | background, 3 at once, 50 ms apart |
 | `mob_cast` | A caster raises its circle (its 0.5 s wind-up; the circle bursts later, as boom_small). | A rising magic hum ending in a whomp. | fight, 2 at once, 120 ms apart |
 | `mob_charge_windup` | A charger (a boar, a rhino, a ram, a hog) paws the ground before it charges. | A snort, hooves scraping, a growl. | fight, 2 at once, 150 ms apart |
 | `mob_charge` | A charger, or a boss, charges; a boss leaps. | Galloping thuds and rushing air. | fight, 2 at once, 120 ms apart |

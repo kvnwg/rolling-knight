@@ -19,6 +19,7 @@
  */
 import { tierStep } from '../core/skillbook';
 import { COLORS } from '../world/chance';
+import type { BulletForm } from '../world/bullets';
 import type { Fx, Shot, Unit } from '../world/entities';
 import type { MobType } from '../world/mobgen';
 import type { SkillRollEvent } from '../world/skills';
@@ -95,6 +96,29 @@ function pitchOf(u: Unit): number {
 }
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+
+/**
+ * What each kind of foe's bullet sounds like as it leaves (world/bullets.ts), from the sounds there
+ * are: a dart is a bowstring, a thrown blade a weapon's whoosh, a wisp a ghost's wail, a beam's sparks
+ * an arcane zap, the pips of a seed or a mine bursting a pop; spit, spores, seeds, globs, mines and
+ * pellets are the foes' own spit and puff. A golem's crescents leave under its slam's own boom (null).
+ * They play a little higher and quieter than the knights' own use of the same sounds.
+ */
+const FORM_CUE: Readonly<Record<BulletForm, FightCue | null>> = {
+  dart: 'atk_bow',
+  spit: 'mob_shot',
+  spore: 'mob_shot',
+  seed: 'mob_shot',
+  pip: 'arcane_pop',
+  glob: 'mob_shot',
+  mine: 'mob_shot',
+  blade: 'mob_swipe',
+  pellet: 'mob_shot',
+  wisp: 'hit_ghost',
+  wave: null,
+  spark: 'atk_arcane',
+};
+const FORM_PITCH = 1.15;
 
 // ------------------------------------------------------------------ the skill reel
 /** The skill reel as the HUD draws it (ui/SkillRoll.tsx): cells to the result, the kick back, the brake. */
@@ -258,23 +282,29 @@ export class FightObserver {
     for (const s of w.shots) now.set(s.uid, s);
     const bolts: Shot[] = [];
     for (const [id, s] of this.shots) {
+      // A foe's lobbed glob coming down: a wet splat where it lands.
+      if (!now.has(id) && s.team === 'mob' && s.b?.form === 'glob') this.add('death_slime', s, { level: 0.2, pitch: 1.3, prio: 0 });
       if (now.has(id) || s.team !== 'hero') continue;
       // Stopped by something (a foe, a wall) rather than flying out: it was set to exactly 0.
       const struck = s.life >= 0;
       if (struck && (s.kind === 'arrow' || s.kind === 'spear')) this.add('arrow_thunk', s);
       if (s.kind === 'bolt' && s.splash) bolts.push(s);
     }
-    const volleys = new Map<number, { n: number; x: number; y: number }>();
+    const volleys = new Map<number, { n: number; x: number; y: number; form: BulletForm | undefined }>();
     for (const s of w.shots) {
       if (this.shots.has(s.uid) || s.team !== 'mob') continue;
       const v = volleys.get(s.from);
       if (v) v.n++;
-      else volleys.set(s.from, { n: 1, x: s.x, y: s.y });
+      else volleys.set(s.from, { n: 1, x: s.x, y: s.y, form: s.b?.form });
     }
     for (const [from, v] of volleys) {
       const m = w.mobs.find((u) => u.uid === from);
       const big = v.n >= 3 || !!m?.boss;
-      this.add('mob_shot', v, { level: big ? 1 : 0.3, pitch: m ? pitchOf(m) : 1, prio: big ? 1 : 0 });
+      // Each kind of bullet leaves with a sound that fits it (a dart's twang, a blade's whoosh, a wisp's wail).
+      const cue = v.form ? FORM_CUE[v.form] : 'mob_shot';
+      if (!cue) continue;
+      if (cue === 'mob_shot') this.add(cue, v, { level: big ? 1 : 0.3, pitch: m ? pitchOf(m) : 1, prio: big ? 1 : 0 });
+      else this.add(cue, v, { level: big ? 0.6 : 0.3, pitch: (m ? pitchOf(m) : 1) * FORM_PITCH, gain: 0.7, prio: big ? 1 : 0 });
     }
     this.shots = now;
     return bolts;

@@ -70,8 +70,10 @@ recording: [`docs/SOUNDS.md`](docs/SOUNDS.md).
   white smears in the classic pixel-art way: on the hit, one wedge sweeps from behind the head far
   out in front to a crisp point, then a thin streak, then it's gone (the Guardian's a heavy chop, the
   Lancer's a spike to its reach). Arrows are hand-drawn in 16 directions; the arcane bolt twinkles
-  with sparks orbiting it, the holy orb turns in a halo, foes' bullets are big glossy danger balls
-  with an ink outline; each shot ends in an impact sized to the hit. Commons stay white; each tier
+  with sparks orbiting it, the holy orb turns in a halo, foes' bullets come in a dozen kinds (darts, looping blades,
+  weaving spores, seeds that burst, lobbed globs, mines, homing wisps, ground waves...), all with
+  one ink outline and a white-hot heart, red for straight, pink for bending, orange for bursting
+  (`src/render/art/bullets.ts`; `bullets-preview.html` shows them); each shot ends in an impact sized to the hit. Commons stay white; each tier
   tints, edges and layers the smears in its color, up to Primordial's rainbow and Absolute's black
   and white. Like every attack effect they're crisp and flat: nothing glows or lights the scene.
   (PixelForge paints a white trail on every swing too; the knights' sheets are imported without it,
@@ -208,7 +210,10 @@ hit, hit-stop that plays the same at any frame rate, every class's dash), dodge 
 skill rolls one after another and their odds, Rewind, the balance
 curve and the first floors' edge; how monsters fight: every kind with a lunge or a gun, their
 bullets slower than a knight's, each volley's pattern (aimed, fans, bursts, rings, curving shots)
-and the tell before it, dashes and leaps that hit a knight standing in them and go straight through
+and the tell before it, every kind of bullet flying its own way (a seed splits, a glob lands on its
+mark, a blade comes back, a wisp turns and can be cut), seen coming by knights on Auto, cut by a
+swing where it should be and a PERFECT roll when rolled through, each family of monster with its
+own, and a floor's incoming damage what it was before them, dashes and leaps that hit a knight standing in them and go straight through
 one rolling, an ogre throwing a boulder across water at a knight it can't reach (and at one that
 keeps away) onto the ring it marked, quake rings, the spawn-in, perfect rolls marked once per roll,
 the squad's AI seeing a lunge's lane or landing ring, the lunges' crouch, arc and squash and the red

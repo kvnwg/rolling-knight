@@ -814,7 +814,7 @@ export function reflectSprite(L: VfxLook, dir: number, frame: number): VfxSprite
 }
 
 /** A glossy ball in ramp `r` (ink, dark, body, light, white) with a tail behind it along `dir`. */
-function ballSprite(r: Ramp, dir: number, frame: number, big: boolean): VfxSprite {
+export function ballSprite(r: Ramp, dir: number, frame: number, big: boolean): VfxSprite {
   const d = new Draft(16);
   const f = ((frame % BULLET_FRAMES) + BULLET_FRAMES) % BULLET_FRAMES;
   const pulse = f === 1 || f === 2;
