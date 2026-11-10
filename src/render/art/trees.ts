@@ -126,7 +126,6 @@ function pineFrom(r: Ramp): string[] {
 
 /** Reddish-brown bark after the reference: deep plum, the trunk, its light side, the light stripe. */
 const RED_BARK: Ramp = ['#22101a', '#33161f', '#5b3138', '#8e5252', '#aa7564'];
-const RED_BARK_NIGHT: Ramp = ['#130a10', '#211018', '#3a1f26', '#5a3438', '#74504c'];
 
 function grassOf(biome: Biome): [string, string] | undefined {
   const g = biome.ground;
@@ -172,8 +171,8 @@ function leafLook(kind: TreeKind, biome: Biome, seed: number): LeafLook {
       return { leaf: [j(LEAF.crimson), j(LEAF.red, 3)], mix: [3, 1], ink: INK.crimson, bark: RED_BARK, fall: [LEAF.crimson[4], LEAF.red[4]] };
     }
     case 'forest': {
-      if (pick < 0.2) return { leaf: [j(LEAF.rust), j(green, 3)], mix: [3, 1], moonRim: true, bark: RED_BARK_NIGHT, moss: MOSS_DARK, fall: [LEAF.rust[4], LEAF.rust[3]] };
-      return { leaf: [j(green)], moonRim: true, bark: RED_BARK_NIGHT, moss: MOSS_DARK, fall: [green[4], green[3]] };
+      if (pick < 0.2) return { leaf: [j(LEAF.rust), j(green, 3)], mix: [3, 1], bark: RED_BARK, moss: MOSS_DARK, fall: [LEAF.rust[4], LEAF.rust[3]] };
+      return { leaf: [j(green)], bark: RED_BARK, moss: MOSS_DARK, fall: [green[4], green[3]] };
     }
     case 'swamp':
       return { leaf: [j(green)], bark: kind === 'willow' ? BARK.willow : BARK.bog, moss: MOSS_DARK, fall: [green[4]] };
@@ -324,7 +323,7 @@ function conifer(kind: 'pine' | 'snowPine', biome: Biome, seed: number, size: Tr
     bark = RED_BARK;
   } else if (biome.id === 'forest') {
     needle = pineFrom(biome.treeRamp);
-    bark = RED_BARK_NIGHT;
+    bark = RED_BARK;
   } else if (biome.id === 'tundra' || kind === 'snowPine') {
     needle = NEEDLE.frost;
     bark = BARK.frost;

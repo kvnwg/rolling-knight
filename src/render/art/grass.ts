@@ -115,9 +115,9 @@ const LOOKS: Record<string, GrassLook> = {
   // Gloomwood: a dark mossy floor at night, blue-green; cushions of brighter moss, leaf litter, tiny
   // glowing flowers.
   forest: {
-    g: ['#0b1513', '#13211c', '#1b2e25', '#24392d', '#2f4734', '#3c5a3d', '#52744a', '#6c9058'],
+    g: ['#12261f', '#1a3527', '#234631', '#2f5a3b', '#3d6f44', '#4f864d', '#689f58', '#86b866'],
     // Bare earth under the leaf litter, in patches between the moss.
-    dry: ['#0e100b', '#181a12', '#212418', '#2b2d1e', '#363724', '#47462d', '#5f5b39', '#7c7548'],
+    dry: ['#1a1c12', '#26281a', '#333522', '#42422b', '#525034', '#676240', '#827a4e', '#9f9560'],
     patch: 40,
     lush: 0.42,
     sun: 0.62,
@@ -125,7 +125,7 @@ const LOOKS: Record<string, GrassLook> = {
     marks: [0.45, 0.35, 0.3],
     tufts: [16, 6, 1.6],
     clover: 0.8,
-    cloverTone: ['#142a20', '#1f402e', '#2f5a3c', '#467a50'],
+    cloverTone: ['#1c3a2a', '#2a563a', '#3d7449', '#58965c'],
     flowers: 1.2,
     species: [['speck', '#6fd0c0', 3], ['bell', '#b48ae0', 2], ['speck', '#e0d070', 1]],
     pebbles: 0.6,

@@ -2634,12 +2634,14 @@ const DEFAULT_GRADE: Grade = {
 };
 
 /** Biomes in daylight. */
-const DAYLIGHT: ReadonlySet<string> = new Set(['hamlet', 'farmland', 'desert', 'tundra']);
+const DAYLIGHT: ReadonlySet<string> = new Set(['hamlet', 'farmland', 'forest', 'desert', 'tundra']);
 
 /** How strong the sun rays are per biome: only where there's daylight (none in the dark ones). */
 const RAYS: Readonly<Record<string, number>> = {
   hamlet: 0.2,
   farmland: 0.2,
+  // Shafts through the canopy.
+  forest: 0.24,
   desert: 0.12,
   tundra: 0.1,
 };

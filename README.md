@@ -35,6 +35,19 @@ recording: [`docs/SOUNDS.md`](docs/SOUNDS.md).
 
 ## The look
 
+- Every floor has real height. The solid ground round a floor (the woods round a clearing, a town's
+  lots, a cave's rock, a crypt's walls) stands a storey above the floor you walk on, and in the 3/4
+  view that shows as a face wherever it has open floor to its south (`src/world/relief.ts` for the
+  heights, `src/render/relief.ts` for the painting): retaining walls of slate blocks with the grass
+  hanging over them, moss in the joints and vines, round the woods and lawns; tall brickwork with a
+  lit cap, pilasters and a plinth in the crypt, the wall's thickness showing as coping round every
+  room; rock in shelves and columns in the caves and canyons. Back from the floor's edge, terraces
+  climb a second step with walls and flights of pale stone steps of their own, trees standing on
+  top of them. Raised ground throws its shadow on the ground below and to its right
+  (`castShadows.ts`). Gloomwood is a green forest in the shade with shafts of sun and a pale
+  flagstone path, and the dark biomes' fill light is lifted so that all of this reads.
+  `terrain-preview.html?biome=forest&seed=3&s=2` shows a whole floor unlit (`&grid` tints its tiles,
+  `&bare` leaves the props out).
 - The knights and most mobs come from PixelForge, the game's character pipeline: chibi sprites in
   one palette with a 1 px plum outline, drawn in four directions with real attacks, dodges, hurts,
   deaths and victories (`src/render/pf/`), in PixelForge's vivid second design pass. Each class has a

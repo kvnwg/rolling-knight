@@ -27,8 +27,8 @@ const STONE: Partial<Record<string, Ramp>> = {
   farmland: ['#3e362c', '#544a3c', '#6e6250', '#8c8068', '#b0a488'],
   forest: ['#27313c', '#36424f', '#495866', '#647582', '#8d9da4'],
   tundra: ['#34435c', '#46587a', '#5c7096', '#7e94b4', '#b4c8dc'],
-  swamp: ['#1e241a', '#2c3424', '#3e4830', '#566042', '#748058'],
-  graveyard: ['#1c1a22', '#2a2832', '#3c3a46', '#54525e', '#74727e'],
+  swamp: ['#2a3026', '#3a4234', '#4e5846', '#68725c', '#8a947a'],
+  graveyard: ['#2a2836', '#3a3848', '#50506a', '#6c6c86', '#9292aa'],
 };
 
 const MOSS: Partial<Record<string, readonly [string, string]>> = {
