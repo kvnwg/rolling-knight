@@ -65,7 +65,7 @@ interface CrazySdk {
 
 /** How long the SDK may take to answer before the game starts without it (its own wait for the portal's frame is 7 s). */
 const INIT_WAIT_MS = 9000;
-/** An ad that never calls back (a hung request) lets the game go after this long. */
+/** An ask for an ad that is never answered lets the game go after this long (one that has started is waited out, however long it is). */
 const AD_WAIT_MS = 90_000;
 
 function sdkOnPage(): CrazySdk | null {
@@ -244,6 +244,7 @@ export class CrazyGames {
         sdk.ad.requestAd(kind, {
           adStarted: () => {
             if (over) return;
+            clearTimeout(giveUp);
             this.adUp = true;
             this.tellMute();
             this.syncPlay();

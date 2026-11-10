@@ -194,14 +194,22 @@ describe('the CrazyGames SDK', () => {
     expect((await onCrazyGames({ launchFlow: 'basic' })).portal.rewards).toBe(false);
   });
 
-  it('an ad that never answers lets the game go in the end', async () => {
+  it('an ask that is never answered lets the game go in the end; an ad that has started is waited out', async () => {
     vi.useFakeTimers();
-    const { portal } = await onCrazyGames();
+    const { portal, ad } = await onCrazyGames();
     const over = portal.ad('midgame');
     expect(portal.busy).toBe(true);
     await vi.advanceTimersByTimeAsync(91_000);
     expect(await over).toBe('none');
     expect(portal.busy).toBe(false);
+    // A long ad: the game stays held and silent for all of it.
+    const long = portal.ad('rewarded');
+    ad().adStarted!();
+    await vi.advanceTimersByTimeAsync(300_000);
+    expect(portal.busy).toBe(true);
+    expect(portal.muted).toBe(true);
+    ad().adFinished!();
+    expect(await long).toBe('done');
   });
 
   it("the portal's mute switch is above the game's own volume", async () => {

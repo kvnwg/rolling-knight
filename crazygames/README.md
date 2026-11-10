@@ -55,7 +55,7 @@ npm run dev:crazygames
 **Tags:** Idle, RPG, Roguelike, Pixel, Knight, Dungeon, Fantasy, Luck, Mouse, 1 Player
 
 **Devices:** desktop, tablet, phone. **Orientation:** landscape and portrait. **Players:** 1.
-**Age:** suits PEGI 12 (cartoon pixel fighting, no blood, no chat, no purchases, no links out).
+**Age:** suits PEGI 12 (cartoon pixel fighting; no chat, no purchases, no links out).
 
 **Description**
 
@@ -78,7 +78,7 @@ npm run dev:crazygames
 - An altar that never stops rolling: 78 knights in 13 rarities, with odds from 1 in 3 to 1 in 250 million
 - Twin-stick fighting: aim, attack, cut shots out of the air, dash through the rest
 - Six classes (Guardian, Blade, Ranger, Cleric, Arcanist, Lancer), each with six skills that roll themselves in a fight
-- Twelve hand-painted pixel biomes, ten floor designs, traps, merchants you can rob, and three bosses
+- Twelve pixel-art places, ten floor designs, traps, merchants you can rob, and a boss every five floors
 - Luck upgrades, combat upgrades, perks and rebirths that last
 - It keeps rolling while you're away, and saves to your CrazyGames account
 
