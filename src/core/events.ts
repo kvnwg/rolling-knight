@@ -28,6 +28,8 @@ export type CoreEvent =
   | { type: 'floorClear'; floor: number }
   /** A boss floor's way down opened: its boss fell. */
   | { type: 'portalOpen'; floor: number }
+  /** The squad stepped into a floor's open portal: it swirls in, and the next floor follows. */
+  | { type: 'warp'; floor: number }
   | { type: 'bossDown'; floor: number; first: boolean }
   /** A checkpoint floor (every 10th) reached: a wipe from here on comes back to it. */
   | { type: 'checkpoint'; floor: number }

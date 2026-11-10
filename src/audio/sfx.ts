@@ -278,6 +278,8 @@ class Sfx {
         break;
       case 'floorClear':
       case 'portalOpen':
+      // (Into the portal: its own swirl again, the squad in it.)
+      case 'warp':
         this.portal();
         break;
       case 'bossDown':
@@ -1260,7 +1262,7 @@ class Sfx {
   }
 
   // ------------------------------------------------------------------ the dungeon
-  /** A floor's portal opens (cleared): rising bells and a swirling whoosh. */
+  /** A floor's portal opens (cleared), or the squad swirls into it: rising bells and a swirling whoosh. */
   private portal(): void {
     if (!this.gate('portal', 300)) return;
     const at = this.ctx.currentTime;
