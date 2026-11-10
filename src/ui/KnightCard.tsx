@@ -1,13 +1,14 @@
 /**
- * A knight's card, the same wherever knights are listed (the roster, the scrap dealer, the summon
- * log, the codex, the welcome-back report): the rarity's color as a crisp frame round a softly lit
- * picture of the knight, the name, then up to two fixed lines (level; power and odds), in icons and
+ * A knight's card, the same wherever knights are listed (the roster, the summon log, the codex): the
+ * rarity's color as a crisp frame round the knight standing in its rarity's little pixel scene
+ * (backdrop.ts), the name, then up to two fixed lines (level; power and odds), in icons and
  * numbers. Badges have fixed spots that keep clear of the knight: the leader's crown in the
  * picture's top left corner, the spare copies chip in its top right, NEW on the card's top edge.
  */
 import { useRef, type CSSProperties, type ReactNode } from 'react';
 import { RARITY_NAME, RARITY_ODDS, type Rarity } from '../core/rarity';
 import type { MutationId } from '../core/state';
+import { backdropStyle } from './backdrop';
 import { HeroArt, rarityStyle } from './common';
 import { oneInShort } from './format';
 import { KNIGHT_PIC_H, KNIGHT_PIC_W } from './sprites';
@@ -27,11 +28,20 @@ export function artPx(): number {
  * than others. Sized from KNIGHT_PIC_W/H, so a redrawn knight of another size fits the same box.
  */
 export function knightFit(w: number, h: number): CSSProperties {
+  const pix = knightPix(w, h);
+  return { width: `${KNIGHT_PIC_W * pix}px`, height: `${KNIGHT_PIC_H * pix}px` };
+}
+
+/** CSS px to one of the knight's pixels when it's fitted into a box of `w` x `h` art pixels (knightFit). */
+export function knightPix(w: number, h: number): number {
   const px = artPx();
   const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
   const k = Math.max(1, Math.floor(Math.min((w * px * dpr) / KNIGHT_PIC_W, (h * px * dpr) / KNIGHT_PIC_H)));
-  return { width: `${(KNIGHT_PIC_W * k) / dpr}px`, height: `${(KNIGHT_PIC_H * k) / dpr}px` };
+  return k / dpr;
 }
+
+/** The art box's height (art px) on a card: .kcard .kc-art in styles.css. */
+const CARD_ART_H = 40;
 
 /** A rarity's odds as the altar's odds table has them, short ("1 in 1K", "1 in 2.5B"); Common is just Common. */
 export function rarityOdds(r: Rarity): string {
@@ -89,9 +99,13 @@ export interface TileProps {
 }
 
 export function KnightTile(p: TileProps) {
+  // The rarity's little scene behind the knight, in the knight's own pixels; its feet a pixel of the
+  // card's above the foot of the box (the picture's four rows under the feet, then the margin).
+  const pix = knightPix(CARD_KNIGHT.w, CARD_KNIGHT.h);
+  const scene = backdropStyle(p.rarity, pix, CARD_ART_H * artPx(), 4 + artPx() / pix);
   const body = (
     <>
-      <div className="kc-art">
+      <div className="kc-art" style={scene}>
         <HeroArt id={p.id} mutation={p.mutation ?? null} silhouette={p.silhouette} style={knightFit(CARD_KNIGHT.w, CARD_KNIGHT.h)} />
         {p.tl && <span className="kc-corner tl">{p.tl}</span>}
         {p.tr && <span className="kc-corner tr">{p.tr}</span>}

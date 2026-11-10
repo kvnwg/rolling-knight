@@ -12,7 +12,8 @@ import { knightRating } from '../core/power';
 import type { Game } from '../game';
 import { Chunky, HeroLive, Section, rarityGrad, rarityStyle } from './common';
 import { fmt, oneIn } from './format';
-import { KnightTile, knightFit, rarityOdds } from './KnightCard';
+import { artPx, KnightTile, knightFit, knightPix, rarityOdds } from './KnightCard';
+import { backdropStyle } from './backdrop';
 import { Px } from './px';
 import { SkillTable } from './SkillRoll';
 import { skillRollLuck } from '../core/chance';
@@ -81,7 +82,7 @@ export function HeroDetail({ game, id, onClose }: { game: Game; id: string; onCl
         <button className="btn red square x" onClick={onClose} aria-label="Close">
           ✕
         </button>
-        <div className="stage-art">
+        <div className="stage-art" style={backdropStyle(def.rarity, knightPix(80, 56), 62 * artPx(), 4 + (2 * artPx()) / knightPix(80, 56), 128)}>
           <HeroLive id={id} mutation={rec.mutation} style={knightFit(80, 56)} />
           {isNewKnight(rec, Date.now()) && <span className="ktag new stage-new">NEW</span>}
         </div>

@@ -14,6 +14,8 @@
  *   ?tut=attack       the tutorial from that step on (core/tutorial.ts; ?tut alone: from the top;
  *                     ?tut=tips: every step done, the one-off tips to come); without it, ?floor's
  *                     ready squad skips the tutorial
+ *   ?away=21600       as if back after that many seconds away: the altar's rolls and the squad's
+ *                     gold while you were gone, and the welcome back after PLAY
  * The game is also on window.__game.
  */
 import { isDesign } from './core/deck';
@@ -21,6 +23,7 @@ import { TUT_STEPS } from './core/tutorial';
 import { CLASSES, knightId, type ClassId } from './core/knights';
 import { RARITIES, type Rarity } from './core/rarity';
 import { checkpointFor } from './core/newGame';
+import { runOffline } from './core/offline';
 import { addKnight } from './core/roster';
 import { Game } from './game';
 import { forceSky, type SkyKind } from './world/sky';
@@ -70,6 +73,8 @@ export function devGame(): Game {
   if (q.has('camp')) game.inDungeon = false;
   if (q.has('gold')) s.gold = Number(q.get('gold'));
   if (q.has('auto')) game.bot = true;
+  const away = Number(q.get('away'));
+  if (away > 0) game.offline = runOffline(s, game.rng, away, Date.now());
   (window as unknown as { __game: Game }).__game = game;
   return game;
 }

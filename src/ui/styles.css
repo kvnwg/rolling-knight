@@ -598,8 +598,9 @@ button.kcard:active {
   justify-content: center;
   height: calc(40 * var(--px));
   overflow: hidden;
-  background: radial-gradient(ellipse 60% 52% at 50% 66%, color-mix(in srgb, var(--rc) 36%, transparent), transparent 74%),
-    linear-gradient(180deg, color-mix(in srgb, var(--rc) 22%, #1e1519), color-mix(in srgb, var(--rc) 8%, #150e11));
+  /* The rarity's pixel scene (KnightCard.tsx sets it); dark until it's painted. */
+  background-color: #150e11;
+  image-rendering: pixelated;
 }
 .kcard .kc-art > img {
   margin-bottom: var(--px);
@@ -1155,7 +1156,7 @@ select.select {
     opacity: 0;
   }
 }
-/* The knight sheet's picture: the card's look, big (a crisp rarity frame round a soft pool of light). */
+/* The knight sheet's picture: the card's look, big (a crisp rarity frame round the knight in its rarity's scene). */
 .stage-art {
   position: relative;
   display: flex;
@@ -1165,8 +1166,9 @@ select.select {
   flex: none;
   height: calc(62 * var(--px));
   padding-bottom: calc(2 * var(--px));
-  background: radial-gradient(ellipse 46% 50% at 50% 64%, color-mix(in srgb, var(--rc) 40%, transparent), transparent 74%),
-    linear-gradient(180deg, color-mix(in srgb, var(--rc) 24%, #1e1519), color-mix(in srgb, var(--rc) 8%, #150e11));
+  /* The rarity's pixel scene (panels.tsx sets it). */
+  background-color: #150e11;
+  image-rendering: pixelated;
   box-shadow: 0 0 0 var(--px) var(--ink), inset 0 0 0 var(--px) var(--rc), inset 0 0 0 calc(2 * var(--px)) color-mix(in srgb, var(--rc) 22%, #120a0c);
   overflow: hidden;
 }
@@ -2204,8 +2206,11 @@ body,
   display: block;
   width: calc(18 * var(--px));
   height: calc(18 * var(--px));
-  /* A frame: ink, the rarity's color, a dark inner line; inside, the rarity's light from above. */
-  background: linear-gradient(180deg, color-mix(in srgb, var(--rc) 45%, #fff4dc) 0%, color-mix(in srgb, var(--rc) 70%, #3a2414) 100%);
+  /* A frame: ink, the rarity's color, a dark inner line; inside, the rarity's little scene behind the
+     face (SquadCard.tsx sets it), at the face's own pixel size. */
+  background-color: #2b170c;
+  background-size: 100% 100%;
+  image-rendering: pixelated;
   box-shadow:
     0 0 0 var(--px) #2b170c,
     inset 0 0 0 var(--px) var(--rc),

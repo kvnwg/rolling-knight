@@ -23,6 +23,7 @@ import { fmt } from './format';
 import { Px } from './px';
 import { SkillRoll } from './SkillRoll';
 import { knightFaceUrl } from './sprites';
+import { backdropUrl } from './backdrop';
 
 interface Pop {
   key: number;
@@ -152,7 +153,7 @@ export function SquadCard({ game, slot, knightId, mutation, name, cls, rarity, m
       onClick={onPick}
       title={`${name}, ${CLASSES[cls].name}${me ? ' (you)' : ': tap to play'}`}
     >
-      <span className="portrait">
+      <span className="portrait" style={{ backgroundImage: `url(${backdropUrl(rarity, 18, 18, -8)})` }}>
         <img className="px face" src={knightFaceUrl(knightId, mutation as never)} alt="" draggable={false} />
         <i className="hurt" />
         {me && (
