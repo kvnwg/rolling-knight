@@ -34,7 +34,7 @@ module.exports = {
   },
   // The Cinderwyrm's lair in the Ember Depths: a Meteor Storm.
   wyrm: {
-    query: '?floor=50&squad=divine&classes=blade,arcanist,cleric&auto',
+    query: '?floor=50&squad=eternal&classes=blade,arcanist,cleric&auto',
     seconds: 30,
     cues: [...heals(30, 0.5), cast(8.2, 1, 'meteorStorm')],
   },
@@ -67,7 +67,7 @@ module.exports.CUT = [
   ['dungeon', 5.5, 7.5],
   ['reveal', 5.7, 7.6],
   ['desert', 5.3, 6.9],
-  ['wyrm', 8.6, 10.8],
+  ['wyrm', 10.3, 12.5],
   ['grotto', 11.9, 13.5],
   ['rook', 12.0, 14.0],
   ['rook', 16.3, 17.2],

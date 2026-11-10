@@ -175,8 +175,11 @@ python3 -I tools/crazygames/covers.py
 
 ## The trailer
 
-Two films of the same cut, 20 seconds, silent, opening on the cover: 1920x1080, and 1080x1620 from
-a phone-sized screen with its touch controls. Every frame is the game itself, drawn at a sixtieth
+Two films of the same cut, 19.8 seconds, silent, 60 frames a second, opening on the cover:
+1920x1080, and 1080x1620 from a phone-sized screen with its touch controls. Ten shots: steady play
+in the hamlet and Gloomwood, Titan's Wrath on the tundra, Skyfall in the Grimstone Dungeon, the
+altar landing a 1 in 25,000 Mythic, the ruins, a Meteor Storm on the boss of the Ember Depths, the
+Prism Grotto, and Excalibur on Rook, down to BOSS DEFEATED. Every frame is the game itself, drawn at a sixtieth
 of a second after the last (`tools/trailer/`): nothing is sped up.
 
 The takes and what each is there to show are in `tools/trailer/shots.cjs`. To film them again and
