@@ -61,7 +61,25 @@ export function mend(raw: unknown): GameState {
   sanitizeSquad(out);
   mendPerks(out);
   cashInSpares(out);
+  mendExtras(out);
   return out;
+}
+
+/**
+ * Extras (repeat pulls waiting at the broker's, on each knight's record): a save from before them
+ * has none (its repeats paid out as gold as they landed). A damaged count becomes a whole number, and
+ * extras that lost what they'd fetch are valued at what a repeat is worth now.
+ */
+function mendExtras(out: GameState): void {
+  for (const rec of Object.values(out.roster)) {
+    if (!rec || typeof rec !== 'object') continue;
+    const n = Math.max(0, Math.floor(Number(rec.extras) || 0));
+    let g = Number(rec.extrasGold);
+    if (!Number.isFinite(g) || g < 0 || n === 0) g = 0;
+    if (n > 0 && g === 0 && KNIGHTS_BY_ID.has(rec.id)) g = n * dupeGold(out, rec.id);
+    rec.extras = n;
+    rec.extrasGold = g;
+  }
 }
 
 /**
@@ -117,8 +135,9 @@ export function clearSave(): void {
 }
 
 /**
- * Shards and spare copies are gone (duplicates turn into gold as they're rolled): an older save's
- * spare copies pay what a duplicate pays now, and its shards half that each, into the purse.
+ * Shards and the first kind of spare copies are long gone: a save from back then has its spare
+ * copies (`dupes`, from before repeats were kept as extras) paid what a repeat is worth now, and its
+ * shards half that each, into the purse.
  */
 function cashInSpares(out: GameState): void {
   const raw = out as GameState & { dupeRules?: unknown };

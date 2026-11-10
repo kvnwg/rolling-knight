@@ -420,6 +420,10 @@
 .tagMut {
   background: var(--m, #7546b8);
 }
+/* A knight you already had: kept as an extra (the extras' purple). */
+.tagExtra {
+  background: #6a5a8e;
+}
 .hyperSub {
   font-size: calc(7 * var(--u));
   color: #fff3b0;

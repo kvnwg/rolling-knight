@@ -700,6 +700,40 @@ button.kcard:active {
 .ktag.mult {
   background: #e07a12;
 }
+/* An extra (a repeat pull kept for the broker to sell): the extras' purple. */
+.ktag.extra {
+  background: #6a5a8e;
+}
+/* The knight sheet's extras: "+3 EXTRAS" on a purple tag, what they'd fetch, and who sells them. */
+.kextras {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: calc(1 * var(--px)) calc(2 * var(--px));
+  font-size: calc(4.4 * var(--fpx, var(--px)));
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text);
+}
+.kextras > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--px);
+}
+.kextras .ktag {
+  font-size: calc(3.8 * var(--fpx, var(--px)));
+  line-height: calc(6 * var(--px));
+}
+.kextras small {
+  flex-basis: 100%;
+  font-size: calc(4 * var(--fpx, var(--px)));
+  font-weight: 400;
+  color: var(--muted);
+}
+.kextras b {
+  color: var(--gold);
+}
 /* The spare copies chip: two cards and "×4", brass on dark, the same on every card and in the sheet. */
 .kspare {
   display: inline-flex;

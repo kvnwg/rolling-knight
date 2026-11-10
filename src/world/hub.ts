@@ -2,12 +2,13 @@
  * The painted hub: where you go between dives. One cozy shop front at night, about a phone's screen
  * of it: the Gilded Reel's timber front under its dark slate roof (the round reel sign glowing in the
  * gable, string lights along the barge boards, the lit window of goods, the Oracle in the open
- * doorway), the junk dealer at the lit curio cabinet in the left wing and the notice board by the
- * door, the tinker at his shelves of bottles in the right wing. In front, a short court of warm
- * flagstones: the quartermaster at her round table, the sage in his armchair, the priestess at her
- * candle shrine, the smith at his anvil and brazier, and at its foot the dark stone steps going down
- * to the dungeon (a violet glow at the bottom), the warden on his landing beside them. Lush leaves
- * frame it all. The renderer shows it closer than the dungeon (about 150 art px across a phone).
+ * doorway), the broker at the lit curio cabinet in the left wing (he sells your extras) and the
+ * notice board by the door, the tinker at his shelves of bottles in the right wing. In front, a short
+ * court of warm flagstones: the quartermaster at her round table, the sage in his armchair, the
+ * priestess at her candle shrine, the smith at his anvil and brazier, and at its foot the dark stone
+ * steps going down to the dungeon (a violet glow at the bottom), the warden on his landing beside
+ * them. Lush leaves frame it all. The renderer shows it closer than the dungeon (about 150 art px
+ * across a phone).
  *
  * Everything is fixed and deterministic, painted once on first use (hubScene() caches it; about half a
  * second, so call it early). Positions are hub pixels (the same as world pixels; TILE = 16): the art

@@ -62,10 +62,10 @@ export const BAL = {
   /**
    * Away: the squad's combat gold keeps coming at `efficiency` of its recent rate (Night Watch adds
    * `perTier` a tier), for up to `capHours`; the altar rolls at a tenth of its speed, up to `maxRolls`
-   * (only Epic-or-better finds are kept), and the duplicates it turns into gold pay `dupeShare` of
-   * their usual. A night away is worth about an hour of play, two with Night Watch maxed.
+   * (every pull lands: new knights join, and repeats are kept as extras worth `dupeShare` of their
+   * usual). A night away is worth about an hour of play, two with Night Watch maxed.
    */
-  offline: { capHours: 8, efficiency: 0.12, perTier: 0.05, rollSlowdown: 10, maxRolls: 300, dupeShare: 0.15, keepRarity: 'epic' as const, minAwaySeconds: 60 },
+  offline: { capHours: 8, efficiency: 0.12, perTier: 0.05, rollSlowdown: 10, maxRolls: 300, dupeShare: 0.15, minAwaySeconds: 60 },
   /** The run scale (core/economy.ts): every price in a run is this many times the last run's. */
   economy: { runPriceGrowth: 3 },
   /**
@@ -97,7 +97,7 @@ export const BAL = {
      * knights, and `growth` times more every time that knight is reforged.
      */
     reforge: { kills: 40, rarityStep: 0.6, growth: 1.35, oddsMult: 6 },
-    /** Gold a duplicate turns into when it's rolled, in kills' worth of gold at your best floor. */
+    /** What a repeat is worth (the gold its extra fetches at the broker's), in kills' worth of gold at your best floor. */
     sellKills: {
       common: 0.5, uncommon: 1, rare: 2, epic: 4, legendary: 10, mythic: 50, ancient: 80, exalted: 120,
       celestial: 180, astral: 280, divine: 450, eternal: 750, primordial: 1500, absolute: 7500,

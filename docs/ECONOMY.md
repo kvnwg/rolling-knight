@@ -11,19 +11,24 @@ floors more than the last (15, 25, 35...).
 
 - **Income** comes from the fights: a kill pays `goldPerKill x goldGrowth^floor` (x1.14 a floor)
   times the gold multipliers (Greed, the Royal Treasury, rebirths, the solo bonus, run items).
-  Duplicates rolled at the altar turn into a few kills' worth of gold at your best floor
-  (`BAL.roster.sellKills`: a Rare 2, an Epic 4, a Legendary 10, a Mythic 50).
+  Repeats rolled at the altar are kept as extras, each worth a few kills' worth of gold at your best
+  floor as it lands (`BAL.roster.sellKills`: a Rare 2, an Epic 4, a Legendary 10, a Mythic 50), paid
+  when Bram the Broker sells them: the same gold as when repeats paid on landing, collected later.
 - **Prices** are set per run (core/economy.ts). A run goes ten floors deeper than the last, where
   a kill pays 1.14^10 = 3.7 times as much, so every price in it is `BAL.economy.runPriceGrowth`
   (3) times the last run's: the tinker's tiers, combat rolls, the knights' levels. The scale stays
   under 3.7 on purpose, so each run goes a little faster than the last, with the rebirth's own gold,
-  luck and power on top. Merchants' wares, reforging and duplicates are priced from the floor you're
+  luck and power on top. Merchants' wares, reforging and extras are priced from the floor you're
   on or your best, so they scale already.
 - **Away** (core/offline.ts): the fights' gold keeps coming at 12% of the last ten minutes' rate of
   picked-up gold (Night Watch adds 5% a tier), for up to 8 hours. That is about an hour of play for
   a night away, up to about three with Night Watch maxed. It counts fight gold only, never a purse
-  swollen by duplicates, a sale or saving up. The altar rolls at a tenth of its speed, up to 300
-  rolls, and keeps only Epic-or-better finds; duplicates found while away pay 15% of their gold.
+  swollen by extras sold, a sale or saving up. The altar rolls at a tenth of its speed, up to 300
+  rolls, and every pull lands: new knights join, and repeats found while away are kept as extras
+  worth 15% of their usual.
+- **Rebirth** takes extras with their knights, like the rest of the gold (a purse emptied by a
+  rebirth would only swallow them, and carrying them over would bring the last run's prices into a
+  fresh one); the Shrine lists them, and what they'd fetch, before you go.
 
 ## What the old numbers did
 
@@ -31,7 +36,7 @@ Six hours of the bot's play under the old numbers:
 
 - The combat tab was maxed in the fourth run (about 1.5 hours in), the luck tab in the fifth (about
   2 hours), and the squad was at level 57.
-- Duplicates paid up to 17 times what kills did.
+- Duplicates (now extras) paid up to 17 times what kills did.
 - A night away paid 22 billion gold: about 98 hours of play's worth.
 
 Away paid 75% of the purse's growth rate, plus 40% a tier of Night Watch: 275% maxed, more than
@@ -65,9 +70,11 @@ The bot plays every fight perfectly, so a person takes longer.
 Everything is in `src/core/balance.ts`:
 
 - `economy.runPriceGrowth`: how much dearer each run is (under 3.7 makes later runs quicker).
-- `offline`: efficiency, Night Watch's share, the rolls and the duplicates' share.
-- `roster.sellKills`: what duplicates pay.
+- `offline`: efficiency, Night Watch's share, the rolls and the extras' share.
+- `roster.sellKills`: what a repeat's extra fetches.
 - `dungeon.goldGrowth`, `goldPerKill`: the income curve.
 
 tests/economy.test.ts holds the rules: every price scales per rebirth, a night away pays the fights'
-rate (about an hour of it), the 8-hour cap, and duplicates worth a few kills.
+rate (about an hour of it) and lands every pull, the 8-hour cap, and a repeat's extra worth a few
+kills. tools/econ.ts sells the player's extras whenever it spends (every few seconds), which comes
+to the same gold as repeats paying on landing.

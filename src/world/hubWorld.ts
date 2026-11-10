@@ -1,10 +1,10 @@
 /**
  * The hub: where you go between dives. You walk your knight round the warm court in front of the
  * Gilded Reel at night, and each keeper there does one job: the Oracle in the shop's doorway
- * (summoning: the rolling never stops), the smith (levels and reforging), the junk dealer (break down
- * and sell duplicates), the quartermaster (your squad), the tinker (upgrades), the sage (perks), the
- * priestess (rebirth), the notice board (quests) and the warden at the steps down into the dungeon.
- * Walk up to a keeper and talk to open their counter.
+ * (summoning: the rolling never stops), Bram the Broker at the curio cabinet (he sells your extras,
+ * the repeat pulls of knights you already have), the tinker (upgrades), the sage (perks), the
+ * priestess (rebirth), the notice board (quests) and the warden at the steps down into the dungeon
+ * (your squad, its levels and reforging). Walk up to a keeper and talk to open their counter.
  *
  * The court and its keepers are painted (hub.ts, hubScene()); this is what the game needs of it.
  */

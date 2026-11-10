@@ -73,17 +73,19 @@ export const HUB_CAST = {
     shoes: BOOTS,
     panel: { kind: 'apron', ramp: ['#5a3418', '#8a5428'] },
   }, ['Clang.', 'Shards. Gold. Hammer. Better knight.', 'Mind the sparks.']),
-  scrap: keeper('scrap', 'Rusty Mags', 'junk dealer', {
-    skin: SKIN.pale,
+  // The broker: a grey-haired man with a pointed beard, in a dark cap banded in gold, his
+  // shirtsleeves and a plum waistcoat (the purple of an EXTRA tag) with brass buttons.
+  scrap: keeper('scrap', 'Bram the Broker', 'sells your extras', {
+    skin: SKIN.light,
     hair: HAIR.gray,
-    hairStyle: 'bun',
-    glasses: true,
-    hat: { kind: 'kerchief', ramp: ['#6a2a12', '#a4481e', '#d4723a'] },
-    shirt: ['#3a3e1e', '#5a602e', '#7e8442'],
-    panel: { kind: 'vest', ramp: ['#3e2a1a', '#6a4a2e'] },
-    pants: ['#22304a', '#34507a', '#5076a6'],
+    hairStyle: 'short',
+    beard: 'goatee',
+    hat: { kind: 'beret', ramp: ['#1e1424', '#33263c', '#4a3a56'], trim: GOLD2 },
+    shirt: ['#8a7a66', '#c4b49a', '#ece0c8'],
+    panel: { kind: 'vest', ramp: ['#3a1e44', '#5e3470'] },
+    pants: ['#26222e', '#3a3444', '#524a5e'],
     shoes: SHOES,
-  }, ['One knight\'s spare is another knight\'s shards.', 'Everything breaks down. Eventually.', 'I buy doubles. I buy triples. I buy.']),
+  }, ['Extras? I\'ll take them off your hands.', 'Your knight stays put. Only the copy goes.', 'Every extra has a price. I know it to the coin.']),
   squad: keeper('squad', 'Quartermaster Hilde', 'keeper of the roster', {
     skin: SKIN.light,
     hair: HAIR.blond,
@@ -156,7 +158,7 @@ export const HUB_CAST = {
 /** The tool each keeper holds (the stock NPC items cover the rest). */
 export const HUB_TOOLS: Partial<Record<keyof typeof HUB_CAST, KeeperTool>> = {
   smith: 'hammer',
-  scrap: 'tongs',
+  scrap: 'book',
   upgrades: 'wrench',
   rebirth: 'candle',
   traveller: 'cup',
@@ -166,7 +168,7 @@ export const HUB_TOOLS: Partial<Record<keyof typeof HUB_CAST, KeeperTool>> = {
 
 /*
  * Drawn upright with the grip at (px, py), like the stock NPC items. Keys: M m N metal light, mid,
- * dark   B b wood   W wax   Y O flame (glows)   G g brass   R r red   P paper
+ * dark   B b wood   W wax   Y O flame (glows)   G g brass   R r red   P p paper, its edge in shadow
  */
 interface ToolArt {
   rows: readonly string[];
@@ -183,7 +185,7 @@ const TOOLS: Record<KeeperTool, ToolArt> = {
 };
 const TOOL_COLORS: Record<string, string> = {
   M: '#e6e8f0', m: '#9aa2b2', N: '#5a6072', B: '#9a6a3a', b: '#62401e', W: '#f4ead2', Y: '#fff2a8', O: '#ff9a3a',
-  G: '#e0b040', g: '#8a5a1a', R: '#a8302a', r: '#6a1a1a', P: '#f2e6c6',
+  G: '#e0b040', g: '#8a5a1a', R: '#a8302a', r: '#6a1a1a', P: '#f2e6c6', p: '#c4b08a',
 };
 const TOOL_GLOW = new Set(['Y', 'O']);
 

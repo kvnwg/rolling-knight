@@ -4,6 +4,7 @@ import { mend } from '../src/core/save';
 import {
   AUTO_ASK,
   AUTO_READ,
+  EXTRAS_TIP,
   SKILLS_READ,
   TIP_MIN,
   TIP_REST,
@@ -45,6 +46,7 @@ function at(where: TutCtx['where'], o: Partial<TutCtx> = {}): TutCtx {
     canRebirth: false,
     soloShown: false,
     autoOn: false,
+    extras: 0,
     ...o,
   };
 }
@@ -394,6 +396,14 @@ describe('the tutorial: one-off tips', () => {
     expect(after().key(at('hub', { canRebirth: true }))).toBe('tip:rebirth');
     expect(after().key(at('warden', { soloShown: true }))).toBe('tip:solo');
     expect(after().key(at('dungeon', { floor: 3 }))).toBe('tip:auto');
+    // Extras piling up at the hub: Bram the Broker sells them (not for the first one alone).
+    expect(after().key(at('hub', { extras: EXTRAS_TIP }))).toBe('tip:extras');
+    expect(after().key(at('hub', { extras: EXTRAS_TIP - 1 }))).toBeNull();
+    expect(after().key(at('dungeon', { floor: 2, extras: 9, autoOn: true }))).toBeNull();
+    // A visit to his counter first says it all: the tip never comes.
+    const b = after();
+    b.did('broker');
+    expect(b.key(at('hub', { extras: 9 }))).toBeNull();
     // Not with a foe on you, nor with auto battle already on.
     expect(after().key(at('dungeon', { floor: 3, foeNear: true }))).toBeNull();
     expect(after().key(at('dungeon', { floor: 3, autoOn: true }))).toBeNull();

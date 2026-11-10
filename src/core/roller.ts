@@ -206,8 +206,11 @@ export function startSpin(state: GameState, rng: Rng, nowMs: number, emit: Event
   return spin;
 }
 
-/** Lands every reel due by `upTo` seconds into the spin (all of them by default). */
-export function landReels(state: GameState, emit: EventSink, upTo = Infinity): void {
+/**
+ * Lands every reel due by `upTo` seconds into the spin (all of them by default). A repeat it lands
+ * becomes an extra worth `extrasShare` of a repeat's usual (less while you're away: core/offline.ts).
+ */
+export function landReels(state: GameState, emit: EventSink, upTo = Infinity, extrasShare = 1): void {
   const spin = state.roll.current;
   if (!spin || spin.landed) return;
   const all = spin.reels.map((x) => x.tokens);
@@ -222,7 +225,7 @@ export function landReels(state: GameState, emit: EventSink, upTo = Infinity): v
       state.records.bestOneIn = reel.oneIn;
       state.records.bestName = reel.knightId;
     }
-    const result = addKnight(state, reel.knightId, reel.mutation);
+    const result = addKnight(state, reel.knightId, reel.mutation, Date.now(), extrasShare);
     emit({
       type: 'land',
       spinId: spin.id,

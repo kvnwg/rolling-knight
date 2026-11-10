@@ -18,6 +18,7 @@ import { Px } from './px';
 import { SkillTable } from './SkillRoll';
 import { skillRollLuck } from '../core/chance';
 import { restartTutorial, tutorialOn } from '../core/tutorial';
+import { extrasText } from './keeper/BrokerShop';
 
 export { Section } from './common';
 
@@ -60,8 +61,9 @@ export function Codex({ game }: { game: Game }) {
 
 /**
  * A knight's sheet: what it is (rarity and class, its mutation), its numbers (power, HP, attack, its
- * odds at the altar, its level) and its skill roll. Only information: picking the squad, levelling
- * and reforging are the Warden's (keeper/Shops.tsx WardenShop).
+ * odds at the altar, its level), any extras waiting at the broker's, and its skill roll. Only
+ * information: picking the squad, levelling and reforging are the Warden's (keeper/Shops.tsx
+ * WardenShop); selling extras is Bram the Broker's (keeper/BrokerShop.tsx).
  */
 export function HeroDetail({ game, id, onClose }: { game: Game; id: string; onClose: () => void }) {
   const s = game.state;
@@ -94,6 +96,20 @@ export function HeroDetail({ game, id, onClose }: { game: Game; id: string; onCl
             {rec.mutation && <span className="t-gold"> · {rec.mutation.toUpperCase()}</span>}
           </span>
           <span className="t-muted outlined">{slot >= 0 ? (lead ? 'In your squad: the one you play' : 'In your squad') : 'Not in your squad'} · the Warden picks who goes down</span>
+          {rec.extras > 0 && (
+            // Its extras (repeat pulls), and who sells them: never this knight, only its copies.
+            <span className="kextras outlined" title="Repeat pulls of this knight: Bram the Broker sells them, and this knight stays as it is">
+              <span className="ktag extra">
+                <Px icon="copies" size="sm" />+{extrasText(rec.extras).toUpperCase()}
+              </span>
+              <span className="num">
+                <Px icon="coin" size="sm" /> {fmt(rec.extrasGold)}
+              </span>
+              <small>
+                Sell them at <b>Bram the Broker's</b>
+              </small>
+            </span>
+          )}
           <div className="kstats outlined num">
             <span title="Power">
               <small>POWER</small>

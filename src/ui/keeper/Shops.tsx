@@ -5,8 +5,9 @@
  *  - Sage Orrin: perks, rolled for sigils (core/perks.ts);
  *  - Sister Maren: rebirth, what it gives and what it takes, and the button (core/newGame.ts);
  *  - the notice board: your jobs, their progress and rewards (core/quests.ts);
- *  - Oracle Vesper: the altar's reels, your latest summons and the odds;
+ *  - Oracle Vesper: the altar's reels, your latest summons (repeats tagged EXTRA) and the odds;
  *  - Warden Tobb: who goes down (your squad and who leads), levelling and reforging them, the way down.
+ * (Bram the Broker, who sells your extras, has his own: BrokerShop.tsx.)
  */
 import { Fragment, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { BAL } from '../../core/balance';
@@ -18,7 +19,7 @@ import { activeQuests, MAX_ACTIVE_QUESTS, mobNoun, plural, questGoal, rewardText
 import { RARITIES, RARITY_COLOR, RARITY_NAME, RARITY_ODDS, rarityChances, rarityIndex } from '../../core/rarity';
 import { drySpell, reelCount, spinCycle, tokenChance } from '../../core/roller';
 import { hasPerk } from '../../core/perks';
-import { benchKnight, bestSquad, canLevel, isBestSquad, levelCost, levelUp, maxedLevel, rankedKnights, rebirthStatMult, reforge, reforgeCost, sellKnight, sellValue, setSquadSlot, soloBonus, squadSize, squadSlots } from '../../core/roster';
+import { benchKnight, bestSquad, canLevel, extrasCount, extrasValue, isBestSquad, levelCost, levelUp, maxedLevel, rankedKnights, rebirthStatMult, reforge, reforgeCost, sellKnight, sellValue, setSquadSlot, soloBonus, squadSize, squadSlots } from '../../core/roster';
 import type { Game } from '../../game';
 import { biomeForFloor } from '../../world/biomes';
 import type { HubStation } from '../../world/hubWorld';
@@ -30,7 +31,8 @@ import { Px, type IconName } from '../px';
 import { uiSound } from '../sound';
 import { InfoPopup } from './InfoPopup';
 import { Delta, Glyph, KeeperScreen, Purse, ShopBody, ShopFoot, ShopGrid, ShopHeading, ShopHint, ShopTop, Stat, keeperStyles as s, useGameTick } from './KeeperScreen';
-import { OfferCard } from './OfferCard';
+import { OfferCard, type CardLine } from './OfferCard';
+import { extrasText } from './BrokerShop';
 import { RollBody, RollButton, RollHead, RollLabel, RollList, RollReel, RollRow, RollStage, pctShort, rarityInk, type ReelSpin } from './RollMachine';
 import { Icon } from './TinkerShop';
 import { ClassTag } from '../ClassTag';
@@ -230,13 +232,21 @@ export function ShrineShop({ game, station, onClose }: { game: Game; station: Hu
     ...fresh.map((c) => ({ id: `cls-${c}`, art: <HeroArt id={knightId('rare', c)} s={1} />, name: CLASSES[c].name, icon: 'helm' as IconName, line: <b style={{ color: 'var(--good)' }}>NEW</b>, text: `${CLASSES[c].name} knights start turning up at the altar.` })),
     ...(next === BAL.perks.unlockRebirths ? [{ id: 'perks', art: <Px icon="sigil" size="lg" s={1} />, name: 'Perks', icon: 'sigil' as IconName, line: <b style={{ color: 'var(--good)' }}>OPEN</b>, text: 'Sage Orrin rolls perks for sigils.' }] : []),
   ];
+  // Extras go with their knights (core/newGame.ts rebirth): said here, with what they'd fetch, while
+  // there's still time to sell them and spend it.
+  const extras = extrasCount(st);
+  const extrasGold = fmt(extrasValue(st));
   const losses: Array<{ id: string; icon: string; name: string; line: string; text: string }> = [
-    { id: 'knights', icon: 'helm10', name: 'Knights', line: 'All of them', text: 'Your knights, with their levels, shards and duplicates (the Codex stays).' },
+    { id: 'knights', icon: 'helm10', name: 'Knights', line: 'All of them', text: 'Your knights, with their levels and their extras (the Codex stays).' },
+    ...(extras > 0
+      ? [{ id: 'extras', icon: 'copies', name: 'Extras', line: `${extras} · ${extrasGold} gold`, text: `Your ${extrasText(extras)} go with their knights, and the ${extrasGold} gold they'd fetch with them. Bram the Broker sells them, if you'd rather spend it first.` }]
+      : []),
     { id: 'gold', icon: 'coin', name: 'Gold', line: 'Back to 0', text: 'All your gold.' },
     { id: 'upgrades', icon: 'gear', name: 'Upgrades', line: 'Back to 0', text: "The tinker's upgrades." },
     { id: 'perks', icon: 'sigil', name: 'Perks', line: 'Rolled again', text: 'Your perks go; you start the run with a sigil for each rebirth to roll them again.' },
   ];
-  const all = [...gains.map((g) => ({ ...g, lose: false })), ...losses.map((l) => ({ id: `lose-${l.id}`, art: l.icon in { helm10: 1 } ? <Icon icon={l.icon} big /> : <Px icon={l.icon as IconName} size="lg" s={1} />, name: l.name, icon: l.icon, line: l.line as ReactNode, text: l.text, lose: true }))];
+  const lossArt = (icon: string) => (icon === 'helm10' ? <Icon icon={icon} big /> : <Px icon={icon as IconName} size="lg" s={icon === 'copies' ? 2 : 1} />);
+  const all = [...gains.map((g) => ({ ...g, lose: false })), ...losses.map((l) => ({ id: `lose-${l.id}`, art: lossArt(l.icon), name: l.name, icon: l.icon, line: l.line as ReactNode, text: l.text, lose: true }))];
   const card = (g: (typeof all)[number]) => (
     <OfferCard
       key={g.id}
@@ -483,7 +493,11 @@ export function OracleShop({ game, station, onClose, onOpen }: { game: Game; sta
               The altar <b>summons a free knight every {spinCycle(st).toFixed(1)}s</b>, even while you fight. More luck, rarer knights.
             </>
           ))}
-        {tab === 'latest' && <>Your last summons, newest first. Tap one to see that knight.</>}
+        {tab === 'latest' && (
+          <>
+            Your last summons, newest first (tap one to see it). <b>EXTRA</b>: you had it already, so Bram the Broker sells the copy.
+          </>
+        )}
         {tab === 'odds' && (
           <>
             How likely each rarity is: the <b>base</b> odds, and <b>your</b> chance with your luck (x{luck < 10 ? luck.toFixed(2) : fmt(luck)}).
@@ -491,7 +505,7 @@ export function OracleShop({ game, station, onClose, onOpen }: { game: Game; sta
         )}
         {tab === 'codex' && (
           <>
-            Every knight there is: {Object.keys(st.codex).length} of {KNIGHTS.length} found. Rolling one you already have turns it into gold.
+            Every knight there is: {Object.keys(st.codex).length} of {KNIGHTS.length} found. Rolling one you already have makes an <b>extra</b>, for Bram the Broker to sell.
           </>
         )}
       </ShopHint>
@@ -550,7 +564,7 @@ export function OracleShop({ game, station, onClose, onOpen }: { game: Game; sta
                     level={r.mult > 1 ? `x${r.mult}` : undefined}
                     art={<HeroArt id={r.knightId} mutation={r.mutation} s={1} />}
                     tall
-                    tag={r.isNew ? { text: 'NEW', kind: 'new' } : { color: RARITY_COLOR[def.rarity], title: RARITY_NAME[def.rarity] }}
+                    tag={r.isNew ? { text: 'NEW', kind: 'new' } : { text: 'EXTRA', kind: 'dupe', title: 'A knight you already have: kept as an extra for Bram the Broker to sell (your knight stays as it is)' }}
                     name={def.name}
                     lines={[
                       { text: RARITY_NAME[def.rarity], tone: 'muted' },
@@ -608,6 +622,11 @@ const wardenMemory = { tab: 'squad', slot: -1 };
 function rarityTag(id: string) {
   const r = knightDef(id).rarity;
   return { color: RARITY_COLOR[r], title: RARITY_NAME[r] };
+}
+
+/** A knight's extras on its card, in their purple, pointing to the broker (nothing when it has none). */
+function extrasLine(n: number): CardLine[] {
+  return n > 0 ? [{ icon: 'copies', text: <span className={s.extraLine} title="Repeat pulls of this knight: Bram the Broker sells them, and the knight stays as it is">+{extrasText(n)} <small>at Bram's</small></span> }] : [];
 }
 
 /**
@@ -705,11 +724,12 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
     const name = knightDef(id).name;
     const art = document.querySelector(`[data-card="${id}"] .${s.well}`);
     const purse = document.querySelector('[data-keeper] [data-purse]');
+    const extras = st.roster[id]?.extras ?? 0;
     const g = sellKnight(st, id);
     if (!g) return false;
     uiSound('sell', Math.min(6, ri));
     setSure(null);
-    setSold(`Sold ${name} for ${fmt(g)} gold`);
+    setSold(extras > 0 ? `Sold ${name} and ${extrasText(extras)} for ${fmt(g)} gold` : `Sold ${name} for ${fmt(g)} gold`);
     // The knight turns into coins that fly up into the gold counter.
     const coins = 6 + ri * 3;
     let paid = 0;
@@ -864,7 +884,7 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
           </b>
         ) : (
           <>
-            <b>Sell</b> knights you don't need for gold (weakest first). Knights in your squad stay; Rare and up ask twice.
+            <b>Sell</b> knights you don't need for gold (weakest first), their extras with them. Knights in your squad stay; Rare and up ask twice.
           </>
         )}
       </ShopHint>
@@ -895,7 +915,12 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
                     tag={rarityTag(id)}
                     name={def.name}
                     onArt={() => (uiSound('tap'), onOpen(id))}
-                    lines={[{ icon: 'sword', text: `Power ${fmt(knightRating(st, id))}` }]}
+                    lines={[
+                      { icon: 'sword', text: `Power ${fmt(knightRating(st, id))}` },
+                      // Selling a knight sells its extras with it (they can't stay without it); one in
+                      // the squad can't be sold, so its extras are Bram's to sell.
+                      ...(rec.extras <= 0 ? [] : inSquad ? extrasLine(rec.extras) : [{ icon: 'copies' as IconName, text: <span className={s.extraLine}>its {extrasText(rec.extras)} {rec.extras === 1 ? 'goes' : 'go'} too</span> }]),
+                    ]}
                     button={
                       inSquad
                         ? { kind: 'done', label: 'IN SQUAD' }
@@ -932,7 +957,7 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
                     tag={rarityTag(id)}
                     name={def.name}
                     onArt={() => (uiSound('tap'), onOpen(id))}
-                    lines={[{ icon: 'sword', text: `Power ${fmt(knightRating(st, id))}` }]}
+                    lines={[{ icon: 'sword', text: `Power ${fmt(knightRating(st, id))}` }, ...extrasLine(rec.extras)]}
                     button={
                       maxed
                         ? { kind: 'done', label: 'MAX LEVEL' }
@@ -970,7 +995,7 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
                   onArt={() => (uiSound('tap'), onOpen(id))}
                   lines={[
                     { icon: 'sword', text: `Power ${fmt(knightRating(st, id))}` },
-                    ...(msg[id] ? [{ icon: 'sparkle' as IconName, text: msg[id], tone: msg[id].endsWith('!') ? ('good' as const) : ('muted' as const) }] : []),
+                    ...(msg[id] ? [{ icon: 'sparkle' as IconName, text: msg[id], tone: msg[id].endsWith('!') ? ('good' as const) : ('muted' as const) }] : extrasLine(rec.extras)),
                   ]}
                   button={
                     voided

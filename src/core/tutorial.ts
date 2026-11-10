@@ -22,7 +22,8 @@
  * their own (walking down the steps without asking the warden) is done as they pass it.
  *
  * After that, a single one-off tip the first time each later thing comes up: a merchant on a floor,
- * the first checkpoint, rebirth (stronger for good), going down short-handed, auto battle.
+ * the first checkpoint, rebirth (stronger for good), going down short-handed, auto battle, and extras
+ * piling up (repeat pulls: Bram the Broker sells them; a visit to him first says it all already).
  *
  * One line at a time, and none while something else has the screen. A new game gets it; a save from
  * before it with any progress behind it (knights, gold, floors) never does (core/save.ts). Skipping
@@ -35,7 +36,7 @@ import { BAL } from './balance';
 
 export const TUT_STEPS = ['seal', 'altar', 'move', 'talk', 'descend', 'attack', 'skills', 'exit', 'auto', 'camp', 'spend'] as const;
 export type TutStepId = (typeof TUT_STEPS)[number];
-export const TUT_TIPS = ['shop', 'checkpoint', 'rebirth', 'solo', 'auto'] as const;
+export const TUT_TIPS = ['shop', 'checkpoint', 'rebirth', 'solo', 'auto', 'extras'] as const;
 export type TutTipId = (typeof TUT_TIPS)[number];
 
 /** The step each one waits for: it never shows before that one's done. */
@@ -115,12 +116,14 @@ export interface TutCtx {
   soloShown: boolean;
   /** Auto battle is on. */
   autoOn: boolean;
+  /** Extras (repeat pulls) waiting for Bram the Broker to sell them. */
+  extras: number;
 }
 
 /** What a line points at: a part of the screen, or a spot in the world. */
 export type TutTarget =
   | { kind: 'ui'; id: 'seal' | 'close' | 'talk' | 'descend' | 'level' | 'squadTab' | 'attack' | 'reel' | 'camp' | 'auto' | 'floor' | 'solo' }
-  | { kind: 'world'; id: 'knight' | 'warden' | 'steps' | 'foe' | 'door' | 'shop' | 'shrine' };
+  | { kind: 'world'; id: 'knight' | 'warden' | 'steps' | 'foe' | 'door' | 'shop' | 'shrine' | 'broker' };
 
 /** The line on the screen. */
 export interface TutView {
@@ -160,7 +163,9 @@ export type TutAction =
   /** Bought something off a merchant. */
   | 'bought'
   /** Turned auto battle on. */
-  | 'autoOn';
+  | 'autoOn'
+  /** Opened Bram the Broker's counter (where extras are sold). */
+  | 'broker';
 
 /** Seconds the skills line stays up (it shows as a reel spins; a roll takes 1.8 s to cast). */
 export const SKILLS_READ = 4;
@@ -174,6 +179,8 @@ export const TIP_SECONDS = 7;
 export const TIP_MIN = 2.5;
 /** Seconds after a tip before the next one. */
 export const TIP_REST = 2;
+/** Extras waiting before their tip comes up (a few have piled up, not just the first). */
+export const EXTRAS_TIP = 3;
 
 export function freshTutorial(): TutorialSave {
   return { done: [], tips: [], skipped: false };
@@ -350,11 +357,13 @@ function tipView(tip: TutTipId): TutView {
       return line('tip:solo', 'Fewer knights, more gold!', ui('solo'), true);
     case 'auto':
       return line('tip:auto', '[AUTO] lets your knight fight on its own.', ui('auto'), true);
+    case 'extras':
+      return line('tip:extras', 'Repeat pulls are [extras]: Bram sells them for gold!', world('broker'), true);
   }
 }
 
 /** Where a tip lives, and whether its moment is here. */
-const TIP_WHERE: Record<TutTipId, TutWhere> = { shop: 'dungeon', checkpoint: 'dungeon', rebirth: 'hub', solo: 'warden', auto: 'dungeon' };
+const TIP_WHERE: Record<TutTipId, TutWhere> = { shop: 'dungeon', checkpoint: 'dungeon', rebirth: 'hub', solo: 'warden', auto: 'dungeon', extras: 'hub' };
 
 function tipMoment(tip: TutTipId, t: TutorialSave, ctx: TutCtx): boolean {
   if (ctx.where !== TIP_WHERE[tip]) return false;
@@ -369,6 +378,8 @@ function tipMoment(tip: TutTipId, t: TutorialSave, ctx: TutCtx): boolean {
       return ctx.soloShown;
     case 'auto':
       return !ctx.autoOn && !ctx.foeNear && ctx.floor >= 3 && currentStep(t) === null;
+    case 'extras':
+      return ctx.extras >= EXTRAS_TIP;
   }
 }
 
@@ -455,6 +466,11 @@ export function tutorialDid(t: TutorialSave, run: TutRun, action: TutAction): vo
       break;
     case 'autoOn':
       if (run.tip === 'auto') run.tipUntil = 0;
+      break;
+    case 'broker':
+      // Found him already: the tip has nothing left to say.
+      if (!t.tips.includes('extras')) t.tips.push('extras');
+      if (run.tip === 'extras') run.tipUntil = 0;
       break;
   }
 }

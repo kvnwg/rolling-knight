@@ -7,7 +7,28 @@ import { rollPerk } from '../src/core/perks';
 import { RARITIES, RARITY_ODDS, RARITY_STAT, rarityAtLeast, rarityChances, rollRarity } from '../src/core/rarity';
 import { Rng } from '../src/core/rng';
 import { chainFloor, comboSteps, performSpin, reelCount, rollTokens, spinCycle, tokenMult } from '../src/core/roller';
-import { addKnight, benchKnight, bestSquad, dupeGold, fillSquad, knightPower, levelCost, levelMult, levelUp, sanitizeSquad, setSquadSlot, soloBonus, squadSlots } from '../src/core/roster';
+import {
+  addKnight,
+  benchKnight,
+  bestSquad,
+  dupeGold,
+  extrasCount,
+  extrasList,
+  extrasValue,
+  fillSquad,
+  knightPower,
+  levelCost,
+  levelMult,
+  levelUp,
+  sanitizeSquad,
+  sellAllExtras,
+  sellExtras,
+  sellKnight,
+  sellValue,
+  setSquadSlot,
+  soloBonus,
+  squadSlots,
+} from '../src/core/roster';
 import { mend } from '../src/core/save';
 import type { GameState } from '../src/core/state';
 
@@ -141,16 +162,94 @@ describe('roster', () => {
     expect(RARITY_STAT.absolute).toBeGreaterThan(RARITY_STAT.primordial * 3);
   });
 
-  it('turns a repeat straight into gold (a better mutation it rolled with sticks)', () => {
+  it('keeps a repeat as an extra, worth what a repeat was worth as it landed (a better mutation it rolled with sticks)', () => {
     const s = done();
     const id = knightId('common', 'blade');
     expect(addKnight(s, id, null).kind).toBe('new');
+    expect(s.roster[id]).toMatchObject({ extras: 0, extrasGold: 0 });
     const each = dupeGold(s, id);
     const r = addKnight(s, id, 'gilded');
+    // Nothing is paid as it lands: the gold waits at the broker's, the knight upgraded by the mutation.
     expect(r).toEqual({ kind: 'dupe', gold: each, mutationUp: true });
-    expect(s.gold).toBe(each);
-    expect(s.roster[id].mutation).toBe('gilded');
-    expect(s.roster[id].copies).toBe(2);
+    expect(s.gold).toBe(0);
+    expect(s.roster[id]).toMatchObject({ mutation: 'gilded', copies: 2, extras: 1, extrasGold: each, level: 1 });
+    // Its worth is locked in: a deeper best floor makes later repeats worth more, not this one.
+    s.run.bestFloor = 30;
+    const later = dupeGold(s, id);
+    expect(later).toBeGreaterThan(each);
+    addKnight(s, id, null);
+    expect(s.roster[id]).toMatchObject({ extras: 2, extrasGold: each + later, mutation: 'gilded' });
+    expect(extrasCount(s)).toBe(2);
+    expect(extrasValue(s)).toBe(each + later);
+    expect(extrasList(s)).toEqual([id]);
+  });
+
+  it('sells extras for what they were locked in at, never touching the knight', () => {
+    const s = done();
+    const id = knightId('rare', 'ranger');
+    addKnight(s, id, null);
+    s.gold = 1e6;
+    levelUp(s, id);
+    levelUp(s, id);
+    addKnight(s, id, 'shadow');
+    addKnight(s, id, null);
+    addKnight(s, id, null);
+    const rec = s.roster[id];
+    const before = { ...rec, extras: undefined, extrasGold: undefined };
+    const slot = s.squad.indexOf(id);
+    expect(slot).toBeGreaterThanOrEqual(0);
+    const codex = { ...s.codex[id] };
+    const worth = rec.extrasGold;
+    const gold = s.gold;
+    expect(sellExtras(s, id)).toBe(worth);
+    expect(s.gold).toBe(gold + worth);
+    // The knight itself: the same level, mutation, copies and place in the squad, its Codex entry as it was.
+    expect({ ...s.roster[id], extras: undefined, extrasGold: undefined }).toEqual(before);
+    expect(s.roster[id]).toMatchObject({ extras: 0, extrasGold: 0, level: 3, mutation: 'shadow' });
+    expect(s.squad.indexOf(id)).toBe(slot);
+    expect(s.codex[id]).toEqual(codex);
+    // Nothing more to sell: it pays nothing again.
+    expect(sellExtras(s, id)).toBe(0);
+    expect(s.gold).toBe(gold + worth);
+    expect(sellExtras(s, 'nobody')).toBe(0);
+  });
+
+  it('sells every extra at once', () => {
+    const s = done();
+    const ids = [knightId('common', 'guardian'), knightId('rare', 'blade'), knightId('epic', 'cleric')];
+    for (const id of ids) addKnight(s, id, null);
+    addKnight(s, ids[0], null);
+    addKnight(s, ids[0], null);
+    addKnight(s, ids[2], null);
+    const total = extrasValue(s);
+    expect(extrasCount(s)).toBe(3);
+    // Rarest first.
+    expect(extrasList(s)).toEqual([ids[2], ids[0]]);
+    expect(sellAllExtras(s)).toBe(total);
+    expect(s.gold).toBe(total);
+    expect(extrasCount(s)).toBe(0);
+    expect(extrasValue(s)).toBe(0);
+    expect(extrasList(s)).toEqual([]);
+    for (const id of ids) expect(s.roster[id].level).toBe(1);
+    expect(sellAllExtras(s)).toBe(0);
+  });
+
+  it("sells a knight's extras with it at the Warden's", () => {
+    const s = done();
+    const keep = [knightId('rare', 'guardian'), knightId('rare', 'blade'), knightId('rare', 'cleric')];
+    for (const id of keep) addKnight(s, id, null);
+    const id = knightId('common', 'ranger');
+    addKnight(s, id, null);
+    expect(s.squad.includes(id)).toBe(false);
+    const alone = sellValue(s, id);
+    addKnight(s, id, null);
+    addKnight(s, id, null);
+    const extras = s.roster[id].extrasGold;
+    expect(sellValue(s, id)).toBe(alone + extras);
+    expect(sellKnight(s, id)).toBe(alone + extras);
+    expect(s.gold).toBe(alone + extras);
+    expect(s.roster[id]).toBeUndefined();
+    expect(extrasCount(s)).toBe(0);
   });
 
   it('levels up with gold alone, more for rarer knights', () => {
@@ -168,6 +267,28 @@ describe('roster', () => {
     expect(levelCost(s, knightId('legendary', 'ranger'))).toBeGreaterThan(10 * levelCost(s, knightId('common', 'ranger')));
     s.gold = 0;
     expect(levelUp(s, id)).toBe(false);
+  });
+
+  it('loads a save from before extras with none, and mends a damaged count', () => {
+    const old = done();
+    const a = knightId('epic', 'cleric');
+    const b = knightId('rare', 'blade');
+    addKnight(old, a, null);
+    addKnight(old, b, null);
+    const raw = JSON.parse(JSON.stringify(old));
+    delete raw.roster[a].extras;
+    delete raw.roster[a].extrasGold;
+    raw.roster[b].extras = '2.7';
+    raw.roster[b].extrasGold = 'lost';
+    const s = mend(raw);
+    expect(s.roster[a]).toMatchObject({ extras: 0, extrasGold: 0 });
+    // Two extras whose worth went missing: valued at what a repeat is worth now.
+    expect(s.roster[b]).toMatchObject({ extras: 2, extrasGold: 2 * dupeGold(s, b) });
+    expect(s.gold).toBe(0);
+    // A good save's extras come through as they were.
+    addKnight(old, a, null);
+    const again = mend(JSON.parse(JSON.stringify(old)));
+    expect(again.roster[a]).toMatchObject({ extras: 1, extrasGold: old.roster[a].extrasGold });
   });
 
   it("cashes an old save's spare copies and shards in as gold", () => {
@@ -217,6 +338,20 @@ describe('rebirth', () => {
     expect(Object.keys(s.codex)).toHaveLength(1);
     expect(currentLuck(s, Date.now())).toBeCloseTo(luck * 1.25, 5);
     expect(s.sigils).toBe(1);
+  });
+
+  it('takes the extras with their knights, like the rest of the gold', () => {
+    const s = done();
+    const id = knightId('epic', 'blade');
+    addKnight(s, id, null);
+    addKnight(s, id, null);
+    addKnight(s, id, null);
+    expect(extrasCount(s)).toBe(2);
+    s.run.bestFloor = 15;
+    expect(rebirth(s)).toBe(true);
+    expect(s.gold).toBe(0);
+    expect(extrasCount(s)).toBe(0);
+    expect(extrasValue(s)).toBe(0);
   });
 });
 

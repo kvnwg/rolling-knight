@@ -87,6 +87,11 @@ const EXTRA: Record<string, Rows> = {
   quill: ['.......kk', '......kWk', '.....kW5k', '....kW5k.', '...kW5k..', '..kW5k...', '.kx5k....', 'kxkk.....', 'kk.......'],
 };
 
+/** Smaller cuts of a few of them, for the tiny size (beside a card's line of text). */
+const EXTRA_XS: Partial<Record<keyof typeof EXTRA, Rows>> = {
+  copies: ['..kkkkk', '..k554k', 'kkkkk4k', 'kWWTk4k', 'kWWTkkk', 'kTTTk..', 'kkkkk..'],
+};
+
 export type IconName = UiIcon | keyof typeof EXTRA | `token${2 | 3 | 5 | 10}` | ItemIcon;
 export type IconSize = 'xs' | 'sm' | 'md' | 'lg';
 
@@ -94,7 +99,7 @@ const urls = new Map<string, { url: string; w: number; h: number }>();
 
 function rowsFor(icon: IconName, size: IconSize): Rows | undefined {
   if (icon.startsWith('token')) return LUCK_TOKENS[Number(icon.slice(5)) as 2 | 3 | 5 | 10];
-  if (icon in EXTRA) return EXTRA[icon as keyof typeof EXTRA];
+  if (icon in EXTRA) return (size === 'xs' ? EXTRA_XS[icon as keyof typeof EXTRA] : undefined) ?? EXTRA[icon as keyof typeof EXTRA];
   const ui = icon as UiIcon;
   if (size === 'xs') return UI_XS[ui] ?? UI_SM[ui] ?? UI_MD[ui] ?? UI_SPRITES[ui];
   if (size === 'sm') return UI_SM[ui] ?? UI_MD[ui] ?? UI_SPRITES[ui];

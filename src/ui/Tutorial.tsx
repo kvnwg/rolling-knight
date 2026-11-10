@@ -15,7 +15,7 @@
  */
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import { canRebirth } from '../core/newGame';
-import { canLevel } from '../core/roster';
+import { canLevel, extrasCount } from '../core/roster';
 import { newTutRun, skipTutorial, tutorialDid, tutorialView, type TutAction, type TutCtx, type TutTarget, type TutView, type TutWhere } from '../core/tutorial';
 import type { Game } from '../game';
 import type { Controls } from '../input/input';
@@ -196,10 +196,11 @@ function worldSpot(game: Game, r: Renderer, id: Extract<TutTarget, { kind: 'worl
     case 'knight':
       return lead ? at(lead.x, lead.y, 24, 9) : null;
     case 'warden':
-    case 'shrine': {
-      // (Just over his helmet, or her hood: they're a head shorter than a knight.)
-      const st = w.stations.find((x) => x.id === (id === 'warden' ? 'gate' : 'rebirth'));
-      return st ? at(st.x, st.y, id === 'warden' ? 17 : 19, 9) : null;
+    case 'shrine':
+    case 'broker': {
+      // (Just over his helmet, her hood or his cap: they're a head shorter than a knight.)
+      const st = w.stations.find((x) => x.id === (id === 'warden' ? 'gate' : id === 'shrine' ? 'rebirth' : 'scrap'));
+      return st ? at(st.x, st.y, id === 'shrine' ? 19 : 17, 9) : null;
     }
     case 'steps':
       return at(HUB_CX, HUB_STEPS_Y + 12, 4, 18);
@@ -562,6 +563,7 @@ export function Tutorial(props: TutorialProps) {
       }
       if (st.settings.autoPlay && !mem.auto) did('autoOn');
       mem.auto = st.settings.autoPlay;
+      if (p.station === 'scrap') did('broker');
 
       // The fight round your knight.
       let foeNear = false;
@@ -611,6 +613,7 @@ export function Tutorial(props: TutorialProps) {
         canRebirth: st.rebirths === 0 && canRebirth(st),
         soloShown: where === 'warden' && !!document.querySelector('[data-keeper="gate"] [data-tut="solo"]'),
         autoOn: st.settings.autoPlay,
+        extras: extrasCount(st),
       };
       const v = game.bot ? null : tutorialView(t, run.current, ctx, now);
       const key = v?.key ?? null;

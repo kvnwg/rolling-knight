@@ -10,7 +10,7 @@ import { knightId } from '../src/core/knights';
 import { newGame } from '../src/core/newGame';
 import { runOffline } from '../src/core/offline';
 import { Rng } from '../src/core/rng';
-import { addKnight, dupeGold, killGold, levelCost } from '../src/core/roster';
+import { addKnight, dupeGold, extrasCount, extrasValue, killGold, levelCost } from '../src/core/roster';
 import { upgradeCost } from '../src/core/upgrades';
 
 const fresh = (rebirths = 0) => {
@@ -45,7 +45,7 @@ describe('the economy', () => {
   it("pays a night away from the fights' own rate, about an hour's worth, whatever gold piled up", () => {
     const s = fresh(1);
     s.stats.combatPerMinute = 1000;
-    // A purse that grew fast (duplicates, a sale, nothing spent) doesn't count: only the fights do.
+    // A purse that grew fast (extras sold, a knight sold, nothing spent) doesn't count: only the fights do.
     s.stats.goldPerMinute = 1e9;
     const rep = runOffline(s, new Rng(3), 8 * 3600, 1_700_000_000_000)!;
     expect(rep.gold).toBe(Math.round(1000 * 8 * 60 * BAL.offline.efficiency));
@@ -62,6 +62,32 @@ describe('the economy', () => {
     expect(rep.gold / 1000 / 60).toBeLessThan(3.5);
   });
 
+  it('lands every pull while away: new knights join, repeats wait as extras at a share of their worth', () => {
+    const s = fresh(1);
+    s.stats.combatPerMinute = 1000;
+    for (const c of ['guardian', 'blade', 'cleric'] as const) addKnight(s, knightId('common', c), null, 0);
+    const spins = s.records.spins;
+    const rep = runOffline(s, new Rng(3), 8 * 3600, 1_700_000_000_000)!;
+    // One entry per pull, every one of them landed (none dropped for being too common).
+    expect(rep.rolls).toBeGreaterThan(20);
+    expect(rep.kept.length).toBe(rep.rolls);
+    expect(s.records.spins - spins).toBe(rep.rolls);
+    expect(rep.kept.some((k) => k.rarity === 'common')).toBe(true);
+    // A knight is new once; every other pull of it is an extra.
+    const joined = rep.kept.filter((k) => k.isNew);
+    expect(new Set(joined.map((k) => k.knightId)).size).toBe(joined.length);
+    for (const k of joined) expect(s.roster[k.knightId]).toBeDefined();
+    expect(rep.extras).toBe(rep.kept.length - joined.length);
+    expect(rep.extras).toBeGreaterThan(0);
+    expect(extrasCount(s)).toBe(rep.extras);
+    // The repeats wait at the broker's, each at dupeShare of what a repeat fetches; the purse only got
+    // the fights' gold.
+    let worth = 0;
+    for (const k of rep.kept) if (!k.isNew) worth += dupeGold(s, k.knightId) * BAL.offline.dupeShare;
+    expect(extrasValue(s)).toBeCloseTo(worth, 6);
+    expect(s.gold).toBe(rep.gold);
+  });
+
   it('caps the night at 8 hours and the rolls it makes', () => {
     const s = fresh(1);
     s.stats.combatPerMinute = 1000;
@@ -70,7 +96,7 @@ describe('the economy', () => {
     expect(rep.rolls).toBeLessThanOrEqual(BAL.offline.maxRolls);
   });
 
-  it("turns duplicates into a few kills' worth of gold, a Legendary's about ten", () => {
+  it("values a repeat (the extra it becomes) at a few kills' worth of gold, a Legendary's about ten", () => {
     const s = fresh(0);
     s.run.bestFloor = 30;
     const kill = killGold(30);

@@ -1,6 +1,8 @@
 /**
- * Your knights: you own each knight once (its first pull); every later pull of it turns straight
- * into gold (and a better mutation it rolled with sticks to the knight). Gold levels knights up.
+ * Your knights: you own each knight once (its first pull). Every later pull of it is an extra, kept
+ * on that knight's record until Bram the Broker sells it for you, for what a repeat was worth the
+ * moment it landed (a better mutation it rolled with still sticks to the knight). An extra is only
+ * gold to be: selling it never touches the knight. Gold levels knights up.
  * Also the squad: three slots, one of them yours to control. Empty slots fill themselves with your
  * strongest free knight; anything else is your choice at the Warden's (or Best squad).
  */
@@ -139,7 +141,7 @@ export function goldMult(state: GameState): number {
   return (1 + upgradeFx(state).goldPct / 100) * (1 + BAL.rebirth.goldMultPer * state.rebirths);
 }
 
-/** The gold a duplicate of this knight turns into when it's rolled. */
+/** What a repeat of this knight is worth right now: the gold an extra of it fetches, locked in as it lands. */
 export function dupeGold(state: GameState, id: string): number {
   const def = knightDef(id);
   let v = BAL.roster.sellKills[def.rarity] * killGold(Math.max(1, state.run.bestFloor)) * goldMult(state);
@@ -182,8 +184,9 @@ export function levelUp(state: GameState, id: string): boolean {
 // ------------------------------------------------------------------ selling
 
 /**
- * Gold for selling a knight outright: what a duplicate of it pays (twice that with a mutation), plus
- * half the gold its levels cost.
+ * Gold for selling a knight outright: what a repeat of it is worth (twice that with a mutation), plus
+ * half the gold its levels cost, plus whatever its extras fetch (they can't stay without their
+ * knight, so they're sold with it, at what they were locked in at).
  */
 export function sellValue(state: GameState, id: string): number {
   const rec = state.roster[id];
@@ -193,7 +196,7 @@ export function sellValue(state: GameState, id: string): number {
   let levels = 0;
   for (let L = 1; L < rec.level; L++) levels += R.goldBase * Math.pow(R.goldGrowth, L - 1) * Math.pow(R.rarityGrowth, rarityIndex(rarity));
   if (hasPerk(state, 'handMeDowns') && isUnderdog(rarity)) levels *= 0.5;
-  return Math.max(1, Math.round(dupeGold(state, id) * (rec.mutation ? 2 : 1) + levels * 0.5));
+  return Math.max(1, Math.round(dupeGold(state, id) * (rec.mutation ? 2 : 1) + levels * 0.5)) + rec.extrasGold;
 }
 
 /** A knight can be sold when it isn't in the squad. */
@@ -201,7 +204,10 @@ export function canSell(state: GameState, id: string): boolean {
   return !!state.roster[id] && !state.squad.includes(id);
 }
 
-/** Sells a knight (gone from the roster; the codex still remembers it). Returns the gold, 0 if it can't be sold. */
+/**
+ * Sells a knight, its extras with it (gone from the roster; the codex still remembers it). Returns
+ * the gold, 0 if it can't be sold.
+ */
 export function sellKnight(state: GameState, id: string): number {
   if (!canSell(state, id)) return 0;
   const g = sellValue(state, id);
@@ -229,6 +235,10 @@ export function isNewKnight(rec: Pick<KnightRec, 'gotAt'> | null | undefined, no
   return age >= 0 && age < NEW_FOR_MS;
 }
 
+/**
+ * What a pull came to: a new knight, or a repeat stored as an extra. A repeat's `gold` is what that
+ * extra will fetch at the broker's (nothing is paid yet); `mutationUp`, that it upgraded the knight.
+ */
 export type AddResult = { kind: 'new' } | { kind: 'dupe'; gold: number; mutationUp: boolean };
 
 function betterMutation(a: MutationId | null, b: MutationId | null): boolean {
@@ -239,24 +249,75 @@ function betterMutation(a: MutationId | null, b: MutationId | null): boolean {
 
 /**
  * A rolled knight arrives: a new knight joins (stamped with the wall clock `now`, for its NEW tag);
- * a repeat turns straight into gold (a better mutation it rolled with sticks to the knight).
+ * a repeat is kept on the knight's record as an extra, worth what a repeat is worth now (`share` of
+ * that for the altar's rolls while you're away), for the broker to sell. A better mutation a repeat
+ * rolled with sticks to the knight; nothing else about the knight changes.
  */
-export function addKnight(state: GameState, id: string, mutation: MutationId | null, now = Date.now()): AddResult {
+export function addKnight(state: GameState, id: string, mutation: MutationId | null, now = Date.now(), share = 1): AddResult {
   const codex = (state.codex[id] ??= { count: 0, best: null, firstAt: state.playTimeMs });
   codex.count += 1;
   if (betterMutation(mutation, codex.best)) codex.best = mutation;
   const rec = state.roster[id];
   if (!rec) {
-    state.roster[id] = { id, level: 1, mutation, copies: 1, firstAt: state.playTimeMs, gotAt: now };
+    state.roster[id] = { id, level: 1, mutation, copies: 1, extras: 0, extrasGold: 0, firstAt: state.playTimeMs, gotAt: now };
     fillSquad(state);
     return { kind: 'new' };
   }
   rec.copies += 1;
   const mutationUp = betterMutation(mutation, rec.mutation);
   if (mutationUp) rec.mutation = mutation;
-  const gold = dupeGold(state, id);
-  state.gold += gold;
+  // Its worth is locked in now (at this run's best floor and the gold multipliers you have now), so
+  // the gold comes to the same as when repeats paid on landing, only collected later.
+  const gold = dupeGold(state, id) * share;
+  rec.extras += 1;
+  rec.extrasGold += gold;
   return { kind: 'dupe', gold, mutationUp };
+}
+
+// ------------------------------------------------------------------ extras (the broker's)
+
+/** Extras waiting to be sold, all told. */
+export function extrasCount(state: Pick<GameState, 'roster'>): number {
+  let n = 0;
+  for (const rec of Object.values(state.roster)) n += rec.extras;
+  return n;
+}
+
+/** What every extra waiting would fetch, all told. */
+export function extrasValue(state: Pick<GameState, 'roster'>): number {
+  let g = 0;
+  for (const rec of Object.values(state.roster)) g += rec.extras > 0 ? rec.extrasGold : 0;
+  return g;
+}
+
+/** The knights with extras waiting, rarest first (then by class, so the order holds as more come in). */
+export function extrasList(state: Pick<GameState, 'roster'>): string[] {
+  return Object.values(state.roster)
+    .filter((r) => r.extras > 0)
+    .sort((a, b) => rarityIndex(knightDef(b.id).rarity) - rarityIndex(knightDef(a.id).rarity) || a.id.localeCompare(b.id))
+    .map((r) => r.id);
+}
+
+/**
+ * Bram the Broker sells a knight's extras: pays what they were locked in at and clears them. The
+ * knight itself stays exactly as it was (its level, mutation, place in the squad, copies and Codex
+ * count). Returns the gold (0 when it had none).
+ */
+export function sellExtras(state: GameState, id: string): number {
+  const rec = state.roster[id];
+  if (!rec || rec.extras <= 0) return 0;
+  const g = rec.extrasGold;
+  rec.extras = 0;
+  rec.extrasGold = 0;
+  state.gold += g;
+  return g;
+}
+
+/** Sells every knight's extras (the broker's SELL ALL). Returns the gold. */
+export function sellAllExtras(state: GameState): number {
+  let g = 0;
+  for (const id of Object.keys(state.roster)) g += sellExtras(state, id);
+  return g;
 }
 
 // ------------------------------------------------------------------ squad
