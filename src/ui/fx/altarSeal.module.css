@@ -1,7 +1,8 @@
 /*
  * The Oracle's sealed altar (AltarSeal.tsx): Dumpster Legend's padlocked dumpster (dumpsterLock.module.css)
- * made a magic seal. Sizes in art pixels (var(--px)); every piece sits on whole pixels (placed from
- * JS) and moves in whole-pixel steps.
+ * made hers, chains and a padlock. Sizes in art pixels (var(--px)); every piece sits on whole pixels
+ * (placed from JS), moves in whole-pixel steps, and every picture is pixel art shown pixelated: frames
+ * are swapped, never scaled.
  */
 .seal {
   position: absolute;
@@ -12,13 +13,24 @@
   -webkit-tap-highlight-color: transparent;
   outline: none;
 }
-.seal:focus-visible .disc {
-  filter: drop-shadow(0 0 0 #fff28c) drop-shadow(var(--px) 0 0 #fff28c) drop-shadow(calc(-1 * var(--px)) 0 0 #fff28c);
+.seal img,
+.seal i,
+.seal span {
+  pointer-events: none;
+}
+.seal img {
+  position: absolute;
+  image-rendering: pixelated;
+  user-select: none;
+}
+.seal:focus-visible .body {
+  filter: drop-shadow(var(--px) 0 0 #fff28c) drop-shadow(calc(-1 * var(--px)) 0 0 #fff28c) drop-shadow(0 var(--px) 0 #fff28c)
+    drop-shadow(0 calc(-1 * var(--px)) 0 #fff28c);
 }
 .tint {
   position: absolute;
   inset: 0;
-  background: rgba(10, 8, 24, 0.55);
+  background: rgba(10, 8, 24, 0.5);
 }
 .seal[data-phase='fall'] .tint {
   animation: tintOut 0.45s steps(3) forwards;
@@ -29,177 +41,172 @@
   }
 }
 
-/* ------------------------------------------------------------ the bindings */
-.plate,
-.strap {
-  position: absolute;
-  overflow: hidden;
-  image-rendering: pixelated;
-  box-shadow:
-    0 0 0 var(--px) var(--ink, #1a1326),
-    0 calc(2 * var(--px)) 0 var(--px) rgba(10, 6, 20, 0.45);
+/* ------------------------------------------------------------ the chains */
+/* Each length of chain is the altar's size, its links drawn where they lie (and its shadow). */
+/* The tap rattles them: across up and down, down side to side. */
+.seal[data-phase='hit'] .chain[data-run='x'] {
+  animation: rattleX 0.17s both;
 }
-.plate {
-  left: calc(-2 * var(--px));
-  right: calc(-2 * var(--px));
-  height: calc(11 * var(--px));
-  background:
-    var(--runes-x) 0 calc(3 * var(--px)) / calc(36 * var(--px)) calc(5 * var(--px)) repeat-x,
-    linear-gradient(
-      180deg,
-      #d9c4ff 0 var(--px),
-      #7a58c0 var(--px) calc(3 * var(--px)),
-      #4e3090 calc(3 * var(--px)) calc(8 * var(--px)),
-      #2e1a5a calc(8 * var(--px)) 100%
-    );
+.seal[data-phase='hit'] .chain[data-run='y'] {
+  animation: rattleY 0.17s both;
 }
-.strap {
-  top: calc(-2 * var(--px));
-  bottom: calc(-2 * var(--px));
-  width: calc(16 * var(--px));
-  background:
-    var(--runes-y) calc(5.5 * var(--px)) 0 / calc(5 * var(--px)) calc(36 * var(--px)) repeat-y,
-    linear-gradient(
-      90deg,
-      #d9c4ff 0 var(--px),
-      #7a58c0 var(--px) calc(5 * var(--px)),
-      #4e3090 calc(5 * var(--px)) calc(12 * var(--px)),
-      #2e1a5a calc(12 * var(--px)) 100%
-    );
+@keyframes rattleX {
+  0% {
+    transform: translateY(var(--px));
+    animation-timing-function: steps(1, end);
+  }
+  40% {
+    transform: translateY(calc(-1 * var(--px)));
+    animation-timing-function: steps(1, end);
+  }
+  75%,
+  100% {
+    transform: translateY(0);
+  }
 }
-/* The runes on the bands pulse, and a glint runs along the bands now and then. */
-.plate::before,
-.strap::before {
-  content: '';
+@keyframes rattleY {
+  0% {
+    transform: translateX(calc(-1 * var(--px)));
+    animation-timing-function: steps(1, end);
+  }
+  40% {
+    transform: translateX(var(--px));
+    animation-timing-function: steps(1, end);
+  }
+  75%,
+  100% {
+    transform: translateX(0);
+  }
+}
+/*
+ * A glint runs along each chain now and then: a window 12 pixels wide (AltarSeal's GLINT_W) slides
+ * along in whole steps (its timing from JS: so many steps of so many pixels), over the links' glints,
+ * which stay put.
+ */
+.glints {
   position: absolute;
   inset: 0;
-  background: rgba(120, 240, 255, 0.16);
-  mix-blend-mode: screen;
-  animation: runePulse 2.4s steps(1) infinite;
+  pointer-events: none;
 }
-.strap::before {
-  animation-delay: 0.6s;
-}
-@keyframes runePulse {
-  0%,
-  60% {
-    opacity: 0;
-  }
-  70% {
-    opacity: 0.6;
-  }
-  80% {
-    opacity: 1;
-  }
-  90% {
-    opacity: 0.5;
-  }
-}
-.plate::after {
-  content: '';
+.glintX,
+.glintY {
   position: absolute;
+  left: 0;
   top: 0;
-  bottom: 0;
-  left: calc(-4 * var(--px));
-  width: calc(2 * var(--px));
-  background: rgba(255, 255, 255, 0.6);
-  animation: glint 3.2s infinite;
+  overflow: hidden;
 }
-.plate + .plate::after {
-  animation-delay: 0.25s;
+.glintX {
+  animation: runX 3.6s infinite;
 }
-@keyframes glint {
+.glintX > img {
+  animation: runXBack 3.6s infinite;
+}
+.glintY {
+  animation: runY 3.6s 1.5s infinite backwards;
+}
+.glintY > img {
+  animation: runYBack 3.6s 1.5s infinite backwards;
+}
+@keyframes runX {
   0% {
-    transform: translateX(0);
-    animation-timing-function: steps(30, end);
+    transform: translateX(calc(-12 * var(--px)));
   }
-  55%,
+  50%,
   100% {
-    transform: translateX(calc(180 * var(--px)));
+    transform: translateX(calc(var(--run-x) - 12 * var(--px)));
   }
 }
-.rivet {
-  position: absolute;
-  width: calc(2 * var(--px));
-  height: calc(2 * var(--px));
-  background: #ffe48a;
-  box-shadow:
-    var(--px) var(--px) 0 0 #8a4a1a,
-    0 0 0 var(--px) var(--ink, #1a1326);
+@keyframes runXBack {
+  0% {
+    transform: translateX(calc(12 * var(--px)));
+  }
+  50%,
+  100% {
+    transform: translateX(calc(12 * var(--px) - var(--run-x)));
+  }
+}
+@keyframes runY {
+  0% {
+    transform: translateY(calc(-12 * var(--px)));
+  }
+  40%,
+  100% {
+    transform: translateY(calc(var(--run-y) - 12 * var(--px)));
+  }
+}
+@keyframes runYBack {
+  0% {
+    transform: translateY(calc(12 * var(--px)));
+  }
+  40%,
+  100% {
+    transform: translateY(calc(12 * var(--px) - var(--run-y)));
+  }
 }
 
-/* ------------------------------------------------------------ the seal */
-.disc,
-.half,
-.glow,
-.burst {
+/* ------------------------------------------------------------ the lock */
+.lock {
   position: absolute;
 }
-.disc > img,
-.half > img {
+.body {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  image-rendering: pixelated;
+  filter: drop-shadow(var(--px) calc(2 * var(--px)) 0 rgba(8, 4, 18, 0.5));
 }
-.disc,
-.half {
-  filter: drop-shadow(0 calc(2 * var(--px)) 0 rgba(10, 6, 20, 0.5));
+/* It breathes: the keyhole lit up, then not (with the glow behind it). */
+.body > .lit {
+  opacity: 0;
+  animation: breatheIn 1.6s infinite;
 }
-/* It breathes: the runes and the star lit, then not. */
-.disc > .lit {
-  animation: breathe 1.6s steps(1) infinite;
-}
-@keyframes breathe {
+@keyframes breatheIn {
   0%,
-  45% {
+  49.9% {
     opacity: 0;
   }
   50%,
-  95% {
+  100% {
     opacity: 1;
   }
 }
-/* A halo of light behind it in three rings, swelling as it breathes (its box reaches 8 px past the seal). */
-.glow {
-  pointer-events: none;
-  background: radial-gradient(
-    circle closest-side,
-    rgba(200, 140, 255, 0.34) 0 76%,
-    rgba(150, 100, 240, 0.17) 76% 87%,
-    rgba(100, 200, 255, 0.08) 87% 100%,
-    transparent 100%
-  );
-  animation: swell 1.6s steps(1) infinite;
-}
-@keyframes swell {
+@keyframes breatheOut {
   0%,
-  45% {
-    transform: scale(1);
+  49.9% {
+    opacity: 1;
   }
   50%,
-  95% {
-    transform: scale(1.06);
+  100% {
+    opacity: 0;
   }
 }
-.seal:not([data-phase='idle']) .glow {
-  animation: none;
+/* A shine sweeps across the brass now and then: a strip of frames, a frame a step. */
+.shine {
+  position: absolute;
+  background-size: var(--shine-w) 100%;
+  background-repeat: repeat-x;
+  image-rendering: pixelated;
+  animation: shine 4.4s 0.8s infinite backwards;
 }
-.seal[data-phase='fall'] .glow {
-  display: none;
+@keyframes shine {
+  0% {
+    background-position: 0 0;
+    animation-timing-function: steps(8, end);
+  }
+  14%,
+  100% {
+    background-position: calc(-1 * var(--shine-w)) 0;
+  }
 }
-/* Idle: a little wiggle every so often. */
-.seal[data-phase='idle'] .disc {
-  animation: wiggle 1.7s infinite;
+/* Idle: a jiggle every so often, as if something tugged at it. */
+.seal[data-phase='idle'] .body {
+  animation: wiggle 2.3s infinite;
 }
 @keyframes wiggle {
   0%,
-  78% {
+  80% {
     transform: translate(0, 0);
     animation-timing-function: steps(1, end);
   }
-  82% {
+  83% {
     transform: translate(calc(-1 * var(--px)), 0);
     animation-timing-function: steps(1, end);
   }
@@ -207,26 +214,26 @@
     transform: translate(var(--px), calc(-1 * var(--px)));
     animation-timing-function: steps(1, end);
   }
-  90% {
+  89% {
     transform: translate(calc(-1 * var(--px)), 0);
     animation-timing-function: steps(1, end);
   }
-  94%,
+  92%,
   100% {
     transform: translate(0, 0);
   }
 }
-/* The tap: a jolt, and the seal flares. */
-.seal[data-phase='hit'] .disc {
+/* The tap: a jolt, the keyhole flares. */
+.seal[data-phase='hit'] .body {
   animation: jolt 0.17s both;
 }
-.seal[data-phase='hit'] .disc > .lit {
+.seal[data-phase='hit'] .body > .lit {
   animation: none;
   opacity: 1;
 }
 @keyframes jolt {
   0% {
-    transform: translate(calc(2 * var(--px)), calc(1 * var(--px)));
+    transform: translate(calc(2 * var(--px)), var(--px));
     animation-timing-function: steps(1, end);
   }
   35% {
@@ -238,9 +245,46 @@
     transform: translate(var(--px), calc(-1 * var(--px)));
   }
 }
+/* It springs open: a hop up. */
+.seal[data-phase='open'] .body {
+  animation: hop 0.15s both;
+}
+@keyframes hop {
+  0% {
+    transform: translate(0, calc(-2 * var(--px)));
+    animation-timing-function: steps(1, end);
+  }
+  50%,
+  100% {
+    transform: translate(0, calc(-1 * var(--px)));
+  }
+}
 
 /* ------------------------------------------------------------ the magic */
-/* Motes of light drifting up off the seal, blinking out as they go. */
+/* The glow behind the lock: two sizes of it, swapped as it breathes. */
+.glow,
+.glowBig {
+  pointer-events: none;
+}
+.glow {
+  animation: breatheOut 1.6s infinite;
+}
+.glowBig {
+  opacity: 0;
+  animation: breatheIn 1.6s infinite;
+}
+.seal:not([data-phase='idle']) .glow {
+  animation: none;
+  opacity: 0;
+}
+.seal:not([data-phase='idle']) .glowBig {
+  animation: none;
+  opacity: 1;
+}
+.seal[data-phase='fall'] .glowBig {
+  display: none;
+}
+/* Motes of light drifting up off the lock, blinking out as they go. */
 .mote {
   position: absolute;
   inset: 0;
@@ -257,15 +301,19 @@
 }
 .mote > i[data-c='w'] {
   background: #ffffff;
-  box-shadow: 0 0 0 calc(0.5 * var(--px)) rgba(255, 255, 255, 0.35);
+  box-shadow:
+    var(--px) 0 0 rgba(220, 164, 255, 0.6),
+    calc(-1 * var(--px)) 0 0 rgba(220, 164, 255, 0.6),
+    0 var(--px) 0 rgba(220, 164, 255, 0.6),
+    0 calc(-1 * var(--px)) 0 rgba(220, 164, 255, 0.6);
 }
 .mote > i[data-c='v'] {
-  background: #e0a8ff;
+  background: #c890ff;
   width: calc(2 * var(--px));
   height: calc(2 * var(--px));
 }
-.mote > i[data-c='c'] {
-  background: #8ef4ff;
+.mote > i[data-c='p'] {
+  background: #f2d6ff;
 }
 .mote > i[data-c='g'] {
   background: #ffe48a;
@@ -286,53 +334,63 @@
     opacity: 0;
   }
 }
-/* It breaks: a ring of light goes out, sparks fly from the crack, a flash. */
+/*
+ * It breaks: a ring of light goes out from behind the lock (four frames, each wider), sparks fly out
+ * of the keyhole (a white-hot pixel and its four arms), a flash.
+ */
 .burst {
+  position: absolute;
+  width: 0;
+  height: 0;
   pointer-events: none;
 }
 .ring {
   position: absolute;
+  background-size: var(--ring-w) 100%;
+  background-repeat: no-repeat;
   image-rendering: pixelated;
-  animation: ringOut 0.42s both;
+  animation: ringOut 0.4s steps(4, end) forwards;
 }
 @keyframes ringOut {
   0% {
-    transform: scale(0.45);
-    opacity: 1;
-    animation-timing-function: steps(1, end);
-  }
-  33% {
-    transform: scale(0.8);
-    opacity: 1;
-    animation-timing-function: steps(1, end);
-  }
-  66% {
-    transform: scale(1.2);
-    opacity: 0.6;
-    animation-timing-function: steps(1, end);
+    background-position: 0 0;
   }
   100% {
-    transform: scale(1.6);
-    opacity: 0;
+    background-position: calc(-1 * var(--ring-w)) 0;
   }
 }
 .spark {
+  --arm: #b46cf0;
   position: absolute;
-  left: calc(15.5 * var(--px));
-  top: calc(15.5 * var(--px));
-  width: calc(2 * var(--px));
-  height: calc(2 * var(--px));
+  left: 0;
+  top: 0;
+  width: var(--px);
+  height: var(--px);
   background: #ffffff;
-  box-shadow: 0 0 0 var(--px) #b46cf0;
+  box-shadow:
+    var(--px) 0 0 var(--arm),
+    calc(-1 * var(--px)) 0 0 var(--arm),
+    0 var(--px) 0 var(--arm),
+    0 calc(-1 * var(--px)) 0 var(--arm);
   animation: spark 0.36s both;
 }
-.spark[data-c='v'] {
-  background: #f4d8ff;
-  box-shadow: 0 0 0 var(--px) #8a3ad8;
+.spark[data-c='w'] {
+  --arm: #e8c4ff;
+  box-shadow:
+    var(--px) 0 0 var(--arm),
+    calc(-1 * var(--px)) 0 0 var(--arm),
+    0 var(--px) 0 var(--arm),
+    0 calc(-1 * var(--px)) 0 var(--arm),
+    calc(2 * var(--px)) 0 0 #a858f0,
+    calc(-2 * var(--px)) 0 0 #a858f0,
+    0 calc(2 * var(--px)) 0 #a858f0,
+    0 calc(-2 * var(--px)) 0 #a858f0;
 }
-.spark[data-c='c'] {
-  background: #e0feff;
-  box-shadow: 0 0 0 var(--px) #2fb8d8;
+.spark[data-c='v'] {
+  --arm: #a858f0;
+}
+.spark[data-c='g'] {
+  --arm: #f7cd62;
 }
 @keyframes spark {
   0% {
@@ -365,11 +423,11 @@
 }
 @keyframes flash {
   0% {
-    opacity: 0.55;
+    opacity: 0.5;
     animation-timing-function: steps(1, end);
   }
   50% {
-    opacity: 0.25;
+    opacity: 0.2;
     animation-timing-function: steps(1, end);
   }
   100% {
@@ -377,25 +435,36 @@
   }
 }
 
-/* Reduce motion: no wiggle, glint, breath, motes or flash; the seal still breaks and falls. */
-.seal[data-calm] .plate::after,
-.seal[data-calm] .plate::before,
-.seal[data-calm] .strap::before,
-.seal[data-calm] .disc,
-.seal[data-calm] .disc > .lit,
+/* Reduce motion: no jiggle, glints, shine, breath, motes or flash; the lock still opens and falls. */
+.seal[data-calm] .glintX,
+.seal[data-calm] .glintX > img,
+.seal[data-calm] .glintY,
+.seal[data-calm] .glintY > img,
+.seal[data-calm] .shine,
+.seal[data-calm] .body,
+.seal[data-calm] .body > .lit,
 .seal[data-calm] .glow,
+.seal[data-calm] .glowBig,
 .seal[data-calm] .flash {
   animation: none !important;
 }
-.seal[data-calm] .mote {
+.seal[data-calm] .glints,
+.seal[data-calm] .mote,
+.seal[data-calm] .shine {
   display: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  .plate::after,
-  .seal[data-phase='idle'] .disc {
+  .seal[data-phase='idle'] .body,
+  .glintX,
+  .glintX > img,
+  .glintY,
+  .glintY > img,
+  .shine {
     animation: none;
   }
-  .mote {
+  .glints,
+  .mote,
+  .shine {
     display: none;
   }
 }
