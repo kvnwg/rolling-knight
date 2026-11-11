@@ -41,6 +41,11 @@ export function mend(raw: unknown): GameState {
   for (const rec of Object.values(out.roster)) {
     if (rec && typeof rec === 'object') delete (rec as { isNew?: unknown }).isNew;
   }
+  // A record that isn't a knight the game has (a damaged save, or a knight since renamed) goes: left
+  // in, the first thing to look it up throws, on every start, before anything can be saved over it.
+  for (const [id, rec] of Object.entries(out.roster)) {
+    if (!rec || typeof rec !== 'object' || rec.id !== id || !KNIGHTS_BY_ID.has(id)) delete out.roster[id];
+  }
   if (!Array.isArray(out.quests)) out.quests = [];
   if (!Array.isArray(out.squad) || out.squad.length !== 3) out.squad = [null, null, null];
   out.squad = out.squad.map((id) => (id && out.roster[id] ? id : null));
@@ -50,8 +55,10 @@ export function mend(raw: unknown): GameState {
   }
   // The tutorial: the save's own, cleaned; a save from before it gets none if it has any progress.
   out.seen.tutorial = mendTutorial((s.seen as { tutorial?: unknown } | undefined)?.tutorial, out);
-  // A spin in progress is replayed from scratch rather than resumed mid-animation.
-  if (out.roll.current && !out.roll.current.landed) out.roll.current = null;
+  // A spin in progress is replayed from the top, the same spin (what it rolled was settled, and what
+  // it spent was spent, the moment it began: dropping it would lose both). A damaged one goes.
+  const cur = out.roll.current;
+  if (cur && !(Array.isArray(cur.reels) && cur.reels.length > 0 && cur.reels.every((r) => r && KNIGHTS_BY_ID.has(r.knightId) && Number.isFinite(r.landAt)) && Number.isFinite(cur.spinSeconds) && Number.isFinite(cur.restSeconds))) out.roll.current = null;
   out.roll.timer = 0;
   mendDeck(out, s.run);
   out.version = SAVE_VERSION;

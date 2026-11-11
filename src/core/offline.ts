@@ -41,26 +41,30 @@ export function runOffline(state: GameState, rng: Rng, awaySeconds: number, nowM
   let done = 0;
   // Spins run for real (the big-reveal history is left as it was: nobody saw them).
   const savedHist = state.roll.hist;
+  // (Nor do they spend Hourglasses: a spin while away is no quicker for one, and the count of spins
+  // was settled above without them.)
+  const savedGlasses = state.hourglasses;
+  const landed = (e: Parameters<Parameters<typeof landReels>[1]>[0]) => {
+    if (e.type !== 'land') return;
+    kept.push({ knightId: e.knightId, rarity: e.rarity, mutation: e.mutation, isNew: e.result.kind === 'new' });
+    if (e.result.kind === 'dupe') extras += 1;
+  };
+  // The spin that was turning when you left lands first, whole (it was rolled while you were here).
+  if (state.roll.current && !state.roll.current.landed) landReels(state, landed);
+  state.roll.current = null;
+  state.roll.timer = 0;
   while (done < rolls) {
     const spin = startSpin(state, rng, nowMs, () => {});
     for (const r of spin.reels) {
       if (done >= rolls) r.landed = true; // past the cap: never rolled
       else done += 1;
     }
-    landReels(
-      state,
-      (e) => {
-        if (e.type !== 'land') return;
-        kept.push({ knightId: e.knightId, rarity: e.rarity, mutation: e.mutation, isNew: e.result.kind === 'new' });
-        if (e.result.kind === 'dupe') extras += 1;
-      },
-      Infinity,
-      BAL.offline.dupeShare,
-    );
+    landReels(state, landed, Infinity, BAL.offline.dupeShare);
     state.roll.current = null;
     state.roll.timer = 0;
   }
   state.roll.hist = savedHist;
+  state.hourglasses = savedGlasses;
   const rate = state.stats.combatPerMinute ?? Math.min(state.stats.goldPerMinute, 0);
   const gold = Math.round(rate * (seconds / 60) * eff);
   state.gold += gold;

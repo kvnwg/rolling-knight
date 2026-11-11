@@ -70,13 +70,14 @@ let nextKey = 1;
  * The full-screen reveal for `item`. A new item (a different object) starts a fresh reveal, so a queue
  * can show `items[0]` and drop it in `onDone`.
  */
-export function Reveal({ item, onDone, calm }: { item: RevealItem; onDone: () => void; calm?: boolean }) {
+/** `auto`: Auto battle is playing (nobody may be watching): once the knight has landed the reveal closes itself after AUTO_CLOSE_S. */
+export function Reveal({ item, onDone, calm, auto }: { item: RevealItem; onDone: () => void; calm?: boolean; auto?: boolean }) {
   let k = keys.get(item);
   if (!k) {
     k = nextKey++;
     keys.set(item, k);
   }
-  return <RareReveal key={k} item={item} onDone={onDone} calm={!!calm} />;
+  return <RareReveal key={k} item={item} onDone={onDone} calm={!!calm} auto={!!auto} />;
 }
 
 /** The window in CSS px and the UI pixel unit, kept up to date. */
@@ -231,7 +232,10 @@ function fitSize(text: string, cols: number, max: number, min: number): number {
   return Math.max(min, Math.min(max, Math.floor((cols - 12) / (text.length * 0.7))));
 }
 
-function RareReveal({ item, onDone, calm }: { item: RevealItem; onDone: () => void; calm: boolean }) {
+/** Seconds a landed reveal waits before closing itself while Auto battle plays. */
+const AUTO_CLOSE_S = 12;
+
+function RareReveal({ item, onDone, calm, auto }: { item: RevealItem; onDone: () => void; calm: boolean; auto: boolean }) {
   const drama = item.drama;
   const lvl = DRAMA_LEVEL[drama];
   const noFlash = calm;
@@ -421,6 +425,33 @@ function RareReveal({ item, onDone, calm }: { item: RevealItem; onDone: () => vo
     if (phaseRef.current === 'landed') onDone();
     else skip.current = true;
   };
+  // The keyboard's tap: Enter, Space or Esc (and nothing under the reveal hears the key).
+  const tapRef = useRef(tap);
+  tapRef.current = tap;
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (!e.repeat) tapRef.current();
+    };
+    window.addEventListener('keydown', key, true);
+    return () => window.removeEventListener('keydown', key, true);
+  }, []);
+  // With Auto battle on, a landed reveal doesn't hold the game for good (the fight and the altar wait
+  // behind it): it counts down and closes itself.
+  const [left, setLeft] = useState(AUTO_CLOSE_S);
+  useEffect(() => {
+    if (!auto || !landed) return;
+    const t = setInterval(() => setLeft((n) => n - 1), 1000);
+    return () => clearInterval(t);
+  }, [auto, landed]);
+  const closed = useRef(false);
+  useEffect(() => {
+    if (!auto || !landed || left > 0 || closed.current) return;
+    closed.current = true;
+    onDone();
+  }, [auto, landed, left, onDone]);
 
   const def = knightDef(item.knightId);
   const color = RARITY_COLOR[item.rarity];
@@ -534,7 +565,7 @@ function RareReveal({ item, onDone, calm }: { item: RevealItem; onDone: () => vo
       </div>
       {phase === 'appear' && !noFlash && !hyper && <div className={s.flashLate} />}
       {lit && !noFlash && <div key={phase} className={s.flash} />}
-      {!locked && <span className={`${s.tap} ${hyper ? s.tapNow : ''}`}>{landed ? 'Tap to continue' : 'Tap to skip'}</span>}
+      {!locked && <span className={`${s.tap} ${hyper ? s.tapNow : ''}`}>{landed ? (auto ? `Tap to continue (${Math.max(0, left)})` : 'Tap to continue') : 'Tap to skip'}</span>}
     </div>
   );
 }

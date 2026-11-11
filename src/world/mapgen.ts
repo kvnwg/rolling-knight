@@ -15,6 +15,7 @@ import { dressFloor } from './decor';
 import { buildTiers, standOnRelief } from './relief';
 import { DESIGNS, Shaper } from './designs';
 import { placeTrees, roomTree, type TreeSize } from './forest';
+import { trapTiles } from './traps';
 
 export const TILE = 16;
 export const SOLID = 0;
@@ -407,7 +408,10 @@ export function generateFloor(opts: GenOptions): FloorMap {
   // --- props
   const propRng = rng.fork(1);
   const occupied = new Set<number>();
-  const nearCenter = (x: number, yy: number) => byDoor(x, yy) || rooms.some((r) => (r.kind === 'start' || r.kind === 'exit' || r.kind === 'arena') && Math.abs(x - r.cx) <= 2 && Math.abs(yy - r.cy) <= 2);
+  // (An arena's boss stands three tiles above the middle, and is wide: its row and the tiles either side stay clear too.)
+  const nearCenter = (x: number, yy: number) =>
+    byDoor(x, yy) ||
+    rooms.some((r) => (r.kind === 'start' || r.kind === 'exit' || r.kind === 'arena') && Math.abs(x - r.cx) <= 2 && (Math.abs(yy - r.cy) <= 2 || (r.kind === 'arena' && yy >= r.cy - 4 && yy < r.cy)));
   const floorTiles: number[] = [];
   for (let i = 0; i < m.tiles.length; i++) if (m.tiles[i] === FLOOR) floorTiles.push(i);
   // Wall torches over room walls (rooms layout): on solid tiles with floor right below.
@@ -479,6 +483,7 @@ export function generateFloor(opts: GenOptions): FloorMap {
 
   // --- spawns
   const spawnRng = rng.fork(2);
+  const trapped = trapTiles(m);
   rooms.forEach((r, ri) => {
     if (r.kind === 'start' || r.quiet) return;
     if (r.kind === 'arena') {
@@ -493,7 +498,7 @@ export function generateFloor(opts: GenOptions): FloorMap {
       for (let tries = 0; tries < 12; tries++) {
         const x = r.cx + spawnRng.int(-r.rx + 1, r.rx - 1);
         const yy = r.cy + spawnRng.int(-r.ry + 1, r.ry - 1);
-        if (tileAt(m, x, yy) !== FLOOR) continue;
+        if (tileAt(m, x, yy) !== FLOOR || trapped.has(yy * m.w + x)) continue;
         // Never close enough to the start to wake as the squad arrives.
         if (Math.hypot(x - start.cx, yy - start.cy) < 8) continue;
         m.spawns.push({ x: x * TILE + 8, y: yy * TILE + 8, room: ri, elite: spawnRng.chance(eliteChance), boss: false });

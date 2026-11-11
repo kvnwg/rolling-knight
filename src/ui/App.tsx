@@ -36,7 +36,6 @@ import { Tutorial } from './Tutorial';
 import { WelcomeBack } from './WelcomeBack';
 import { FloorRewind } from './fx/FloorRewind';
 import { CampAsk } from './CampAsk';
-import { campFloor } from '../core/newGame';
 
 export interface Toast {
   id: number;
@@ -119,6 +118,12 @@ export function App() {
   const sheetOpen = detail !== null || settings || luck || station !== null || choosing;
   const sheetRef = useRef(sheetOpen);
   sheetRef.current = sheetOpen;
+  // A sheet over a keeper's screen (a knight's details, settings, the luck sheet): Esc closes it alone.
+  const topRef = useRef(false);
+  topRef.current = detail !== null || settings || luck;
+  // The welcome back is up (it takes the screen: the fight waits and no key reaches what's under it).
+  const awayRef = useRef(false);
+  awayRef.current = offline !== null && picked && !intro;
   // The world waits on the title screen (no knights roll in behind it before PLAY).
   const titleRef = useRef(choosing);
   titleRef.current = choosing;
@@ -253,7 +258,8 @@ export function App() {
           break;
         case 'camp':
           // (Nothing to show when the run keeps its floor and nobody had fallen.)
-          if (e.from > e.back || e.revived > 0) setRewind({ id: nextId++, from: e.from, back: e.back, revived: e.revived });
+          // (From a beaten boss's floor the run goes on a floor, not back: no ticking, just where it stands.)
+          if (e.from > e.back || e.revived > 0) setRewind({ id: nextId++, from: Math.max(e.from, e.back), back: e.back, revived: e.revived });
           break;
         case 'potion':
           toast({ text: `Luck Potion: luck ×2 for ${secs(e.seconds)}`, color: '#8af07a' });
@@ -303,10 +309,16 @@ export function App() {
       const w = game.inDungeon ? game.world : game.hub;
       rainSound.set(game.inDungeon && game.world ? game.world.sky.rain : 0);
       // Walking off at the hub stays there (no auto return).
+      // (Nor does it go while you're reading a keeper's screen: it holds at its full count until you close it.)
       if (!game.inDungeon && game.autoReturnT > 0 && (c.mx || c.my)) game.autoReturnT = 0;
+      if (!game.inDungeon && game.autoReturnT > 0 && (sheetRef.current || awayRef.current)) game.autoReturnT = Math.max(game.autoReturnT, 5);
       if (game.inDungeon !== wasIn) {
         wasIn = game.inDungeon;
-        if (!wasIn) {
+        if (wasIn) {
+          // Whatever was open at the hub stays at the hub.
+          setStation(null);
+          setDetail(null);
+        } else {
           music.setScene('camp');
           // What was open over the fight goes with it.
           setTalking(null);
@@ -318,7 +330,7 @@ export function App() {
       // steering or attacking yourself takes over for as long as you do. A sheet open only aims and
       // attacks for you. The dev bot (?auto, the sim) never lets go.
       // (A talk and CAMP's question are only ever on the screen in the dungeon: they hold nothing up at the hub.)
-      game.paused = revealRef.current.length > 0 || titleRef.current || (game.inDungeon && (talkRef.current !== null || campAskRef.current));
+      game.paused = revealRef.current.length > 0 || titleRef.current || (game.inDungeon && (talkRef.current !== null || campAskRef.current || awayRef.current));
       if (w) {
         const autoBattle = game.inDungeon && game.state.settings.autoPlay && !(c.mx || c.my || c.attack);
         w.auto = game.state.settings.autoPlay || sheetRef.current;
@@ -327,8 +339,10 @@ export function App() {
         const hold = !game.inDungeon && sheetRef.current;
         w.input.mx = hold ? 0 : c.mx;
         w.input.my = hold ? 0 : c.my;
-        if (c.dodge) w.input.dodge = true;
-        if (c.special) w.input.special = true;
+        // (A key pressed while the game is held, or a screen is open, isn't saved up for when it resumes.)
+        const live = !game.paused && !sheetRef.current;
+        if (c.dodge && live) w.input.dodge = true;
+        if (c.special && live) w.input.special = true;
         // Attacking: held, toward the mouse; on touch the Attack button auto-aims, or aims the way
         // it's dragged (world/aim.ts).
         const fight = game.inDungeon && !hold;
@@ -343,12 +357,13 @@ export function App() {
       } else r.cursor = null;
       c.dodge = false;
       c.special = false;
+      const held = game.paused || sheetRef.current;
       if (c.switchTo !== null) {
-        game.switchTo(c.switchTo);
+        if (!held) game.switchTo(c.switchTo);
         c.switchTo = null;
       }
       if (c.toggleAuto) {
-        game.setAuto(!game.state.settings.autoPlay);
+        if (!held) game.setAuto(!game.state.settings.autoPlay);
         c.toggleAuto = false;
       }
       game.tick(dt);
@@ -380,7 +395,12 @@ export function App() {
     };
     raf = requestAnimationFrame(loop);
     const save = () => game.save();
-    const vis = () => document.visibilityState === 'hidden' && game.save();
+    // Out of sight nothing ticks: the time is made up as time away when the page is back.
+    const vis = () => {
+      if (document.visibilityState === 'hidden') return game.hidden();
+      const report = game.shown();
+      if (report) setOffline((old) => (old ? { seconds: old.seconds + report.seconds, rolls: old.rolls + report.rolls, kept: [...old.kept, ...report.kept], extras: old.extras + report.extras, gold: old.gold + report.gold } : report));
+    };
     window.addEventListener('beforeunload', save);
     document.addEventListener('visibilitychange', vis);
     const unlock = () => {
@@ -403,28 +423,38 @@ export function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
-      if (k === 'escape') {
+      // The welcome back takes the screen: nothing under it answers a key (a reveal takes its own keys).
+      if (awayRef.current || revealRef.current.length > 0) return;
+      // (Enter is the game's here: it mustn't also press whichever HUD button the mouse last clicked.)
+      if (k === 'enter' && !sheetRef.current && !talkRef.current) e.preventDefault();
+      if (k === 'escape' && !e.repeat) {
         // (A keeper's own overlays, the upgrade map and the details popups, take Esc first.)
-        if (sheetRef.current) {
+        if (topRef.current) {
+          // What's on top closes, and only that: the keeper's screen under a knight's details stays.
           setDetail(null);
           setSettings(false);
           setLuck(false);
+        } else if (sheetRef.current) {
           // (The Oracle's sealed altar stays: a new game's first screen, until the seal is broken.)
           setStation((st) => (st?.id === 'altar' && game.state.roll.sealed ? st : null));
-        } else if (game.inDungeon) {
+        } else if (game.inDungeon && !game.wiping) {
           // Esc asks to leave, and Esc again takes the question back.
           uiSound(campAskRef.current ? 'close' : 'open');
           setCampAsk(!campAskRef.current);
         }
+        return;
       }
-      if (campAskRef.current && k === 'enter') {
-        setCampAsk(false);
-        if (game.inDungeon) game.leaveDungeon();
+      if (campAskRef.current) {
+        // Enter goes (the question says so on its buttons); nothing else gets through to the fight.
+        if (k === 'enter' && !e.repeat) {
+          setCampAsk(false);
+          if (game.inDungeon) game.leaveDungeon();
+        }
         return;
       }
       // At the hub, E or Enter talks to the keeper you're standing by; in the dungeon (where E is
       // your skill) it's Enter or F.
-      if ((k === 'e' || k === 'enter') && !game.inDungeon && !sheetRef.current) {
+      if ((k === 'e' || k === 'enter') && !game.inDungeon && !sheetRef.current && !e.repeat) {
         const near = game.hub?.nearStation();
         if (near) {
           uiSound('open');
@@ -476,7 +506,7 @@ export function App() {
           controls={ctl.controls}
           press={ctl.press}
           hold={ctl.hold}
-          onCamp={() => setCampAsk(true)}
+          onCamp={() => !game.wiping && setCampAsk(true)}
           onRebirth={() => {
             // Back to camp, the Shrine's screen open there.
             game.leaveDungeon();
@@ -534,7 +564,7 @@ export function App() {
       {campAsk && inDungeon && (
         <CampAsk
           floor={game.state.run.floor}
-          back={campFloor(game.state.run.floor, game.state.run.checkpoint)}
+          back={game.campTarget()}
           fallen={game.world ? game.world.heroes.filter((h) => h.downed).length : 0}
           onStay={() => (uiSound('close'), setCampAsk(false))}
           onGo={() => {
@@ -572,7 +602,7 @@ export function App() {
         />
       )}
       {luck && <LuckSheet game={game} onClose={() => setLuck(false)} />}
-      {reveals.length > 0 && <Reveal key={reveals.length + ':' + reveals[0].knightId} item={reveals[0]} calm={game.state.settings.reduceMotion} onDone={() => (uiSound('tap'), setReveals((r) => r.slice(1)))} />}
+      {reveals.length > 0 && <Reveal key={reveals.length + ':' + reveals[0].knightId} item={reveals[0]} calm={game.state.settings.reduceMotion} auto={game.state.settings.autoPlay} onDone={() => (uiSound('tap'), setReveals((r) => r.slice(1)))} />}
       {/* Back after time away: not over the title (that opens the game), but once you've pressed PLAY. */}
       {offline && picked && !intro && <WelcomeBack report={offline} onClose={() => setOffline(null)} />}
     </>

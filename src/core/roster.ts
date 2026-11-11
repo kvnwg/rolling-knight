@@ -196,6 +196,8 @@ export function sellValue(state: GameState, id: string): number {
   let levels = 0;
   for (let L = 1; L < rec.level; L++) levels += R.goldBase * Math.pow(R.goldGrowth, L - 1) * Math.pow(R.rarityGrowth, rarityIndex(rarity));
   if (hasPerk(state, 'handMeDowns') && isUnderdog(rarity)) levels *= 0.5;
+  // (Half of what the levels cost at this run's prices: levelCost's own scale.)
+  levels *= priceScale(state);
   return Math.max(1, Math.round(dupeGold(state, id) * (rec.mutation ? 2 : 1) + levels * 0.5)) + rec.extrasGold;
 }
 

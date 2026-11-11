@@ -116,6 +116,15 @@ export class Game {
     this.isNew = !loaded;
     this.state = loaded ?? newGame();
     this.rng = new Rng(this.state.rngState);
+    if (loaded) {
+      // The game opens at the hub. A save from the middle of a dive (the page closed or reloaded on a
+      // floor) comes back as a trip to camp does: the floor after the last boss beaten, the merchants'
+      // goods gone. (A save made at the hub is there already: this changes nothing in it.)
+      const run = this.state.run;
+      run.floor = campFloor(run.floor, run.checkpoint);
+      run.items = {};
+      run.thief = false;
+    }
     this.biome = biomeForFloor(this.state.run.floor, this.state.run.biomeSeed);
     if (loaded) {
       const away = (Date.now() - loaded.savedAt) / 1000;
@@ -314,7 +323,7 @@ export class Game {
   }
 
   /** Rebuilds the hub when your knight changes: just them, at the hub's spawn, among the keepers. */
-  syncHub(force = false): void {
+  syncHub(force = false, keepPlace = false): void {
     const s = this.state;
     const id = s.squad[s.controlled] ?? s.squad.find(Boolean) ?? null;
     const key = `${id}|${id ? s.roster[id]?.mutation ?? '' : ''}`;
@@ -341,7 +350,8 @@ export class Game {
     });
     // A new knight takes over where the old one stood (only the start of a visit begins at the spawn).
     const now = this.hub.leader();
-    if (was && now && !force) {
+    // (`keepPlace`: a rebuild in the middle of a visit, e.g. the Warden changed the squad: you stay by his counter.)
+    if (was && now && (!force || keepPlace)) {
       now.x = was.x;
       now.y = was.y;
       now.view = was.view;
@@ -398,13 +408,62 @@ export class Game {
   }
 
   /**
+   * The floor a trip to camp would leave the run on: the floor after the last boss beaten (campFloor),
+   * or, from a boss floor whose boss has just fallen, the floor after this one (it's behind you).
+   */
+  campTarget(): number {
+    const from = this.state.run.floor;
+    const beaten = this.inDungeon && !!this.world && this.world.boss && this.world.portalOpen;
+    return beaten ? from + 1 : campFloor(from, this.state.run.checkpoint);
+  }
+
+  /** The squad is down and the walk home is on its way (CAMP has nothing to ask). */
+  get wiping(): boolean {
+    return this.wipeT > 0;
+  }
+
+  private hiddenAt: number | null = null;
+
+  /** The page went out of sight (another tab, the phone's home screen): nothing ticks from here, so note when. */
+  hidden(): void {
+    this.hiddenAt ??= Date.now();
+    this.save();
+  }
+
+  /**
+   * The page is back in sight. Time out of sight is time away, the same as with the game closed (the
+   * altar's slow rolls, the squad's gold): without this a tab left open in the background all night
+   * earned nothing, where closing it would have paid.
+   */
+  shown(): OfflineReport | null {
+    const at = this.hiddenAt;
+    this.hiddenAt = null;
+    if (at === null) return null;
+    const report = runOffline(this.state, this.rng, (Date.now() - at) / 1000, Date.now());
+    if (report) {
+      this.state.rngState = this.rng.state;
+      this.save();
+      this.version++;
+    }
+    return report;
+  }
+
+  /**
    * Back to camp. The run steps back to the floor after the last boss you beat (campFloor), and the
    * squad rests: the fallen are up again and everyone is whole for the next trip down.
    */
   leaveDungeon(): void {
     if (!this.inDungeon) return;
+    // The squad is down and the wipe is on its way: camp is no way round it.
+    if (this.wipeT > 0) {
+      this.wipeT = 0;
+      this.returnToHub();
+      this.save();
+      this.version++;
+      return;
+    }
     const from = this.state.run.floor;
-    const back = campFloor(from, this.state.run.checkpoint);
+    const back = this.campTarget();
     const revived = this.world ? this.world.heroes.filter((h) => h.downed).length : 0;
     // Everything about being at the hub first, all of it together: nothing after this can leave the
     // game half way (in the dungeon with no floor draws nothing at all).
@@ -572,7 +631,11 @@ export class Game {
     dt = Math.min(dt, 0.1);
     s.playTimeMs += dt * 1000;
     // (A sealed altar waits for its seal to be broken.)
+    // The squad is locked in the dungeon: a knight rolled during a dive waits at the hub (it doesn't
+    // take an empty place on the floor's cards, nor a share of the short-handed gold).
+    const locked = this.inDungeon && this.world ? [...s.squad] : null;
     if (!s.roll.sealed) rollTick(s, this.rng, Date.now(), dt, this.emit);
+    if (locked) s.squad = locked;
     s.rngState = this.rng.state;
     if (!this.inDungeon) {
       // At the hub: your knight walks among the keepers; the dungeon waits. Empty squad slots fill
@@ -658,6 +721,7 @@ export class Game {
       }
       // Coins still in the air are banked.
       for (const p of w.pickups) this.collect(p.kind, p.amount);
+      w.pickups = [];
     }
     this.pendingFloor = floor;
     this.fadeDir = 1;
@@ -686,11 +750,13 @@ export class Game {
         case 'kill':
           s.stats.killsThisRun += 1;
           s.records.kills += 1;
-          this.questEvent({ type: 'kill', elite: e.elite, boss: e.boss && !e.robbed, mobName: e.name });
+          // (A demon out of its disguise is a boss of a foe, but not the floor's boss: no boss floor has one.)
+          const floorBoss = e.boss && !e.robbed && w.boss;
+          this.questEvent({ type: 'kill', elite: e.elite || (e.boss && !floorBoss), boss: floorBoss, mobName: e.name });
           if (e.robbed) {
             // The merchant you robbed: no floor's boss (no sigil, no boss count), but a win all the same.
             this.emit({ type: 'merchantDown', name: e.name });
-          } else if (e.boss) {
+          } else if (floorBoss) {
             const first = w.floor / 5 > s.run.bosses;
             if (first) {
               s.run.bosses = w.floor / 5;

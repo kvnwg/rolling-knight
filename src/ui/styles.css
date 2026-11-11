@@ -4040,3 +4040,17 @@ body,
   gap: calc(3 * var(--px));
   width: 100%;
 }
+/* Which key answers (a keyboard's players only: nothing on a touch screen). */
+.ca-key {
+  display: block;
+  margin-top: calc(1 * var(--px));
+  font: inherit;
+  font-size: calc(5 * var(--px));
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+}
+@media (pointer: coarse) {
+  .ca-key {
+    display: none;
+  }
+}

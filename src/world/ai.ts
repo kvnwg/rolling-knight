@@ -13,11 +13,11 @@
 import { CLASSES } from '../core/knights';
 import { signatureSkill } from '../core/skillbook';
 import { HUE, bossPattern, bulletThreat, fire, formVolley, kick, quake, type BulletForm } from './bullets';
-import { dist, inRing, lineOfSight, moveUnit, norm, walkClear, type Unit } from './entities';
+import { clear, dist, inRing, lineOfSight, moveUnit, norm, walkClear, type Unit } from './entities';
 import { flowDist, flowStep, type Flow } from './flow';
 import { TILE } from './mapgen';
 import type { Gun, Lunge, Volley } from './mobgen';
-import { besideLeader, kiteDir, navCommit, navFlow, navNudge, navOf, navTo, navWatch } from './nav';
+import { besideLeader, freeSpot, kiteDir, navCommit, navFlow, navNudge, navOf, navTo, navWatch } from './nav';
 import { heroDodge, heroSpecial } from './skills';
 import { uid, type World } from './world';
 
@@ -964,9 +964,11 @@ function bossMove(w: World, m: Unit, target: Unit, enraged: boolean): void {
         a.awake = true;
         a.room = m.room;
         w.spawnIn(a);
-        if (!moveUnit(w.map, a, 0, 0)) {
-          a.x = m.x;
-          a.y = m.y + 10;
+        // On floor it can stand on, in the squad's reach (not inside a wall, where nothing could get at it).
+        if (!clear(w.map, a.x, a.y, a.r, a.flying)) {
+          const spot = freeSpot(w, a.x, a.y, a.r, m.x, m.y, 64);
+          a.x = spot ? spot[0] : m.x + (k - 1) * 6;
+          a.y = spot ? spot[1] : m.y + 10;
         }
         w.mobs.push(a);
         w.fx.push({ kind: 'spark', x: a.x, y: a.y - 6, color: t.ramp[3] });

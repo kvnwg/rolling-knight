@@ -17,6 +17,7 @@ import { Rng } from '../core/rng';
 import type { BiomeId, PropKind } from './biomes';
 import { houseLayout } from './decor';
 import { BLOCKED, FLOOR, LIQUID, SOLID, TILE, bfs, tileAt, type FloorMap, type Room } from './mapgen';
+import { trapTiles } from './traps';
 
 export interface CampPiece {
   kind: PropKind;
@@ -319,6 +320,7 @@ function clearSpawns(m: FloorMap, camp: Camp, camps: readonly Camp[], rng: Rng):
       return Math.hypot(cm.x - x, cm.y - y) >= CAMP_CLEAR + 8;
     });
   const gone = new Set<number>();
+  const trapped = trapTiles(m);
   m.spawns.forEach((s, si) => {
     if (s.boss || Math.hypot(s.x - mid.x, s.y - mid.y) >= CAMP_CLEAR) return;
     const order = m.rooms
@@ -329,7 +331,7 @@ function clearSpawns(m: FloorMap, camp: Camp, camps: readonly Camp[], rng: Rng):
       const spots: Array<[number, number]> = [];
       for (let ty = r.cy - r.ry + 1; ty <= r.cy + r.ry - 1; ty++) {
         for (let tx = r.cx - r.rx + 1; tx <= r.cx + r.rx - 1; tx++) {
-          if (tileAt(m, tx, ty) !== FLOOR) continue;
+          if (tileAt(m, tx, ty) !== FLOOR || trapped.has(ty * m.w + tx)) continue;
           const x = tx * TILE + 8;
           const y = ty * TILE + 8;
           if (!far(x, y)) continue;

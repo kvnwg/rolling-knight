@@ -5,7 +5,7 @@
  * the best find standing in its rarity's little scene; the gold your squad brought back and the
  * repeats kept as extras. COLLECT puts it away.
  */
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { OfflineReport } from '../core/offline';
 import { RARITIES, RARITY_COLOR, RARITY_NAME, rarityIndex, type Rarity } from '../core/rarity';
 import { CLASSES, knightDef } from '../core/knights';
@@ -52,6 +52,19 @@ export function WelcomeBack({ report, onClose }: { report: OfflineReport; onClos
     uiSound('collect', 3);
     onClose();
   };
+  // Enter, Space or Esc collects (and nothing under the sheet hears the key).
+  const collectRef = useRef(collect);
+  collectRef.current = collect;
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (!e.repeat) collectRef.current();
+    };
+    window.addEventListener('keydown', key, true);
+    return () => window.removeEventListener('keydown', key, true);
+  }, []);
   return (
     <div className="modal" onPointerDown={(e) => e.target === e.currentTarget && collect()}>
       <div className="sheet wb-sheet">
