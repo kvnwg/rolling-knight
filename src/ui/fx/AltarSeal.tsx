@@ -244,7 +244,7 @@ export function AltarSeal({ game }: { game: Game }) {
       data-altar-seal
       role="button"
       tabIndex={0}
-      aria-label="Break the seal"
+      aria-label="Break the lock"
       onClick={open}
       onKeyDown={onKey}
       style={

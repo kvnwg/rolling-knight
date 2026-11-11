@@ -334,7 +334,7 @@ function stepView(step: TutStepId, ctx: TutCtx, run: TutRun): TutView | null {
   switch (step) {
     case 'seal':
       // (The Oracle, over her sealed altar.)
-      return where === 'altar' && ctx.sealed ? line('seal', touch ? 'Tap the [seal] to summon your first knight!' : 'Click the [seal] to summon your first knight!', ui('seal')) : null;
+      return where === 'altar' && ctx.sealed ? line('seal', touch ? 'Tap the [lock] to summon your first knight!' : 'Click the [lock] to summon your first knight!', ui('seal')) : null;
     case 'altar':
       return where === 'altar' && ctx.hasKnight ? line('altar', 'Your first knight! Now close the altar.', ui('close')) : null;
     case 'descend':

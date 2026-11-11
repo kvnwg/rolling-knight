@@ -496,7 +496,7 @@ export function OracleShop({ game, station, onClose, onOpen }: { game: Game; sta
         {tab === 'summon' &&
           (st.roll.sealed ? (
             <>
-              The altar is <b>sealed</b>. Break the seal and it <b>summons a free knight every {spinCycle(st).toFixed(1)}s</b>, even while you fight.
+              The altar is <b>locked</b>. Break the lock and it <b>summons a free knight every {spinCycle(st).toFixed(1)}s</b>, even while you fight.
             </>
           ) : (
             <>
