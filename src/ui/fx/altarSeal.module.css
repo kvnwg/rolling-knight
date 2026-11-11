@@ -79,8 +79,9 @@
   }
 }
 /*
- * A glint runs along each chain now and then: a window a few links wide slides along in whole steps
- * (its timing from JS: so many steps of so many pixels), over the links' glints, which stay put.
+ * A glint runs along each chain now and then: a window 12 pixels wide (AltarSeal's GLINT_W) slides
+ * along in whole steps (its timing from JS: so many steps of so many pixels), over the links' glints,
+ * which stay put.
  */
 .glints {
   position: absolute;

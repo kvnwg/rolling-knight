@@ -404,6 +404,11 @@ interface Link {
   face: boolean;
 }
 
+/*
+ * Each chain's link at the crossing is edge-on (face-on ones every other link out from it), so inside
+ * the shackle the chain down runs plainly through it, over the one across (AltarSeal stacks them so).
+ */
+
 /** The chain across: links out from the crossing both ways, sagging to it (y of a link's middle). */
 function acrossLinks(L: SealLayout): { left: Link[]; right: Link[] } {
   const half = Math.max(L.cx, L.W - L.cx);
@@ -418,7 +423,7 @@ function acrossLinks(L: SealLayout): { left: Link[]; right: Link[] } {
   const n = Math.ceil(half / (PITCH / 2)) + 2;
   for (let k = 0; k <= n; k++) {
     const dx = (k * PITCH) / 2;
-    const face = (k % 2 === 0) === AT_CROSSING.acrossFace;
+    const face = k % 2 === 1;
     left.push({ x: L.cx - dx, y: yAt(dx), face });
     if (k > 0) right.push({ x: L.cx + dx, y: yAt(dx), face });
   }
@@ -431,16 +436,10 @@ function downLinks(L: SealLayout): { top: Link[]; bottom: Link[] } {
   const bottom: Link[] = [];
   const nUp = Math.ceil(L.cy / (PITCH / 2)) + 2;
   const nDown = Math.ceil((L.H - L.cy) / (PITCH / 2)) + 2;
-  const face = (k: number) => (k % 2 === 0) === AT_CROSSING.downFace;
-  for (let k = 0; k <= nUp; k++) top.push({ x: L.cx, y: L.cy - (k * PITCH) / 2, face: face(k) });
-  for (let k = 1; k <= nDown; k++) bottom.push({ x: L.cx, y: L.cy + (k * PITCH) / 2, face: face(k) });
+  for (let k = 0; k <= nUp; k++) top.push({ x: L.cx, y: L.cy - (k * PITCH) / 2, face: k % 2 === 1 });
+  for (let k = 1; k <= nDown; k++) bottom.push({ x: L.cx, y: L.cy + (k * PITCH) / 2, face: k % 2 === 1 });
   return { top, bottom };
 }
-/**
- * Which way each chain's link at the crossing lies: both edge-on, so inside the shackle the chain down
- * runs plainly through it, over the one across (AltarSeal stacks them so).
- */
-const AT_CROSSING = { acrossFace: false, downFace: false } as const;
 
 /**
  * A run of links drawn into a W x H picture: the face-on ones first, the edge-on ones over them (each
