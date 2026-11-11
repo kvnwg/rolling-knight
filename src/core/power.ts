@@ -80,6 +80,9 @@ export interface Difficulty {
   challenge: Challenge;
 }
 
+/** The first boss's floor (the labels are kinder on the floors before it). */
+const FIRST_BOSS = 5;
+
 export function challengeOf(ratio: number): Challenge {
   if (ratio < 0.5) return 'deadly';
   if (ratio < 0.8) return 'hard';
@@ -97,7 +100,11 @@ export function floorDifficulty(floor: number, power: number, size = 3): Difficu
   const ratio = power > 0 ? power / par : 1;
   const band = ratio >= 1 ? Math.pow(ratio, B.aboveExp) : Math.pow(ratio, B.belowExp);
   const value = par * Math.max(B.minBand, Math.min(B.maxBand, band));
-  return { par, power, ratio, value, challenge: challengeOf(ratio) };
+  // (Before the first boss a new squad sits well under par and clears the floors all the same: the
+  // first floors are built to be won. Their label says so, not DEADLY in red on a player's first floor.)
+  const ch = challengeOf(ratio);
+  const challenge = floor < FIRST_BOSS && (ch === 'deadly' || ch === 'hard') ? 'fair' : ch;
+  return { par, power, ratio, value, challenge };
 }
 
 // ------------------------------------------------------------------ foes

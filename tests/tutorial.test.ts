@@ -356,7 +356,7 @@ describe('the tutorial: one step at a time', () => {
       'Hold [left click] to attack.',
       'Press [T] for [AUTO]: it fights by itself!',
       '[AUTO] is on! Move any time to take over.',
-      'Press [Esc] to go spend your gold.',
+      'Press [C] to go back and spend your gold.',
       'Click [LEVEL UP] for a stronger knight.',
     ]);
     // Every line short: one thing at a time.

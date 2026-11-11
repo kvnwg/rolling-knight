@@ -323,7 +323,7 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
             </>
           )}
         </Key>
-        <Key size="sm" rim="iron" className="k-camp" label="CAMP" hint="ESC" flash={flash.camp} title={campFloor(s.run.floor, s.run.checkpoint) < s.run.floor ? `Camp (Esc): the run goes back to floor ${campFloor(s.run.floor, s.run.checkpoint)}` : 'Camp (Esc)'} onClick={() => (uiSound('close'), onCamp())}>
+        <Key size="sm" rim="iron" className="k-camp" label="CAMP" hint="C" flash={flash.camp} title={campFloor(s.run.floor, s.run.checkpoint) < s.run.floor ? `Camp (C): the run goes back to floor ${campFloor(s.run.floor, s.run.checkpoint)}` : 'Camp (C)'} onClick={() => (uiSound('close'), onCamp())}>
           <Px icon="flame" size="sm" s={1} />
         </Key>
         <Key size="md" rim={dodge <= 0 && me ? 'brass' : 'iron'} className={`k-dodge ${dodge <= 0 && me ? 'ready' : 'cooling'}`} label={me ? dashLabel(me) : 'DODGE'} hint="SPACE" flash={flash.dodge} title="Dodge roll (Space)" onDown={() => press('dodge')}>

@@ -1,5 +1,5 @@
 /**
- * "Back to camp?": CAMP (or Esc) in the dungeon asks before it goes, because leaving costs floors
+ * "Back to camp?": CAMP (or C) in the dungeon asks before it goes, because leaving costs floors
  * (the run steps back to the floor after the last boss: core/newGame.ts campFloor). It says what
  * you give up and what you get (the squad rests, the fallen are up again), with STAY as the easy
  * answer: a tap outside it, or Esc, stays. The fight waits while it's up.

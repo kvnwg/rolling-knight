@@ -236,7 +236,7 @@ export function SettingsSheet({ game, onClose, onReset }: { game: Game; onClose:
                 ['Skill', 'rolls and fires by itself in a fight; E rolls now', 'SKILL'],
                 ['Switch knight', '1, 2, 3', 'tap their card'],
                 ['Auto battle', 'T (plays your knight; steer to take over)', 'AUTO'],
-                ['Camp', 'Esc', 'CAMP'],
+                ['Camp', 'C', 'CAMP'],
               ] as const
             ).map(([what, keys, touchKeys]) => (
               <div key={what} className="control-row">

@@ -23,6 +23,8 @@ export interface Controls {
   aimDir: { x: number; y: number } | null;
   switchTo: number | null;
   toggleAuto: boolean;
+  /** C: asks to go back to camp (not Esc: on CrazyGames and in any fullscreen, Esc leaves fullscreen). */
+  camp: boolean;
   /** The touch joystick, for the HUD to draw (screen pixels). */
   stick: { active: boolean; ox: number; oy: number; x: number; y: number };
   /** The Attack button's aim stick while it's dragged, for the HUD to draw (screen pixels). */
@@ -47,7 +49,7 @@ export interface ControlsApi {
 
 export function createControls(onKey?: (key: string) => void, stickAnywhere?: () => boolean): ControlsApi {
   const c: Controls = {
-    mx: 0, my: 0, dodge: false, special: false, attack: false, aim: null, overPlay: false, aimDir: null, switchTo: null, toggleAuto: false,
+    mx: 0, my: 0, dodge: false, special: false, attack: false, aim: null, overPlay: false, aimDir: null, switchTo: null, toggleAuto: false, camp: false,
     stick: { active: false, ox: 0, oy: 0, x: 0, y: 0 },
     aimStick: { active: false, ox: 0, oy: 0, x: 0, y: 0 },
   };
@@ -66,15 +68,30 @@ export function createControls(onKey?: (key: string) => void, stickAnywhere?: ()
     c.mx = x / l;
     c.my = y / l;
   };
+  /**
+   * A key by where it sits on the keyboard, not what's printed on it (e.code: KeyW is the key in W's
+   * place on any layout, so French players get ZQSD and the rest move with it), as a QWERTY name.
+   * Keys with no such code (old browsers) go by what they print.
+   */
+  const keyOf = (e: KeyboardEvent): string => {
+    const code = e.code ?? '';
+    if (code.startsWith('Key')) return code.slice(3).toLowerCase();
+    if (code.startsWith('Digit')) return code.slice(5);
+    if (code.startsWith('Arrow')) return code.toLowerCase();
+    if (code === 'Space') return ' ';
+    if (code === 'ShiftLeft' || code === 'ShiftRight') return 'shift';
+    return e.key.toLowerCase();
+  };
   const down = (e: KeyboardEvent) => {
     if (typing(e)) return;
-    const k = e.key.toLowerCase();
+    const k = keyOf(e);
     if (k === ' ' || k === 'shift') {
       c.dodge = true;
       e.preventDefault();
     } else if (k === 'e' || k === 'q') c.special = true;
     else if (k === '1' || k === '2' || k === '3') c.switchTo = Number(k) - 1;
     else if (k === 't') c.toggleAuto = true;
+    else if (k === 'c' && !e.repeat) c.camp = true;
     if (k.startsWith('arrow')) e.preventDefault();
     keys.add(k);
     update();
@@ -82,7 +99,7 @@ export function createControls(onKey?: (key: string) => void, stickAnywhere?: ()
     onKey?.(k);
   };
   const up = (e: KeyboardEvent) => {
-    keys.delete(e.key.toLowerCase());
+    keys.delete(keyOf(e));
     update();
     attackNow();
   };

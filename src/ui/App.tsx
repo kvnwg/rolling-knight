@@ -457,6 +457,14 @@ export function App() {
         if (!held) game.setAuto(!game.state.settings.autoPlay);
         c.toggleAuto = false;
       }
+      if (c.camp) {
+        // C asks to go back to camp, and C again takes the question back (as the CAMP key does).
+        if (game.inDungeon && !sheetRef.current && !talkRef.current && revealRef.current.length === 0 && !game.wiping) {
+          uiSound(campAskRef.current ? 'close' : 'open');
+          setCampAsk(!campAskRef.current);
+        }
+        c.camp = false;
+      }
       game.tick(dt);
       // The fight's sounds, from what the update just did (before the renderer takes its effects).
       sfx.world(game.inDungeon ? game.world : null);
@@ -531,10 +539,10 @@ export function App() {
         } else if (sheetRef.current) {
           // (The Oracle's sealed altar stays: a new game's first screen, until the seal is broken.)
           setStation((st) => (st?.id === 'altar' && game.state.roll.sealed ? st : null));
-        } else if (game.inDungeon && !game.wiping) {
-          // Esc asks to leave, and Esc again takes the question back.
-          uiSound(campAskRef.current ? 'close' : 'open');
-          setCampAsk(!campAskRef.current);
+        } else if (campAskRef.current) {
+          // Esc takes the question back (it doesn't ask it: Esc also leaves fullscreen, so C does).
+          uiSound('close');
+          setCampAsk(false);
         }
         return;
       }

@@ -357,7 +357,7 @@ function stepView(step: TutStepId, ctx: TutCtx, run: TutRun): TutView | null {
       return ctx.doorInView ? line('exit:near', 'Step into the [door] to go deeper.', world('door')) : line('exit:far', 'Find the [door] to go deeper.', world('door'));
     case 'camp':
       if (where !== 'dungeon' || !ctx.canLevel || ctx.foeNear) return null;
-      return line('camp', touch ? 'Tap [CAMP] to go spend your gold.' : 'Press [Esc] to go spend your gold.', ui('camp'));
+      return line('camp', touch ? 'Tap [CAMP] to go spend your gold.' : 'Press [C] to go back and spend your gold.', ui('camp'));
     case 'spend':
       if (!ctx.canLevel) return null;
       if (where === 'warden') {
