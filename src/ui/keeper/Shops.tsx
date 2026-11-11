@@ -447,7 +447,12 @@ export function OracleShop({ game, station, onClose, onOpen }: { game: Game; sta
   useGameTick(game, 250);
   const st = game.state;
   const [tabAt, setTabState] = useState(oracleMemory.tab);
-  const setTab = (t: string) => ((oracleMemory.tab = t), setTabState(t));
+  const setTab = (t: string) => {
+    // (A tab tapped on a sealed altar goes nowhere, now or once the seal's broken.)
+    if (game.state.roll.sealed) return;
+    oracleMemory.tab = t;
+    setTabState(t);
+  };
   // A sealed altar is its seal and nothing else (the seal is on SUMMON: on any other tab there'd be
   // nothing to tap, and no way out of the screen).
   const tab = st.roll.sealed ? 'summon' : tabAt;

@@ -27,7 +27,7 @@ import { floorBoss, floorMobs } from './world/mobgen';
 import { World, type HeroSpec } from './world/world';
 import { HUB_DESCEND_Y, HUB_STEPS_Y, hubLayout } from './world/hubWorld';
 import { applyDialogAction, dialogFor, placeNpcs, type DialogChoice, type DialogNode, type Npc } from './world/npcs';
-import { questEvent, type Quest, type QuestEvent, type QuestReward } from './core/quests';
+import { pruneQuests, questEvent, type Quest, type QuestEvent, type QuestReward } from './core/quests';
 import { onFloorStart } from './world/chance';
 import { skillRollLuck } from './core/chance';
 import type { ScreenView } from './render/view';
@@ -218,7 +218,8 @@ export class Game {
     const mobTypes = floorMobs(biome, floor, seed);
     // Built for the knights you bring (par is for three); going short-handed pays more gold.
     this.difficulty = floorDifficulty(floor, squadPower(s), squadSize(s));
-    s.quests ??= [];
+    // (Jobs handed in are done with: nothing asks after them, and they'd only pile up in the save.)
+    s.quests = pruneQuests(s.quests ?? []);
     const npcs = placeNpcs(map, floor, biome.id, seed, s.quests);
     // Now and then a room is a merchant's (world/shop.ts): her wares priced by this floor's gold (a
     // thief's price if you stole from one earlier this run).

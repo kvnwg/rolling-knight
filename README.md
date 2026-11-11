@@ -226,7 +226,7 @@ as usual). `?fresh` starts a new game. The game is on
 npm test
 ```
 
-460 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
+531 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
 timing, extra reels, the start's ordinary quick spins, bad-luck protection, Lucky Spins, repeat pulls
 kept as extras at the worth they landed with and sold (one knight's, all at once, or with the knight
 at the Warden's) without touching the knight, old saves' spares cashed in and extras mended,
@@ -308,6 +308,21 @@ npx tsx tools/vfxPreview.ts shots
 
 Every attack effect by tier and frame on grass, stone, a crypt, sand and snow (`shots/vfx_*.png`);
 `tools/vfxSmearCheck.ts` draws the melee smears in eight directions.
+
+## Loading
+
+What a player waits for, and what's done about each:
+
+- **The title** is up in well under a second: its backdrop (about a second's painting) is built a
+  part each frame behind a plain dusk and fades in, so the name and PLAY never wait for it.
+- **PLAY to the hub**: while the title is up, the hub is painted and drawn once behind it (nothing
+  else is drawn under the title), so PLAY opens straight onto it.
+- **Pictures made into data URLs** (icons, knights, skill art, frames) are drawn on canvases kept
+  in memory (`ui/readCanvas.ts`). Left to the browser they may go to the graphics card, and each
+  read back then waits behind the game's own frame.
+- **Going down a floor** is the terrain's painting (0.4 to 0.7 s on a desktop), under the fade.
+
+`tests/crawl.test.ts` pins what a comb through the game for bugs turned up.
 
 ## Build
 
