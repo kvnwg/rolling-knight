@@ -11,14 +11,14 @@ import type { MutationId } from '../core/state';
 import { heroAi, heroAutoRoll, mobAi, quakeRing } from './ai';
 import type { Biome } from './biomes';
 import { tickBullet } from './bullets';
-import { dist, inRing, lineOfSight, moveUnit, norm, type Area, type FloatText, type Fx, type Pickup, type Shot, type Unit, type View } from './entities';
+import { clear, dist, inRing, lineOfSight, moveUnit, norm, type Area, type FloatText, type Fx, type Pickup, type Shot, type Unit, type View } from './entities';
 import { flowFrom, type Flow } from './flow';
-import { FLOOR, TILE, tileAt, type FloorMap } from './mapgen';
+import { TILE, tileAt, type FloorMap } from './mapgen';
 import { type MobType } from './mobgen';
 import { TALK_RANGE, type HubStation } from './hubWorld';
 import { demonDeathLines, demonEnrageLines, demonMobType, demonTauntsFor, type Npc, type NpcDef } from './npcs';
 import type { Ware } from './shop';
-import { furyFalls, tickFury, type Fury } from './thief';
+import { furyFalls, roomToFight, tickFury, type Fury } from './thief';
 import { floorPar, foeStats } from '../core/power';
 import { heroDodge, heroSpecial, heroTick } from './skills';
 import { CLEAR, skyOf, type Sky } from './sky';
@@ -281,7 +281,7 @@ export class World {
     // Coins lying on the floor are real gold: they sit where they lie until the squad picks them up.
     for (const p of o.map.props) {
       if (p.kind !== 'coins') continue;
-      this.pickups.push({ uid: uid(), x: p.x, y: p.y, vx: 0, vy: 0, z: 0, vz: 0, kind: 'gold', amount: Math.max(1, Math.round(this.goldPerKill * 3)), t: 0, taken: false });
+      this.pickups.push({ uid: uid(), x: p.x, y: p.y, vx: 0, vy: 0, z: 0, vz: 0, kind: 'gold', amount: Math.max(1, Math.round(this.goldPerKill * 3)), t: 0, taken: false, lying: true });
     }
     o.map.props = o.map.props.filter((p) => p.kind !== 'coins');
     for (const s of o.map.spawns) {
@@ -663,6 +663,8 @@ export class World {
     this.events.push({ type: 'kill', gold, elite: !!m.elite, boss: !!m.boss, x: m.x, y: m.y, name: t.name, ...(robbed ? { robbed } : {}) });
     onKill(this, m);
     if (robbed) furyFalls(this, m);
+    // (Asked now: the demon's record is cleared just below. Not by its name: the Ember Depths' own boss is an `ember-` too.)
+    const wasDemon = this.demon?.unit === m;
     if (this.demon && this.demon.unit === m) {
       this.text(m.x, m.y - 34, this.rng.pick(demonDeathLines), '#ff9a6a', true);
       this.demon = null;
@@ -679,7 +681,7 @@ export class World {
     if (robbed) {
       this.shakeIt(5, 0.6);
       this.hitStop = 0.2;
-    } else if (m.boss && m.type?.id.startsWith('ember-')) {
+    } else if (m.boss && wasDemon) {
       // An unmasked demon: a big moment, but the floor's other foes don't fall with it.
       this.shakeIt(5, 0.6);
       this.hitStop = 0.2;
@@ -783,7 +785,8 @@ export class World {
     }
     for (const m of this.mobs) {
       const p = f.mobs.get(m.uid);
-      if (!p || m.dead) continue;
+      // (Not onto a spot it couldn't stand on: a foe caught mid-vault over a counter would be put back behind it.)
+      if (!p || m.dead || m.vault || !clear(this.map, p.x, p.y, m.r, m.flying)) continue;
       m.x = p.x;
       m.y = p.y;
     }
@@ -859,9 +862,11 @@ export class World {
   unmaskDemon(npc: Npc): void {
     this.npcs = this.npcs.filter((n) => n !== npc);
     const t = demonMobType(this.floor, this.biome.id, npc.seed);
-    // Behind a counter it vaults over it, onto the open floor in front.
-    const at = npc.camp && tileAt(this.map, Math.floor(npc.x / TILE), Math.floor(npc.y / TILE)) !== FLOOR ? npc.camp.talk : npc;
-    const m = this.makeMob(t, at.x, at.y, false, true);
+    const m = this.makeMob(t, npc.x, npc.y, false, true);
+    // Behind a counter, or between a stall's posts, it comes out onto the open floor in front (thief.ts).
+    const at = roomToFight(this, npc, m.r);
+    m.x = at.x;
+    m.y = at.y;
     m.awake = true;
     // Built like a boss of this floor, but a little gentler (it's a side show).
     m.maxHp *= 0.6;
@@ -1040,7 +1045,9 @@ export class World {
       }
     } else {
       const mayLeave = !this.bot || this.cleared || (this.boss && this.portalOpen);
-      if (this.portalOpen && mayLeave && !this.exited && lead && dist(lead.x, lead.y, this.map.exit.x, this.map.exit.y) < 14) this.startWarp();
+      // (Whoever leads now: the leader this step began with may have fallen in it.)
+      const goer = this.leader();
+      if (this.portalOpen && mayLeave && !this.exited && !this.wiped && goer && dist(goer.x, goer.y, this.map.exit.x, this.map.exit.y) < 14) this.startWarp();
     }
     if (this.arrive) {
       this.arrive.t += clock;
@@ -1236,9 +1243,19 @@ function updateAreas(w: World, dt: number): void {
   w.areas = w.areas.filter((a) => !a.done);
 }
 
+/** How near (px) a knight must come to a pile of coins lying on the floor before it flies to the squad. */
+const PILE_REACH = 44;
+
 function updatePickups(w: World, dt: number): void {
   const lead = w.leader();
   for (const p of w.pickups) {
+    if (p.lying) {
+      // A pile on the floor stays put until one of the squad comes by.
+      // (Or the floor is cleared: what's left lying comes in by itself.)
+      if (!w.cleared && !w.heroes.some((h) => !h.downed && dist(h.x, h.y, p.x, p.y) < PILE_REACH)) continue;
+      p.lying = false;
+      p.t = 0.6;
+    }
     p.t += dt;
     if (p.t < 0.6) {
       // A little hop where it dropped.
@@ -1254,9 +1271,13 @@ function updatePickups(w: World, dt: number): void {
     // Then it flies to the squad's leader.
     const [nx, ny] = norm(lead.x - p.x, lead.y - 8 - p.y);
     const sp = 60 + (p.t - 0.6) * 260;
-    p.x += nx * sp * dt;
-    p.y += ny * sp * dt;
-    if (dist(p.x, p.y, lead.x, lead.y - 8) < 6) {
+    // (A step that would carry it to the leader or past is a catch: left to overshoot, a fast coin
+    // hops from side to side of the knight for good and its gold never lands.)
+    const left = dist(p.x, p.y, lead.x, lead.y - 8);
+    const reached = sp * dt >= left - 6;
+    p.x += nx * Math.min(sp * dt, left);
+    p.y += ny * Math.min(sp * dt, left);
+    if (reached) {
       p.taken = true;
       w.events.push({ type: 'pickup', kind: p.kind, amount: p.amount });
       if (p.kind !== 'gold') {

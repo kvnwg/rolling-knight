@@ -7,7 +7,7 @@
  * every animation frame; the React UI re-renders ten times a second.
  */
 import { RUN_ITEMS } from '../core/runItems';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { music } from '../audio/music';
 import { rainSound } from '../audio/rain';
 import { sfx } from '../audio/sfx';
@@ -32,11 +32,11 @@ import type { SoundName } from '../audio/sfx';
 import { uiSound } from './sound';
 import { rebirthPitch } from './RebirthPill';
 import { VistaCanvas } from './VistaCanvas';
+import { hubScene } from '../world/hub';
 import { Tutorial } from './Tutorial';
 import { WelcomeBack } from './WelcomeBack';
 import { FloorRewind } from './fx/FloorRewind';
 import { CampAsk } from './CampAsk';
-import { campFloor } from '../core/newGame';
 
 export interface Toast {
   id: number;
@@ -102,6 +102,19 @@ export function App() {
   const [luck, setLuck] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [banner, setBanner] = useState<Banner | null>(null);
+  // The browser took the GPU away and gave it back (a driver reset, the tab starved): the game's own
+  // picture rebuilds itself (render/post.ts), and the HUD's little canvases (the corner altar's frame,
+  // a keeper's frame) were wiped with it, so the HUD is mounted afresh to draw them again.
+  const [gpu, setGpu] = useState(0);
+  useEffect(() => {
+    const back = () => setGpu((n) => n + 1);
+    document.addEventListener('contextrestored', back, true);
+    document.addEventListener('webglcontextrestored', back, true);
+    return () => {
+      document.removeEventListener('contextrestored', back, true);
+      document.removeEventListener('webglcontextrestored', back, true);
+    };
+  }, []);
   // CAMP asks first (leaving costs floors): the fight waits while it's up.
   const [campAsk, setCampAsk] = useState(false);
   const campAskRef = useRef(campAsk);
@@ -121,9 +134,30 @@ export function App() {
   const sheetOpen = detail !== null || settings || luck || station !== null || choosing;
   const sheetRef = useRef(sheetOpen);
   sheetRef.current = sheetOpen;
+  // A sheet over a keeper's screen (a knight's details, settings, the luck sheet): Esc closes it alone.
+  const topRef = useRef(false);
+  topRef.current = detail !== null || settings || luck;
+  // The welcome back is up (it takes the screen: the fight waits and no key reaches what's under it).
+  const awayRef = useRef(false);
+  awayRef.current = offline !== null && picked && !intro;
   // The world waits on the title screen (no knights roll in behind it before PLAY).
   const titleRef = useRef(choosing);
   titleRef.current = choosing;
+  // While the title is up and nothing else is going on, the hub is got ready behind it (its painting,
+  // then a couple of frames of it drawn under the title to make its textures): PLAY then opens onto it
+  // at once, not after a second or more of nothing. `warm`: frames of the hub still to draw under the title.
+  const warm = useRef(0);
+  const warmHub = useCallback(() => {
+    window.setTimeout(() => {
+      if (!titleRef.current) return;
+      hubScene();
+      window.setTimeout(() => {
+        if (!titleRef.current) return;
+        game.syncHub();
+        warm.current = 3;
+      }, 30);
+    }, 80);
+  }, [game]);
 
   // (A brand-new game opens on the title too; its PLAY goes to the altar, to watch the first knights roll in.)
 
@@ -251,7 +285,8 @@ export function App() {
           break;
         case 'camp':
           // (Nothing to show when the run keeps its floor and nobody had fallen.)
-          if (e.from > e.back || e.revived > 0) setRewind({ id: nextId++, from: e.from, back: e.back, revived: e.revived });
+          // (From a beaten boss's floor the run goes on a floor, not back: no ticking, just where it stands.)
+          if (e.from > e.back || e.revived > 0) setRewind({ id: nextId++, from: Math.max(e.from, e.back), back: e.back, revived: e.revived });
           break;
         case 'potion':
           toast({ text: `Luck Potion: luck ×2 for ${secs(e.seconds)}`, color: '#8af07a' });
@@ -302,17 +337,29 @@ export function App() {
       const w = game.inDungeon ? game.world : game.hub;
       rainSound.set(game.inDungeon && game.world ? game.world.sky.rain : 0);
       // Walking off at the hub stays there (no auto return).
+      // (Nor does it go while you're reading a keeper's screen: it holds at its full count until you close it.)
       if (!game.inDungeon && game.autoReturnT > 0 && (c.mx || c.my)) game.autoReturnT = 0;
+      if (!game.inDungeon && game.autoReturnT > 0 && (sheetRef.current || awayRef.current)) game.autoReturnT = Math.max(game.autoReturnT, 5);
       if (game.inDungeon !== wasIn) {
         wasIn = game.inDungeon;
-        if (!wasIn) music.setScene('camp');
+        if (wasIn) {
+          // Whatever was open at the hub stays at the hub.
+          setStation(null);
+          setDetail(null);
+        } else {
+          music.setScene('camp');
+          // What was open over the fight goes with it.
+          setTalking(null);
+          setCampAsk(false);
+        }
       }
       // A reveal pauses the fight (the altar keeps its own pace). Auto battle (the setting) plays your
       // knight outright in a fight: it moves, dodges, fights and goes down when the floor is done;
       // steering or attacking yourself takes over for as long as you do. A sheet open only aims and
       // attacks for you. The dev bot (?auto, the sim) never lets go.
-      // (So does an ad: from the moment the portal is asked for one until it's over.)
-      game.paused = revealRef.current.length > 0 || talkRef.current !== null || titleRef.current || campAskRef.current || portal.busy;
+      // (A talk and CAMP's question are only ever on the screen in the dungeon: they hold nothing up at the hub.)
+      // (An ad holds everything up, wherever it falls: from the moment the portal is asked for one until it's over.)
+      game.paused = revealRef.current.length > 0 || titleRef.current || portal.busy || (game.inDungeon && (talkRef.current !== null || campAskRef.current || awayRef.current));
       if (w) {
         const autoBattle = game.inDungeon && game.state.settings.autoPlay && !(c.mx || c.my || c.attack);
         w.auto = game.state.settings.autoPlay || sheetRef.current;
@@ -321,8 +368,10 @@ export function App() {
         const hold = !game.inDungeon && sheetRef.current;
         w.input.mx = hold ? 0 : c.mx;
         w.input.my = hold ? 0 : c.my;
-        if (c.dodge) w.input.dodge = true;
-        if (c.special) w.input.special = true;
+        // (A key pressed while the game is held, or a screen is open, isn't saved up for when it resumes.)
+        const live = !game.paused && !sheetRef.current;
+        if (c.dodge && live) w.input.dodge = true;
+        if (c.special && live) w.input.special = true;
         // Attacking: held, toward the mouse; on touch the Attack button auto-aims, or aims the way
         // it's dragged (world/aim.ts).
         const fight = game.inDungeon && !hold;
@@ -337,12 +386,13 @@ export function App() {
       } else r.cursor = null;
       c.dodge = false;
       c.special = false;
+      const held = game.paused || sheetRef.current;
       if (c.switchTo !== null) {
-        game.switchTo(c.switchTo);
+        if (!held) game.switchTo(c.switchTo);
         c.switchTo = null;
       }
       if (c.toggleAuto) {
-        game.setAuto(!game.state.settings.autoPlay);
+        if (!held) game.setAuto(!game.state.settings.autoPlay);
         c.toggleAuto = false;
       }
       game.tick(dt);
@@ -351,7 +401,14 @@ export function App() {
       // A keeper's screen covers the hub (all of it on a phone; on a wide screen it shows blurred
       // either side): draw the hub a quarter as often underneath, with the time that went by.
       skipDt += dt;
-      if (!stationRef.current || game.inDungeon || ++frameN % 4 === 0) {
+      if (titleRef.current) {
+        // The title covers everything: nothing is drawn under it, but for the hub's first frames (warmHub).
+        if (warm.current > 0 && game.hub) {
+          warm.current--;
+          r.render(game, 0, game.hub);
+        }
+        skipDt = 0;
+      } else if (!stationRef.current || game.inDungeon || ++frameN % 4 === 0) {
         r.render(game, game.paused ? 0 : skipDt, game.inDungeon ? game.world : game.hub);
         skipDt = 0;
       }
@@ -367,7 +424,12 @@ export function App() {
     };
     raf = requestAnimationFrame(loop);
     const save = () => game.save();
-    const vis = () => document.visibilityState === 'hidden' && game.save();
+    // Out of sight nothing ticks: the time is made up as time away when the page is back.
+    const vis = () => {
+      if (document.visibilityState === 'hidden') return game.hidden();
+      const report = game.shown();
+      if (report) setOffline((old) => (old ? { seconds: old.seconds + report.seconds, rolls: old.rolls + report.rolls, kept: [...old.kept, ...report.kept], extras: old.extras + report.extras, gold: old.gold + report.gold } : report));
+    };
     window.addEventListener('beforeunload', save);
     document.addEventListener('visibilitychange', vis);
     const unlock = () => {
@@ -390,28 +452,39 @@ export function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const k = keyOf(e);
-      if (k === 'escape') {
+      // The welcome back takes the screen: nothing under it answers a key (a reveal takes its own keys).
+      // Nor does anything while a portal's ad is being fetched or is playing.
+      if (awayRef.current || revealRef.current.length > 0 || portal.busy) return;
+      // (Enter is the game's here: it mustn't also press whichever HUD button the mouse last clicked.)
+      if (k === 'enter' && !sheetRef.current && !talkRef.current) e.preventDefault();
+      if (k === 'escape' && !e.repeat) {
         // (A keeper's own overlays, the upgrade map and the details popups, take Esc first.)
-        if (sheetRef.current) {
+        if (topRef.current) {
+          // What's on top closes, and only that: the keeper's screen under a knight's details stays.
           setDetail(null);
           setSettings(false);
           setLuck(false);
+        } else if (sheetRef.current) {
           // (The Oracle's sealed altar stays: a new game's first screen, until the seal is broken.)
           setStation((st) => (st?.id === 'altar' && game.state.roll.sealed ? st : null));
-        } else if (game.inDungeon) {
+        } else if (game.inDungeon && !game.wiping) {
           // Esc asks to leave, and Esc again takes the question back.
           uiSound(campAskRef.current ? 'close' : 'open');
           setCampAsk(!campAskRef.current);
         }
+        return;
       }
-      if (campAskRef.current && k === 'enter') {
-        setCampAsk(false);
-        if (game.inDungeon) game.leaveDungeon();
+      if (campAskRef.current) {
+        // Enter goes (the question says so on its buttons); nothing else gets through to the fight.
+        if (k === 'enter' && !e.repeat) {
+          setCampAsk(false);
+          if (game.inDungeon) game.leaveDungeon();
+        }
         return;
       }
       // At the hub, E or Enter talks to the keeper you're standing by; in the dungeon (where E is
       // your skill) it's Enter or F.
-      if ((k === 'e' || k === 'enter') && !game.inDungeon && !sheetRef.current) {
+      if ((k === 'e' || k === 'enter') && !game.inDungeon && !sheetRef.current && !e.repeat) {
         const near = game.hub?.nearStation();
         if (near) {
           uiSound('open');
@@ -461,14 +534,14 @@ export function App() {
   return (
     <>
       <canvas ref={canvasRef} className={aiming ? 'game aiming' : 'game'} data-play="1" />
-      {choosing && <VistaCanvas game={game} wide={wide} pick={csPick} />}
+      {choosing && <VistaCanvas game={game} wide={wide} pick={csPick} onReady={warmHub} />}
       {inDungeon ? (
-        <DungeonHud
+        <DungeonHud key={`DungeonHud${gpu}`}
           game={game}
           controls={ctl.controls}
           press={ctl.press}
           hold={ctl.hold}
-          onCamp={() => setCampAsk(true)}
+          onCamp={() => !game.wiping && setCampAsk(true)}
           onRebirth={() => {
             // Back to camp, the Shrine's screen open there.
             game.leaveDungeon();
@@ -481,7 +554,7 @@ export function App() {
           onTalk={(n) => (uiSound('open'), setTalking(n))}
         />
       ) : (
-        !choosing && <HubHud game={game} onTalk={setStation} onSettings={() => setSettings(true)} onLuck={() => setLuck(true)} />
+        !choosing && <HubHud key={`HubHud${gpu}`} game={game} onTalk={setStation} onSettings={() => setSettings(true)} onLuck={() => setLuck(true)} />
       )}
       {!inDungeon && ctl.controls.stick.active && (
         <div className="stick" style={{ left: ctl.controls.stick.ox, top: ctl.controls.stick.oy }}>
@@ -506,7 +579,7 @@ export function App() {
           }}
         />
       )}
-      {station && !inDungeon && <StationSheet game={game} station={station} onOpen={setDetail} onClose={() => setStation(null)} />}
+      {station && !inDungeon && <StationSheet key={`StationSheet${gpu}`} game={game} station={station} onOpen={setDetail} onClose={() => setStation(null)} />}
       {talking && inDungeon && <DialogBox game={game} npc={talking} onClose={() => setTalking(null)} />}
       <div className="toasts">
         {toasts.map((t) => (
@@ -526,7 +599,7 @@ export function App() {
       {campAsk && inDungeon && (
         <CampAsk
           floor={game.state.run.floor}
-          back={campFloor(game.state.run.floor, game.state.run.checkpoint)}
+          back={game.campTarget()}
           fallen={game.world ? game.world.heroes.filter((h) => h.downed).length : 0}
           onStay={() => (uiSound('close'), setCampAsk(false))}
           onGo={() => {
@@ -564,7 +637,7 @@ export function App() {
         />
       )}
       {luck && <LuckSheet game={game} onClose={() => setLuck(false)} />}
-      {reveals.length > 0 && <Reveal key={reveals.length + ':' + reveals[0].knightId} item={reveals[0]} calm={game.state.settings.reduceMotion} onDone={() => (uiSound('tap'), setReveals((r) => r.slice(1)))} />}
+      {reveals.length > 0 && <Reveal key={reveals.length + ':' + reveals[0].knightId} item={reveals[0]} calm={game.state.settings.reduceMotion} auto={game.state.settings.autoPlay} onDone={() => (uiSound('tap'), setReveals((r) => r.slice(1)))} />}
       {/* Back after time away: not over the title (that opens the game), but once you've pressed PLAY. */}
       {offline && picked && !intro && <WelcomeBack game={game} report={offline} onClose={() => setOffline(null)} />}
       {/* An ad is being fetched or is playing: nothing in the game can be pressed until it's over. */}

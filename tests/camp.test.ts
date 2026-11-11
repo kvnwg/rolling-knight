@@ -50,6 +50,31 @@ describe('back to camp', () => {
     expect(events.filter((e) => e.type === 'camp').length).toBe(n);
   });
 
+  it('never leaves the screen black: a fade with nowhere to go turns back, and a listener that throws leaves the game at the hub', () => {
+    const g = new Game(true);
+    for (let t = 0; t < 3; t += 1 / 30) g.tick(1 / 30);
+    // A fade to black that nothing is waiting behind (no steps being walked, no portal's cut).
+    g.fadeDir = 1;
+    for (let t = 0; t < 2; t += 1 / 30) g.tick(1 / 30);
+    expect(g.fadeDir).toBe(-1);
+    expect(g.fade).toBe(0);
+    // Leaving for camp is all done before anyone is told: a listener blowing up can't leave the game
+    // in the dungeon with no floor (which draws nothing).
+    g.hub!.leader()!.y = HUB_DESCEND_Y + 2;
+    for (let t = 0; t < 1.5; t += 1 / 30) g.tick(1 / 30);
+    expect(g.inDungeon).toBe(true);
+    g.on((e) => {
+      if (e.type === 'camp') throw new Error('a listener fell over');
+    });
+    expect(() => g.leaveDungeon()).toThrow();
+    expect(g.inDungeon).toBe(false);
+    expect(g.world).toBeNull();
+    expect(g.hub).not.toBeNull();
+    for (let t = 0; t < 1.5; t += 1 / 30) g.tick(1 / 30);
+    expect(g.inDungeon).toBe(false);
+    expect(g.fade).toBe(0);
+  });
+
   it('the count ticks at a readable pace however far it has to go', () => {
     expect(rewindTick(0)).toBe(0);
     for (let s = 1; s <= 4; s++) {

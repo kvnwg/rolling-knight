@@ -4,6 +4,7 @@
  * behind the tabs and over the paper's edge, that takes no clicks. Also the dress that goes with
  * it: the paper's tint and the lit tab's colours, as CSS variables for the screen.
  */
+import { READ } from '../readCanvas';
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { FRAME_OVER, keeperDress, paintKeeperFrame } from '../../render/art/keepers/frames';
 import type { StationId } from '../../world/hubWorld';
@@ -18,7 +19,7 @@ function paperTile(c: readonly [string, string, string]): string {
   const cv = document.createElement('canvas');
   cv.width = n;
   cv.height = n;
-  const g = cv.getContext('2d')!;
+  const g = cv.getContext('2d', READ)!;
   g.fillStyle = c[0];
   g.fillRect(0, 0, n, n);
   for (let y = 0; y < n; y++) {

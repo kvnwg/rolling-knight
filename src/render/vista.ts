@@ -113,6 +113,27 @@ const FLY = hex('#e8ff9a');
 /** How long a new size or focus must hold before the layers are rebuilt, and the crossfade after. */
 const SETTLE_MS = 200;
 const FADE_MS = 400;
+/** The first build's share of a frame. */
+const STEP_MS = 6;
+
+/** The sky's own colours top to bottom, no more: what's up while the scene is painted, and what it fades in from. */
+function dusk(ctx: Ctx, w: number, h: number, alpha: number, horizon: number): void {
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = alpha;
+  const grad = ctx.createLinearGradient(0, 0, 0, h * horizon);
+  for (const [at, col] of SKY) if (at <= 1) grad.addColorStop(at, col);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+  // (And the land under it, in the dark.)
+  const land = ctx.createLinearGradient(0, h * horizon, 0, h * (horizon + 0.16));
+  land.addColorStop(0, 'rgba(20,14,48,0)');
+  land.addColorStop(1, 'rgba(20,14,48,0.94)');
+  ctx.fillStyle = land;
+  ctx.fillRect(0, h * horizon, w, h * (1 - horizon));
+  ctx.restore();
+}
 
 const now = (): number => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
@@ -128,9 +149,20 @@ export class Vista {
   private knights = new Map<string, KnightSprite | null>();
   private still: Canvas | null = null;
   private stillKey = '';
+  /** The first build, under way (a part each frame). */
+  private job: { key: string; steps: Generator<void, Built> } | null = null;
+  /** Where the horizon is, as a share of the height (for the dusk). */
+  private horizon = 0.3;
+  /** When the first build came in (it fades in over the plain dusk shown while it was painted). */
+  private bornAt = 0;
 
   constructor() {
     // Canvases are made lazily on the first draw (no DOM at import time).
+  }
+
+  /** The scene is painted and showing (not the plain dusk it's built behind). */
+  get ready(): boolean {
+    return this.built !== null;
   }
 
   /**
@@ -141,6 +173,10 @@ export class Vista {
     w = Math.max(1, Math.round(w));
     h = Math.max(1, Math.round(h));
     const S = this.ensure(w, h, opts.focusX, opts.focusY, !!opts.reduceMotion);
+    if (!S) {
+      dusk(ctx, w, h, 1, this.horizon);
+      return;
+    }
     if (opts.reduceMotion) {
       // A still frame: composed once per layout, then just blitted.
       const k = `${this.key}|${opts.heroes.map((hh) => `${hh.id}:${hh.mutation ?? ''}`).join(',')}`;
@@ -177,21 +213,41 @@ export class Vista {
         ctx.restore();
       }
     }
+    // The scene comes up out of the dusk it was painted behind.
+    const born = (now() - this.bornAt) / FADE_MS;
+    if (born < 1) dusk(ctx, w, h, 1 - born * born * (3 - 2 * born), this.horizon);
   }
 
   // ------------------------------------------------------------------ building
 
   /**
-   * The layers for this size and focus. The first build happens at once; later changes wait until the
-   * size and focus have held still for a moment (a rotation, a window drag or a menu transition costs
-   * one rebuild, not one per frame), then the new layout fades in over the old.
+   * The layers for this size and focus. The first build is done a part each frame (null until it's
+   * in: the caller shows a plain dusk meanwhile); later changes wait until the size and focus have
+   * held still for a moment (a rotation, a window drag or a menu transition costs one rebuild, not one
+   * per frame), then the new layout fades in over the old.
    */
-  private ensure(w: number, h: number, fx: number, fy: number, noFade: boolean): Built {
+  private ensure(w: number, h: number, fx: number, fy: number, noFade: boolean): Built | null {
     const key = `${w}x${h}|${Math.round(fx * 200)}|${Math.round(fy * 200)}`;
     if (!this.built) {
-      this.key = key;
-      this.built = build(makeLayout(w, h, fx, fy));
-      return this.built;
+      if (!this.job || this.job.key !== key) {
+        // (Nothing painted on the frame it starts: that frame is the title's own first.)
+        const L = makeLayout(w, h, fx, fy);
+        this.horizon = L.hy / L.H;
+        this.job = { key, steps: buildSteps(L) };
+        return null;
+      }
+      const until = now() + STEP_MS;
+      do {
+        const r = this.job.steps.next();
+        if (r.done) {
+          this.key = key;
+          this.built = r.value;
+          this.job = null;
+          this.bornAt = noFade ? -1e9 : now();
+          return this.built;
+        }
+      } while (now() < until);
+      return null;
     }
     if (key === this.key) {
       this.pendingKey = '';
@@ -652,7 +708,12 @@ function bloomOf(src: Pix, sigma: number, pad: number, threshold: number): Canva
 /** The flames don't depend on the layout: painted once. */
 let fireCache: Canvas[] | null = null;
 
-function build(L: Layout): Built {
+/**
+ * The layers, a part at a time (the first build: about a second's painting on a desktop, several on
+ * a phone, so it's spread over frames with the title already up and answering, not done in one go
+ * before anything shows).
+ */
+function* buildSteps(L: Layout): Generator<void, Built> {
   const { p, W, H, w, h } = L;
   const r = rng(L.seed + 100);
   const G = ground(L);
@@ -701,6 +762,7 @@ function build(L: Layout): Built {
     drawPix(sg, sp, Math.round(L.sunX - (L.sunR * len) / 2 + (dy - 0.4) * L.sunR) * p, Math.round(L.sunY + dy * L.sunR - 2) * p, p);
   }
 
+  yield;
   // --- Clouds (drifting sprites with a bloom on their lit edges).
   const clouds: Drifter[] = [];
   const addCloud = (kind: CloudKind, cx: number, bottom: number, cw: number, chh: number, speed: number, seed: number) => {
@@ -741,6 +803,7 @@ function build(L: Layout): Built {
     streaksFront.push({ c: pix.toCanvas(), bloom: null, pad: 0, x0: cx - pix.w / 2, y: v * L.hy - sh, w: pix.w, h: pix.h, speed: 0.22 + r() * 0.3 });
   }
 
+  yield;
   // --- Far and middle distance, blurred and crisp, into one device-res band.
   const far = paintFar(L);
   const mid = paintMid(L);
@@ -763,10 +826,12 @@ function build(L: Layout): Built {
   fg.globalCompositeOperation = 'source-over';
   drawPix(fg, crop(mid.pix, 0, fmTop, W, fmBot - fmTop), 0, 0, p);
 
+  yield;
   // --- The lake.
   const lakeM = 6;
   const lake = paintLake(L, far, mid.pix, lakeM);
 
+  yield;
   // --- Near: forests, meadow, cliff, camp; the foreground softened (depth of field).
   const nearPix = paintNear(L, G);
   paintCamp(nearPix, L, G);
@@ -793,6 +858,7 @@ function build(L: Layout): Built {
     ng.drawImage(mc, 0, (dofY - pad - nearY) * p);
   }
 
+  yield;
   // --- Out-of-focus framing.
   const fronts = paintFront(L).map((f) => {
     // Blurred at half resolution (it is out of focus anyway), drawn back up at full size.
@@ -803,6 +869,7 @@ function build(L: Layout): Built {
     return { c: hb.toCanvas(), x: f.x - pad, y: f.y - pad, w: hb.w * 2, h: hb.h * 2 };
   });
 
+  yield;
   // --- Mist drifting over the far shore, over the near forest and down in the valley.
   const mist = (h0: number, color: string, seed: number, density: number, y: number, speed: number, alpha: number): Mist => {
     const mw = Math.ceil(W / 2);
@@ -824,6 +891,7 @@ function build(L: Layout): Built {
     mist(mh3 * 2.2, '#8a5aa6', L.seed + 95, 0.7, H - mh3 * 2.6, 0.5, 0.32),
   ];
 
+  yield;
   // --- Light shafts from the sun (low res, blurred).
   const rs = 4;
   const rays = new Pix(Math.ceil(W / rs), Math.ceil(H / rs));
@@ -854,6 +922,7 @@ function build(L: Layout): Built {
     blurRGBA(rays.d, rays.w, rays.h, 1.3);
   }
 
+  yield;
   // --- Vignette and grade (low res, scaled up smooth).
   const vs = 4;
   const vig = canvas(Math.ceil(w / vs), Math.ceil(h / vs));
@@ -882,6 +951,7 @@ function build(L: Layout): Built {
     vg.fillRect(0, 0, vw, vh);
   }
 
+  yield;
   // --- Twinkles, glints and fireflies.
   const stars: Built['stars'] = [];
   for (let i = 0; i < Math.round(W * 0.1); i++) {
@@ -938,4 +1008,13 @@ function build(L: Layout): Built {
     fire: (fireCache ??= fireFrames().map((f) => f.toCanvas())),
     fireFront: { c: ffr.pix.toCanvas(), x: ffr.x, y: ffr.y, w: ffr.pix.w, h: ffr.pix.h },
   };
+}
+
+/** The layers, all at once (a later rebuild: the old layout is on screen meanwhile). */
+function build(L: Layout): Built {
+  const steps = buildSteps(L);
+  for (;;) {
+    const r = steps.next();
+    if (r.done) return r.value;
+  }
 }

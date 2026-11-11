@@ -16,9 +16,9 @@
  */
 import { BAL } from '../core/balance';
 import { foeStats } from '../core/power';
-import type { Unit } from './entities';
-import { FLOOR, TILE, tileAt } from './mapgen';
+import { clear, type Unit } from './entities';
 import { floorBoss, type MobType } from './mobgen';
+import { freeSpot } from './nav';
 import type { Npc } from './npcs';
 import type { World } from './world';
 
@@ -125,14 +125,29 @@ export function provoke(w: World): boolean {
   return true;
 }
 
+/**
+ * Where a keeper who turns foe lands: where they stand if a body that wide can move there, else the
+ * talking spot in front of their set-up, else the nearest open floor to it the squad can reach.
+ */
+export function roomToFight(w: World, npc: Npc, r: number): { x: number; y: number } {
+  if (clear(w.map, npc.x, npc.y, r, false)) return npc;
+  const talk = npc.camp?.talk ?? npc;
+  if (clear(w.map, talk.x, talk.y, r, false)) return talk;
+  const lead = w.leader();
+  const spot = freeSpot(w, talk.x, talk.y, r, lead?.x ?? talk.x, lead?.y ?? talk.y, 80);
+  return spot ? { x: spot[0], y: spot[1] } : talk;
+}
+
 /** The warning's over: she's off the list of folk and on the floor as a foe, vaulting her counter. */
 function turn(w: World, f: Fury): void {
   const npc = f.npc;
   w.npcs = w.npcs.filter((n) => n !== npc);
-  // From behind a counter she lands on the open floor in front of it (where you'd stand to talk).
-  const behind = tileAt(w.map, Math.floor(npc.x / TILE), Math.floor(npc.y / TILE)) !== FLOOR;
-  const at = npc.camp && behind ? npc.camp.talk : npc;
-  const m = w.makeMob(furiousMerchantType(w.biome.id, w.floor, npc), at.x, at.y, false, true);
+  const m = w.makeMob(furiousMerchantType(w.biome.id, w.floor, npc), npc.x, npc.y, false, true);
+  // From behind a counter, or from between her stall's posts (she's wider than the gap as a foe, and
+  // would stand wedged there all fight), she lands on the open floor in front, where you'd stand to talk.
+  const at = roomToFight(w, npc, m.r);
+  m.x = at.x;
+  m.y = at.y;
   const boss = wouldBeBoss(w);
   m.maxHp = boss.hp * BAL.shop.thief.might;
   m.hp = m.maxHp;

@@ -9,7 +9,7 @@ import type { CoreEvent } from '../src/core/events';
 import type { OfflineReport } from '../src/core/offline';
 import { loadGame, SAVE_KEY, saveGame, setSaveStore, type SaveStore } from '../src/core/save';
 import { newGame } from '../src/core/newGame';
-import { FAVOUR_EVERY_MS, Game } from '../src/game';
+import { DOUBLE_AFTER_S, FAVOUR_EVERY_MS, Game } from '../src/game';
 import { CrazyGames } from '../src/platform/crazygames';
 import { HUB_DESCEND_Y } from '../src/render/art/hubScene';
 
@@ -374,5 +374,10 @@ describe('rewards for watching an ad', () => {
     expect(game.doubleAway(report)).toBe(0);
     expect(game.state.gold).toBe(before + 500);
     expect(game.doubleAway({ ...report, gold: 0, doubled: false })).toBe(0);
+    // A minute out of sight brings a report too (the tab in the background): no ad is offered for that.
+    const short: OfflineReport = { ...report, seconds: DOUBLE_AFTER_S - 1, doubled: false };
+    expect(game.canDoubleAway(short)).toBe(false);
+    expect(game.doubleAway(short)).toBe(0);
+    expect(game.canDoubleAway({ ...short, seconds: DOUBLE_AFTER_S })).toBe(true);
   });
 });

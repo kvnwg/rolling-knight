@@ -115,6 +115,22 @@ export function trapPhase(tr: Pick<Trap, 'kind' | 'phase' | 'reach' | 'armedAt'>
 }
 
 /** The traps of a floor, ready to play. */
+/**
+ * The tiles a trap can hurt on (a saw's whole run, not just where it starts): nothing is put down on
+ * these (a foe asleep on spikes is hurt awake, and its room with it, before the squad has moved; a
+ * ware on a vent costs HP to buy).
+ */
+export function trapTiles(m: FloorMap): Set<number> {
+  const out = new Set<number>();
+  for (const t of m.traps ?? []) {
+    const tx = Math.floor(t.x / TILE);
+    const ty = Math.floor(t.y / TILE);
+    const run = t.kind === 'saw' ? Math.ceil((t.reach ?? 16) / TILE) : 0;
+    for (let d = -run; d <= run; d++) out.add(ty * m.w + tx + d);
+  }
+  return out;
+}
+
 export function makeTraps(m: FloorMap): Trap[] {
   return (m.traps ?? []).map((s) => ({ ...s, hits: new Map(), armedAt: -1 }));
 }

@@ -313,6 +313,8 @@ export interface Pickup {
   amount: number;
   t: number;
   taken: boolean;
+  /** A pile lying on the floor since the floor was made: it waits there until a knight comes near. */
+  lying?: boolean;
 }
 
 /** Things the renderer should burst into particles (hits, deaths, spells). */

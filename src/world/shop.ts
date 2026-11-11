@@ -13,6 +13,7 @@ import { isBossFloor } from './biomes';
 import { pitchCamp, type Camp } from './camps';
 import { FLOOR, TILE, tileAt, type FloorMap } from './mapgen';
 import { SHOPKEEPER, makeNpc, type Npc } from './npcs';
+import { trapTiles } from './traps';
 
 export interface Ware {
   uid: number;
@@ -42,7 +43,8 @@ export function shopChance(floor: number): number {
 /** The open floor in front of a set-up where wares can stand: a row below its talking spot, spread out. */
 function wareSpots(m: FloorMap, camp: Camp, n: number): Array<{ x: number; y: number }> {
   const out: Array<{ x: number; y: number }> = [];
-  const open = (x: number, y: number) => tileAt(m, Math.floor(x / TILE), Math.floor(y / TILE)) === FLOOR;
+  const trapped = trapTiles(m);
+  const open = (x: number, y: number) => tileAt(m, Math.floor(x / TILE), Math.floor(y / TILE)) === FLOOR && !trapped.has(Math.floor(y / TILE) * m.w + Math.floor(x / TILE));
   // The rows in front of the set-up (the first is where you stand to talk; the wares go below it).
   for (const dy of [TILE + 12, 2 * TILE + 12]) {
     const y = camp.talk.y + dy;

@@ -27,7 +27,7 @@ import { floorBoss, floorMobs } from './world/mobgen';
 import { World, type HeroSpec } from './world/world';
 import { HUB_DESCEND_Y, HUB_STEPS_Y, hubLayout } from './world/hubWorld';
 import { applyDialogAction, dialogFor, placeNpcs, type DialogChoice, type DialogNode, type Npc } from './world/npcs';
-import { questEvent, type Quest, type QuestEvent, type QuestReward } from './core/quests';
+import { pruneQuests, questEvent, type Quest, type QuestEvent, type QuestReward } from './core/quests';
 import { onFloorStart } from './world/chance';
 import { skillRollLuck } from './core/chance';
 import type { ScreenView } from './render/view';
@@ -55,6 +55,11 @@ export const PORTAL_REVEAL = 5;
 const FADE_IN = 1.6;
 /** The Oracle's Favour (a Luck Potion for watching an ad) can be taken this often. */
 export const FAVOUR_EVERY_MS = 10 * 60_000;
+/**
+ * The welcome back's double (the away gold again for watching an ad) is for a real time away: a
+ * report comes after a minute out of sight, and an ad on offer every minute would be too many.
+ */
+export const DOUBLE_AFTER_S = 10 * 60;
 
 export class Game {
   state: GameState;
@@ -120,6 +125,15 @@ export class Game {
     this.isNew = !loaded;
     this.state = loaded ?? newGame();
     this.rng = new Rng(this.state.rngState);
+    if (loaded) {
+      // The game opens at the hub. A save from the middle of a dive (the page closed or reloaded on a
+      // floor) comes back as a trip to camp does: the floor after the last boss beaten, the merchants'
+      // goods gone. (A save made at the hub is there already: this changes nothing in it.)
+      const run = this.state.run;
+      run.floor = campFloor(run.floor, run.checkpoint);
+      run.items = {};
+      run.thief = false;
+    }
     this.biome = biomeForFloor(this.state.run.floor, this.state.run.biomeSeed);
     if (loaded) {
       const away = (Date.now() - loaded.savedAt) / 1000;
@@ -213,7 +227,8 @@ export class Game {
     const mobTypes = floorMobs(biome, floor, seed);
     // Built for the knights you bring (par is for three); going short-handed pays more gold.
     this.difficulty = floorDifficulty(floor, squadPower(s), squadSize(s));
-    s.quests ??= [];
+    // (Jobs handed in are done with: nothing asks after them, and they'd only pile up in the save.)
+    s.quests = pruneQuests(s.quests ?? []);
     const npcs = placeNpcs(map, floor, biome.id, seed, s.quests);
     // Now and then a room is a merchant's (world/shop.ts): her wares priced by this floor's gold (a
     // thief's price if you stole from one earlier this run).
@@ -318,7 +333,7 @@ export class Game {
   }
 
   /** Rebuilds the hub when your knight changes: just them, at the hub's spawn, among the keepers. */
-  syncHub(force = false): void {
+  syncHub(force = false, keepPlace = false): void {
     const s = this.state;
     const id = s.squad[s.controlled] ?? s.squad.find(Boolean) ?? null;
     const key = `${id}|${id ? s.roster[id]?.mutation ?? '' : ''}`;
@@ -345,7 +360,8 @@ export class Game {
     });
     // A new knight takes over where the old one stood (only the start of a visit begins at the spawn).
     const now = this.hub.leader();
-    if (was && now && !force) {
+    // (`keepPlace`: a rebuild in the middle of a visit, e.g. the Warden changed the squad: you stay by his counter.)
+    if (was && now && (!force || keepPlace)) {
       now.x = was.x;
       now.y = was.y;
       now.view = was.view;
@@ -404,29 +420,82 @@ export class Game {
   }
 
   /**
+   * The floor a trip to camp would leave the run on: the floor after the last boss beaten (campFloor),
+   * or, from a boss floor whose boss has just fallen, the floor after this one (it's behind you).
+   */
+  campTarget(): number {
+    const from = this.state.run.floor;
+    const beaten = this.inDungeon && !!this.world && this.world.boss && this.world.portalOpen;
+    return beaten ? from + 1 : campFloor(from, this.state.run.checkpoint);
+  }
+
+  /** The squad is down and the walk home is on its way (CAMP has nothing to ask). */
+  get wiping(): boolean {
+    return this.wipeT > 0;
+  }
+
+  private hiddenAt: number | null = null;
+
+  /** The page went out of sight (another tab, the phone's home screen): nothing ticks from here, so note when. */
+  hidden(): void {
+    this.hiddenAt ??= Date.now();
+    this.save();
+  }
+
+  /**
+   * The page is back in sight. Time out of sight is time away, the same as with the game closed (the
+   * altar's slow rolls, the squad's gold): without this a tab left open in the background all night
+   * earned nothing, where closing it would have paid.
+   */
+  shown(): OfflineReport | null {
+    const at = this.hiddenAt;
+    this.hiddenAt = null;
+    if (at === null) return null;
+    const report = runOffline(this.state, this.rng, (Date.now() - at) / 1000, Date.now());
+    if (report) {
+      this.state.rngState = this.rng.state;
+      this.save();
+      this.version++;
+    }
+    return report;
+  }
+
+  /**
    * Back to camp. The run steps back to the floor after the last boss you beat (campFloor), and the
    * squad rests: the fallen are up again and everyone is whole for the next trip down.
    */
   leaveDungeon(): void {
     if (!this.inDungeon) return;
+    // The squad is down and the wipe is on its way: camp is no way round it.
+    if (this.wipeT > 0) {
+      this.wipeT = 0;
+      this.returnToHub();
+      this.save();
+      this.version++;
+      return;
+    }
     const from = this.state.run.floor;
-    const back = campFloor(from, this.state.run.checkpoint);
+    const back = this.campTarget();
     const revived = this.world ? this.world.heroes.filter((h) => h.downed).length : 0;
+    // Everything about being at the hub first, all of it together: nothing after this can leave the
+    // game half way (in the dungeon with no floor draws nothing at all).
+    this.inDungeon = false;
+    this.world = null;
     this.state.run.floor = back;
     this.hpShare.clear();
-    this.world = null;
-    this.syncHub(true);
-    this.emit({ type: 'camp', from, back, revived });
-    this.inDungeon = false;
     // A merchant's goods are for one run: heading back to camp ends it (and what the merchants say of you).
     this.state.run.items = {};
     this.state.run.thief = false;
-    // (So is a portal's cut to the next floor, if it was under way.)
+    // (So is a portal's cut to the next floor, a wipe's walk home or a step down the stairs, if one was under way.)
     this.pendingFloor = null;
     this.bossBehind = false;
+    this.descending = false;
+    this.wipeT = 0;
     this.fade = 1;
     this.fadeDir = -1;
     this.fadeIn = FADE_IN;
+    this.syncHub(true);
+    this.emit({ type: 'camp', from, back, revived });
     this.save();
     this.version++;
   }
@@ -575,7 +644,11 @@ export class Game {
     dt = Math.min(dt, 0.1);
     s.playTimeMs += dt * 1000;
     // (A sealed altar waits for its seal to be broken.)
+    // The squad is locked in the dungeon: a knight rolled during a dive waits at the hub (it doesn't
+    // take an empty place on the floor's cards, nor a share of the short-handed gold).
+    const locked = this.inDungeon && this.world ? [...s.squad] : null;
     if (!s.roll.sealed) rollTick(s, this.rng, Date.now(), dt, this.emit);
+    if (locked) s.squad = locked;
     s.rngState = this.rng.state;
     if (!this.inDungeon) {
       // At the hub: your knight walks among the keepers; the dungeon waits. Empty squad slots fill
@@ -592,6 +665,8 @@ export class Game {
       // No floor until the squad has someone in it.
       fillSquad(s);
       if (s.squad.some(Boolean)) this.startFloor(s.run.floor);
+      // (Nobody to send down: back at the hub, not in a dungeon with no floor, which draws nothing.)
+      else this.inDungeon = false;
     } else {
       // The squad is locked in the dungeon: new knights wait at the hub.
       this.world.luck = this.luck * skillRollLuck(s);
@@ -602,6 +677,9 @@ export class Game {
       this.handleWorldEvents();
     }
     if (this.fade > 0 && this.fadeDir < 0) this.fade = Math.max(0, this.fade - dt * this.fadeIn);
+    // A fade to black is always on its way somewhere (down the steps, through a portal): one with
+    // nowhere to go would leave the screen black for good, so it turns back.
+    if (this.fadeDir > 0 && !this.descending && this.pendingFloor === null) this.fadeDir = -1;
     if (this.fadeDir > 0) {
       // (Through a portal it's a cut, black in a blink; down the hub's steps, a fade.)
       this.fade = Math.min(1, this.fade + dt * (this.pendingFloor !== null ? PORTAL_CUT : 2.2));
@@ -663,6 +741,7 @@ export class Game {
       }
       // Coins still in the air are banked.
       for (const p of w.pickups) this.collect(p.kind, p.amount);
+      w.pickups = [];
     }
     this.pendingFloor = floor;
     this.bossBehind = !!w?.boss;
@@ -692,11 +771,13 @@ export class Game {
         case 'kill':
           s.stats.killsThisRun += 1;
           s.records.kills += 1;
-          this.questEvent({ type: 'kill', elite: e.elite, boss: e.boss && !e.robbed, mobName: e.name });
+          // (A demon out of its disguise is a boss of a foe, but not the floor's boss: no boss floor has one.)
+          const floorBoss = e.boss && !e.robbed && w.boss;
+          this.questEvent({ type: 'kill', elite: e.elite || (e.boss && !floorBoss), boss: floorBoss, mobName: e.name });
           if (e.robbed) {
             // The merchant you robbed: no floor's boss (no sigil, no boss count), but a win all the same.
             this.emit({ type: 'merchantDown', name: e.name });
-          } else if (e.boss) {
+          } else if (floorBoss) {
             const first = w.floor / 5 > s.run.bosses;
             if (first) {
               s.run.bosses = w.floor / 5;
@@ -828,9 +909,14 @@ export class Game {
     return true;
   }
 
+  /** Whether this report's gold can be doubled for an ad: there is some, it hasn't been, and the time away was long enough. */
+  canDoubleAway(report: OfflineReport): boolean {
+    return !report.doubled && report.gold > 0 && report.seconds >= DOUBLE_AFTER_S;
+  }
+
   /** The gold a night away brought in, once more (the welcome back's "double" for watching an ad). Once per report. */
   doubleAway(report: OfflineReport): number {
-    if (report.doubled || !(report.gold > 0)) return 0;
+    if (!this.canDoubleAway(report)) return 0;
     report.doubled = true;
     this.state.gold += report.gold;
     this.emit({ type: 'gold', amount: report.gold });

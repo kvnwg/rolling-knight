@@ -1,4 +1,5 @@
 /** Pixel sprites in the menus: knights, silhouettes and small icons drawn from the game's own art. */
+import { READ } from './readCanvas';
 import { useEffect, useRef } from 'react';
 import { knightDef } from '../core/knights';
 import type { MutationId } from '../core/state';
@@ -48,7 +49,7 @@ function bufToUrl(b: PixelBuf, silhouette?: string, ghost = false): string {
   const c = document.createElement('canvas');
   c.width = b.w;
   c.height = b.h;
-  const ctx = c.getContext('2d')!;
+  const ctx = c.getContext('2d', READ)!;
   const img = ctx.createImageData(b.w, b.h);
   img.data.set(b.px);
   if (silhouette) {

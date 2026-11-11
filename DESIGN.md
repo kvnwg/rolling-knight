@@ -386,7 +386,8 @@ no other build does, and without it none of this exists for the player.
   and as the hub comes up after a wipe. Not in a player's first four minutes, and never anywhere
   else. The game is paused from the ask until the ad is over; its sound goes only while one plays.
 - **Rewards for watching an ad**, both optional and both away from the fight:
-  - the welcome back's GOLD x2: the squad's gold from the time away, paid once more;
+  - the welcome back's GOLD x2: the squad's gold from the time away, paid once more (offered after
+    ten minutes or more away, not for a minute with the tab in the background);
   - the Oracle's Favour, in the Luck sheet at the hub: a Luck Potion (as if one had dropped; it
     adds to one that's running), once every 10 minutes.
 - The portal's mute switch silences the game above its own volume sliders; its device type (not

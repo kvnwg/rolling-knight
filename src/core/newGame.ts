@@ -106,6 +106,13 @@ export function rebirth(state: GameState): boolean {
   const { designDeck, lastDesign } = state.run;
   state.run = { floor: 1, bestFloor: 1, bosses: 0, checkpoint: 1, biomeSeed: Rng.hashSeed(state.seed ^ (state.rebirths * 7919)), deaths: 0, designDeck, lastDesign, visits: 0 };
   state.stats.killsThisRun = 0;
+  // No gold comes through: not as time away paid at the last run's fight rate, nor as a job taken at
+  // the last run's depth and handed in on floor 1.
+  state.stats.goldPerMinute = 0;
+  state.stats.goldWindow = [];
+  state.stats.combatPerMinute = 0;
+  state.stats.combatWindow = [];
+  state.quests = [];
   state.roll.current = null;
   state.roll.timer = 0;
   state.roll.sinceLucky = 0;

@@ -20,7 +20,7 @@ import { combatTiers } from '../core/combatRoll';
 import { newTutRun, skipTutorial, tutorialDid, tutorialProgress, tutorialView, TUT_STEPS, type TutAction, type TutCtx, type TutTarget, type TutView, type TutWhere } from '../core/tutorial';
 import type { Game } from '../game';
 import type { Controls } from '../input/input';
-import { toCanvas } from '../render/art/draw';
+import { bufUrl } from './readCanvas';
 import { HUB_CX, HUB_STEPS_Y } from '../render/art/hubScene';
 import type { Renderer } from '../render/renderer';
 import type { StationId } from '../world/hubWorld';
@@ -49,10 +49,10 @@ let art: { hand: Record<PtrDir, string>; arrow: Record<PtrDir, string>; ring: st
 
 function tutArt() {
   art ??= {
-    hand: Object.fromEntries(DIRS.map((d) => [d, toCanvas(gloveBuf(d)).toDataURL()])) as Record<PtrDir, string>,
-    arrow: Object.fromEntries(DIRS.map((d) => [d, toCanvas(arrowBuf(d)).toDataURL()])) as Record<PtrDir, string>,
-    ring: toCanvas(ringBuf(false)).toDataURL(),
-    ringHi: toCanvas(ringBuf(true)).toDataURL(),
+    hand: Object.fromEntries(DIRS.map((d) => [d, bufUrl(gloveBuf(d))])) as Record<PtrDir, string>,
+    arrow: Object.fromEntries(DIRS.map((d) => [d, bufUrl(arrowBuf(d))])) as Record<PtrDir, string>,
+    ring: bufUrl(ringBuf(false)),
+    ringHi: bufUrl(ringBuf(true)),
   };
   return art;
 }

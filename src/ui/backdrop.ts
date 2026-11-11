@@ -3,6 +3,7 @@
  * knight's own pixel size: a card's, a sheet's or the HUD face's frame gets the rarity's backdrop
  * painted to fill it, its feet on the floor where the knight stands. Painted once per size.
  */
+import { READ } from './readCanvas';
 import type { CSSProperties } from 'react';
 import type { Rarity } from '../core/rarity';
 import { paintBackdrop } from '../render/art/backdrops';
@@ -21,7 +22,7 @@ export function backdropUrl(r: Rarity, w: number, h: number, feetUp = 5): string
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;
-  c.getContext('2d')!.putImageData(new ImageData(px, w, h), 0, 0);
+  c.getContext('2d', READ)!.putImageData(new ImageData(px, w, h), 0, 0);
   url = c.toDataURL();
   urls.set(key, url);
   return url;

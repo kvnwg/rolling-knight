@@ -3,6 +3,8 @@
  * luck tokens (16 x 16, a four-leaf clover with a plaque reading ×N), the four-point sparkle (7 x 7)
  * and the payline arrow (4 x 6). Rows of palette keys, '.' transparent, turned into data URLs once.
  */
+import { READ } from '../readCanvas';
+
 const PAL: Record<string, string> = {
   k: '#1a1326',
   w: '#ffffff',
@@ -80,7 +82,7 @@ function pic(key: string, rows: Rows, flip = false): PixelPic {
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;
-  const g = c.getContext('2d');
+  const g = c.getContext('2d', READ);
   if (g) {
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {

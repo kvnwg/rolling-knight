@@ -38,6 +38,10 @@ export function CampAsk({ floor, back, fallen, onStay, onGo }: { floor: number; 
               You give up <b>{lost === 1 ? '1 floor' : `${lost} floors`}</b>: the run goes back to floor {back}
               {back > 1 ? `, after the floor ${back - 1} boss` : ''}.
             </>
+          ) : lost < 0 ? (
+            <>
+              The boss is beaten: the run picks up on <b>floor {back}</b>.
+            </>
           ) : (
             <>Your run stays on floor {floor}.</>
           )}
@@ -46,11 +50,13 @@ export function CampAsk({ floor, back, fallen, onStay, onGo }: { floor: number; 
           <Px icon="heart" size="sm" /> {fallen > 0 ? (fallen === 1 ? 'Your fallen knight gets back up' : `Your ${fallen} fallen knights get back up`) : 'Your squad rests'} and everyone is healed.
         </p>
         <div className="ca-btns">
-          <button className="btn big" onClick={onStay} autoFocus>
+          <button className="btn big" onClick={onStay}>
             STAY
+            <kbd className="ca-key">ESC</kbd>
           </button>
           <button className="btn gold big" onClick={onGo}>
             GO TO CAMP
+            <kbd className="ca-key">ENTER</kbd>
           </button>
         </div>
       </div>

@@ -447,8 +447,16 @@ const oracleMemory = { tab: 'summon' };
 export function OracleShop({ game, station, onClose, onOpen }: { game: Game; station: HubStation; onClose: () => void; onOpen: (id: string) => void }) {
   useGameTick(game, 250);
   const st = game.state;
-  const [tab, setTabState] = useState(oracleMemory.tab);
-  const setTab = (t: string) => ((oracleMemory.tab = t), setTabState(t));
+  const [tabAt, setTabState] = useState(oracleMemory.tab);
+  const setTab = (t: string) => {
+    // (A tab tapped on a sealed altar goes nowhere, now or once the seal's broken.)
+    if (game.state.roll.sealed) return;
+    oracleMemory.tab = t;
+    setTabState(t);
+  };
+  // A sealed altar is its seal and nothing else (the seal is on SUMMON: on any other tab there'd be
+  // nothing to tap, and no way out of the screen).
+  const tab = st.roll.sealed ? 'summon' : tabAt;
   const luck = game.luck;
   const pity = Math.max(0, drySpell(st) - st.roll.dry);
   const lucky = Math.max(0, Math.max(4, 10 - (st.upgrades.luckySpin ?? 0)) - st.roll.sinceLucky);
@@ -681,7 +689,7 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
   const target = pick >= 0 && pick < slots ? pick : empty >= 0 ? empty : weakest;
   const refresh = () => {
     game.syncSquad();
-    game.syncHub(true);
+    game.syncHub(true, true);
     game.touch();
     bump((x) => x + 1);
   };
@@ -713,8 +721,11 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
     refresh();
     return true;
   };
+  const lastSale = useRef(0);
   // Rare and up ask twice before they go.
   const sell = (id: string): boolean => {
+    // (A sold card's place is taken by the next at once: a second tap just after a sale is the same tap, not another sale.)
+    if (performance.now() - lastSale.current < 350) return false;
     const ri = rarityIndex(knightDef(id).rarity);
     if (ri >= rarityIndex('rare') && sure !== id) {
       setSure(id);
@@ -727,6 +738,7 @@ export function WardenShop({ game, station, onClose, onOpen }: { game: Game; sta
     const extras = st.roster[id]?.extras ?? 0;
     const g = sellKnight(st, id);
     if (!g) return false;
+    lastSale.current = performance.now();
     uiSound('sell', Math.min(6, ri));
     setSure(null);
     setSold(extras > 0 ? `Sold ${name} and ${extrasText(extras)} for ${fmt(g)} gold` : `Sold ${name} for ${fmt(g)} gold`);

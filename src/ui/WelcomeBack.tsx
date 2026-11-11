@@ -6,7 +6,7 @@
  * repeats kept as extras. COLLECT puts it away. On a portal with rewarded ads there's a second button
  * the same size beside it: the squad's gold twice over, for watching one (once per report).
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Game } from '../game';
 import { portal } from '../platform/portal';
 import type { OfflineReport } from '../core/offline';
@@ -57,7 +57,7 @@ export function WelcomeBack({ game, report, onClose }: { game: Game; report: Off
   };
   // The gold again for watching an ad: an offer beside COLLECT, never in its way.
   const [ad, setAd] = useState<'idle' | 'wait' | 'none'>('idle');
-  const canDouble = portal.rewards && report.gold > 0 && !report.doubled;
+  const canDouble = portal.rewards && game.canDoubleAway(report);
   const double = async () => {
     if (ad === 'wait') return;
     setAd('wait');
@@ -67,6 +67,20 @@ export function WelcomeBack({ game, report, onClose }: { game: Game; report: Off
       collect();
     } else setAd(outcome === 'none' ? 'none' : 'idle');
   };
+  // Enter, Space or Esc collects (and nothing under the sheet hears the key). Not while an ad is
+  // on its way or playing: the report waits for it.
+  const collectRef = useRef(collect);
+  collectRef.current = ad === 'wait' ? () => {} : collect;
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (!e.repeat) collectRef.current();
+    };
+    window.addEventListener('keydown', key, true);
+    return () => window.removeEventListener('keydown', key, true);
+  }, []);
   return (
     <div className="modal" onPointerDown={(e) => e.target === e.currentTarget && ad !== 'wait' && collect()}>
       <div className="sheet wb-sheet">

@@ -3,6 +3,8 @@
  * into a small canvas with the fade to the edges baked into its alpha, and shown as a plain rotating
  * image (Dumpster Legend's rays.ts: a huge CSS conic gradient with a mask crashed phone browsers).
  */
+import { READ } from '../readCanvas';
+
 const cache = new Map<string, string>();
 
 const SIZE = 384;
@@ -15,7 +17,7 @@ export function raysUrl(colors: readonly string[], spokes = 16, alpha = 0.45): s
   const c = document.createElement('canvas');
   c.width = SIZE;
   c.height = SIZE;
-  const g = c.getContext('2d');
+  const g = c.getContext('2d', READ);
   if (!g) return '';
   const r = SIZE / 2;
   const step = (Math.PI * 2) / spokes;

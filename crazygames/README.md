@@ -126,7 +126,8 @@ Only through the SDK, and the game plays the same when none come (an ad blocker,
   comes up. Never in a player's first four minutes. How often one actually shows is the SDK's call.
 - **Rewarded** (`ad.requestAd('rewarded')`), two offers, both optional and both off the fight:
   - *Welcome back*: "GOLD x2, watch an ad" beside COLLECT, the same size. Pays the squad's gold
-    from the time away a second time.
+    from the time away a second time. Only after ten minutes or more away (a report comes after
+    one minute out of sight; an ad on offer that often would be too many).
   - *Oracle's Favour*: in the Luck sheet at the hub, a Luck Potion (luck x2 for a minute) every
     ten minutes. The Luck pill shows a small "x2" while it's there to take.
 - From the ask until the ad is over the game is paused and nothing in it can be pressed. Its sound

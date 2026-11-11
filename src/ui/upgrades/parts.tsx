@@ -7,6 +7,10 @@ import s from './hexmap.module.css';
 /**
  * Hold to keep buying: the first buy on press, then again after 380 ms, each wait a fifth shorter than
  * the last (never under 70 ms), until a buy fails or the press ends.
+ *
+ * Under a finger nothing is bought on the way down (it may be the start of a scroll: these buttons sit
+ * in lists that scroll): a tap buys once when it lifts, and a finger held still for those 380 ms starts
+ * the run. A scroll that starts on the button cancels the press and buys nothing.
  */
 export function useHoldRepeat(fn: (repeat: number) => boolean) {
   const timer = useRef<number | null>(null);
@@ -17,19 +21,34 @@ export function useHoldRepeat(fn: (repeat: number) => boolean) {
     timer.current = null;
   };
   useEffect(() => stop, []);
-  const start = (e: { preventDefault: () => void; button?: number }) => {
+  /** This press is a finger's, and whether its hold has bought anything yet. */
+  const finger = useRef(false);
+  const ran = useRef(false);
+  const start = (e: { preventDefault: () => void; button?: number; pointerType?: string }) => {
     if (e.button !== undefined && e.button > 0) return;
-    e.preventDefault();
     stop();
     let n = 0;
-    if (!fnRef.current(n++)) return;
     let delay = 380;
     const loop = () => {
+      ran.current = true;
       if (!fnRef.current(n++)) return stop();
       delay = Math.max(70, delay * 0.8);
       timer.current = window.setTimeout(loop, delay);
     };
+    finger.current = e.pointerType === 'touch';
+    ran.current = false;
+    if (finger.current) {
+      timer.current = window.setTimeout(loop, delay);
+      return;
+    }
+    e.preventDefault();
+    if (!fnRef.current(n++)) return;
     timer.current = window.setTimeout(loop, delay);
+  };
+  // A finger's tap (a press that ended before the hold began): one buy.
+  const click = () => {
+    if (finger.current && !ran.current) fnRef.current(0);
+    finger.current = false;
   };
   // Enter or Space buys one tier (held down, the key repeats).
   const key = (e: { key: string; repeat: boolean; preventDefault: () => void }) => {
@@ -37,7 +56,7 @@ export function useHoldRepeat(fn: (repeat: number) => boolean) {
     e.preventDefault();
     fnRef.current(e.repeat ? 1 : 0);
   };
-  return { onPointerDown: start, onPointerUp: stop, onPointerLeave: stop, onPointerCancel: stop, onKeyDown: key, onContextMenu: (e: { preventDefault: () => void }) => e.preventDefault() };
+  return { onPointerDown: start, onPointerUp: stop, onPointerLeave: stop, onPointerCancel: stop, onClick: click, onKeyDown: key, onContextMenu: (e: { preventDefault: () => void }) => e.preventDefault() };
 }
 
 /** A line's icon on a tile colored like its hex (a "?" for one not yet revealed). */

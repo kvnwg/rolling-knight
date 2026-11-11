@@ -8,15 +8,19 @@ import { useEffect, useRef, type MutableRefObject } from 'react';
 import type { Game } from '../game';
 import { Vista, type VistaHero } from '../render/vista';
 
-export function VistaCanvas({ game, wide, pick }: { game: Game; wide: boolean; pick?: MutableRefObject<string | null> }) {
+/** `onReady`: called once, when the scene has been painted (it's built over the first frames, behind a plain dusk). */
+export function VistaCanvas({ game, wide, pick, onReady }: { game: Game; wide: boolean; pick?: MutableRefObject<string | null>; onReady?: () => void }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const wideRef = useRef(wide);
   wideRef.current = wide;
+  const readyRef = useRef(onReady);
+  readyRef.current = onReady;
   useEffect(() => {
     const c = ref.current!;
     const ctx = c.getContext('2d')!;
     const vista = new Vista();
     let raf = 0;
+    let told = false;
     const start = performance.now();
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
@@ -39,6 +43,10 @@ export function VistaCanvas({ game, wide, pick }: { game: Game; wide: boolean; p
         focusY: tall ? 0.3 : 0.5,
         reduceMotion: s.settings.reduceMotion,
       });
+      if (!told && vista.ready) {
+        told = true;
+        readyRef.current?.();
+      }
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
