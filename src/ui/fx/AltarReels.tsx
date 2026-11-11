@@ -47,6 +47,7 @@ import { buildStrip, filler, stripAt, type Strip, type StripCell } from './reelS
 import { chainMult, comboOf, reelStops, tokenHoldMs, type ReelStop } from './reelTiming';
 import { comboSound, combosDone, riserSound, tokenSound } from './tokenFx';
 import { CONFETTI_COLORS, fmtNum, rarityBands, RAINBOW_TIERS, readU, tierColor } from './util';
+import { layoutNow, miniPick, type Layout as ScreenLayout } from '../layout';
 import s from './reels.module.css';
 import m from './mini.module.css';
 
@@ -657,9 +658,13 @@ function TokenFly({ value, from, to, L }: { value: number; from: { x: number; y:
 
 // ------------------------------------------------------------------ the big reels
 
+/** Art px kept free under the big altar when it's fitted to the screen's height (the chips row under it). */
+const BIG_BELOW = 16;
+
 function BigReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
   const hostRef = useRef<HTMLDivElement>(null);
-  const [box, setBox] = useState<{ w: number; u: number } | null>(null);
+  /** The room it has: its width, the height down to the foot of what it scrolls in (CSS px), and the UI pixel. */
+  const [box, setBox] = useState<{ w: number; room: number; u: number } | null>(null);
   const [calm, setCalm] = useState(game.state.settings.reduceMotion);
   const [run, setRun] = useState<Run>(() => idleRun(game));
   // The first spin rolls away from what the idle reels showed.
@@ -686,7 +691,12 @@ function BigReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
     if (!box) return null;
     const n = run.strips.length;
     if (!altarOn) return { L: layoutFor(n, box.w, box.u), altar: null };
-    const W = Math.max(120, Math.floor(box.w / box.u));
+    // As wide as its column, unless that would run it off the foot of the screen (a screen on its
+    // side, a short phone): then narrower (it's drawn to its width), down to under half of it.
+    const tall = (W: number) => bigHeight(layoutFor(n, bigWindow(W).w * box.u, box.u, 0).win, W) * box.u;
+    let W = Math.max(120, Math.floor(box.w / box.u));
+    const least = Math.max(120, Math.floor(W * 0.45));
+    while (W > least && tall(W) > box.room) W -= 2;
     const aw = bigWindow(W);
     const L = layoutFor(n, aw.w * box.u, box.u, 0);
     const win: Rect = { x: aw.x, y: aw.y, w: aw.w, h: L.win };
@@ -715,11 +725,17 @@ function BigReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
     const measure = () => {
       const u = readU(el);
       const w = el.clientWidth;
-      setBox((b) => (b && b.w === w && b.u === u ? b : { w, u }));
+      // The height down to the foot of what it scrolls in, less a row for the chips under it.
+      const room = sc ? Math.floor(sc.getBoundingClientRect().top + sc.clientHeight - (el.getBoundingClientRect().top + sc.scrollTop) - BIG_BELOW * u) : Infinity;
+      setBox((b) => (b && b.w === w && b.u === u && b.room === room ? b : { w, room, u }));
     };
+    // (What it scrolls in: its height changes as the keeper's scene above it settles.)
+    let sc = el.parentElement;
+    while (sc && !/auto|scroll/.test(getComputedStyle(sc).overflowY)) sc = sc.parentElement;
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
+    if (sc) ro.observe(sc);
     window.addEventListener('resize', measure);
     return () => {
       ro.disconnect();
@@ -1184,43 +1200,37 @@ interface MiniPlan {
 /** What the windows last showed, kept while the mini roller is away (so it comes back as it was). */
 const miniShown: Array<{ url: string; rim: string | null; state: string; chip: string; tier: number; gold: boolean }> = [];
 
-/**
- * The corner roller's art pixel (CSS px) for `n` reels. With a set width (`width` CSS px: a desktop,
- * where it matches the skill reel under it) the shrine fills that width whatever its reel count;
- * otherwise (a phone) it keeps the mounted size for one reel and draws finer with more, never taking
- * more room than the one-reel shrine across or down. Whole device pixels; on a phone never under one
- * CSS pixel.
- */
-export function miniFitU(base: number, n: number, altarOn = true, width = 0, dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1): number {
-  const size = (k: number): [number, number] => {
-    if (altarOn) {
-      const l = miniLayout(k);
-      return [l.W, l.H];
-    }
-    const cols = k <= 1 ? 1 : k <= 4 ? 2 : 3;
-    const rows = k <= 2 ? 1 : 2;
-    return [miniSpan(cols, MINI.winW), miniSpan(rows, MINI.winH)];
-  };
-  const [w, h] = size(n);
-  if (width > 0) return Math.max(1 / dpr, Math.floor((width / w) * dpr + 1e-6) / dpr);
-  const [w1, h1] = size(1);
-  const u = Math.min(base, (base * w1) / w, (base * h1) / h);
-  return Math.max(Math.min(base, 1), Math.floor(u * dpr + 1e-6) / dpr);
+/** The corner roller's size in art px for `n` reels: the shrine round its windows, or the plain windows. */
+function miniSize(n: number, altarOn: boolean, oneRow = false): readonly [number, number] {
+  if (altarOn) {
+    const l = miniLayout(n, oneRow);
+    return [l.W, l.H];
+  }
+  const cols = n <= 1 ? 1 : n <= 4 ? 2 : 3;
+  const rows = n <= 2 ? 1 : 2;
+  return [miniSpan(cols, MINI.winW), miniSpan(rows, MINI.winH)];
 }
 
-/** The corner roller's set width (CSS px; 0 for none), from the page (App sets it). */
-function miniWidth(): number {
-  if (typeof document === 'undefined') return 0;
-  const v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mini-w'));
-  return Number.isFinite(v) && v > 0 ? v : 0;
+/**
+ * The corner roller's art pixel for `n` reels, and whether its reels go in one row (layout.ts
+ * miniPick): the layout's own pixel whatever the reel count, so more reels make a bigger shrine with
+ * knights just as big, until it fills its corner; a short wide corner takes them in one row when two
+ * would draw them smaller.
+ */
+export function miniFitU(n: number, altarOn = true, l: ScreenLayout = layoutNow()): { u: number; oneRow: boolean } {
+  const two = miniSize(n, altarOn);
+  if (!altarOn || n <= 3) return { u: miniPick(l, [two]).u, oneRow: false };
+  const { pick, u } = miniPick(l, [two, miniSize(n, altarOn, true)]);
+  return { u, oneRow: pick === 1 };
 }
 
 function MiniReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
   const countNow = () => Math.max(1, game.state.roll.current?.reels.length ?? reelCount(game.state));
   const [n, setN] = useState(countNow);
-  const [uBase, setU] = useState(() => readU());
-  // The shrine's size: as wide as the skill reel on a desktop; on a phone more reels draw finer.
-  const u = miniFitU(uBase, n, altarOn, miniWidth());
+  // The window's layout (layout.ts): the shrine's art pixel is the same for any reel count, until
+  // the shrine would overfill its corner.
+  const [lay0, setLay] = useState(layoutNow);
+  const { u, oneRow } = miniFitU(n, altarOn, lay0);
   const uRef = useRef(u);
   uRef.current = u;
   const rootRef = useRef<HTMLDivElement>(null);
@@ -1230,7 +1240,7 @@ function MiniReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
   const rolls = useRef<Array<Array<HTMLImageElement | null>>>([]);
   const chips = useRef<(HTMLSpanElement | null)[]>([]);
   // The shrine round the windows (altarArt.ts paints it, altar.ts lights it).
-  const shrine = useMemo(() => (altarOn ? { lay: miniLayout(n), art: paintMini(n) } : null), [n, altarOn]);
+  const shrine = useMemo(() => (altarOn ? { lay: miniLayout(n, oneRow), art: paintMini(n, oneRow) } : null), [n, altarOn, oneRow]);
   const altarRef = useRef<Altar | null>(null);
   const shrineRef = useRef(shrine);
   shrineRef.current = shrine;
@@ -1244,17 +1254,13 @@ function MiniReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
   }, [shrine]);
 
   useEffect(() => {
-    // (Read where it's mounted: the roller sets its own --u from this.)
-    const on = () => setU(readU(rootRef.current?.parentElement));
-    on();
-    // Read it again once the app has set its sizes (a parent's effects run after this child's, so
-    // on the first pass --mini-u isn't there yet).
+    // Read it again once the app has set its sizes (a parent's effects run after this child's), and
+    // whenever the window changes.
+    const on = () => setLay(layoutNow());
     const raf = requestAnimationFrame(on);
-    const later = window.setTimeout(on, 300);
     window.addEventListener('resize', on);
     return () => {
       cancelAnimationFrame(raf);
-      window.clearTimeout(later);
       window.removeEventListener('resize', on);
     };
   }, []);
@@ -1273,7 +1279,7 @@ function MiniReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
     let lastEl = 0;
     const timers: Array<ReturnType<typeof setTimeout>> = [];
     // The windows' size (art px): the shrine's cells, or the plain windows' inside.
-    const cells = altarOn ? miniLayout(n).cells : Array.from({ length: n }, () => ({ w: MINI.winW, h: MINI.winH }));
+    const cells = altarOn ? miniLayout(n, oneRow).cells : Array.from({ length: n }, () => ({ w: MINI.winW, h: MINI.winH }));
     // Whole knights (the windows are tall enough for one; a narrow window crops a long weapon at
     // its sides). Only a window too short for a whole knight would show head and shoulders.
     const bust = cells[0].h < 24;
@@ -1518,11 +1524,16 @@ function MiniReels({ game, altarOn }: { game: Game; altarOn: boolean }) {
       cancelAnimationFrame(raf);
       timers.forEach(clearTimeout);
     };
-  }, [game, n, altarOn]);
+  }, [game, n, altarOn, oneRow]);
 
   const cols = miniCols(n);
   const rows = Math.ceil(n / cols);
   const lay = shrine?.lay ?? null;
+  const shownH = (lay ? lay.H : miniSpan(rows, MINI.winH)) * u;
+  // What hangs under the altar (the news on a phone held upright) hangs under however tall it is.
+  useLayoutEffect(() => {
+    document.documentElement.style.setProperty('--mini-h', `${shownH}px`);
+  }, [shownH]);
   return (
     <div
       ref={rootRef}

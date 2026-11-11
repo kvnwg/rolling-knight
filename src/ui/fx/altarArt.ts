@@ -737,13 +737,16 @@ export interface MiniCell {
   h: number;
 }
 
-/** Window size and grid for `n` reels in the mini shrine (all within about 70 x 64 art px). */
-export function miniGrid(n: number): { w: number; h: number; cols: number; rows: number; gap: number } {
-  // Every window the same size, whatever the count (tall enough for a whole knight, helmet or hat to
-  // boots; a long weapon crops at the sides): one row of up to three, then two rows (2 + 2, 3 + 2).
+/**
+ * Window size and grid for `n` reels in the mini shrine. Every window the same size, whatever the
+ * count (tall enough for a whole knight, helmet or hat to boots; a long weapon crops at the sides):
+ * one row of up to three, then two rows (2 + 2, 3 + 2), or all in one row (`oneRow`: a short wide
+ * corner, a phone on its side, where two rows would leave the knights tiny).
+ */
+export function miniGrid(n: number, oneRow = false): { w: number; h: number; cols: number; rows: number; gap: number } {
   const w = 24;
   const h = 25;
-  if (n <= 3) return { w, h, cols: Math.max(1, n), rows: 1, gap: 1 };
+  if (n <= 3 || oneRow) return { w, h, cols: Math.max(1, n), rows: 1, gap: 1 };
   if (n === 4) return { w, h, cols: 2, rows: 2, gap: 1 };
   return { w, h, cols: 3, rows: 2, gap: 1 };
 }
@@ -760,8 +763,8 @@ export interface MiniRow {
  * The windows (canvas px) and the shrine's size for `n` reels. The frame follows the rows: a short
  * second row (three over two) gets a narrower frame of its own, stepped in under the first.
  */
-export function miniLayout(n: number): { W: number; H: number; cells: MiniCell[]; rows: MiniRow[] } {
-  const g = miniGrid(n);
+export function miniLayout(n: number, oneRow = false): { W: number; H: number; cells: MiniCell[]; rows: MiniRow[] } {
+  const g = miniGrid(n, oneRow);
   const R = MINI_ART.rim;
   const cw = g.cols * g.w + (g.cols - 1) * g.gap;
   const ch = g.rows * g.h + (g.rows - 1) * g.gap;
@@ -782,8 +785,8 @@ export function miniLayout(n: number): { W: number; H: number; cells: MiniCell[]
   return { W, H, cells, rows };
 }
 
-export function paintMini(n: number): AltarArt {
-  const { W, H, cells, rows } = miniLayout(n);
+export function paintMini(n: number, oneRow = false): AltarArt {
+  const { W, H, cells, rows } = miniLayout(n, oneRow);
   const p = new Painter(W, H);
   const top = MINI_ART.crest;
   const bot = H - MINI_ART.base; // the frame's bottom edge (exclusive)

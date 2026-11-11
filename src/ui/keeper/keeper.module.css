@@ -1214,52 +1214,50 @@
 }
 
 /* ------------------------------------------------------------ phones */
-@media (max-width: 599px) {
-  .body {
-    display: flex;
-    flex-direction: column;
-  }
-  .cats {
-    flex: none;
-    flex-direction: row;
-    width: auto;
-    overflow-x: auto;
-    overflow-y: hidden;
-    touch-action: pan-x;
-    padding: calc(1.5 * var(--px)) calc(1 * var(--px)) calc(1 * var(--px));
-  }
-  .cat {
-    flex: none;
-    min-height: calc(13 * var(--px));
-  }
-  .cat span {
-    overflow: visible;
-  }
-  /* The count sits after the name instead of over its end. */
-  .cat em {
-    position: static;
-    margin-left: calc(0.5 * var(--px));
-  }
-  .scroll {
-    flex: 1;
-  }
-  .tab {
-    min-width: 0;
-    flex: 1 1 auto;
-    gap: calc(1 * var(--px));
-    padding: calc(1 * var(--px)) calc(1.5 * var(--px)) 0;
-    font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
-  }
+:global(:where(:root[data-aw='n'])) .body {
+  display: flex;
+  flex-direction: column;
+}
+:global(:where(:root[data-aw='n'])) .cats {
+  flex: none;
+  flex-direction: row;
+  width: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  touch-action: pan-x;
+  padding: calc(1.5 * var(--px)) calc(1 * var(--px)) calc(1 * var(--px));
+}
+:global(:where(:root[data-aw='n'])) .cat {
+  flex: none;
+  min-height: calc(13 * var(--px));
+}
+:global(:where(:root[data-aw='n'])) .cat span {
+  overflow: visible;
+}
+/* The count sits after the name instead of over its end. */
+:global(:where(:root[data-aw='n'])) .cat em {
+  position: static;
+  margin-left: calc(0.5 * var(--px));
+}
+:global(:where(:root[data-aw='n'])) .scroll {
+  flex: 1;
+}
+:global(:where(:root[data-aw='n'])) .tab {
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: calc(1 * var(--px));
+  padding: calc(1 * var(--px)) calc(1.5 * var(--px)) 0;
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
 }
 
 /* ------------------------------------------------------------ wide screens */
-@media (min-width: 700px) {
-  .cats {
-    width: calc(48 * var(--px));
-  }
-  .grid {
-    grid-template-columns: repeat(auto-fill, minmax(calc(46 * var(--px)), 1fr));
-  }
+:global(:where(:root[data-aw='w'])) .cats,
+:global(:where(:root[data-aw='x'])) .cats {
+  width: calc(48 * var(--px));
+}
+:global(:where(:root[data-aw='w'])) .grid,
+:global(:where(:root[data-aw='x'])) .grid {
+  grid-template-columns: repeat(auto-fill, minmax(calc(46 * var(--px)), 1fr));
 }
 @media (prefers-reduced-motion: reduce) {
   .float,
@@ -1290,30 +1288,31 @@
 
 /* A short screen (a phone in the Claude app, a small phone): the squad's cards come down in size so
    the knights below them, and their LEVEL UP, keep room. */
-@media (max-height: 800px) {
-  .slot {
-    gap: calc(0.5 * var(--px));
-    padding: var(--px) var(--px) calc(1.5 * var(--px));
-  }
-  .slotArt {
-    height: calc(25 * var(--px));
-    overflow: hidden;
-  }
-  .slot .second {
-    min-height: calc(8.5 * var(--px)) !important;
-  }
-  .youTag {
-    min-height: calc(8.5 * var(--px));
-  }
-  .panel {
-    gap: calc(1.5 * var(--px));
-  }
+:global(:where(:root[data-ah='s'])) .slot,
+:global(:where(:root[data-ah='m'])) .slot {
+  gap: calc(0.5 * var(--px));
+  padding: var(--px) var(--px) calc(1.5 * var(--px));
+}
+:global(:where(:root[data-ah='s'])) .slotArt,
+:global(:where(:root[data-ah='m'])) .slotArt {
+  height: calc(25 * var(--px));
+  overflow: hidden;
+}
+:global(:where(:root[data-ah='s'])) .slot .second,
+:global(:where(:root[data-ah='m'])) .slot .second {
+  min-height: calc(8.5 * var(--px)) !important;
+}
+:global(:where(:root[data-ah='s'])) .youTag,
+:global(:where(:root[data-ah='m'])) .youTag {
+  min-height: calc(8.5 * var(--px));
+}
+:global(:where(:root[data-ah='s'])) .panel,
+:global(:where(:root[data-ah='m'])) .panel {
+  gap: calc(1.5 * var(--px));
 }
 /* A very short screen: the counter's one-line hint goes (the tutorial and the cards say it all). */
-@media (max-height: 680px) {
-  .hint {
-    display: none;
-  }
+:global(:where(:root[data-ah='s'])) .hint {
+  display: none;
 }
 
 /* A phone: the squad's slots scroll with the knights under them (WardenShop's compact layout). */

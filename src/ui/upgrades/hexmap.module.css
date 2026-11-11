@@ -335,23 +335,38 @@
   animation: none !important;
 }
 /* Phones: the bar's gold, Close and numbers all fit across. */
-@media (max-width: 480px) {
-  .coins {
-    font-size: max(var(--fmin, 0px), calc(6 * var(--fpx, var(--px))));
-    gap: calc(1 * var(--px));
-  }
-  .close {
-    min-width: calc(40 * var(--px));
-    min-height: calc(15 * var(--px));
-    font-size: max(var(--fmin, 0px), calc(5.5 * var(--fpx, var(--px))));
-  }
-  .stat {
-    font-size: max(var(--fmin, 0px), calc(4.2 * var(--fpx, var(--px))));
-    gap: calc(1 * var(--px));
-  }
-  .bar {
-    gap: calc(2 * var(--px));
-  }
+:global(:where(:root[data-aw='n'])) .coins {
+  font-size: max(var(--fmin, 0px), calc(6 * var(--fpx, var(--px))));
+  gap: calc(1 * var(--px));
+}
+:global(:where(:root[data-aw='n'])) .close {
+  min-width: calc(40 * var(--px));
+  min-height: calc(15 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(5.5 * var(--fpx, var(--px))));
+}
+:global(:where(:root[data-aw='n'])) .stat {
+  font-size: max(var(--fmin, 0px), calc(4.2 * var(--fpx, var(--px))));
+  gap: calc(1 * var(--px));
+}
+:global(:where(:root[data-aw='n'])) .bar {
+  gap: calc(2 * var(--px));
+}
+/* One column of room: the card's words get its width (the icon beside them), and its button goes
+   under them, across the card, rather than squeezing the words into a strip between the two. */
+:global(:where(:root[data-aw='n'])) .card {
+  flex-wrap: wrap;
+  row-gap: calc(2 * var(--px));
+  padding: calc(4 * var(--px));
+}
+:global(:where(:root[data-aw='n'])) .card > .buy,
+:global(:where(:root[data-aw='n'])) .card > .buyCol {
+  flex: 1 0 100%;
+}
+:global(:where(:root[data-aw='n'])) .buyCol > .buy {
+  width: 100%;
+}
+:global(:where(:root[data-aw='n'])) .buy {
+  min-height: calc(16 * var(--px));
 }
 @media (prefers-reduced-motion: reduce) {
   .overlay,

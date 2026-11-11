@@ -3,6 +3,7 @@
  * the painted ground, then everything standing on it sorted by how far down the screen its feet are
  * (the 3/4 view: things lower down are in front), then shots, sparks and weather, then the light.
  */
+import { worldShortSide } from '../ui/layout';
 import type { Game } from '../game';
 import { RARITY_COLOR } from '../core/rarity';
 import { BIOMES, type Biome } from '../world/biomes';
@@ -473,8 +474,9 @@ export class Renderer {
     const dpr = Math.min(3, window.devicePixelRatio || 1);
     const cw = Math.floor(window.innerWidth * dpr);
     const ch = Math.floor(window.innerHeight * dpr);
-    const phone = Math.min(window.innerWidth, window.innerHeight) < 600;
-    let P = Math.max(2, Math.round(Math.min(cw, ch) / (this.hubZoom ? HUB_SHORT_SIDE : phone ? PHONE_SHORT_SIDE : SHORT_SIDE)));
+    // (A phone comes in closer, blending out to a desktop's view as the screen grows: layout.ts.)
+    const side = this.hubZoom ? HUB_SHORT_SIDE : worldShortSide(window.innerWidth, window.innerHeight, PHONE_SHORT_SIDE, SHORT_SIDE);
+    let P = Math.max(2, Math.round(Math.min(cw, ch) / side));
     // The hub is one painting: closer still where the view would reach far past its edges (a little
     // past is fine: the painting fades into the dark round it).
     if (this.hubZoom) P = Math.max(P, Math.ceil(cw / (HUB_W * 1.3)), Math.ceil(ch / (HUB_H * 1.3)));

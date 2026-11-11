@@ -13,11 +13,7 @@ import { installSkin } from '../skin';
 import { devGame } from '../../dev';
 import { UpgradeMap, focusUpgradeHex } from './UpgradeMap';
 import { sfx } from '../../audio/sfx';
-
-function uiPx(): number {
-  const raw = Math.min(window.innerWidth, window.innerHeight * 0.62) / 180;
-  return Math.max(2, Math.min(4, Math.round(raw * 2) / 2));
-}
+import { applyLayout } from '../layout';
 
 function Preview() {
   const game = useMemo(() => {
@@ -32,7 +28,7 @@ function Preview() {
   }, []);
   const [open, setOpen] = useState(true);
   useEffect(() => {
-    const set = () => document.documentElement.style.setProperty('--px', `${uiPx()}px`);
+    const set = () => void applyLayout();
     set();
     window.addEventListener('resize', set);
     let raf = 0;
@@ -60,5 +56,5 @@ function Preview() {
 }
 
 installSkin();
-document.documentElement.style.setProperty('--px', `${uiPx()}px`);
+applyLayout();
 createRoot(document.getElementById('root')!).render(<Preview />);

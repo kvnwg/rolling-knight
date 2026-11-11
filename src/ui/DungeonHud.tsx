@@ -27,6 +27,7 @@ import { uiSound } from './sound';
 import { Glyph } from './keeper/KeeperScreen';
 import { goalName, questIcon } from './keeper/Shops';
 import { TopBar } from './TopBar';
+import { SPELL_REEL, layoutNow } from './layout';
 import { dashLabel } from '../world/dash';
 import { furious, merchantOf } from '../world/thief';
 import { BAL } from '../core/balance';
@@ -172,10 +173,19 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
   const items = RUN_ITEM_IDS.filter((id) => (s.run.items?.[id] ?? 0) > 0);
   const jobs = activeQuests(s.quests ?? []);
   const flash = useKeyFlash();
-  // The big spell reel: 30 art px wide on a phone (its icons 2x), 46 on a desktop (3x); the window
-  // is 1.75 cells tall inside a 4 px frame.
-  const reelN = touch ? 30 : 46;
-  const reel = { n: reelN, h: Math.round((reelN - 8) * 1.75) + 8 };
+  // The big spell reel: 46 art px wide with a mouse and the rows for it (its icons 3x), else 30 (2x,
+  // a phone's and a short window's: layout.ts); the window is 1.75 cells tall inside a 4 px frame.
+  const reel = layoutNow().bigReel ? SPELL_REEL.big : SPELL_REEL.small;
+  // The reel stands on the keys, however tall their block comes out (their names have a least size).
+  const keysRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = keysRef.current;
+    const hud = el?.parentElement;
+    if (!el || !hud) return;
+    const ro = new ResizeObserver(() => hud.style.setProperty('--keys-h', `${el.offsetHeight}px`));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   return (
     <div className={`dhud ${boss ? 'has-boss' : ''}`}>
       <TopBar
@@ -294,7 +304,7 @@ export function DungeonHud({ game, controls, press, hold, onCamp, onSettings, on
       )}
       <SpellSlam game={game} />
 
-      <div className={`actions ${touch ? 'touch' : ''}`}>
+      <div ref={keysRef} className={`actions ${touch ? 'touch' : ''}`}>
         {touch && (
           <Key size="lg" rim={me ? 'brass' : 'iron'} className="k-attack" label="ATTACK" title="Attack" capture onDown={() => hold(true)} onUp={() => hold(false)}>
             <Px icon="swords" s={2} />

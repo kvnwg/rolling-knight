@@ -532,34 +532,32 @@
 }
 
 /* ------------------------------------------------------------ wide screens: the stage in a column of its own */
-@media (min-width: 800px) {
-  .body {
-    flex-direction: row;
-    gap: calc(4 * var(--px));
-  }
-  .stage {
-    flex-direction: column;
-    justify-content: center;
-    width: calc(112 * var(--px));
-    padding: calc(2 * var(--px)) calc(1 * var(--px));
-    border-bottom: 0;
-    border-right: var(--px) dashed #c9ad80;
-  }
-  .side {
-    flex: none;
-    width: 100%;
-    padding-right: calc(2 * var(--px));
-  }
-  .label {
-    justify-content: center;
-    text-align: center;
-    min-height: calc(22 * var(--px));
-  }
-  .result,
-  .nameRow {
-    align-items: center;
-    justify-content: center;
-  }
+:global(:where(:root[data-aw='x'])) .body {
+  flex-direction: row;
+  gap: calc(4 * var(--px));
+}
+:global(:where(:root[data-aw='x'])) .stage {
+  flex-direction: column;
+  justify-content: center;
+  width: calc(112 * var(--px));
+  padding: calc(2 * var(--px)) calc(1 * var(--px));
+  border-bottom: 0;
+  border-right: var(--px) dashed #c9ad80;
+}
+:global(:where(:root[data-aw='x'])) .side {
+  flex: none;
+  width: 100%;
+  padding-right: calc(2 * var(--px));
+}
+:global(:where(:root[data-aw='x'])) .label {
+  justify-content: center;
+  text-align: center;
+  min-height: calc(22 * var(--px));
+}
+:global(:where(:root[data-aw='x'])) .result,
+:global(:where(:root[data-aw='x'])) .nameRow {
+  align-items: center;
+  justify-content: center;
 }
 
 @media (prefers-reduced-motion: reduce) {

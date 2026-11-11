@@ -8,6 +8,7 @@ import { bootFailure, Guard, runtimeError } from './ui/Failure';
 import { installSkin } from './ui/skin';
 import { pfLoad } from './render/pf/assets';
 import { measureKnightPics } from './ui/sprites';
+import { applyLayout } from './ui/layout';
 
 /** How long the sheets may take to decode before the game starts without them (the old art shows until they're in). */
 const SHEETS_WAIT_MS = 8000;
@@ -20,6 +21,8 @@ window.addEventListener('unhandledrejection', (e) => onError(e.reason));
 
 try {
   installSkin();
+  // Every size on screen is set before the first frame (App sets them again on every resize).
+  applyLayout();
 } catch (e) {
   bootFailure(e);
 }

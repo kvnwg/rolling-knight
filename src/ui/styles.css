@@ -1399,13 +1399,11 @@ select.select {
 }
 /* A phone held upright: narrower cards, and the class's little chip goes (the face and the skill's
    well say who it is), so the name has the room to be read whole. */
-@media (max-aspect-ratio: 1/1) {
-  .squad.top .member {
-    width: calc(56 * var(--px));
-  }
-  .squad.top .member.plate .nm > .cls-chip {
-    display: none;
-  }
+:where(:root[data-upright='1']) .squad.top .member {
+  width: calc(56 * var(--px));
+}
+:where(:root[data-upright='1']) .squad.top .member.plate .nm > .cls-chip {
+  display: none;
 }
 .member.plate .nm > span {
   min-width: 0;
@@ -1589,21 +1587,15 @@ select.select {
 .mini-roller .frame canvas {
   display: block;
 }
-/* The altar reads its art pixel from here (App sets --mini-u: smaller on phones). */
-.mini-roller .frame {
-  --u: var(--mini-u, var(--px));
-}
+/* (The altar sizes itself from the layout: layout.ts miniFit.) */
 .mini-roller .note {
   font-size: max(var(--fmin, 0px), calc(3.8 * var(--fpx, var(--px))));
   padding: calc(0.5 * var(--px)) calc(2 * var(--px));
 }
-/* A desktop: the altar stands centered over the skill reel, as wide as it (whatever its reel count). */
-@media (min-width: 900px) and (orientation: landscape) {
-  .dhud .mini-roller {
-    right: calc(5 * var(--px) + env(safe-area-inset-right, 0px));
-    width: calc(46 * var(--px));
-    align-items: center;
-  }
+/* On its side the altar lines up with the spell reel under it, right edge on right edge (one reel
+   about as wide as it; more reels reach further in). */
+:where(:root[data-upright='0']) .dhud .mini-roller {
+  right: calc(5 * var(--px) + env(safe-area-inset-right, 0px));
 }
 
 /* The left column: on a desktop the squad sits at the bottom left and the jobs at the top left (the
@@ -1756,33 +1748,31 @@ canvas.game.aiming {
 }
 
 /* Narrow screens: the floor's plate on three lines (floor, place, foes left) rather than a ragged wrap. */
-@media (max-width: 480px) {
-  .floor-pill {
-    font-size: max(var(--fmin, 0px), calc(3.8 * var(--fpx, var(--px))));
-    padding: calc(1 * var(--px)) calc(2.5 * var(--px));
-  }
-  .floor-pill b {
-    font-size: max(var(--fmin, 0px), calc(5 * var(--fpx, var(--px))));
-    white-space: nowrap;
-  }
-  .floor-pill .dchip {
-    margin-left: calc(1 * var(--px));
-    font-size: max(var(--fmin, 0px), calc(3.6 * var(--fpx, var(--px))));
-  }
-  .floor-pill .dchip::before {
-    width: calc(9 * var(--px));
-    height: calc(9 * var(--px));
-  }
-  .floor-pill .sep {
-    display: none;
-  }
-  .floor-pill .foes {
-    display: block;
-  }
-  /* The squad's cards start under the floor's plate, however many lines it takes. */
-  .squad.top {
-    top: calc(36 * var(--px) + env(safe-area-inset-top, 0px));
-  }
+:where(:root[data-aw='n']) .floor-pill {
+  font-size: max(var(--fmin, 0px), calc(3.8 * var(--fpx, var(--px))));
+  padding: calc(1 * var(--px)) calc(2.5 * var(--px));
+}
+:where(:root[data-aw='n']) .floor-pill b {
+  font-size: max(var(--fmin, 0px), calc(5 * var(--fpx, var(--px))));
+  white-space: nowrap;
+}
+:where(:root[data-aw='n']) .floor-pill .dchip {
+  margin-left: calc(1 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(3.6 * var(--fpx, var(--px))));
+}
+:where(:root[data-aw='n']) .floor-pill .dchip::before {
+  width: calc(9 * var(--px));
+  height: calc(9 * var(--px));
+}
+:where(:root[data-aw='n']) .floor-pill .sep {
+  display: none;
+}
+:where(:root[data-aw='n']) .floor-pill .foes {
+  display: block;
+}
+/* The squad's cards start under the floor's plate, however many lines it takes. */
+:where(:root[data-aw='n']) .squad.top {
+  top: calc(36 * var(--px) + env(safe-area-inset-top, 0px));
 }
 
 /* ------------------------------------------------------------ toasts and banners */
@@ -1817,24 +1807,21 @@ canvas.game.aiming {
 /* On a touch screen held upright the squad's cards sit at the top left: news drops in on the right,
    under the altar. (On its side there's room for it top center, between the floor's plate and the
    altar, as on a desktop.) */
-@media (max-aspect-ratio: 1/1) {
-  :root:has(.squad.top) .toasts {
-    top: calc(66 * var(--px) + env(safe-area-inset-top, 0px));
-    left: auto;
-    right: calc(3 * var(--px) + env(safe-area-inset-right, 0px));
-    transform: none;
-    align-items: flex-end;
-    max-width: 58vw;
-  }
+:root:where([data-upright='1']):has(.squad.top) .toasts {
+  /* (Under the altar however tall it is, and its "Epic+ in" note: MiniReels sets --mini-h.) */
+  top: calc(44 * var(--hud-px, var(--px)) + var(--mini-h, 30 * var(--px)) + env(safe-area-inset-top, 0px));
+  left: auto;
+  right: calc(3 * var(--px) + env(safe-area-inset-right, 0px));
+  transform: none;
+  align-items: flex-end;
+  max-width: 58vw;
 }
 /* With a boss on the floor, news drops in under its bar instead of over its name. */
 :root:has(.dhud.has-boss) .toasts {
   top: calc(52 * var(--px) + env(safe-area-inset-top, 0px));
 }
-@media (max-aspect-ratio: 1/1) {
-  :root:has(.dhud.has-boss) .toasts {
-    top: calc(92 * var(--px) + env(safe-area-inset-top, 0px));
-  }
+:root:where([data-upright='1']):has(.dhud.has-boss) .toasts {
+  top: calc(76 * var(--hud-px, var(--px)) + var(--mini-h, 30 * var(--px)) + env(safe-area-inset-top, 0px));
 }
 @keyframes toastIn {
   from {
@@ -2358,11 +2345,9 @@ body,
 .spell-reel {
   position: absolute;
   right: calc(5 * var(--px) + env(safe-area-inset-right, 0px));
-  bottom: calc(64 * var(--px) + env(safe-area-inset-bottom, 0px));
+  /* On the keys' block (DungeonHud measures it: --keys-h), whatever its height comes out. */
+  bottom: calc(var(--keys-h, 72 * var(--px)) + 7 * var(--px) + env(safe-area-inset-bottom, 0px));
   pointer-events: none;
-}
-.spell-reel.touch {
-  bottom: calc(76 * var(--px) + env(safe-area-inset-bottom, 0px));
 }
 .reel-frame {
   position: relative;
@@ -2790,15 +2775,13 @@ body,
 .char-select .cs-title {
   margin-bottom: auto;
 }
-@media (min-aspect-ratio: 1/1) {
-  .char-select {
-    justify-content: center;
-    padding: calc(8 * var(--px)) 3vw calc(8 * var(--px)) 54vw;
-    background: linear-gradient(to right, rgba(10, 5, 3, 0) 40%, rgba(10, 5, 3, 0.55) 60%, rgba(10, 5, 3, 0.8));
-  }
-  .char-select .cs-title {
-    margin-bottom: calc(4 * var(--px));
-  }
+:where(:root[data-upright='0']) .char-select {
+  justify-content: center;
+  padding: calc(8 * var(--px)) 3vw calc(8 * var(--px)) 54vw;
+  background: linear-gradient(to right, rgba(10, 5, 3, 0) 40%, rgba(10, 5, 3, 0.55) 60%, rgba(10, 5, 3, 0.8));
+}
+:where(:root[data-upright='0']) .char-select .cs-title {
+  margin-bottom: calc(4 * var(--px));
 }
 .cs-title {
   display: flex;
@@ -3322,64 +3305,56 @@ body,
   color: #fff;
   text-shadow: 1px 0 0 #1a1326, -1px 0 0 #1a1326, 0 1px 0 #1a1326, 0 -1px 0 #1a1326;
 }
-@media (max-aspect-ratio: 1/1) {
-  .buy-prompt {
-    top: auto;
-    bottom: calc(92 * var(--px) + env(safe-area-inset-bottom, 0px));
-    left: calc(3 * var(--px));
-    transform: none;
-    /* (Clear of the spell reel on the right.) */
-    max-width: calc(100vw - 42 * var(--px));
-    gap: calc(1.5 * var(--px));
-    padding: calc(1 * var(--px)) calc(1.5 * var(--px));
-  }
-  .buy-icon {
-    width: calc(18 * var(--px));
-    height: calc(18 * var(--px));
-  }
-  .buy-what b {
-    font-size: max(var(--fmin, 0px), calc(4.8 * var(--fpx, var(--px))));
-  }
-  .buy-what small {
-    font-size: max(var(--fmin, 0px), calc(3.7 * var(--fpx, var(--px))));
-  }
-  .buy-btn {
-    min-height: calc(13 * var(--px)) !important;
-    font-size: max(var(--fmin, 0px), calc(4.8 * var(--fpx, var(--px)))) !important;
-    padding-left: calc(2 * var(--px)) !important;
-    padding-right: calc(2 * var(--px)) !important;
-  }
+:where(:root[data-upright='1']) .buy-prompt {
+  top: auto;
+  bottom: calc(92 * var(--px) + env(safe-area-inset-bottom, 0px));
+  left: calc(3 * var(--px));
+  transform: none;
+  /* (Clear of the spell reel on the right.) */
+  max-width: calc(100vw - 42 * var(--px));
+  gap: calc(1.5 * var(--px));
+  padding: calc(1 * var(--px)) calc(1.5 * var(--px));
+}
+:where(:root[data-upright='1']) .buy-icon {
+  width: calc(18 * var(--px));
+  height: calc(18 * var(--px));
+}
+:where(:root[data-upright='1']) .buy-what b {
+  font-size: max(var(--fmin, 0px), calc(4.8 * var(--fpx, var(--px))));
+}
+:where(:root[data-upright='1']) .buy-what small {
+  font-size: max(var(--fmin, 0px), calc(3.7 * var(--fpx, var(--px))));
+}
+:where(:root[data-upright='1']) .buy-btn {
+  min-height: calc(13 * var(--px)) !important;
+  font-size: max(var(--fmin, 0px), calc(4.8 * var(--fpx, var(--px)))) !important;
+  padding-left: calc(2 * var(--px)) !important;
+  padding-right: calc(2 * var(--px)) !important;
 }
 /* On tall screens the boss's name plate gets its own band across the screen under the top bar, and
    everything below the top bar (the squad and jobs on the left, the little altar on the right) steps
    down under it. The talk button sits above the action keys. */
-@media (max-aspect-ratio: 1/1) {
-  .dhud.has-boss .bossbar {
-    top: calc(35 * var(--px) + env(safe-area-inset-top, 0px));
-    width: calc(100vw - 16 * var(--px));
-  }
-  .dhud.has-boss .mini-roller {
-    top: calc(62 * var(--px) + env(safe-area-inset-top, 0px));
-  }
-  .dhud.has-boss .hud-left.top {
-    top: calc(62 * var(--px) + env(safe-area-inset-top, 0px));
-  }
-  .talk-prompt.dungeon {
-    top: auto;
-    bottom: calc(88 * var(--px) + env(safe-area-inset-bottom, 0px));
-  }
+:where(:root[data-upright='1']) .dhud.has-boss .bossbar {
+  top: calc(35 * var(--px) + env(safe-area-inset-top, 0px));
+  width: calc(100vw - 16 * var(--px));
+}
+:where(:root[data-upright='1']) .dhud.has-boss .mini-roller {
+  top: calc(62 * var(--px) + env(safe-area-inset-top, 0px));
+}
+:where(:root[data-upright='1']) .dhud.has-boss .hud-left.top {
+  top: calc(62 * var(--px) + env(safe-area-inset-top, 0px));
+}
+:where(:root[data-upright='1']) .talk-prompt.dungeon {
+  top: auto;
+  bottom: calc(88 * var(--px) + env(safe-area-inset-bottom, 0px));
 }
 /* Short phones in a boss fight: no room for the jobs under the squad (they come back after). */
-@media (max-aspect-ratio: 1/1) and (max-height: 720px) {
-  .dhud.has-boss .hud-left.top .quests {
-    display: none;
-  }
+:where(:root[data-upright='1'][data-ah='s']) .dhud.has-boss .hud-left.top .quests {
+  display: none;
 }
-@media (max-aspect-ratio: 1/1) {
-  .talk-prompt:not(.dungeon) {
-    flex-direction: column;
-    gap: calc(2 * var(--px));
-  }
+:where(:root[data-upright='1']) .talk-prompt:not(.dungeon) {
+  flex-direction: column;
+  gap: calc(2 * var(--px));
 }
 
 /* Settings: tabs across the top, the controls as a little table (what, keyboard, touch). */
@@ -3736,20 +3711,17 @@ body,
   60%, 100% { background-position: -30% 0; }
 }
 /* On a phone the plate is narrow: just the call, the line goes. */
-@media (max-width: 599px) {
-  .rebirth-pill {
-    top: calc(26 * var(--px) + env(safe-area-inset-top, 0px));
-  }
-  .rebirth-pill .rp-text small {
-    display: none;
-  }
+:where(:root[data-aw='n']) .rebirth-pill {
+  top: calc(26 * var(--px) + env(safe-area-inset-top, 0px));
+}
+:where(:root[data-aw='n']) .rebirth-pill .rp-text small {
+  display: none;
 }
 /* A small window: just the call too, or its line runs into the floor's plate (what it brings is in
    the news when it opens up, and at the Shrine). */
-@media (max-width: 960px) {
-  .rebirth-pill .rp-text small {
-    display: none;
-  }
+:where(:root[data-hw='n']) .rebirth-pill .rp-text small,
+:where(:root[data-hw='m']) .rebirth-pill .rp-text small {
+  display: none;
 }
 /* A boss's bar, its title and the news under it hold the top middle: the plate steps aside, under
    the floor's plate on the left (on a tall screen, under the boss's band, between the squad and the
@@ -3764,20 +3736,16 @@ body,
 }
 /* A touch screen on its side keeps the squad up there under the floor's plate: it steps down under
    the plate. */
-@media (min-aspect-ratio: 1/1) {
-  .dhud.has-boss:has(.rebirth-pill) .hud-left.top {
-    top: calc(50 * var(--px) + env(safe-area-inset-top, 0px));
-  }
+:where(:root[data-upright='0']) .dhud.has-boss:has(.rebirth-pill) .hud-left.top {
+  top: calc(50 * var(--px) + env(safe-area-inset-top, 0px));
 }
-@media (max-aspect-ratio: 1/1) {
-  .dhud.has-boss .rebirth-pill {
-    left: 50%;
-    top: calc(62 * var(--px) + env(safe-area-inset-top, 0px));
-    transform: translateX(-50%);
-  }
-  .dhud.has-boss .rebirth-pill:active {
-    transform: translateX(-50%) translateY(var(--px));
-  }
+:where(:root[data-upright='1']) .dhud.has-boss .rebirth-pill {
+  left: 50%;
+  top: calc(62 * var(--px) + env(safe-area-inset-top, 0px));
+  transform: translateX(-50%);
+}
+:where(:root[data-upright='1']) .dhud.has-boss .rebirth-pill:active {
+  transform: translateX(-50%) translateY(var(--px));
 }
 @media (prefers-reduced-motion: reduce) {
   .rebirth-pill,
@@ -3794,12 +3762,10 @@ body,
   padding: calc(16 * var(--px)) calc(4 * var(--px)) calc(18 * var(--px) + env(safe-area-inset-bottom, 0px));
   background: linear-gradient(to bottom, rgba(1, 6, 5, 0.45), rgba(1, 6, 5, 0) 24%, rgba(1, 6, 5, 0) 66%, rgba(1, 6, 5, 0.55));
 }
-@media (min-aspect-ratio: 1/1) {
-  .char-select.title-screen {
-    justify-content: space-between;
-    padding: calc(12 * var(--px)) 3vw calc(12 * var(--px));
-    background: linear-gradient(to bottom, rgba(1, 6, 5, 0.4), rgba(1, 6, 5, 0) 26%, rgba(1, 6, 5, 0) 70%, rgba(1, 6, 5, 0.5));
-  }
+:where(:root[data-upright='0']) .char-select.title-screen {
+  justify-content: space-between;
+  padding: calc(12 * var(--px)) 3vw calc(12 * var(--px));
+  background: linear-gradient(to bottom, rgba(1, 6, 5, 0.4), rgba(1, 6, 5, 0) 26%, rgba(1, 6, 5, 0) 70%, rgba(1, 6, 5, 0.5));
 }
 .title-screen .cs-title {
   margin-bottom: 0;
@@ -4009,21 +3975,19 @@ body,
   }
 }
 /* A short landscape screen: the best pull beside the tally, not over it, so COLLECT stays in view. */
-@media (min-aspect-ratio: 1/1) and (max-height: 640px) {
-  .modal > .wb-sheet {
-    width: min(100%, calc(240 * var(--px)));
-  }
-  .wb-body {
-    flex-direction: row;
-    align-items: center;
-  }
-  .wb-best {
-    flex: none;
-  }
-  .wb-tally {
-    flex: 1;
-    min-width: 0;
-  }
+:where(:root[data-upright='0'][data-ah='s']) .modal > .wb-sheet {
+  width: min(100%, calc(240 * var(--px)));
+}
+:where(:root[data-upright='0'][data-ah='s']) .wb-body {
+  flex-direction: row;
+  align-items: center;
+}
+:where(:root[data-upright='0'][data-ah='s']) .wb-best {
+  flex: none;
+}
+:where(:root[data-upright='0'][data-ah='s']) .wb-tally {
+  flex: 1;
+  min-width: 0;
 }
 
 /* ------------------------------------------------------------ "Back to camp?" (CampAsk.tsx) */

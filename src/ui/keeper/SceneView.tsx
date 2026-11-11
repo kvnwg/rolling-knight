@@ -5,6 +5,7 @@
  * and the keeper blinks now and then (not with Reduce motion). Paintings are kept, so opening a
  * keeper again is instant.
  */
+import { layoutNow } from '../layout';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { lightLayer } from '../../render/art/keepers/light';
 import { paintKeeperScene, type SceneArt } from '../../render/art/keepers/scenes';
@@ -51,7 +52,9 @@ export function SceneView({ id, calm, title, children }: { id: StationId; calm: 
       // pixels, so the whole keeper (hat and all) fits in under a quarter of its height and the
       // counter's cards below get the room; otherwise the UI's own pixel.
       const MIN_H = 86;
-      const short = window.innerHeight < 800;
+      // (On its side a screen is always short for a keeper's counter: the scene keeps to a quarter.)
+      const l = layoutNow();
+      const short = !l.upright || l.down !== 't';
       const fitK = short ? Math.floor((window.innerHeight * 0.24 * dpr) / MIN_H) : Infinity;
       const k = Math.max(1, Math.min(Math.round(px * dpr), fitK));
       const css = k / dpr;

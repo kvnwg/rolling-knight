@@ -37,6 +37,7 @@ import { Tutorial } from './Tutorial';
 import { WelcomeBack } from './WelcomeBack';
 import { FloorRewind } from './fx/FloorRewind';
 import { CampAsk } from './CampAsk';
+import { applyLayout } from './layout';
 
 export interface Toast {
   id: number;
@@ -53,34 +54,6 @@ export interface Banner {
 }
 
 let nextId = 1;
-
-/**
- * CSS px per art pixel for the UI: about 130 art pixels across a phone (so text and buttons are big
- * enough to read and tap: 3 CSS px a pixel on a 393 px wide phone), about 180 on a desktop's short
- * side, capped for big screens.
- */
-function uiPx(): number {
-  const w = window.innerWidth;
-  const h = window.innerHeight;
-  const phone = Math.min(w, h) < 600;
-  const raw = phone ? Math.min(w, h * 0.62) / 130 : Math.min(w, h * 0.62) / 180;
-  return Math.max(2, Math.min(4, Math.round(raw * 2) / 2));
-}
-
-/**
- * The words' own pixel (--fpx): text is sized in it, the art in --px. On a small screen (the UI's
- * pixel at its least, 2 CSS px) the words come up a quarter over the art, so a line of Pixelify Sans
- * stays readable at a device pixel ratio of 1; from 2.5 up they're the same.
- */
-function fontPx(px: number): number {
-  return Math.max(px, 2.5);
-}
-
-/** The smallest any word is drawn (CSS px; --fmin): Pixelify Sans's own pixels come out about a screen pixel each. */
-const FONT_MIN = 11;
-
-/** Art pixels down a short landscape screen that the HUD's pixel leaves room for (the play area between its corners). */
-const HUD_ROWS = 220;
 
 /** After the context is back: how long the rebuild waits for the sprites to be given back too (ms). */
 const HEAL_WAIT_MS = 2500;
@@ -176,43 +149,12 @@ export function App() {
 
   // (A brand-new game opens on the title too; its PLAY goes to the altar, to watch the first knights roll in.)
 
-  // The UI's pixel size and layout.
+  // Every size on screen, from the window (layout.ts: the UI's pixel, the HUD's, the corner altar's,
+  // and the room words the CSS steps on).
   useEffect(() => {
     const set = () => {
-      document.documentElement.style.setProperty('--px', `${uiPx()}px`);
-      // The words' pixel, and the least any of them is drawn at.
-      document.documentElement.style.setProperty('--fpx', `${fontPx(uiPx())}px`);
-      document.documentElement.style.setProperty('--fmin', `${FONT_MIN}px`);
-      // The reveal and reel effects measure in --u (the same art pixel).
-      document.documentElement.style.setProperty('--u', `${uiPx()}px`);
-      // The corner altar: smaller on a narrow screen, where it would cover the view; much bigger on a
-      // desktop's wide screen, where there's room for it (in whole device pixels, so it stays crisp).
-      const narrow = window.innerWidth < 600;
-      const desk = window.innerWidth >= 900 && window.innerWidth > window.innerHeight;
-      const dpr = window.devicePixelRatio || 1;
-      const miniU = narrow ? Math.max(1.25, Math.round(uiPx() * 0.5 * dpr) / dpr) : desk ? Math.round(uiPx() * 1.7 * dpr) / dpr : uiPx();
-      document.documentElement.style.setProperty('--mini-u', `${miniU}px`);
-      // On a desktop the corner altar is as wide as the skill reel under it (46 art px; its frame less a
-      // pixel of padding each side), whatever its reel count, the two on one line down the right side;
-      // on a phone it keeps its own small size.
-      document.documentElement.style.setProperty('--mini-w', desk ? `${44 * uiPx()}px` : '0px');
-      // The HUD (the hub's and the dungeon's) on a phone held upright: about 70% of the UI's pixel
-      // (less on a short screen), in whole device pixels; its text comes down less (and never under
-      // --fmin). Anywhere else (a desktop, a phone on its side, a small browser window) the HUD keeps
-      // the UI's pixel unless that would leave fewer than HUD_ROWS art pixels down the screen (then
-      // as many whole device pixels as fit, 1.5 CSS px at the least); its words keep their own pixel.
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      const phone = Math.min(vw, vh) < 600;
-      const upright = phone && vw < vh;
-      const k = vh < 680 ? 0.62 : 0.7;
-      const hudPx = upright
-        ? Math.max(1.5, Math.round(uiPx() * k * dpr) / dpr)
-        : Math.max(1.5, Math.min(uiPx(), Math.floor((vh / HUD_ROWS) * dpr) / dpr));
-      const hudFpx = upright ? Math.max(hudPx, Math.round(uiPx() * 0.82 * dpr) / dpr) : fontPx(hudPx);
-      document.documentElement.style.setProperty('--hud-px', `${hudPx}px`);
-      document.documentElement.style.setProperty('--hud-fpx', `${hudFpx}px`);
-      setWide(window.innerWidth >= 900 && window.innerWidth > window.innerHeight);
+      const l = applyLayout();
+      setWide(l.vw >= 900 && !l.upright);
     };
     set();
     window.addEventListener('resize', set);

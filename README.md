@@ -137,6 +137,17 @@ recording: [`docs/SOUNDS.md`](docs/SOUNDS.md).
 - One pixel size: everything is drawn at art resolution (about 270 art pixels on a desktop's short
   side, about 230 across a phone, 150 at the hub) and scaled up by a whole number. The camera follows on a critically damped spring and scrolls
   by sub-pixels in the shader, so the world glides while every sprite stays on the grid.
+- One set of sizes for every screen (`src/ui/layout.ts`): the UI's art pixel is the biggest that
+  still leaves its screens the room they were laid out in (at least 130 x 210 art pixels on a phone,
+  180 x 290 on a desktop or tablet, blending smoothly in between by the short side), in whole device
+  pixels, from 2 up to 6 CSS px on a 4K screen. A phone held upright gets a smaller HUD pixel so the
+  play stays clear; a short landscape screen keeps about 220 art pixels of play down the middle. The
+  corner altar keeps one pixel size whatever its reel count, so more reels make a bigger shrine
+  rather than smaller knights, until it fills its corner; the big altar at the Oracle's counter is
+  drawn narrower when its full width would run off the foot of the screen. The CSS steps its layouts
+  on how much art fits (`data-aw`, `data-ah`, `data-hw`, `data-upright` on `<html>`), never on CSS
+  widths, so a pixel more or less of window never jumps a layout or a size; the tests drag a window
+  across every width to check.
 - The UI wears the medieval pack's materials, painted in code at startup (`src/ui/skin.ts`): bevelled
   wooden, brass, crimson, steel and arcane buttons with a lip; dark plates with iron bolts; the pack's
   copper-rimmed bars; parchment cards; chunky wooden action keys (plank tops, corner nails, an inlay
@@ -145,12 +156,10 @@ recording: [`docs/SOUNDS.md`](docs/SOUNDS.md).
   brown border with torn corners, green tabs and buttons, slots pressed into the paper and dark brown
   pixel text. Each counter says in a line what it's for, every number says what it is ("Luck x1.20",
   "Shards 4/10"), every button says what it does ("LEVEL UP 1.2K", "ADD TO SQUAD"), and an offer's
-  whole story is a tap away. On a phone the text is bigger (about 130 art pixels across the screen
-  for the UI) and the categories run across the top so the cards get two columns. Words have a pixel
-  of their own (`--fpx`, a quarter over the art's on the smallest screens) and are never drawn under
-  11 CSS px (`--fmin`), so every line reads at a device pixel ratio of 1 in a small 16:9 window; on a
-  short landscape screen the HUD keeps whole device pixels and leaves about 220 art pixels of play
-  down the middle (`src/ui/App.tsx`). Each keeper's scene across the top is
+  whole story is a tap away. On a phone the categories run across the top so the cards get two
+  columns. Words have a pixel of their own (`--fpx`, a quarter over the art's on the smallest
+  screens) and are never drawn under 11 CSS px (`--fmin`), so every line reads at a device pixel
+  ratio of 1 in a small 16:9 window. Each keeper's scene across the top is
   painted and lit in code (`src/render/art/keepers/`: the keeper's bust from their hub look, their
   trade round them, lamps, candles, coals and glowing glass in stepped pools of warm light), at a
   whole number of screen pixels per art pixel; `keepers-preview.html` shows them all.
@@ -230,7 +239,7 @@ as usual). `?fresh` starts a new game. The game is on
 npm test
 ```
 
-538 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
+552 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
 timing, extra reels, the start's ordinary quick spins, bad-luck protection, Lucky Spins, repeat pulls
 kept as extras at the worth they landed with and sold (one knight's, all at once, or with the knight
 at the Warden's) without touching the knight, old saves' spares cashed in and extras mended,
