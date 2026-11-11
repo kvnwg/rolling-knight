@@ -292,6 +292,7 @@ export class Post {
   ok: boolean;
   /** The browser took the GPU context away (a driver reset, the tab starved of GPU memory); it comes back with 'webglcontextrestored'. */
   private lost = false;
+  private off = new AbortController();
   private gl: WebGL2RenderingContext | null;
   private progs: Record<'blur' | 'bright' | 'composite' | 'final', WebGLProgram> | null = null;
   private tex: Record<keyof PostLayers, WebGLTexture> | null = null;
@@ -315,17 +316,30 @@ export class Post {
     // A lost context draws nothing: the game would sit there black for good. Ask for it back (the
     // default is to never restore it), draw nothing meanwhile, and when it returns build everything
     // that lived on the GPU again (programs, textures, samplers, the targets at the next frame).
-    canvas.addEventListener('webglcontextlost', (e) => {
-      e.preventDefault();
-      this.lost = true;
-    });
-    canvas.addEventListener('webglcontextrestored', () => {
-      this.targets = null;
-      this.w = 0;
-      this.h = 0;
-      this.ok = this.init();
-      this.lost = false;
-    });
+    canvas.addEventListener(
+      'webglcontextlost',
+      (e) => {
+        e.preventDefault();
+        this.lost = true;
+      },
+      { signal: this.off.signal },
+    );
+    canvas.addEventListener(
+      'webglcontextrestored',
+      () => {
+        this.targets = null;
+        this.w = 0;
+        this.h = 0;
+        this.ok = this.init();
+        this.lost = false;
+      },
+      { signal: this.off.signal },
+    );
+  }
+
+  /** Done with this pipeline (the renderer was rebuilt): it stops listening to the canvas. */
+  dispose(): void {
+    this.off.abort();
   }
 
   private compile(vs: string, fs: string): WebGLProgram {

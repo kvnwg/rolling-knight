@@ -425,11 +425,22 @@ export class Renderer {
   /** The Phantom Dash's afterimages, by knight: silhouettes where it was drawn a moment ago (world time). */
   private heroTrails = new Map<number, { world: World; snaps: Array<{ x: number; y: number; ox: number; oy: number; c: HTMLCanvasElement; at: number }> }>();
 
+  /**
+   * There is something to draw with: the shader pipeline, or the canvas's own 2D context. False when
+   * the canvas can give neither (WebGL was lost for good on a canvas that can't change to 2D): the
+   * renderer then needs a new canvas.
+   */
+  readonly ok: boolean;
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     const post = new Post(canvas);
     if (post.ok) this.post = post;
-    else this.ctx = canvas.getContext('2d')!;
+    else {
+      post.dispose();
+      this.ctx = canvas.getContext('2d');
+    }
+    this.ok = !!(this.post || this.ctx);
     this.scene = makeCanvas(this.W, this.H) as HTMLCanvasElement;
     this.sctx = this.scene.getContext('2d')!;
     const mk = () => {
@@ -439,6 +450,16 @@ export class Renderer {
     this.layers = { stand: mk(), emit: mk(), light: mk(), ui: mk(), cap: mk() };
     this.light = new Lighting(this.W, this.H);
     this.resize();
+  }
+
+  /** Drawing through the shader pipeline (false: the plain 2D path, with no WebGL to be had). */
+  get shaders(): boolean {
+    return !!this.post;
+  }
+
+  /** Done with this renderer (another was built in its place after a graphics reset). */
+  dispose(): void {
+    this.post?.dispose();
   }
 
   /** A point on the screen (CSS px) as a world point (the mouse's aim). */

@@ -315,3 +315,36 @@ describe('time away and saves', () => {
     expect(() => runOffline(out, new Rng(2), 3600, 5_000_000)).not.toThrow();
   });
 });
+
+describe('a graphics reset', () => {
+  it('a kept canvas paints itself again when the browser gives it back, and the count of wiped ones comes back to none', async () => {
+    const { canvasesHealing, graphicsReset, healingGivenUp, heals, onGraphicsReset } = await import('../src/render/art/draw');
+    const fake = () => {
+      const on = new Map<string, () => void>();
+      return { on, c: { addEventListener: (t: string, f: () => void) => on.set(t, f) } as unknown as HTMLCanvasElement };
+    };
+    const a = fake();
+    const b = fake();
+    let painted = 0;
+    heals(a.c, () => painted++);
+    heals(b.c, () => painted++);
+    expect(canvasesHealing()).toBe(0);
+    a.on.get('contextlost')!();
+    a.on.get('contextlost')!();
+    b.on.get('contextlost')!();
+    expect(canvasesHealing()).toBe(2);
+    a.on.get('contextrestored')!();
+    expect(canvasesHealing()).toBe(1);
+    expect(painted).toBe(1);
+    // (One that was thrown away while wiped never reports back: the wait gives up on the count.)
+    healingGivenUp();
+    expect(canvasesHealing()).toBe(0);
+    b.on.get('contextrestored')!();
+    expect(canvasesHealing()).toBe(0);
+    expect(painted).toBe(2);
+    let forgot = 0;
+    onGraphicsReset(() => forgot++);
+    graphicsReset();
+    expect(forgot).toBe(1);
+  });
+});
