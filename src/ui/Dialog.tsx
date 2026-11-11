@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatGold, mobKind, rewardText, type MobKind, type QuestReward } from '../core/quests';
 import type { Game } from '../game';
 import { npcFrame, questMarker } from '../render/art/npcs';
-import { toCanvas } from '../render/art/draw';
+import { bufUrl } from './readCanvas';
 import type { DialogChoice, DialogJob, JobAim, Npc } from '../world/npcs';
 import { Px, type IconName } from './px';
 import { uiSound } from './sound';
@@ -27,7 +27,7 @@ export function DialogBox({ game, npc, onClose }: { game: Game; npc: Npc; onClos
   /** The job card shows its words. */
   const [info, setInfo] = useState(false);
   const node = graph[at] ?? graph.start;
-  const portrait = useMemo(() => toCanvas(npcFrame(npc.def, 'idle', 'down', 0).buf).toDataURL(), [npc]);
+  const portrait = useMemo(() => bufUrl(npcFrame(npc.def, 'idle', 'down', 0).buf), [npc]);
   // Type the words out, a few letters a frame; a tap shows them all.
   useEffect(() => {
     setShown(0);
@@ -141,7 +141,7 @@ function replyKind(c: DialogChoice): string {
 const bubbles = new Map<string, string>();
 function bubble(kind: 'offer' | 'turnIn'): string {
   let u = bubbles.get(kind);
-  if (!u) bubbles.set(kind, (u = toCanvas(questMarker(kind)).toDataURL()));
+  if (!u) bubbles.set(kind, (u = bufUrl(questMarker(kind))));
   return u;
 }
 

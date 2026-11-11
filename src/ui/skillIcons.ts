@@ -4,6 +4,7 @@
  * icons (src/render/pixel/ui.ts), some recolored, the rest drawn here. `skillIconArt` turns one into
  * an image URL (in the browser; the rows themselves are plain data, so Node tools can preview them).
  */
+import { READ } from './readCanvas';
 import type { SkillIcon } from '../core/skillbook';
 import { fromRows, type Rows } from '../render/pixel/buf';
 import { UI_MD } from '../render/pixel/ui';
@@ -295,7 +296,7 @@ export function skillIconArt(icon: SkillIcon): { url: string; w: number; h: numb
   const c = document.createElement('canvas');
   c.width = b.w;
   c.height = b.h;
-  const ctx = c.getContext('2d')!;
+  const ctx = c.getContext('2d', READ)!;
   const img = ctx.createImageData(b.w, b.h);
   img.data.set(b.px);
   ctx.putImageData(img, 0, 0);

@@ -5,6 +5,7 @@
  * 16 x 16 original, or a Scale2x version of a 10 x 10 icon: finer art at the same pixel size, never a
  * blow-up).
  */
+import { READ } from '../readCanvas';
 import { fromRows, scale2x, type PixelBuf } from '../../render/pixel/buf';
 import { UI_SPRITES } from '../../render/pixel/ui';
 import { iconArt, type IconName } from '../px';
@@ -23,7 +24,7 @@ function toPic(b: PixelBuf): IconPic {
   const c = document.createElement('canvas');
   c.width = b.w;
   c.height = b.h;
-  const ctx = c.getContext('2d')!;
+  const ctx = c.getContext('2d', READ)!;
   const img = ctx.createImageData(b.w, b.h);
   img.data.set(b.px);
   ctx.putImageData(img, 0, 0);

@@ -7,7 +7,7 @@
  * every animation frame; the React UI re-renders ten times a second.
  */
 import { RUN_ITEMS } from '../core/runItems';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { music } from '../audio/music';
 import { rainSound } from '../audio/rain';
 import { sfx } from '../audio/sfx';
@@ -31,6 +31,7 @@ import type { SoundName } from '../audio/sfx';
 import { uiSound } from './sound';
 import { rebirthPitch } from './RebirthPill';
 import { VistaCanvas } from './VistaCanvas';
+import { hubScene } from '../world/hub';
 import { Tutorial } from './Tutorial';
 import { WelcomeBack } from './WelcomeBack';
 import { FloorRewind } from './fx/FloorRewind';
@@ -121,6 +122,21 @@ export function App() {
   // The world waits on the title screen (no knights roll in behind it before PLAY).
   const titleRef = useRef(choosing);
   titleRef.current = choosing;
+  // While the title is up and nothing else is going on, the hub is got ready behind it (its painting,
+  // then a couple of frames of it drawn under the title to make its textures): PLAY then opens onto it
+  // at once, not after a second or more of nothing. `warm`: frames of the hub still to draw under the title.
+  const warm = useRef(0);
+  const warmHub = useCallback(() => {
+    window.setTimeout(() => {
+      if (!titleRef.current) return;
+      hubScene();
+      window.setTimeout(() => {
+        if (!titleRef.current) return;
+        game.syncHub();
+        warm.current = 3;
+      }, 30);
+    }, 80);
+  }, [game]);
 
   // (A brand-new game opens on the title too; its PLAY goes to the altar, to watch the first knights roll in.)
 
@@ -341,7 +357,14 @@ export function App() {
       // A keeper's screen covers the hub (all of it on a phone; on a wide screen it shows blurred
       // either side): draw the hub a quarter as often underneath, with the time that went by.
       skipDt += dt;
-      if (!stationRef.current || game.inDungeon || ++frameN % 4 === 0) {
+      if (titleRef.current) {
+        // The title covers everything: nothing is drawn under it, but for the hub's first frames (warmHub).
+        if (warm.current > 0 && game.hub) {
+          warm.current--;
+          r.render(game, 0, game.hub);
+        }
+        skipDt = 0;
+      } else if (!stationRef.current || game.inDungeon || ++frameN % 4 === 0) {
         r.render(game, game.paused ? 0 : skipDt, game.inDungeon ? game.world : game.hub);
         skipDt = 0;
       }
@@ -446,7 +469,7 @@ export function App() {
   return (
     <>
       <canvas ref={canvasRef} className={aiming ? 'game aiming' : 'game'} data-play="1" />
-      {choosing && <VistaCanvas game={game} wide={wide} pick={csPick} />}
+      {choosing && <VistaCanvas game={game} wide={wide} pick={csPick} onReady={warmHub} />}
       {inDungeon ? (
         <DungeonHud key={`DungeonHud${gpu}`}
           game={game}

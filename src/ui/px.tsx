@@ -3,6 +3,7 @@
  * this game, and PixelForge's gear-set item icons (`item:<set>:<piece>`, render/art/items.ts), all
  * shown at exactly one art pixel = var(--px) CSS px, so the UI and its icons share one pixel size.
  */
+import { READ } from './readCanvas';
 import type { CSSProperties } from 'react';
 import { isItemIcon, itemBuf, type ItemIcon } from '../render/art/items';
 import { tierGem } from '../render/art/tierGems';
@@ -128,7 +129,7 @@ export function iconArt(icon: IconName, size: IconSize = 'md'): { url: string; w
   const c = document.createElement('canvas');
   c.width = b.w;
   c.height = b.h;
-  const ctx = c.getContext('2d')!;
+  const ctx = c.getContext('2d', READ)!;
   const img = ctx.createImageData(b.w, b.h);
   img.data.set(b.px);
   ctx.putImageData(img, 0, 0);

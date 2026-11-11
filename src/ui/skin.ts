@@ -7,6 +7,8 @@
  * one pixel size.
  */
 
+import { READ } from './readCanvas';
+
 type Hex = string;
 
 /** A material: its face, the bevel's light and shadow, the lip below it and its outline. */
@@ -79,7 +81,7 @@ class Pix {
     const c = document.createElement('canvas');
     c.width = this.w;
     c.height = this.h;
-    c.getContext('2d')!.putImageData(new ImageData(this.d, this.w, this.h), 0, 0);
+    c.getContext('2d', READ)!.putImageData(new ImageData(this.d, this.w, this.h), 0, 0);
     return c.toDataURL();
   }
 }

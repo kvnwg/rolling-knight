@@ -18,6 +18,7 @@
  * It covers the screen (position fixed, z-index var(--upgrade-map-z, 13): under sheets and reveals,
  * over the HUD) and follows the game on its own, whatever its parent's render cadence.
  */
+import { READ } from '../readCanvas';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { currentLuck } from '../../core/luck';
 import { squadPower } from '../../core/power';
@@ -56,7 +57,7 @@ const GRID_URL = (() => {
   const c = document.createElement('canvas');
   c.width = Math.round(w * S);
   c.height = Math.round(h * S);
-  const g = c.getContext('2d');
+  const g = c.getContext('2d', READ);
   if (!g) return 'none';
   g.scale(S, S);
   g.strokeStyle = 'rgba(255,214,150,0.05)';

@@ -13,6 +13,8 @@
  */
 
 /** The seal's size in art pixels (odd: a center pixel). */
+import { READ } from '../readCanvas';
+
 export const SEAL = 33;
 const C = (SEAL - 1) / 2;
 
@@ -38,7 +40,7 @@ function toUrl(px: Px): string {
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;
-  const g = c.getContext('2d')!;
+  const g = c.getContext('2d', READ)!;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const col = px[y][x];

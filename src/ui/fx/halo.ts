@@ -4,6 +4,8 @@
  * once per colour and size into a small image. Not a smooth gradient: the same stepped, dithered
  * light as the keepers' scenes and the knights' backdrops.
  */
+import { READ } from '../readCanvas';
+
 const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
 
 const cache = new Map<string, string>();
@@ -20,7 +22,7 @@ export function haloUrl(color: string, n: number, strength = 0.6, bands = 5): st
   const c = document.createElement('canvas');
   c.width = n;
   c.height = n;
-  const g = c.getContext('2d')!;
+  const g = c.getContext('2d', READ)!;
   const img = g.createImageData(n, n);
   const v = parseInt(color.slice(1, 7), 16);
   const [cr, cg, cb] = [(v >> 16) & 255, (v >> 8) & 255, v & 255];
