@@ -177,6 +177,31 @@
 .verb {
   margin-right: calc(0.5 * var(--px));
 }
+/* ACCEPT and REJECT, where ROLL was, while an offer waits (the sage's perks). */
+.choiceWrap {
+  display: flex;
+  flex-direction: column;
+  gap: calc(1.5 * var(--px));
+}
+.choice {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: calc(2 * var(--px));
+}
+.choice .roll {
+  min-width: 0;
+}
+.roll[data-kind='reject'] {
+  --sk: var(--sk-btn-paper);
+  --skd: var(--sk-btn-paper-down);
+  color: var(--bad) !important;
+  text-shadow: none !important;
+}
+.choiceNote {
+  font-size: calc(4.2 * var(--px));
+  line-height: 1.25;
+  color: var(--mid);
+}
 .float {
   position: absolute;
   left: 50%;
@@ -525,6 +550,9 @@
   font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--good);
+}
+.rowDone[data-gone] {
+  color: var(--mid);
 }
 
 /* ------------------------------------------------------------ wide screens: the stage in a column of its own */

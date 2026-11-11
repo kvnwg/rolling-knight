@@ -66,8 +66,12 @@ export function pctShort(p: number): string {
   return `${Math.max(0.1, Math.round(v * 10) / 10).toFixed(1)}%`;
 }
 
-/** Wide screens: the reel at twice the size, in a column of its own. */
-const WIDE = '(min-width: 800px)';
+/**
+ * Wide screens: the reel at twice the size, in a column of its own. Only where the screen is tall
+ * enough for it: in a wide, short frame (a game embedded in a portal's page) the big reel pushed the
+ * label and the buttons under it off the bottom.
+ */
+const WIDE = '(min-width: 800px) and (min-height: 640px)';
 function useWide(): boolean {
   const [wide, setWide] = useState(() => typeof matchMedia !== 'undefined' && matchMedia(WIDE).matches);
   useEffect(() => {
@@ -190,6 +194,29 @@ export function RollButton({ state, price, icon, onPress, short, doneText, locke
   );
 }
 
+/**
+ * In ROLL's place while what it landed on waits for an answer (the sage's perks: an offer, not a
+ * purchase): ACCEPT with what it costs, and REJECT, side by side, and a line under them on what
+ * turning it down means.
+ */
+export function RollChoice({ price, icon, onAccept, onReject, note }: { price: string; icon: IconName; onAccept: () => void; onReject: () => void; note?: ReactNode }) {
+  return (
+    <span className={s.choiceWrap}>
+      <span className={s.choice}>
+        <button className={`btn ${s.roll}`} data-kind="ready" data-choice="accept" onClick={onAccept}>
+          <span className={s.verb}>ACCEPT</span>
+          <Px icon={icon} size="sm" />
+          <span>{price}</span>
+        </button>
+        <button className={`btn ${s.roll}`} data-kind="reject" data-choice="reject" onClick={onReject}>
+          <span>REJECT</span>
+        </button>
+      </span>
+      {note && <span className={s.choiceNote}>{note}</span>}
+    </span>
+  );
+}
+
 // ------------------------------------------------------------------ the list
 
 /** The list under (or beside) the stage: rows of what's in the roll and their odds. */
@@ -219,7 +246,7 @@ export function RollHead({ children, icon }: { children: ReactNode; icon?: strin
  * One line of the list: its icon, its name, its tiers as pips (a combat line), and its chance on the
  * next roll in the color of how rare that would be, or MAX / a check when it's out of the roll.
  */
-export function RollRow({ icon, name, tiers, chance, rarity, done, doneText, flash, onTap }: {
+export function RollRow({ icon, name, tiers, chance, rarity, done, doneText, gone, flash, onTap }: {
   icon: string;
   name: string;
   tiers?: { now: number; max: number };
@@ -227,6 +254,8 @@ export function RollRow({ icon, name, tiers, chance, rarity, done, doneText, fla
   rarity: RollRarity | null;
   done?: boolean;
   doneText?: string;
+  /** Out of the roll without being yours (a perk turned down): `doneText` in grey, no tick. */
+  gone?: boolean;
   /** Just landed: the row flashes. */
   flash?: boolean;
   onTap: () => void;
@@ -249,8 +278,8 @@ export function RollRow({ icon, name, tiers, chance, rarity, done, doneText, fla
         )}
       </span>
       {done ? (
-        <span className={s.rowDone}>
-          <Px icon="check" size="xs" />
+        <span className={s.rowDone} data-gone={gone || undefined}>
+          {!gone && <Px icon="check" size="xs" />}
           {doneText}
         </span>
       ) : (

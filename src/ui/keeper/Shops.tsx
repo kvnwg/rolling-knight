@@ -13,7 +13,7 @@ import { Fragment, useEffect, useRef, useState, type CSSProperties, type ReactNo
 import { BAL } from '../../core/balance';
 import { CLASSES, KNIGHTS, knightDef, knightId, unlockedClasses } from '../../core/knights';
 import { canRebirth, rebirthFloor } from '../../core/newGame';
-import { PERKS, PERK_TREES, canRollPerk, perkOdds, perkRollPrice, perkRollsAffordable, perksOpen, rollPerk, type PerkDef, type PerkRoll, type PerkTree } from '../../core/perks';
+import { PERKS, PERK_TREES, acceptPerk, canRollPerk, passedPerk, perkOdds, perkOffer, perkRollPrice, perkRollsAffordable, perksOpen, rejectPerk, rollPerk, type PerkDef, type PerkTree } from '../../core/perks';
 import { CHALLENGE, floorDifficulty, knightRating, squadPower } from '../../core/power';
 import { activeQuests, MAX_ACTIVE_QUESTS, mobNoun, plural, questGoal, rewardText, type Quest } from '../../core/quests';
 import { RARITIES, RARITY_COLOR, RARITY_NAME, RARITY_ODDS, rarityChances, rarityIndex } from '../../core/rarity';
@@ -33,7 +33,7 @@ import { InfoPopup } from './InfoPopup';
 import { Delta, Glyph, KeeperScreen, Purse, ShopBody, ShopFoot, ShopGrid, ShopHeading, ShopHint, ShopTop, Stat, keeperStyles as s, useGameTick } from './KeeperScreen';
 import { OfferCard, type CardLine } from './OfferCard';
 import { extrasText } from './BrokerShop';
-import { RollBody, RollButton, RollHead, RollLabel, RollList, RollReel, RollRow, RollStage, pctShort, rarityInk, type ReelSpin } from './RollMachine';
+import { RollBody, RollButton, RollChoice, RollHead, RollLabel, RollList, RollReel, RollRow, RollStage, RollTag, pctShort, rarityInk, type ReelSpin } from './RollMachine';
 import { Icon } from './TinkerShop';
 import { ClassTag } from '../ClassTag';
 import { backdropStyle } from '../backdrop';
@@ -58,70 +58,95 @@ const TREE_LABEL: Record<PerkTree, string> = { underdog: 'UNDERDOGS', command: '
 let sageSpins = 0;
 
 /**
- * Sage Orrin's counter: ROLL for a random perk you don't have yet (core/perks.ts), for sigils, the
- * reel landing on it; under it every perk by tree, with its chance on the next roll in its rarity's
- * color, or OWNED. Tap a perk for what it does. Until the reel lands, the list and the count show
- * things as they were. Before the first rebirth the roll is locked, and the list shows what's to come.
+ * Sage Orrin's counter: ROLL for a random perk he hasn't shown you yet this run (core/perks.ts), the
+ * reel landing on it. What it lands on is an offer: its name and the whole of what it does, with
+ * ACCEPT (the sigils are paid then) and REJECT (nothing paid, and it's out of his roll for the run)
+ * where ROLL was. An offer waits: close the screen, or the game, and it's still on the counter.
+ * Under it every perk by tree, with its chance on the next roll in its rarity's color, or OWNED, or
+ * REJECTED. Tap a perk for what it does. Before the first rebirth the roll is locked, and the list
+ * shows what's to come.
  */
 export function SageShop({ game, station, onClose }: { game: Game; station: HubStation; onClose: () => void }) {
   useGameTick(game);
   const st = game.state;
   const calm = !!st.settings.reduceMotion;
   const [spin, setSpin] = useState<ReelSpin | null>(null);
-  const [roll, setRoll] = useState<PerkRoll | null>(null);
   const [landed, setLanded] = useState(true);
   const [skip, setSkip] = useState(0);
   const [info, setInfo] = useState<string | null>(null);
-  /** The perks before the roll in flight (shown until it lands). */
-  const before = useRef<string[] | null>(null);
+  /** The answer just given, for the label and the row's flash: the perk taken, or the one turned down. */
+  const [last, setLast] = useState<{ perk: PerkDef; took: boolean } | null>(null);
   const spinning = !!spin && !landed;
-  const shown = spinning && before.current ? { ...st, perks: before.current } : st;
   const open = perksOpen(st);
-  const odds = new Map(perkOdds(shown).map((o) => [o.perk.id, o]));
+  const odds = new Map(perkOdds(st).map((o) => [o.perk.id, o]));
   const price = perkRollPrice(st);
+  /** On the counter, waiting for an answer (once the reel has landed on it; it may be from an earlier visit). */
+  const offer = spinning ? null : perkOffer(st);
 
   const press = () => {
     if (spinning) {
       setSkip((x) => x + 1);
       return;
     }
-    const was = [...st.perks];
     const pool = perkOdds(st).map((o) => ({ icon: o.perk.icon, rarity: o.perk.rarity }));
     const r = rollPerk(st, () => game.rng.next());
     if (!r) return;
-    before.current = was;
-    setRoll(r);
+    setLast(null);
     setLanded(false);
     setSpin({ n: ++sageSpins, face: { icon: r.perk.icon, rarity: r.perk.rarity }, pool });
-    game.syncSquad();
+    // (Saved with the offer on the counter: closing the game is no way to roll again.)
+    game.save();
     game.touch();
   };
   const onLand = (n: number) => {
-    if (n !== sageSpins || !roll) return;
-    before.current = null;
+    if (n !== sageSpins) return;
     setLanded(true);
-    uiSound('perk', roll.perk.rarity === 'rare' || roll.perk.rarity === 'epic' ? 1 : 0);
+    const perk = perkOffer(st);
+    if (perk) uiSound('perk', perk.rarity === 'rare' || perk.rarity === 'epic' ? 1 : 0);
+  };
+  const accept = () => {
+    const perk = acceptPerk(st);
+    if (!perk) return;
+    uiSound('equip', 2);
+    setLast({ perk, took: true });
+    game.syncSquad();
+    game.save();
+    game.touch();
+  };
+  const reject = () => {
+    const perk = rejectPerk(st);
+    if (!perk) return;
+    uiSound('close');
+    setLast({ perk, took: false });
+    game.save();
+    game.touch();
   };
 
-  const label =
-    roll && landed ? (
-      <RollLabel key={spin?.n} name={roll.perk.name} rarity={roll.perk.rarity} line={roll.perk.short} />
-    ) : (
-      <RollLabel
-        spinning={spinning}
-        hint={
-          open ? (
-            <>
-              A random <b>perk</b> you don't have yet.
-            </>
-          ) : (
-            <>
-              Perks open after your <b>first rebirth</b> (floor {rebirthFloor(st.rebirths)}).
-            </>
-          )
-        }
-      />
-    );
+  const label = offer ? (
+    // The whole of what it does, trade-off and all: this is what's being decided.
+    <RollLabel key={`offer${offer.id}`} name={offer.name} rarity={offer.rarity} line={offer.text} />
+  ) : last?.took && !spinning ? (
+    <RollLabel key={`took${last.perk.id}`} name={last.perk.name} rarity={last.perk.rarity} line={last.perk.short} tags={<RollTag text="YOURS" kind="free" />} />
+  ) : (
+    <RollLabel
+      spinning={spinning}
+      hint={
+        !open ? (
+          <>
+            Perks open after your <b>first rebirth</b> (floor {rebirthFloor(st.rebirths)}).
+          </>
+        ) : last ? (
+          <>
+            <b>{last.perk.name}</b> turned down: he won't offer it again this run.
+          </>
+        ) : (
+          <>
+            A random <b>perk</b> he hasn't shown you yet. Take it, or turn it down.
+          </>
+        )
+      }
+    />
+  );
   const infoPerk = info ? PERKS.find((p) => p.id === info) : undefined;
   return (
     <>
@@ -130,24 +155,28 @@ export function SageShop({ game, station, onClose }: { game: Game; station: HubS
           purse={<Purse amount={st.sigils} icon="sigil" label="Sigils" />}
           title={
             <Stat icon="check" label="Owned">
-              {shown.perks.length}/{PERKS.length}
+              {st.perks.length}/{PERKS.length}
             </Stat>
           }
         />
         <RollBody>
           <RollStage
-            reel={<RollReel spin={spin} idle="sigil" calm={calm} skip={skip} onLand={onLand} />}
+            reel={<RollReel spin={spin} idle={offer?.icon ?? 'sigil'} calm={calm} skip={skip} onLand={onLand} />}
             label={label}
             button={
-              <RollButton
-                state={!open ? 'locked' : odds.size === 0 ? 'done' : spinning ? 'spinning' : canRollPerk(st) ? 'ready' : 'short'}
-                price={`${price}`}
-                icon="sigil"
-                onPress={press}
-                short={`need ${price - st.sigils} more`}
-                doneText="ALL OWNED"
-                lockedText="REBIRTH FIRST"
-              />
+              offer ? (
+                <RollChoice price={`${price}`} icon="sigil" onAccept={accept} onReject={reject} note="Reject costs nothing, but he won't offer it again this run." />
+              ) : (
+                <RollButton
+                  state={!open ? 'locked' : odds.size === 0 ? 'done' : spinning ? 'spinning' : canRollPerk(st) ? 'ready' : 'short'}
+                  price={`${price}`}
+                  icon="sigil"
+                  onPress={press}
+                  short={`need ${price - st.sigils} more`}
+                  doneText={st.perks.length === PERKS.length ? 'ALL OWNED' : 'NONE LEFT'}
+                  lockedText="REBIRTH FIRST"
+                />
+              )
             }
           />
           <RollList>
@@ -156,6 +185,7 @@ export function SageShop({ game, station, onClose }: { game: Game; station: HubS
                 <RollHead icon={TREE_ICON[t.id]}>{TREE_LABEL[t.id]}</RollHead>
                 {PERKS.filter((p) => p.tree === t.id).map((p) => {
                   const o = odds.get(p.id);
+                  const passed = passedPerk(st, p.id);
                   return (
                     <RollRow
                       key={p.id}
@@ -164,8 +194,9 @@ export function SageShop({ game, station, onClose }: { game: Game; station: HubS
                       chance={o?.chance ?? 0}
                       rarity={o ? p.rarity : null}
                       done={!o}
-                      doneText="OWNED"
-                      flash={landed && roll?.perk.id === p.id}
+                      doneText={passed ? 'REJECTED' : 'OWNED'}
+                      gone={passed}
+                      flash={offer?.id === p.id || (!spinning && last?.took && last.perk.id === p.id)}
                       onTap={() => (uiSound('open'), setInfo(p.id))}
                     />
                   );
@@ -175,13 +206,21 @@ export function SageShop({ game, station, onClose }: { game: Game; station: HubS
           </RollList>
         </RollBody>
       </KeeperScreen>
-      {infoPerk && <PerkInfo perk={infoPerk} chance={odds.get(infoPerk.id)?.chance ?? null} open={open} onClose={() => setInfo(null)} />}
+      {infoPerk && (
+        <PerkInfo
+          perk={infoPerk}
+          chance={odds.get(infoPerk.id)?.chance ?? null}
+          status={hasPerk(st, infoPerk.id) ? 'owned' : passedPerk(st, infoPerk.id) ? 'passed' : offer?.id === infoPerk.id ? 'offer' : null}
+          open={open}
+          onClose={() => setInfo(null)}
+        />
+      )}
     </>
   );
 }
 
-/** A perk's details: its tree and rarity, what it does, and its chance on the next roll (or that it's yours). */
-function PerkInfo({ perk, chance, open, onClose }: { perk: PerkDef; chance: number | null; open: boolean; onClose: () => void }) {
+/** A perk's details: its tree and rarity, what it does, and its chance on the next roll (or that it's yours, on the counter, or turned down). */
+function PerkInfo({ perk, chance, status, open, onClose }: { perk: PerkDef; chance: number | null; status: 'owned' | 'passed' | 'offer' | null; open: boolean; onClose: () => void }) {
   const tree = PERK_TREES.find((t) => t.id === perk.tree)!;
   return (
     <InfoPopup
@@ -195,12 +234,21 @@ function PerkInfo({ perk, chance, open, onClose }: { perk: PerkDef; chance: numb
       onClose={onClose}
     >
       <p>{perk.text}</p>
-      {chance === null ? (
+      {status === 'owned' ? (
         <div className={s.popRow} data-tone="good">
           <Px icon="check" size="sm" />
           Yours for this run
         </div>
-      ) : (
+      ) : status === 'passed' ? (
+        <div className={s.popRow} data-tone="muted">
+          Turned down: out of the roll this run
+        </div>
+      ) : status === 'offer' ? (
+        <div className={s.popRow} data-tone="muted">
+          <Px icon="sigil" size="sm" />
+          On the counter: accept it, or reject it
+        </div>
+      ) : chance === null ? null : (
         <div className={s.popRow} data-tone="muted">
           <Px icon="dice" size="sm" />
           {open ? 'Next roll' : 'Its chance'}

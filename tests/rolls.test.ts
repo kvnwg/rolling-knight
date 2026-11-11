@@ -3,8 +3,8 @@ import {
   COMBAT_LINES, COMBAT_ROLL, COMBAT_TIERS_MAX, canRollCombat, combatOdds, combatPoolOpen, combatRollPrice, combatRollPriceAt, combatRollsAffordable, combatTiers, lineWeight, rollCombat, tierRarity,
 } from '../src/core/combatRoll';
 import { CLASSES, knightId } from '../src/core/knights';
-import { newGame } from '../src/core/newGame';
-import { PERKS, PERK_ROLL, canRollPerk, perkOdds, perkRollPrice, perkRollsAffordable, perkWeight, rollPerk } from '../src/core/perks';
+import { newGame, rebirth } from '../src/core/newGame';
+import { PERKS, PERK_ROLL, acceptPerk, canRollPerk, passedPerk, perkOdds, perkOffer, perkRollPrice, perkRollsAffordable, perkWeight, rejectPerk, rollAndTakePerk, rollPerk } from '../src/core/perks';
 import { knightRating } from '../src/core/power';
 import { Rng } from '../src/core/rng';
 import { pickWeighted, tidyPrice } from '../src/core/rolls';
@@ -323,7 +323,7 @@ describe("the sage's roll", () => {
     const got: string[] = [];
     while (canRollPerk(s)) {
       const before = [...s.perks];
-      const r = rollPerk(s, () => rng.next())!;
+      const r = rollAndTakePerk(s, () => rng.next())!;
       expect(before, r.perk.id).not.toContain(r.perk.id);
       got.push(r.perk.id);
     }
@@ -341,7 +341,7 @@ describe("the sage's roll", () => {
     const prices: number[] = [];
     for (let i = 0; i < PERKS.length; i++) {
       prices.push(perkRollPrice(s));
-      rollPerk(s, () => 0.5);
+      rollAndTakePerk(s, () => 0.5);
     }
     expect(prices).toEqual([1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4]);
     expect(perkRollsAffordable(sage(7))).toBe(6);
@@ -378,8 +378,101 @@ describe("the sage's roll", () => {
     const t = sage(0);
     expect(rollPerk(t, () => 0.5)).toBeNull();
     t.sigils = 1;
-    expect(rollPerk(t, () => 0.5)?.price).toBe(1);
+    expect(rollAndTakePerk(t, () => 0.5)?.price).toBe(1);
     expect(t.sigils).toBe(0);
+  });
+
+  it('lands an offer, not a purchase: nothing is paid or owned until it is accepted, and no new roll until it is answered', () => {
+    const s = sage(3);
+    const r = rollPerk(s, () => 0)!;
+    expect(r.perk.id).toBe('handMeDowns');
+    expect(perkOffer(s)?.id).toBe('handMeDowns');
+    expect(s.sigils).toBe(3);
+    expect(s.perks).toEqual([]);
+    // It waits on the counter: the roll is shut, and the tab still counts what the sigils cover.
+    expect(canRollPerk(s)).toBe(false);
+    expect(rollPerk(s, () => 0.9)).toBeNull();
+    expect(perkOffer(s)?.id).toBe('handMeDowns');
+    expect(perkRollsAffordable(s)).toBe(3);
+    // ACCEPT: paid now, and it's yours.
+    expect(acceptPerk(s)?.id).toBe('handMeDowns');
+    expect(s.sigils).toBe(2);
+    expect(s.perks).toEqual(['handMeDowns']);
+    expect(perkOffer(s)).toBeNull();
+    expect(acceptPerk(s)).toBeNull();
+    expect(rejectPerk(s)).toBeNull();
+    expect(canRollPerk(s)).toBe(true);
+  });
+
+  it('REJECT costs nothing, and that perk is out of the roll for the rest of the run', () => {
+    const s = sage(100);
+    // Four-Leaf Litter: 3x luck tokens for extras at half the gold. Not everyone's bargain.
+    let acc = 0;
+    for (const o of perkOdds(s)) {
+      if (o.perk.id === 'fourLeafLitter') break;
+      acc += o.chance;
+    }
+    expect(rollPerk(s, () => acc + 0.001)?.perk.id).toBe('fourLeafLitter');
+    expect(rejectPerk(s)?.id).toBe('fourLeafLitter');
+    expect(s.sigils).toBe(100);
+    expect(s.perks).toEqual([]);
+    expect(passedPerk(s, 'fourLeafLitter')).toBe(true);
+    expect(perkOffer(s)).toBeNull();
+    expect(perkOdds(s).map((o) => o.perk.id)).not.toContain('fourLeafLitter');
+    expect(perkOdds(s).length).toBe(PERKS.length - 1);
+    expect(perkOdds(s).reduce((t, o) => t + o.chance, 0)).toBeCloseTo(1, 12);
+    // The same draw can't land it again: he has others to show.
+    const rng = new Rng(4);
+    for (let i = 0; i < 200 && canRollPerk(s); i++) {
+      expect(rollPerk(s, () => rng.next())!.perk.id).not.toBe('fourLeafLitter');
+      rejectPerk(s);
+    }
+    // Everything turned down: nothing left to roll, nothing owned, not a sigil spent.
+    expect(perkOdds(s)).toEqual([]);
+    expect(canRollPerk(s)).toBe(false);
+    expect(s.perksPassed.length).toBe(PERKS.length);
+    expect(s.perks).toEqual([]);
+    expect(s.sigils).toBe(100);
+  });
+
+  it('the price climbs with every five perks shown, taken or turned down: fishing for a better one costs', () => {
+    const s = sage(100);
+    for (let i = 0; i < 4; i++) {
+      rollPerk(s, () => 0.5);
+      rejectPerk(s);
+    }
+    expect(perkRollPrice(s)).toBe(1);
+    rollPerk(s, () => 0.5);
+    rejectPerk(s);
+    // Five looks, none taken: the first perk bought now costs two.
+    expect(s.sigils).toBe(100);
+    expect(perkRollPrice(s)).toBe(2);
+    expect(rollAndTakePerk(s, () => 0.5)?.price).toBe(2);
+    expect(s.sigils).toBe(98);
+    expect(s.perks.length).toBe(1);
+    // A purse of one sigil can look at five and take one of them, no more.
+    const poor = sage(1);
+    for (let i = 0; i < 5; i++) {
+      expect(canRollPerk(poor)).toBe(true);
+      rollPerk(poor, () => 0.5);
+      rejectPerk(poor);
+    }
+    expect(canRollPerk(poor)).toBe(false);
+    expect(perkRollsAffordable(poor)).toBe(0);
+  });
+
+  it('a rebirth clears what was turned down and what was on the counter', () => {
+    const s = sage(5);
+    s.run.bestFloor = 999;
+    rollPerk(s, () => 0);
+    rejectPerk(s);
+    rollPerk(s, () => 0);
+    expect(s.perksPassed.length).toBe(1);
+    expect(perkOffer(s)).not.toBeNull();
+    expect(rebirth(s)).toBe(true);
+    expect(s.perksPassed).toEqual([]);
+    expect(s.perkOffer).toBeNull();
+    expect(perkOdds(s).length).toBe(PERKS.length);
   });
 });
 
@@ -398,5 +491,17 @@ describe('an older save', () => {
     expect(s.perks).toEqual(['glassCannon', 'shieldWall']);
     expect(perkOdds(s).map((o) => o.perk.id)).not.toContain('glassCannon');
     expect(mend({ ...raw, perks: 'junk' }).perks).toEqual([]);
+    // A save from before perks could be turned down has no rejections and nothing on the counter.
+    delete raw.perksPassed;
+    delete raw.perkOffer;
+    expect(mend(raw).perksPassed).toEqual([]);
+    expect(mend(raw).perkOffer).toBeNull();
+    // A damaged list keeps only real perks that aren't owned; an offer he couldn't make goes.
+    const t = mend({ ...raw, perksPassed: ['bloodPact', 'bloodPact', 'nope', 3, 'glassCannon'], perkOffer: 'berserker' });
+    expect(t.perksPassed).toEqual(['bloodPact']);
+    expect(t.perkOffer).toBe('berserker');
+    expect(mend({ ...raw, perkOffer: 'glassCannon' }).perkOffer).toBeNull();
+    expect(mend({ ...raw, perksPassed: ['bloodPact'], perkOffer: 'bloodPact' }).perkOffer).toBeNull();
+    expect(mend({ ...raw, perkOffer: 'nope' }).perkOffer).toBeNull();
   });
 });

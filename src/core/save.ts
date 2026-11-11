@@ -114,8 +114,13 @@ function mendExtras(out: GameState): void {
  * perks that still exist, each once, so the sage's roll never lands one you have.
  */
 function mendPerks(out: GameState): void {
-  const raw: unknown[] = Array.isArray(out.perks) ? out.perks : [];
-  out.perks = [...new Set(raw.filter((id): id is string => typeof id === 'string' && PERKS_BY_ID.has(id)))];
+  const known = (raw: unknown): string[] => [...new Set((Array.isArray(raw) ? raw : []).filter((id): id is string => typeof id === 'string' && PERKS_BY_ID.has(id)))];
+  out.perks = known(out.perks);
+  // Perks turned down this run (a save from before there was a choice has none), never one that's owned;
+  // and the offer on the sage's counter, if it's still one he could make.
+  out.perksPassed = known(out.perksPassed).filter((id) => !out.perks.includes(id));
+  const offer = out.perkOffer;
+  out.perkOffer = typeof offer === 'string' && PERKS_BY_ID.has(offer) && !out.perks.includes(offer) && !out.perksPassed.includes(offer) ? offer : null;
 }
 
 /**

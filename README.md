@@ -15,7 +15,7 @@ you walk round the hub, a lamplit square before the Gilded Reel, where each keep
 the Oracle's altar (summons, the odds and the Codex), the tinker's upgrades on two tabs (Luck,
 bought on a honeycomb map, and Combat, rolled for gold on a reel: Strength, Vitality, Attack Speed,
 Move Speed, Quick Roll for faster skill rolls, chance upgrades like Ricochet and Double or Nothing,
-and rare one-offs), the sage's perks (rolled for sigils), the rebirth shrine, the notice board,
+and rare one-offs), the sage's perks (rolled for sigils: each roll an offer to accept or reject), the rebirth shrine, the notice board,
 Bram the Broker at the curio cabinet, who sells your extras, and Warden Tobb by the steps down,
 who picks the three you send down, levels them up and reforges them: one job each, nothing twice. Talk to a keeper and their screen opens with them big at their counter, lamplit
 among the things of their trade, and their wares below as cards on beige paper: a picture, a level,
@@ -231,7 +231,7 @@ as usual). `?fresh` starts a new game. The game is on
 npm test
 ```
 
-550 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
+555 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
 timing, extra reels, the start's ordinary quick spins, bad-luck protection, Lucky Spins, repeat pulls
 kept as extras at the worth they landed with and sold (one knight's, all at once, or with the knight
 at the Warden's) without touching the knight, old saves' spares cashed in and extras mended,
@@ -252,7 +252,9 @@ one rolling, an ogre throwing a boulder across water at a knight it can't reach 
 keeps away) onto the ring it marked, quake rings, the spawn-in, perfect rolls marked once per roll,
 the squad's AI seeing a lunge's lane or landing ring, the lunges' crouch, arc and squash and the red
 wind-up warning; the camera, the weather, the hub's map and keepers, folk and quests, the Luck
-map, the combat and perk rolls (their odds, prices, doubles and free rolls; a full pool rolls nothing),
+map, the combat and perk rolls (their odds, prices, doubles and free rolls; a full pool rolls nothing;
+a perk roll lands an offer that is accepted, and paid for then, or rejected, free but gone for the
+run, the price climbing with every five perks shown),
 Attack Speed, Quick Roll and every chance upgrade in a fight, the keepers' scenes and cards, a full game
 starting up; and the PixelForge art: every sheet holding what the game plays in four directions, the
 body plan to monster mapping (the Cinderwyrm in the Ember Depths, Rook in the dark halls, the Ashen Duelist's elites), the

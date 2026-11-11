@@ -104,6 +104,10 @@ export interface GameState {
 
   upgrades: Record<string, number>;
   perks: string[];
+  /** Perks turned down at the sage's this run (REJECT): out of his roll until the next rebirth. */
+  perksPassed: string[];
+  /** The perk his last roll landed on, waiting for ACCEPT or REJECT (it waits through a closed screen or a reload). */
+  perkOffer: string | null;
   rebirths: number;
   /** Perk: Heirloom keeps this knight through the next rebirth. */
 

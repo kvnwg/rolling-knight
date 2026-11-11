@@ -11,7 +11,7 @@ import { UPGRADES, buyUpgrade, canBuy, upgradeCost } from '../src/core/upgrades'
 import { canRollCombat, combatRollPrice, combatTiers, rollCombat } from '../src/core/combatRoll';
 import { bestSquad, canLevel, levelUp, sellAllExtras } from '../src/core/roster';
 import { canRebirth } from '../src/core/newGame';
-import { canRollPerk, rollPerk } from '../src/core/perks';
+import { canRollPerk, rollAndTakePerk } from '../src/core/perks';
 import { squadPower } from '../src/core/power';
 import { World } from '../src/world/world';
 
@@ -71,7 +71,7 @@ for (let t = 0; t < minutes * 60; t += dt) {
     const roll = canRollCombat(s) ? combatRollPrice(s) : Infinity;
     if (luck && upgradeCost(s, luck.id) <= roll) buyUpgrade(s, luck.id);
     else if (roll < Infinity) rollCombat(s, () => g.rng.next());
-    while (canRollPerk(s)) rollPerk(s, () => g.rng.next());
+    while (canRollPerk(s)) rollAndTakePerk(s, () => g.rng.next());
     const before = s.squad.join();
     bestSquad(s);
     if (s.squad.join() !== before) g.syncSquad();

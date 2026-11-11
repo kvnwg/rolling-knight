@@ -22,7 +22,7 @@ import { BAL } from '../src/core/balance';
 import { canRollCombat, combatRollPrice, combatTiers, COMBAT_TIERS_MAX, rollCombat } from '../src/core/combatRoll';
 import { canRebirth, rebirthFloor } from '../src/core/newGame';
 import { runOffline } from '../src/core/offline';
-import { canRollPerk, rollPerk } from '../src/core/perks';
+import { canRollPerk, rollAndTakePerk } from '../src/core/perks';
 import { squadPower } from '../src/core/power';
 import { bestSquad, canLevel, levelCost, levelUp, sellAllExtras } from '../src/core/roster';
 import { UPGRADES, buyUpgrade, canBuy, tier, upgradeCost, upgradeCostAt, upgradeTab } from '../src/core/upgrades';
@@ -129,7 +129,7 @@ for (let t = 0; t < hours * 3600; t += dt) {
       else run.spentCombat += spent;
       run.buys.push(mins());
     }
-    while (canRollPerk(s)) rollPerk(s, () => g.rng.next());
+    while (canRollPerk(s)) rollAndTakePerk(s, () => g.rng.next());
     const was = s.squad.join();
     bestSquad(s);
     if (s.squad.join() !== was) g.syncSquad();

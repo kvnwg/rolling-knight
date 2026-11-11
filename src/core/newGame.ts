@@ -24,6 +24,8 @@ export function newGame(seed = Date.now()): GameState {
     controlled: 0,
     upgrades: {},
     perks: [],
+    perksPassed: [],
+    perkOffer: null,
     rebirths: 0,
     roll: {
       count: 0,
@@ -90,6 +92,8 @@ export function rebirth(state: GameState): boolean {
   state.hourglasses = 0;
   state.upgrades = {};
   state.perks = [];
+  state.perksPassed = [];
+  state.perkOffer = null;
   state.sigils = state.rebirths; // one per rebirth to start each run
   // Extras go with the knights they belong to. They are gold not yet collected (the broker pays what
   // each was locked in at), and a rebirth takes all your gold: cashing them in here would only fill a

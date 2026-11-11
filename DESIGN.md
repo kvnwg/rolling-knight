@@ -343,9 +343,23 @@ Codex and records stay.
 
 Perks open after the first rebirth. **Sigils** (one per rebirth at the start of a run, one per boss
 beaten for the first time in a run) roll for perks at Sage Orrin's (`src/core/perks.ts`): a roll
-lands on a random perk you don't have yet. A perk weighs 1 / its old sigil price (Common 1,
-Uncommon 1/2, Rare 1/3, Epic 1/4), and a roll costs a sigil, plus one for every five perks owned (50
-for all twenty). A rebirth clears them all. The four trees only sort them:
+lands on a random perk he hasn't shown you yet this run. A perk weighs 1 / its old sigil price
+(Common 1, Uncommon 1/2, Rare 1/3, Epic 1/4).
+
+**What a roll lands on is an offer.** Its name and the whole of what it does (trade-off and all)
+come up with two buttons where ROLL was:
+
+- **ACCEPT**: the sigils are paid now, and the perk is yours for the run.
+- **REJECT**: nothing is paid, and that perk is out of his roll until the next rebirth (its row
+  says REJECTED).
+
+Nobody is handed a trade they didn't want (Four-Leaf Litter's 3x luck tokens for extras at half
+the gold is a bargain for some runs and a terrible one for others). Turning offers down has a
+price all the same, so the roll still matters: a perk costs a sigil, plus one for every five perks
+he has **shown** you this run, taken or not (50 for all twenty, taking every one). Reject five to
+fish for a better one and the next costs two; a purse of one sigil can look at five and take one.
+An offer waits: it's in the save, so closing the screen or the game doesn't roll again. A rebirth
+clears the perks, the rejections and the counter. The four trees only sort them:
 
 - **Underdogs**: Humble Beginnings (Common and Uncommon level-ups ×3), Peasant Levy (every 4th spin at
   luck 1; low extras fetch 3x), Rags to Riches (+25% stats per tier below Legendary), Peasant Revolt
