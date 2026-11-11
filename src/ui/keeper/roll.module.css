@@ -177,6 +177,10 @@
 .verb {
   margin-right: calc(0.5 * var(--px));
 }
+/* (The first combat roll: FREE in gold where the price goes.) */
+.roll [data-free] {
+  color: #ffe36a;
+}
 .float {
   position: absolute;
   left: 50%;

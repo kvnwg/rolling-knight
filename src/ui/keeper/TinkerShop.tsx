@@ -13,7 +13,7 @@
  * chance on the next roll, in the color of how rare that tier is. Tap a line for what it does.
  */
 import { useRef, useState, type CSSProperties } from 'react';
-import { canRollCombat, combatOdds, combatPoolOpen, combatRollPrice, combatRollsAffordable, rollCombat, type CombatRoll, type LineOdds } from '../../core/combatRoll';
+import { canRollCombat, combatGift, combatOdds, combatPoolOpen, combatRollPrice, combatRollsAffordable, rollCombat, type CombatRoll, type LineOdds } from '../../core/combatRoll';
 import { currentLuck } from '../../core/luck';
 import { squadPower } from '../../core/power';
 import { RARITY_NAME } from '../../core/rarity';
@@ -306,6 +306,7 @@ function CombatTab({ game }: { game: Game }) {
   const odds = combatOdds(shown);
   const price = combatRollPrice(st);
   const open = combatPoolOpen(shown);
+  const gift = combatGift(st);
 
   const press = () => {
     if (spinning) {
@@ -347,12 +348,12 @@ function CombatTab({ game }: { game: Game }) {
         tags={
           <>
             {roll.double && <RollTag text="x2" kind="double" />}
-            {roll.free && <RollTag text="FREE" kind="free" />}
+            {(roll.free || roll.gift) && <RollTag text="FREE" kind="free" />}
           </>
         }
       />
     ) : (
-      <RollLabel spinning={spinning} hint={<>A random <b>combat upgrade</b> each roll. Higher tiers are rarer.</>} />
+      <RollLabel spinning={spinning} hint={gift ? <>Your first roll is <b>free</b>! A random <b>combat upgrade</b> each roll.</> : <>A random <b>combat upgrade</b> each roll. Higher tiers are rarer.</>} />
     );
   // A free roll gives its gold back as the reel lands.
   const purse = st.gold - (spinning && roll?.free ? roll.price : 0);
@@ -376,6 +377,7 @@ function CombatTab({ game }: { game: Game }) {
               tut="combatRoll"
               state={!open ? 'done' : spinning ? 'spinning' : canRollCombat(st) ? 'ready' : 'short'}
               price={fmt(price)}
+              free={gift}
               icon="coin"
               onPress={press}
               short={`need ${fmt(price - st.gold)} more`}

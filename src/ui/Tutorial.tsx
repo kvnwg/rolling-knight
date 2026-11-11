@@ -16,7 +16,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import { canRebirth } from '../core/newGame';
 import { canLevel, extrasCount } from '../core/roster';
-import { combatTiers } from '../core/combatRoll';
+import { combatGift, combatTiers } from '../core/combatRoll';
 import { newTutRun, skipTutorial, tutorialDid, tutorialProgress, tutorialView, TUT_STEPS, type TutAction, type TutCtx, type TutTarget, type TutView, type TutWhere } from '../core/tutorial';
 import type { Game } from '../game';
 import type { Controls } from '../input/input';
@@ -364,6 +364,11 @@ function layout(o: LayoutIn): Placed {
   const mid = ax - sw / 2;
   const leanL = anchor.r + lean - sw;
   const leanR = anchor.l - lean;
+  // (A glove at the side of a big target: past its ring, over or under it, when beside the glove
+  // would cover it, as a wide slip on a phone does.)
+  const ring = kind === 'hand' ? grow(t, RING_OUT * u) : t;
+  const overRing = box(cx - sw / 2, ring.t - gs - sh, sw, sh);
+  const underRing = box(cx - sw / 2, ring.b + gs, sw, sh);
   const sides: Array<[string, Rect]> = !ptr
     ? [
         ['a', above(mid)],
@@ -394,14 +399,18 @@ function layout(o: LayoutIn): Placed {
               ['l', toLeft],
               ['a', above(anchor.r - sw)],
               ['b', below(anchor.r - sw)],
+              ['A', overRing],
+              ['B', underRing],
             ]
           : [
               ['r', toRight],
               ['a', above(anchor.l)],
               ['b', below(anchor.l)],
+              ['A', overRing],
+              ['B', underRing],
             ];
   // What the slip keeps off: the HUD, your knight, the target (and its ring), the pointer's sweep.
-  const keepOff = [...o.clear, ...o.slipClear, kind === 'hand' ? grow(t, RING_OUT * u) : t, ...(ptr ? [swept(ptr.box, ptr.dir)] : [])];
+  const keepOff = [...o.clear, ...o.slipClear, ring, ...(ptr ? [swept(ptr.box, ptr.dir)] : [])];
   const clamp = (a: Rect): Rect => {
     const dx = Math.max(screen.l - a.l, Math.min(0, screen.r - a.r));
     const dy = Math.max(screen.t - a.t, Math.min(0, screen.b - a.b));
@@ -631,6 +640,7 @@ export function Tutorial(props: TutorialProps) {
         nearTinker: !game.inDungeon && game.hub?.nearStation()?.id === 'upgrades',
         treeShown: where === 'tinker' && !!document.querySelector('[data-tut="tree"]'),
         combatShown: where === 'tinker' && !!document.querySelector('[data-keeper="upgrades"] [data-tut="combatRoll"]'),
+        combatGift: combatGift(st),
       };
       const v = game.bot ? null : tutorialView(t, run.current, ctx, now);
       const key = v?.key ?? null;

@@ -54,6 +54,7 @@ function at(where: TutCtx['where'], o: Partial<TutCtx> = {}): TutCtx {
     nearTinker: false,
     treeShown: false,
     combatShown: false,
+    combatGift: false,
     ...o,
   };
 }
@@ -218,6 +219,18 @@ describe('the tutorial: one step at a time', () => {
     expect(g.wait(at('tinker', { combatShown: true }), COMBAT_READ + 0.5)).toBeNull();
     expect(currentStep(g.t)).toBeNull();
     expect([...g.t.done].sort()).toEqual([...TUT_STEPS].sort());
+  });
+
+  it('with the first combat roll still free, asks for it and waits for the roll', () => {
+    const g = play();
+    g.t.done = TUT_STEPS.filter((s) => s !== 'combat');
+    const free = at('tinker', { combatShown: true, combatGift: true });
+    expect(g.key(free)).toBe('combat:free');
+    expect(g.wait(free, COMBAT_READ * 4)).toBe('combat:free');
+    expect(currentStep(g.t)).toBe('combat');
+    g.did('combatRolled');
+    expect(currentStep(g.t)).toBeNull();
+    expect(g.key(at('tinker', { combatShown: true }))).toBeNull();
   });
 
   it('says how far along it is', () => {

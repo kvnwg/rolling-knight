@@ -154,11 +154,13 @@ export type RollButtonState = 'ready' | 'short' | 'spinning' | 'done' | 'locked'
  * head and floats how much is missing). SKIP while the reel spins; grey with a word when it can't
  * roll at all.
  */
-export function RollButton({ state, price, icon, onPress, short, doneText, lockedText, tut }: {
+export function RollButton({ state, price, free, icon, onPress, short, doneText, lockedText, tut }: {
   /** A name the tutorial's pointer finds it by (data-tut). */
   tut?: string;
   state: RollButtonState;
   price: string;
+  /** This roll costs nothing: ROLL FREE, no price. */
+  free?: boolean;
   icon: IconName;
   onPress: () => void;
   /** Floats up, in red, on a press when short ("need 340 more"). */
@@ -192,8 +194,14 @@ export function RollButton({ state, price, icon, onPress, short, doneText, locke
         ) : (
           <>
             <span className={s.verb}>ROLL</span>
-            <Px icon={icon} size="sm" />
-            <span>{price}</span>
+            {free ? (
+              <span data-free>FREE</span>
+            ) : (
+              <>
+                <Px icon={icon} size="sm" />
+                <span>{price}</span>
+              </>
+            )}
           </>
         )}
       </button>

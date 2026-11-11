@@ -180,6 +180,8 @@ export interface GameState {
   seen: {
     tutorialHints: string[];
     perksIntro: boolean;
+    /** The first combat roll, on the house, has been rolled (core/combatRoll.ts). */
+    combatGift: boolean;
     /** The first-boot tutorial (core/tutorial.ts): its steps done, its tips shown, or skipped. */
     tutorial: TutorialSave;
   };

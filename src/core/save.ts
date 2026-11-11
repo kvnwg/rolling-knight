@@ -2,6 +2,7 @@
  * Saves live in localStorage as JSON. A save that fails to load is kept under a rescue key instead
  * of being thrown away, and anything missing from an older save is filled in from a new game.
  */
+import { combatTiers } from './combatRoll';
 import { cleanDeck, isDesign, shuffleDeck } from './deck';
 import { newGame } from './newGame';
 import { Rng } from './rng';
@@ -65,6 +66,8 @@ export function mend(raw: unknown): GameState {
   // Upgrade tiers within each line's range (the map was rebuilt: some lines have fewer tiers now).
   // Combat lines hang off nothing now (they're rolled), so every combat tier a save has stays.
   sanitizeUpgrades(out);
+  // The free first combat roll: a save from before it that has rolled already doesn't get one.
+  if (typeof (s.seen as { combatGift?: unknown } | undefined)?.combatGift !== 'boolean') out.seen.combatGift = combatTiers(out) > 0;
   sanitizeSquad(out);
   mendPerks(out);
   cashInSpares(out);

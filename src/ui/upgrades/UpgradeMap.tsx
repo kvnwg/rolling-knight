@@ -388,11 +388,25 @@ export function UpgradeMap({ game, onClose, closeText = 'CLOSE', onCombat, onCar
   /** The map needs drawing (a pan, a zoom, a change), or is animating (the ripple, a flash). */
   const mapDirty = useRef(true);
   const mapMoving = useRef(false);
+  /** The tutorial's pointer: over the selected hex (the one the card is for), wherever the map is. */
+  const tutRef = useRef<HTMLElement>(null);
+  const placeTut = () => {
+    const el = tutRef.current;
+    const n = HEX_BY_KEY.get(drawRef.current.sel) ?? HEX_BY_KEY.get(ROOT_KEY);
+    if (!el || !n) return;
+    const v = viewRef.current;
+    const k = scaleRef.current;
+    el.style.left = `${(v.x + nodeX(n) * v.k) * k}px`;
+    el.style.top = `${(v.y + nodeY(n) * v.k) * k}px`;
+    el.style.width = `${2 * R * v.k * k}px`;
+    el.style.height = `${2 * HH * v.k * k}px`;
+  };
   const loop = (now: number) => {
     frame.current = 0;
     const c = canvasRef.current;
     const vp = viewportRef.current;
     if (!c || !vp || !vp.clientWidth) return;
+    placeTut();
     const k = scaleRef.current;
     const sx = (c.width / vp.clientWidth) * k;
     if (mapDirty.current || mapMoving.current) {
@@ -764,8 +778,8 @@ export function UpgradeMap({ game, onClose, closeText = 'CLOSE', onCombat, onCar
     <div className={s.overlay} ref={overlayRef} data-wide={wide || undefined} data-calm={calm || undefined}>
       <div className={s.viewport} ref={viewportRef}>
         <div className={s.grid} ref={gridRef} style={{ backgroundImage: GRID_URL }} aria-hidden />
-        {/* (The tutorial's pointer: the middle of the tree.) */}
-        <i data-tut="tree" aria-hidden style={{ position: 'absolute', left: '50%', top: '46%', width: 'calc(44 * var(--px))', height: 'calc(44 * var(--px))', transform: 'translate(-50%, -50%)', pointerEvents: 'none' }} />
+        {/* (The tutorial's pointer: the selected hex, placed as the map draws.) */}
+        <i ref={tutRef} data-tut="tree" aria-hidden style={{ position: 'absolute', left: '50%', top: '46%', width: 'calc(44 * var(--px))', height: 'calc(44 * var(--px))', transform: 'translate(-50%, -50%)', pointerEvents: 'none' }} />
       </div>
       <canvas ref={canvasRef} className={s.canvas} aria-hidden />
 

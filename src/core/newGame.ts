@@ -45,7 +45,7 @@ export function newGame(seed = Date.now()): GameState {
     stats: { killsThisRun: 0, goldPerMinute: 0, goldWindow: [] },
     settings: { sfx: 0.7, music: 0.5, autoPlay: false, reduceMotion: false, showDamage: true, tiltShift: true },
     // A new game walks you through it (core/tutorial.ts).
-    seen: { tutorialHints: [], perksIntro: false, tutorial: freshTutorial() },
+    seen: { tutorialHints: [], perksIntro: false, combatGift: false, tutorial: freshTutorial() },
     quests: [],
   };
 }

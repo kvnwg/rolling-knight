@@ -15,6 +15,9 @@
  *
  * Variance. One roll in ten is a DOUBLE: the line gains two tiers (when it has two to go). One in
  * twenty is FREE: the gold comes back.
+ *
+ * The first roll is on the house (once a save, rebirths or not): the tutorial asks for it before a
+ * new player has the gold.
  */
 import { priceScale } from './economy';
 import { pickWeighted, tidyPrice, type RollRarity } from './rolls';
@@ -94,16 +97,26 @@ export function combatPoolOpen(state: Pick<GameState, 'upgrades'>): boolean {
   return combatTiers(state) < COMBAT_TIERS_MAX;
 }
 
-export function canRollCombat(state: Pick<GameState, 'upgrades' | 'gold'>): boolean {
-  return combatPoolOpen(state) && state.gold >= combatRollPrice(state);
+/** The first roll is still to come, and free (a state without `seen`, as in tests, has none). */
+export function combatGift(state: Partial<Pick<GameState, 'seen'>>): boolean {
+  return !!state.seen && !state.seen.combatGift;
+}
+
+export function canRollCombat(state: Pick<GameState, 'upgrades' | 'gold'> & Partial<Pick<GameState, 'seen'>>): boolean {
+  return combatPoolOpen(state) && (combatGift(state) || state.gold >= combatRollPrice(state));
 }
 
 /** How many rolls the gold covers in a row (each one dearer than the last), up to `cap`. */
-export function combatRollsAffordable(state: Pick<GameState, 'upgrades' | 'gold'> & Partial<Pick<GameState, 'rebirths'>>, cap = 99): number {
+export function combatRollsAffordable(state: Pick<GameState, 'upgrades' | 'gold'> & Partial<Pick<GameState, 'rebirths' | 'seen'>>, cap = 99): number {
   let gold = state.gold;
   let owned = combatTiers(state);
   let n = 0;
   const scale = priceScale(state);
+  // (The free first roll costs nothing, and the next is priced as if it gave one tier.)
+  if (cap > 0 && owned < COMBAT_TIERS_MAX && combatGift(state)) {
+    owned++;
+    n++;
+  }
   while (n < cap && owned < COMBAT_TIERS_MAX) {
     const price = combatRollPriceAt(owned, scale);
     if (gold < price) break;
@@ -127,7 +140,9 @@ export interface CombatRoll {
   double: boolean;
   /** The gold came back. */
   free: boolean;
-  /** The roll's price, and the gold it took (0 when free). */
+  /** The first roll, on the house: it never cost anything. */
+  gift: boolean;
+  /** The roll's price, and the gold it took (0 when free or a gift). */
   price: number;
   paid: number;
 }
@@ -135,10 +150,12 @@ export interface CombatRoll {
 /**
  * Rolls: pays, picks a line by weight and gives it a tier (two on a double). `rand` gives uniform
  * numbers in [0, 1); a roll always takes three (the pick, the double, the free roll). Null, and
- * nothing paid, when every line is maxed or the gold is short.
+ * nothing paid, when every line is maxed or the gold is short. The first roll (combatGift) takes no
+ * gold, and isn't FREE as well (nothing to give back).
  */
-export function rollCombat(state: Pick<GameState, 'upgrades' | 'gold'>, rand: () => number): CombatRoll | null {
+export function rollCombat(state: Pick<GameState, 'upgrades' | 'gold'> & Partial<Pick<GameState, 'seen'>>, rand: () => number): CombatRoll | null {
   if (!canRollCombat(state)) return null;
+  const gift = combatGift(state);
   const price = combatRollPrice(state);
   const odds = combatOdds(state);
   const u = rand();
@@ -149,8 +166,9 @@ export function rollCombat(state: Pick<GameState, 'upgrades' | 'gold'>, rand: ()
   const from = pick.tier;
   const double = dbl && pick.def.max - from >= 2;
   const to = from + (double ? 2 : 1);
-  const paid = free ? 0 : price;
+  const paid = free || gift ? 0 : price;
   state.gold -= paid;
   state.upgrades[pick.def.id] = to;
-  return { id: pick.def.id, from, to, chance: pick.chance, rarity: tierRarity(pick.def, from + 1), double, free, price, paid };
+  if (gift) state.seen!.combatGift = true;
+  return { id: pick.def.id, from, to, chance: pick.chance, rarity: tierRarity(pick.def, from + 1), double, free: free && !gift, gift, price, paid };
 }

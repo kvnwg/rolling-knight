@@ -132,6 +132,8 @@ export interface TutCtx {
   treeShown: boolean;
   /** At Tinker Pell's counter: his COMBAT tab is open. */
   combatShown: boolean;
+  /** The first combat roll is still to come, and free (core/combatRoll.ts). */
+  combatGift: boolean;
 }
 
 /** What a line points at: a part of the screen, or a spot in the world. */
@@ -318,6 +320,7 @@ function settled(step: TutStepId, ctx: TutCtx, run: TutRun, now: number): boolea
     case 'tree':
       return run.key === 'tree:map' && now - run.since >= TREE_READ;
     case 'combat':
+      // (The free first roll's line waits for the roll: there's no gold to be short of.)
       return run.key === 'combat:roll' && now - run.since >= COMBAT_READ;
     default:
       return false;
@@ -377,6 +380,7 @@ function stepView(step: TutStepId, ctx: TutCtx, run: TutRun): TutView | null {
       return line(ctx.nearTinker ? 'tree:talk' : 'tree:walk', 'Now see [Tinker Pell] for upgrades.', ctx.nearTinker ? ui('talk') : world('tinker'));
     case 'combat':
       if (where === 'tinker') {
+        if (ctx.combatShown && ctx.combatGift) return line('combat:free', 'Your first [combat roll] is free. Roll it!', ui('combatRoll'));
         if (ctx.combatShown) return line('combat:roll', '[Combat upgrades]: roll for stronger knights.', ui('combatRoll'));
         return line('combat:open', touch ? 'Now tap [COMBAT].' : 'Now click [COMBAT].', ui('combatBtn'));
       }

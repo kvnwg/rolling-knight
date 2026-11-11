@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  COMBAT_LINES, COMBAT_ROLL, COMBAT_TIERS_MAX, canRollCombat, combatOdds, combatPoolOpen, combatRollPrice, combatRollPriceAt, combatRollsAffordable, combatTiers, lineWeight, rollCombat, tierRarity,
+  COMBAT_LINES, COMBAT_ROLL, COMBAT_TIERS_MAX, canRollCombat, combatGift, combatOdds, combatPoolOpen, combatRollPrice, combatRollPriceAt, combatRollsAffordable, combatTiers, lineWeight, rollCombat, tierRarity,
 } from '../src/core/combatRoll';
 import { CLASSES, knightId } from '../src/core/knights';
 import { newGame } from '../src/core/newGame';
@@ -17,6 +17,8 @@ import { ATTACK_SPEED, UPGRADES_BY_ID, tier, upgradeFx, type UpgradeId } from '.
 function game(ups: Partial<Record<UpgradeId, number>> = {}, gold = 0): GameState {
   const s = newGame(1);
   s.roll.tutorial = 'done';
+  // (The free first roll is had: the price is what these are about. Its own tests take it back.)
+  s.seen.combatGift = true;
   s.gold = gold;
   Object.assign(s.upgrades, ups);
   return s;
@@ -218,6 +220,50 @@ describe('the combat roll: rolling', () => {
     expect([r.id, r.free, r.paid, r.price]).toEqual(['pratfall', true, 0, 150]);
     expect(s.gold).toBe(500);
     expect(tier(s, 'pratfall')).toBe(1);
+  });
+
+  it('gives the first roll free, once a save: no gold needed, none taken, and a rebirth keeps it had', () => {
+    const s = game({}, 40);
+    s.seen.combatGift = false;
+    expect(combatGift(s)).toBe(true);
+    expect(canRollCombat(s)).toBe(true);
+    expect(combatRollsAffordable(s)).toBe(1);
+    // (It draws its three numbers like any roll, and a lucky FREE on top gives nothing more back.)
+    const r = seq([uFor(s, 'atkSpeed'), 0.5, 0]);
+    const roll = rollCombat(s, r.rand)!;
+    expect(roll).toMatchObject({ id: 'atkSpeed', to: 1, gift: true, free: false, paid: 0, price: 150 });
+    expect(r.drawn()).toBe(3);
+    expect(s.gold).toBe(40);
+    expect(s.seen.combatGift).toBe(true);
+    // The next one is priced as ever, and short of gold.
+    expect(combatGift(s)).toBe(false);
+    expect(canRollCombat(s)).toBe(false);
+    expect(rollCombat(s, () => 0.5)).toBeNull();
+    // A rebirth takes the upgrades, not the gift that was had.
+    s.upgrades = {};
+    expect(combatGift(s)).toBe(false);
+  });
+
+  it('counts the free first roll among the rolls the gold covers, the next priced after it', () => {
+    const s = game({}, combatRollPriceAt(1));
+    s.seen.combatGift = false;
+    expect(combatRollsAffordable(s)).toBe(2);
+    s.gold = combatRollPriceAt(1) - 1;
+    expect(combatRollsAffordable(s)).toBe(1);
+    expect(combatRollsAffordable(s, 0)).toBe(0);
+  });
+
+  it("an old save that has rolled doesn't get the free roll; one that hasn't does", () => {
+    const rolled = JSON.parse(JSON.stringify(game({ might: 2 }, 0)));
+    delete rolled.seen.combatGift;
+    expect(mend(rolled).seen.combatGift).toBe(true);
+    const fresh = JSON.parse(JSON.stringify(game({}, 0)));
+    delete fresh.seen.combatGift;
+    expect(combatGift(mend(fresh))).toBe(true);
+    // A save that says either way keeps it.
+    const kept = JSON.parse(JSON.stringify(game({ might: 2 }, 0)));
+    kept.seen.combatGift = false;
+    expect(mend(kept).seen.combatGift).toBe(false);
   });
 
   it("can't roll short of gold: nothing paid, nothing given", () => {
