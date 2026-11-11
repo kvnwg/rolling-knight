@@ -42,10 +42,7 @@
 }
 
 /* ------------------------------------------------------------ the chains */
-/* Each length of chain is the altar's size, its links drawn where they lie; a shadow under it. */
-.chain {
-  filter: drop-shadow(var(--px) calc(2 * var(--px)) 0 rgba(8, 4, 18, 0.45));
-}
+/* Each length of chain is the altar's size, its links drawn where they lie (and its shadow). */
 /* The tap rattles them: across up and down, down side to side. */
 .seal[data-phase='hit'] .chain[data-run='x'] {
   animation: rattleX 0.17s both;

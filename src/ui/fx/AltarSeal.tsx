@@ -23,7 +23,8 @@ import s from './altarSeal.module.css';
 type Phase = 'idle' | 'hit' | 'open' | 'fall';
 const PIECES = ['lock', 'top', 'bottom', 'left', 'right'] as const;
 type Piece = (typeof PIECES)[number];
-const CHAINS = ['bottom', 'top', 'left', 'right'] as const;
+/** The lengths of chain, bottom of the stack first: the chain down lies over the one across. */
+const CHAINS = ['left', 'right', 'bottom', 'top'] as const;
 
 /**
  * Launch velocities and start delays of the fall: Dumpster Legend's, in its stage pixels (6 to an art

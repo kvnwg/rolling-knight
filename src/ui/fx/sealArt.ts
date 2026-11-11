@@ -325,14 +325,21 @@ function glowPx(w: number, h: number, strength: number): Px {
   return px;
 }
 
-/** The ring of light going out as it breaks: frames of a ring, each wider, thinner and dimmer. */
+/**
+ * The ring of light going out from behind the lock as it breaks (round glowMid): frames of a ring, each
+ * wider, thinner and dimmer; none of it in the sprung shackle's opening (it would show through).
+ */
 function ringFrames(k: LockSpec): Px {
   const n = ringSize(k);
   const c = (n - 1) / 2;
   const strip = grid(n * k.ring.length, n);
+  const inner = k.R - k.hw - 0.5;
+  const mid = glowMid(k);
+  const inOpening = (x: number, y: number) => Math.abs(x - c) <= inner && y - c >= -(mid + k.lift) && y - c < -(mid - k.bodyTop);
   k.ring.forEach((R, f) => {
     for (let y = 0; y < n; y++) {
       for (let x = 0; x < n; x++) {
+        if (inOpening(x, y)) continue;
         const d = Math.hypot(x - c, y - c);
         if (d > R - 0.5 && d <= R + 0.5) strip[y][f * n + x] = f < 2 ? VIOLET[4] : VIOLET[3];
         else if (d > R - 1.5 && d <= R - 0.5 && f < 3) strip[y][f * n + x] = VIOLET[2];
@@ -342,6 +349,8 @@ function ringFrames(k: LockSpec): Px {
   return strip;
 }
 const ringSize = (k: LockSpec) => 2 * k.ring[k.ring.length - 1] + 3;
+/** How far down from the lock's top the glow and the ring of light are centred (on its body). */
+const glowMid = (k: LockSpec) => k.bodyTop + Math.floor((k.h - k.bodyTop) / 3);
 
 // ------------------------------------------------------------------ where it all goes
 
@@ -386,7 +395,7 @@ export function sealLayout(W: number, H: number, win: Rect | null): SealLayout {
   const my = w.y + Math.floor(w.h / 2);
   const lockX = mx - mid;
   const lockY = my - Math.floor(k.h / 2);
-  return { W, H, size, cx: mx, cy: lockY + k.cross, lockX, lockY, lockW: k.w, lockH: k.h, kx: mx, ky: lockY + k.key, gx: mx, gy: lockY + k.bodyTop + Math.floor((k.h - k.bodyTop) / 3) };
+  return { W, H, size, cx: mx, cy: lockY + k.cross, lockX, lockY, lockW: k.w, lockH: k.h, kx: mx, ky: lockY + k.key, gx: mx, gy: lockY + glowMid(k) };
 }
 
 interface Link {
@@ -409,23 +418,29 @@ function acrossLinks(L: SealLayout): { left: Link[]; right: Link[] } {
   const n = Math.ceil(half / (PITCH / 2)) + 2;
   for (let k = 0; k <= n; k++) {
     const dx = (k * PITCH) / 2;
-    const face = k % 2 === 0;
+    const face = (k % 2 === 0) === AT_CROSSING.acrossFace;
     left.push({ x: L.cx - dx, y: yAt(dx), face });
     if (k > 0) right.push({ x: L.cx + dx, y: yAt(dx), face });
   }
   return { left, right };
 }
 
-/** The chain down: straight, through the crossing (an edge-on link there, seen through the ring across). */
+/** The chain down: straight, through the crossing. */
 function downLinks(L: SealLayout): { top: Link[]; bottom: Link[] } {
   const top: Link[] = [];
   const bottom: Link[] = [];
   const nUp = Math.ceil(L.cy / (PITCH / 2)) + 2;
   const nDown = Math.ceil((L.H - L.cy) / (PITCH / 2)) + 2;
-  for (let k = 0; k <= nUp; k++) top.push({ x: L.cx, y: L.cy - (k * PITCH) / 2, face: k % 2 === 1 });
-  for (let k = 1; k <= nDown; k++) bottom.push({ x: L.cx, y: L.cy + (k * PITCH) / 2, face: k % 2 === 1 });
+  const face = (k: number) => (k % 2 === 0) === AT_CROSSING.downFace;
+  for (let k = 0; k <= nUp; k++) top.push({ x: L.cx, y: L.cy - (k * PITCH) / 2, face: face(k) });
+  for (let k = 1; k <= nDown; k++) bottom.push({ x: L.cx, y: L.cy + (k * PITCH) / 2, face: face(k) });
   return { top, bottom };
 }
+/**
+ * Which way each chain's link at the crossing lies: both edge-on, so inside the shackle the chain down
+ * runs plainly through it, over the one across (AltarSeal stacks them so).
+ */
+const AT_CROSSING = { acrossFace: false, downFace: false } as const;
 
 /**
  * A run of links drawn into a W x H picture: the face-on ones first, the edge-on ones over them (each
@@ -465,8 +480,13 @@ function drawChain(L: SealLayout, links: Link[], down: boolean): { px: Px; glint
   };
   for (const k of links) if (k.face) put(k);
   for (const k of links) if (!k.face) put(k);
+  // Its shadow on the altar (and on the other chain, under it), a pixel right and two down.
+  for (let y = L.H - 1; y >= 2; y--) {
+    for (let x = L.W - 1; x >= 1; x--) if (!px[y][x] && px[y - 2][x - 1] && px[y - 2][x - 1] !== SHADOW) px[y][x] = SHADOW;
+  }
   return { px, glint };
 }
+const SHADOW = '#08041273';
 
 /** Both chains: across in its two lengths, down in its two, and the glints along each. */
 function drawChains(L: SealLayout) {

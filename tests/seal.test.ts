@@ -79,9 +79,8 @@ describe("the seal's pixel art", () => {
         expect(piece.length).toBe(L.H);
         expect(piece[0].length).toBe(L.W);
       }
-      // (At the crossing: the ring across, its top wire over the hole; the link down, a side by its slit.)
-      expect(P.left[L.cy - 4][L.cx]).not.toBeNull();
-      expect(P.left[L.cy][L.cx]).toBeNull();
+      // (At the crossing: an edge-on link of each, a side of it either side of its slit.)
+      expect(P.left[L.cy - 2][L.cx]).not.toBeNull();
       expect(P.top[L.cy][L.cx - 2]).not.toBeNull();
       // They run the altar's width and height.
       expect(P.left[L.cy].slice(0, 4).some(Boolean) || P.left.some((row) => row[0])).toBe(true);
