@@ -295,7 +295,7 @@ export function OddsTable({ game }: { game: Game }) {
       </p>
       <div className="glass" style={{ padding: 'calc(2 * var(--px)) calc(3 * var(--px))' }}>
         {[...RARITIES].reverse().map((r) => (
-          <div key={r} className="spread outlined num" style={{ fontSize: 'calc(4.2 * var(--px))', padding: 'calc(0.5 * var(--px)) 0' }}>
+          <div key={r} className="spread outlined num" style={{ fontSize: 'max(var(--fmin, 0px), calc(4.2 * var(--fpx, var(--px))))', padding: 'calc(0.5 * var(--px)) 0' }}>
             <span style={{ color: RARITY_COLOR[r], minWidth: 'calc(30 * var(--px))' }}>{RARITY_NAME[r]}</span>
             <span className="t-muted">{r === 'common' ? '—' : oneIn(RARITY_ODDS[r])}</span>
             <span style={{ minWidth: 'calc(30 * var(--px))', textAlign: 'right' }}>

@@ -16,7 +16,7 @@
   animation: out 0.38s steps(5) both;
 }
 .cap {
-  font-size: calc(5 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(5 * var(--fpx, var(--px))));
   font-weight: 800;
   letter-spacing: 0.14em;
   color: #ffe9b8;
@@ -66,7 +66,7 @@
   box-shadow: 0 0 0 var(--px) #fff7b0, 0 0 calc(4 * var(--px)) rgba(255, 216, 74, 0.8);
 }
 .sub {
-  font-size: calc(5.5 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(5.5 * var(--fpx, var(--px))));
   font-weight: 700;
   padding: calc(1 * var(--px)) calc(4 * var(--px));
   color: var(--text);

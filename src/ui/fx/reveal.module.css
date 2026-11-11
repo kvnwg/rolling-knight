@@ -287,13 +287,13 @@
 }
 .odds i {
   font-style: normal;
-  font-size: calc(8 * var(--u));
+  font-size: max(var(--fmin, 0px), calc(8 * var(--u)));
 }
 .odds b {
   display: inline-block;
   min-width: 2.2ch;
   font-weight: 400;
-  font-size: calc(17 * var(--u));
+  font-size: max(var(--fmin, 0px), calc(17 * var(--u)));
   line-height: 1;
 }
 .odds[data-show] {
@@ -359,7 +359,7 @@
   max-width: 92vw;
 }
 .name {
-  font-size: calc(10 * var(--u));
+  font-size: max(var(--fmin, 0px), calc(10 * var(--u)));
   line-height: 1.1;
   color: #fff;
   -webkit-text-stroke: calc(1.6 * var(--u)) var(--ink);
@@ -367,7 +367,7 @@
   text-shadow: 0 var(--u) 0 var(--ink);
 }
 .sub {
-  font-size: calc(6 * var(--u));
+  font-size: max(var(--fmin, 0px), calc(6 * var(--u)));
   line-height: 1.2;
   color: var(--cream);
   -webkit-text-stroke: var(--u) var(--ink);
@@ -402,7 +402,7 @@
   height: calc(9 * var(--u));
   padding: 0 calc(3 * var(--u));
   box-shadow: var(--edge);
-  font-size: calc(6 * var(--u));
+  font-size: max(var(--fmin, 0px), calc(6 * var(--u)));
   line-height: calc(9 * var(--u));
   color: #fff;
   white-space: nowrap;
@@ -427,13 +427,13 @@
   background: #6a5a8e;
 }
 .hyperSub {
-  font-size: calc(7 * var(--u));
+  font-size: max(var(--fmin, 0px), calc(7 * var(--u)));
   color: #fff3b0;
   -webkit-text-stroke: var(--u) var(--ink);
   paint-order: stroke fill;
 }
 .note {
-  font-size: calc(5 * var(--u));
+  font-size: max(var(--fmin, 0px), calc(5 * var(--u)));
   color: #d8dcf5;
 }
 .rare[data-calm] .card * {
@@ -470,7 +470,7 @@
   left: 0;
   right: 0;
   bottom: calc(8 * var(--u) + env(safe-area-inset-bottom, 0px));
-  font-size: calc(5 * var(--u));
+  font-size: max(var(--fmin, 0px), calc(5 * var(--u)));
   color: rgba(255, 255, 255, 0.65);
   text-align: center;
   pointer-events: none;
@@ -588,7 +588,7 @@
   display: flex;
   white-space: pre;
   font-weight: 700;
-  font-size: calc(9 * var(--u));
+  font-size: max(var(--fmin, 0px), calc(9 * var(--u)));
   line-height: calc(12 * var(--u));
   color: #ff3b3b;
   -webkit-text-stroke: calc(1.4 * var(--u)) var(--ink);

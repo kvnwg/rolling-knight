@@ -146,7 +146,11 @@ recording: [`docs/SOUNDS.md`](docs/SOUNDS.md).
   pixel text. Each counter says in a line what it's for, every number says what it is ("Luck x1.20",
   "Shards 4/10"), every button says what it does ("LEVEL UP 1.2K", "ADD TO SQUAD"), and an offer's
   whole story is a tap away. On a phone the text is bigger (about 130 art pixels across the screen
-  for the UI) and the categories run across the top so the cards get two columns. Each keeper's scene across the top is
+  for the UI) and the categories run across the top so the cards get two columns. Words have a pixel
+  of their own (`--fpx`, a quarter over the art's on the smallest screens) and are never drawn under
+  11 CSS px (`--fmin`), so every line reads at a device pixel ratio of 1 in a small 16:9 window; on a
+  short landscape screen the HUD keeps whole device pixels and leaves about 220 art pixels of play
+  down the middle (`src/ui/App.tsx`). Each keeper's scene across the top is
   painted and lit in code (`src/render/art/keepers/`: the keeper's bust from their hub look, their
   trade round them, lamps, candles, coals and glowing glass in stepped pools of warm light), at a
   whole number of screen pixels per art pixel; `keepers-preview.html` shows them all.

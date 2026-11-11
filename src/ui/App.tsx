@@ -67,6 +67,21 @@ function uiPx(): number {
   return Math.max(2, Math.min(4, Math.round(raw * 2) / 2));
 }
 
+/**
+ * The words' own pixel (--fpx): text is sized in it, the art in --px. On a small screen (the UI's
+ * pixel at its least, 2 CSS px) the words come up a quarter over the art, so a line of Pixelify Sans
+ * stays readable at a device pixel ratio of 1; from 2.5 up they're the same.
+ */
+function fontPx(px: number): number {
+  return Math.max(px, 2.5);
+}
+
+/** The smallest any word is drawn (CSS px; --fmin): Pixelify Sans's own pixels come out about a screen pixel each. */
+const FONT_MIN = 11;
+
+/** Art pixels down a short landscape screen that the HUD's pixel leaves room for (the play area between its corners). */
+const HUD_ROWS = 220;
+
 /** After the context is back: how long the rebuild waits for the sprites to be given back too (ms). */
 const HEAL_WAIT_MS = 2500;
 /** How long a lost context is waited for before the canvas is swapped for a new one (ms). */
@@ -165,6 +180,9 @@ export function App() {
   useEffect(() => {
     const set = () => {
       document.documentElement.style.setProperty('--px', `${uiPx()}px`);
+      // The words' pixel, and the least any of them is drawn at.
+      document.documentElement.style.setProperty('--fpx', `${fontPx(uiPx())}px`);
+      document.documentElement.style.setProperty('--fmin', `${FONT_MIN}px`);
       // The reveal and reel effects measure in --u (the same art pixel).
       document.documentElement.style.setProperty('--u', `${uiPx()}px`);
       // The corner altar: smaller on a narrow screen, where it would cover the view; much bigger on a
@@ -178,12 +196,20 @@ export function App() {
       // pixel of padding each side), whatever its reel count, the two on one line down the right side;
       // on a phone it keeps its own small size.
       document.documentElement.style.setProperty('--mini-w', desk ? `${44 * uiPx()}px` : '0px');
-      // The dungeon HUD on a phone: about 70% of the UI's pixel (less on a short screen), in whole
-      // device pixels; its text comes down less, never under about 10 px.
-      const phone = Math.min(window.innerWidth, window.innerHeight) < 600;
-      const k = window.innerHeight < 680 ? 0.62 : 0.7;
-      const hudPx = phone ? Math.max(1.5, Math.round(uiPx() * k * dpr) / dpr) : uiPx();
-      const hudFpx = phone ? Math.max(hudPx, Math.round(uiPx() * 0.82 * dpr) / dpr) : uiPx();
+      // The HUD (the hub's and the dungeon's) on a phone held upright: about 70% of the UI's pixel
+      // (less on a short screen), in whole device pixels; its text comes down less (and never under
+      // --fmin). Anywhere else (a desktop, a phone on its side, a small browser window) the HUD keeps
+      // the UI's pixel unless that would leave fewer than HUD_ROWS art pixels down the screen (then
+      // as many whole device pixels as fit, 1.5 CSS px at the least); its words keep their own pixel.
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const phone = Math.min(vw, vh) < 600;
+      const upright = phone && vw < vh;
+      const k = vh < 680 ? 0.62 : 0.7;
+      const hudPx = upright
+        ? Math.max(1.5, Math.round(uiPx() * k * dpr) / dpr)
+        : Math.max(1.5, Math.min(uiPx(), Math.floor((vh / HUD_ROWS) * dpr) / dpr));
+      const hudFpx = upright ? Math.max(hudPx, Math.round(uiPx() * 0.82 * dpr) / dpr) : fontPx(hudPx);
       document.documentElement.style.setProperty('--hud-px', `${hudPx}px`);
       document.documentElement.style.setProperty('--hud-fpx', `${hudFpx}px`);
       setWide(window.innerWidth >= 900 && window.innerWidth > window.innerHeight);

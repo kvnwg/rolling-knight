@@ -75,7 +75,7 @@
   border: 0 solid transparent;
   border-image: var(--sk-pa-tab) 5 5 2 5 fill / calc(5 * var(--px)) calc(5 * var(--px)) calc(2 * var(--px)) calc(5 * var(--px)) stretch;
   image-rendering: pixelated;
-  font-size: calc(5 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(5 * var(--fpx, var(--px))));
   font-weight: 700;
   letter-spacing: 0.06em;
   color: #6a4a2e;
@@ -90,7 +90,7 @@
 .tab .badge {
   min-width: calc(6 * var(--px));
   padding: 0 calc(1 * var(--px));
-  font-size: calc(3.6 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(3.6 * var(--fpx, var(--px))));
   line-height: calc(6 * var(--px));
   text-align: center;
   color: #fff8e8;
@@ -166,14 +166,14 @@
   border: 0 solid transparent;
   border-image: var(--sk-pa-inset) 3 fill / calc(3 * var(--px)) stretch;
   image-rendering: pixelated;
-  font-size: calc(5.4 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(5.4 * var(--fpx, var(--px))));
   font-weight: 700;
   color: var(--dark);
   font-variant-numeric: tabular-nums;
 }
 .purse small,
 .chip small {
-  font-size: 0.86em;
+  font-size: max(var(--fmin, 0px), 0.86em);
   font-weight: 700;
   color: var(--mid);
   letter-spacing: 0.02em;
@@ -182,13 +182,13 @@
   flex: 1;
   min-width: 0;
   text-align: right;
-  font-size: calc(4 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(4 * var(--fpx, var(--px))));
   line-height: 1.2;
   color: var(--mid);
 }
 .title b {
   display: block;
-  font-size: calc(5 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(5 * var(--fpx, var(--px))));
   color: var(--dark);
   letter-spacing: 0.06em;
 }
@@ -198,7 +198,7 @@
   flex: none;
   min-height: calc(11 * var(--px)) !important;
   padding: 0 calc(3 * var(--px)) calc(2 * var(--px)) !important;
-  font-size: calc(4.2 * var(--px)) !important;
+  font-size: max(var(--fmin, 0px), calc(4.2 * var(--fpx, var(--px)))) !important;
   color: var(--dark) !important;
   text-shadow: none !important;
   gap: calc(1 * var(--px)) !important;
@@ -236,7 +236,7 @@
   border: 0 solid transparent;
   border-image: var(--sk-btn-paper) 5 fill / calc(5 * var(--px)) stretch;
   image-rendering: pixelated;
-  font-size: calc(4.4 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
   font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--dark);
@@ -265,7 +265,7 @@
   min-width: calc(6 * var(--px));
   padding: 0 calc(1 * var(--px));
   font-style: normal;
-  font-size: calc(3.6 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(3.6 * var(--fpx, var(--px))));
   line-height: calc(6 * var(--px));
   text-align: center;
   color: #fff8e8;
@@ -295,7 +295,7 @@
   gap: calc(2 * var(--px));
   padding: calc(6 * var(--px)) calc(4 * var(--px));
   text-align: center;
-  font-size: calc(4.6 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(4.6 * var(--fpx, var(--px))));
   line-height: 1.4;
   color: var(--mid);
 }
@@ -306,7 +306,7 @@
   gap: calc(3 * var(--px));
   padding: calc(1 * var(--px)) calc(1 * var(--px)) 0;
   border-top: var(--px) dashed #c9ad80;
-  font-size: calc(4.4 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
   line-height: 1.25;
   color: var(--mid);
 }
@@ -343,12 +343,13 @@
 }
 .head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: calc(1 * var(--px));
   min-height: calc(6 * var(--px));
   padding: 0 calc(0.5 * var(--px));
-  font-size: calc(4.4 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
   font-weight: 700;
   line-height: 1;
   color: var(--dark);
@@ -359,12 +360,15 @@
   align-items: center;
 }
 .head small {
-  font-size: calc(4 * var(--px));
+  /* (On a narrow card its band drops under the level, still on the right.) */
+  margin-left: auto;
+  font-size: max(var(--fmin, 0px), calc(4 * var(--fpx, var(--px))));
   color: var(--mid);
   font-weight: 700;
 }
 .lv {
   display: inline-block;
+  white-space: nowrap;
 }
 .card[data-flash] .lv {
   animation: lvPop 0.5s steps(4);
@@ -420,7 +424,7 @@
   left: calc(1 * var(--px));
   top: calc(1 * var(--px));
   padding: 0 calc(1 * var(--px));
-  font-size: calc(3.8 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(3.8 * var(--fpx, var(--px))));
   line-height: calc(5.5 * var(--px));
   font-weight: 700;
   color: #fff8e8;
@@ -463,7 +467,7 @@
   justify-content: center;
   gap: calc(1 * var(--px));
   height: calc(7 * var(--px));
-  font-size: calc(3.8 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(3.8 * var(--fpx, var(--px))));
   font-weight: 700;
   letter-spacing: 0.12em;
   color: #f6e2b8;
@@ -476,7 +480,7 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  font-size: calc(4.8 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(4.8 * var(--fpx, var(--px))));
   font-weight: 700;
   line-height: 1.1;
   color: var(--dark);
@@ -493,7 +497,7 @@
   display: flex;
   align-items: flex-start;
   gap: calc(1 * var(--px));
-  font-size: calc(4.3 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(4.3 * var(--fpx, var(--px))));
   line-height: 1.2;
   color: var(--dark);
 }
@@ -524,7 +528,7 @@
   width: 100%;
   min-height: calc(13 * var(--px)) !important;
   padding: 0 calc(1.5 * var(--px)) calc(2.5 * var(--px)) !important;
-  font-size: calc(4.8 * var(--px)) !important;
+  font-size: max(var(--fmin, 0px), calc(4.8 * var(--fpx, var(--px)))) !important;
   flex-wrap: wrap;
   line-height: 1.1 !important;
   gap: calc(1 * var(--px)) !important;
@@ -545,7 +549,7 @@
   --skd: var(--sk-btn-ash);
   color: #f4ece0 !important;
   text-shadow: calc(0.5 * var(--px)) 0 0 #4a4238, calc(-0.5 * var(--px)) 0 0 #4a4238, 0 calc(0.5 * var(--px)) 0 #4a4238, 0 calc(-0.5 * var(--px)) 0 #4a4238 !important;
-  font-size: calc(4.4 * var(--px)) !important;
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px)))) !important;
   cursor: default;
 }
 .buy[data-kind='gold'] {
@@ -575,7 +579,7 @@
   width: 100%;
   min-height: calc(11 * var(--px)) !important;
   padding: 0 calc(1.5 * var(--px)) calc(2 * var(--px)) !important;
-  font-size: calc(4.2 * var(--px)) !important;
+  font-size: max(var(--fmin, 0px), calc(4.2 * var(--fpx, var(--px)))) !important;
   gap: calc(1 * var(--px)) !important;
   color: var(--dark) !important;
   text-shadow: none !important;
@@ -592,7 +596,7 @@
 .need {
   margin-top: calc(-0.5 * var(--px));
   text-align: center;
-  font-size: calc(4 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(4 * var(--fpx, var(--px))));
   line-height: 1.15;
   color: var(--bad);
 }
@@ -618,7 +622,7 @@
   transform: translateX(-50%);
   pointer-events: none;
   white-space: nowrap;
-  font-size: calc(4.6 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(4.6 * var(--fpx, var(--px))));
   font-weight: 700;
   color: #fff4c8;
   text-shadow: calc(0.5 * var(--px)) 0 0 #3a1c0a, calc(-0.5 * var(--px)) 0 0 #3a1c0a, 0 calc(0.5 * var(--px)) 0 #3a1c0a, 0 calc(-0.5 * var(--px)) 0 #3a1c0a, 0 var(--px) 0 #3a1c0a;
@@ -647,7 +651,7 @@
   flex: none;
   margin: 0 calc(1 * var(--px));
   padding: calc(1.5 * var(--px)) calc(2.5 * var(--px)) calc(1.5 * var(--px)) calc(3 * var(--px));
-  font-size: calc(4.4 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
   line-height: 1.3;
   color: var(--dark);
   background: rgba(150, 110, 60, 0.14);
@@ -661,7 +665,7 @@
   align-items: center;
   gap: calc(1.5 * var(--px));
   padding: calc(1 * var(--px)) calc(0.5 * var(--px)) 0;
-  font-size: calc(4.6 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(4.6 * var(--fpx, var(--px))));
   font-weight: 700;
   letter-spacing: 0.06em;
   color: var(--dark);
@@ -682,7 +686,7 @@
   margin-right: calc(0.5 * var(--px));
 }
 .colhead {
-  font-size: 0.85em;
+  font-size: max(var(--fmin, 0px), 0.85em);
   font-weight: 700;
   color: var(--mid);
   letter-spacing: 0.04em;
@@ -695,7 +699,7 @@
   border: 0 solid transparent;
   border-image: var(--sk-pa-inset) 3 fill / calc(3 * var(--px)) stretch;
   image-rendering: pixelated;
-  font-size: calc(4.4 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
   line-height: 1.35;
   color: var(--dark);
 }
@@ -726,7 +730,7 @@
 .bigBtn {
   --sk: var(--sk-btn-leaf);
   --skd: var(--sk-btn-leaf-down);
-  font-size: calc(6.5 * var(--px)) !important;
+  font-size: max(var(--fmin, 0px), calc(6.5 * var(--fpx, var(--px)))) !important;
   min-height: calc(18 * var(--px)) !important;
   color: #fffbe8 !important;
   text-shadow: calc(0.6 * var(--px)) 0 0 #16300f, calc(-0.6 * var(--px)) 0 0 #16300f, 0 calc(0.6 * var(--px)) 0 #16300f, 0 calc(-0.6 * var(--px)) 0 #16300f, 0 calc(1.2 * var(--px)) 0 #16300f !important;
@@ -743,7 +747,7 @@
   flex: 1 1 0;
   min-width: 0;
   justify-content: center;
-  font-size: calc(6 * var(--px)) !important;
+  font-size: max(var(--fmin, 0px), calc(6 * var(--fpx, var(--px)))) !important;
   min-height: calc(18 * var(--px)) !important;
   gap: calc(2 * var(--px)) !important;
   color: #fffbe8 !important;
@@ -757,7 +761,7 @@
   white-space: nowrap;
 }
 .bestBtn small {
-  font-size: calc(3.6 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(3.6 * var(--fpx, var(--px))));
   font-weight: 400;
   opacity: 0.92;
 }
@@ -798,7 +802,7 @@
   border: 0 solid transparent;
   border-image: var(--sk-pa-inset) 3 fill / calc(3 * var(--px)) stretch;
   image-rendering: pixelated;
-  font-size: calc(4.4 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
   font-weight: 700;
   color: var(--dark);
   white-space: nowrap;
@@ -813,7 +817,7 @@
   color: var(--text);
   background: #24150e;
   box-shadow: inset 0 0 0 var(--px) #120a06, inset 0 0 0 calc(2 * var(--px)) #5a3324;
-  font-size: calc(4.6 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(4.6 * var(--fpx, var(--px))));
 }
 
 /* ------------------------------------------------------------ the warden's squad */
@@ -839,7 +843,7 @@
   image-rendering: pixelated;
   cursor: pointer;
   text-align: center;
-  font-size: calc(4 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(4 * var(--fpx, var(--px))));
   color: var(--dark);
   filter: drop-shadow(0 var(--px) 0 rgba(90, 56, 28, 0.45));
 }
@@ -852,7 +856,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: calc(4.4 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
 }
 .slot small {
   display: inline-flex;
@@ -876,14 +880,14 @@
   gap: calc(1.5 * var(--px));
   width: 100%;
   min-height: calc(30 * var(--px));
-  font-size: calc(3.8 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(3.8 * var(--fpx, var(--px))));
   line-height: 1.15;
   text-align: center;
   color: var(--mid);
   opacity: 0.85;
 }
 .slotLock b {
-  font-size: calc(4.2 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(4.2 * var(--fpx, var(--px))));
   color: var(--dark);
 }
 /* Dragging a knight: the open slots wait for it, the one under it lights up. */
@@ -961,7 +965,7 @@
   gap: calc(1.5 * var(--px));
   margin: calc(-0.5 * var(--px)) calc(1 * var(--px)) 0;
   padding: calc(0.8 * var(--px)) calc(2 * var(--px));
-  font-size: calc(3.9 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(3.9 * var(--fpx, var(--px))));
   color: var(--mid);
   border: 0 solid transparent;
   border-image: var(--sk-pa-inset) 3 fill / calc(3 * var(--px)) stretch;
@@ -1009,7 +1013,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: calc(4.4 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
   color: var(--rc, #fff);
   background: #1e1420;
   box-shadow: 0 0 0 calc(0.5 * var(--px)) #140c14, inset 0 calc(-0.5 * var(--px)) 0 rgba(0, 0, 0, 0.4);
@@ -1040,7 +1044,7 @@
   min-height: calc(10 * var(--px));
   margin-top: auto;
   padding: calc(1 * var(--px)) 0;
-  font-size: calc(3.8 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(3.8 * var(--fpx, var(--px))));
   font-weight: 700;
   letter-spacing: 0.06em;
   color: #fffbe8;
@@ -1061,7 +1065,7 @@
 .slot .second {
   margin-top: auto;
   min-height: calc(10 * var(--px)) !important;
-  font-size: calc(3.8 * var(--px)) !important;
+  font-size: max(var(--fmin, 0px), calc(3.8 * var(--fpx, var(--px)))) !important;
 }
 
 /* ------------------------------------------------------------ the details popup */
@@ -1127,7 +1131,7 @@
   min-width: 0;
 }
 .popName b {
-  font-size: calc(6 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(6 * var(--fpx, var(--px))));
   line-height: 1.1;
   color: var(--dark);
 }
@@ -1136,7 +1140,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: calc(1.5 * var(--px));
-  font-size: calc(4.2 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(4.2 * var(--fpx, var(--px))));
   font-weight: 700;
   color: var(--mid);
 }
@@ -1144,7 +1148,7 @@
   display: flex;
   flex-direction: column;
   gap: calc(2 * var(--px));
-  font-size: calc(4.8 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(4.8 * var(--fpx, var(--px))));
   line-height: 1.35;
   color: var(--dark);
 }
@@ -1191,7 +1195,7 @@
 }
 .popActions .buy {
   min-height: calc(15 * var(--px)) !important;
-  font-size: calc(5.4 * var(--px)) !important;
+  font-size: max(var(--fmin, 0px), calc(5.4 * var(--fpx, var(--px)))) !important;
 }
 /* "now, then next": a value, a little arrow, the next value. */
 .delta {
@@ -1244,7 +1248,7 @@
     flex: 1 1 auto;
     gap: calc(1 * var(--px));
     padding: calc(1 * var(--px)) calc(1.5 * var(--px)) 0;
-    font-size: calc(4.4 * var(--px));
+    font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
   }
 }
 
@@ -1362,7 +1366,7 @@
   right: calc(-1 * var(--px));
   bottom: 0;
   padding: 0 calc(1 * var(--px));
-  font-size: calc(3.8 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(3.8 * var(--fpx, var(--px))));
   line-height: calc(5.5 * var(--px));
   font-weight: 700;
   color: #fff8e8;
@@ -1376,7 +1380,7 @@
   font-weight: 700;
 }
 .extraLine small {
-  font-size: 0.9em;
+  font-size: max(var(--fmin, 0px), 0.9em);
   font-weight: 400;
   color: var(--mid);
 }
@@ -1387,7 +1391,7 @@
   flex: 1 1 0;
   min-width: 0;
   justify-content: center;
-  font-size: calc(6 * var(--px)) !important;
+  font-size: max(var(--fmin, 0px), calc(6 * var(--fpx, var(--px)))) !important;
   min-height: calc(18 * var(--px)) !important;
   gap: calc(2 * var(--px)) !important;
   color: #fffbe8 !important;
@@ -1402,7 +1406,7 @@
   min-width: 0;
 }
 .sellAllBtn small {
-  font-size: calc(3.8 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(3.8 * var(--fpx, var(--px))));
   font-weight: 400;
   opacity: 0.95;
 }

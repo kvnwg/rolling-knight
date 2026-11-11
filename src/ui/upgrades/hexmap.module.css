@@ -96,13 +96,13 @@
 }
 .sub {
   max-width: calc(150 * var(--px));
-  font-size: calc(4.4 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
   line-height: 1.25;
   color: var(--text);
   text-shadow: var(--pixel-text);
 }
 .hint {
-  font-size: calc(4 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(4 * var(--fpx, var(--px))));
   line-height: 1.25;
   color: var(--muted);
   text-shadow: var(--pixel-text);
@@ -175,7 +175,7 @@
 }
 .cardQ {
   font-weight: 700;
-  font-size: calc(14 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(14 * var(--fpx, var(--px))));
   line-height: 1;
   color: #fff4dc;
   -webkit-text-stroke: calc(1.4 * var(--px)) var(--ink);
@@ -197,7 +197,7 @@
   align-items: center;
   gap: calc(1 * var(--px)) calc(2 * var(--px));
   font-weight: 700;
-  font-size: calc(5.6 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(5.6 * var(--fpx, var(--px))));
   line-height: 1.1;
   color: var(--text-dark);
   cursor: pointer;
@@ -207,20 +207,20 @@
   box-shadow: var(--pixel-edge);
   background: #ffc233;
   font-style: normal;
-  font-size: calc(3.8 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(3.8 * var(--fpx, var(--px))));
   color: var(--text-dark);
 }
 .cardTag[data-kind='chance'] {
   background: #b6ff5c;
 }
 .cardDesc {
-  font-size: calc(4.4 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
   line-height: 1.25;
   color: #6b5446;
 }
 .cardFx {
   font-weight: 700;
-  font-size: calc(4.4 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
   line-height: 1.25;
   color: #7a6250;
 }
@@ -241,7 +241,7 @@
   flex: none;
   min-width: calc(42 * var(--px));
   min-height: calc(19 * var(--px));
-  font-size: calc(6.4 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(6.4 * var(--fpx, var(--px))));
   touch-action: none;
   -webkit-touch-callout: none;
 }
@@ -264,7 +264,7 @@
   }
 }
 .short {
-  font-size: calc(3.6 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(3.6 * var(--fpx, var(--px))));
   text-align: center;
   color: #7a6250;
 }
@@ -289,7 +289,7 @@
   align-items: center;
   gap: calc(2 * var(--px));
   font-weight: 700;
-  font-size: calc(7.5 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(7.5 * var(--fpx, var(--px))));
   color: var(--gold);
   -webkit-text-stroke: calc(1.2 * var(--px)) var(--ink);
   paint-order: stroke fill;
@@ -300,7 +300,7 @@
   flex: none;
   min-width: calc(54 * var(--px));
   min-height: calc(18 * var(--px));
-  font-size: calc(7 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(7 * var(--fpx, var(--px))));
 }
 .barRight {
   flex: 1;
@@ -315,7 +315,7 @@
   align-items: center;
   gap: calc(1.5 * var(--px));
   font-weight: 700;
-  font-size: calc(5 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(5 * var(--fpx, var(--px))));
   color: var(--text);
   -webkit-text-stroke: calc(1 * var(--px)) var(--ink);
   paint-order: stroke fill;
@@ -323,7 +323,7 @@
   white-space: nowrap;
 }
 .stat small {
-  font-size: 0.8em;
+  font-size: max(var(--fmin, 0px), 0.8em);
   color: #e8d2a8;
 }
 .stat[data-k='luck'] {
@@ -337,16 +337,16 @@
 /* Phones: the bar's gold, Close and numbers all fit across. */
 @media (max-width: 480px) {
   .coins {
-    font-size: calc(6 * var(--px));
+    font-size: max(var(--fmin, 0px), calc(6 * var(--fpx, var(--px))));
     gap: calc(1 * var(--px));
   }
   .close {
     min-width: calc(40 * var(--px));
     min-height: calc(15 * var(--px));
-    font-size: calc(5.5 * var(--px));
+    font-size: max(var(--fmin, 0px), calc(5.5 * var(--fpx, var(--px))));
   }
   .stat {
-    font-size: calc(4.2 * var(--px));
+    font-size: max(var(--fmin, 0px), calc(4.2 * var(--fpx, var(--px))));
     gap: calc(1 * var(--px));
   }
   .bar {
@@ -433,12 +433,12 @@
 }
 .popDesc {
   margin: 0;
-  font-size: calc(4.4 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
   line-height: 1.35;
   color: var(--text);
 }
 .popFrom {
-  font-size: calc(4 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(4 * var(--fpx, var(--px))));
   color: var(--muted);
 }
 .ladder {
@@ -453,13 +453,13 @@
   gap: calc(2 * var(--px));
   min-height: calc(12 * var(--px));
   padding: calc(1 * var(--px)) calc(2.5 * var(--px));
-  font-size: calc(4.4 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
   color: var(--muted);
   background: rgba(10, 5, 3, 0.45);
   box-shadow: var(--pixel-edge);
 }
 .rung b {
-  font-size: calc(5 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(5 * var(--fpx, var(--px))));
   color: var(--gold);
   text-shadow: var(--pixel-text);
 }

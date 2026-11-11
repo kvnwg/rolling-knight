@@ -66,18 +66,34 @@ export function pctShort(p: number): string {
   return `${Math.max(0.1, Math.round(v * 10) / 10).toFixed(1)}%`;
 }
 
-/** Wide screens: the reel at twice the size, in a column of its own. */
+/**
+ * Wide screens: the reel at twice the size, in a column of its own. A wide but short one (a small
+ * browser window, a phone on its side) has no room down the column for that and ROLL under it: there
+ * it's up to one and a half times its size, as many whole device pixels to its pixel as that allows.
+ */
 const WIDE = '(min-width: 800px)';
-function useWide(): boolean {
-  const [wide, setWide] = useState(() => typeof matchMedia !== 'undefined' && matchMedia(WIDE).matches);
+const SHORT = '(max-height: 540px)';
+function reelScale(): number {
+  if (typeof matchMedia === 'undefined' || !matchMedia(WIDE).matches) return 1;
+  if (!matchMedia(SHORT).matches) return 2;
+  const px = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--px')) || 2;
+  const dev = px * (window.devicePixelRatio || 1);
+  return Math.max(1, Math.floor(dev * 1.5) / dev);
+}
+function useReelScale(): number {
+  const [k, setK] = useState(reelScale);
   useEffect(() => {
     if (typeof matchMedia === 'undefined') return;
-    const mq = matchMedia(WIDE);
-    const on = () => setWide(mq.matches);
-    mq.addEventListener('change', on);
-    return () => mq.removeEventListener('change', on);
+    const on = () => setK(reelScale());
+    const mqs = [matchMedia(WIDE), matchMedia(SHORT)];
+    for (const mq of mqs) mq.addEventListener('change', on);
+    window.addEventListener('resize', on);
+    return () => {
+      for (const mq of mqs) mq.removeEventListener('change', on);
+      window.removeEventListener('resize', on);
+    };
   }, []);
-  return wide;
+  return k;
 }
 
 // ------------------------------------------------------------------ the layout
@@ -368,8 +384,7 @@ function glowTiers(r: number): number[] {
  * the first roll; `skip` lands a spin in flight at once when it changes; `onLand` says when it's down.
  */
 export function RollReel({ spin, idle, calm, skip, onLand }: { spin: ReelSpin | null; idle: string; calm: boolean; skip: number; onLand: (n: number) => void }) {
-  const wide = useWide();
-  const k = wide ? 2 : 1;
+  const k = useReelScale();
   const geo = useRef(k);
   geo.current = k;
   const rootRef = useRef<HTMLDivElement>(null);
