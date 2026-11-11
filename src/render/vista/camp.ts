@@ -364,7 +364,7 @@ function compose(id: string, mutation: MutationId | null, view: View, frame: num
  * Lights a sprite for the scene. `fireDir` is where the fire is (-1 left, 1 right, 0 in front, below);
  * `rimSide` is the side the sun is on. Returns the dusk-shaded and the fire-lit versions.
  */
-function lightUp(b: PixelBuf, fireDir: number, rimSide: number): [PixelBuf, PixelBuf] {
+function lightUp(b: PixelBuf, fireDir: number, rimSide: number, rimColor: readonly [number, number, number] = [255, 184, 140]): [PixelBuf, PixelBuf] {
   const W = b.w;
   const H = b.h;
   const A = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && b.px[(y * W + x) * 4 + 3] > 0;
@@ -376,7 +376,7 @@ function lightUp(b: PixelBuf, fireDir: number, rimSide: number): [PixelBuf, Pixe
   }
   const dim = blank(W, H);
   const lit = blank(W, H);
-  const rim = [255, 184, 140];
+  const rim = rimColor;
   const put = (o: PixelBuf, i: number, r: number, g: number, bl: number) => {
     o.px[i] = clamp(r, 0, 255);
     o.px[i + 1] = clamp(g, 0, 255);
@@ -424,12 +424,12 @@ function lightUp(b: PixelBuf, fireDir: number, rimSide: number): [PixelBuf, Pixe
  * face west in their own drawing and are tripled pixel for pixel; the old art was mirrored and
  * smoothed with Scale3x.
  */
-export function knightSprite(id: string, mutation: MutationId | null, view: View, frame: number, flip: boolean, t: number, fireDir: number, rimSide: number): KnightSprite {
+export function knightSprite(id: string, mutation: MutationId | null, view: View, frame: number, flip: boolean, t: number, fireDir: number, rimSide: number, scale = PF_SCALE, rimColor?: RGB): KnightSprite {
   if (pfReady()) {
     const c = composePF(id, mutation, view, flip, frame, t);
-    const buf = scaleUp(c.buf, PF_SCALE);
-    const [dim, lit] = lightUp(buf, fireDir, rimSide);
-    return { dim: toCanvas(dim), lit: toCanvas(lit), w: buf.w, h: buf.h, ax: c.ax * PF_SCALE + Math.floor(PF_SCALE / 2), ay: c.ay * PF_SCALE + PF_SCALE - 1, glow: c.glow };
+    const buf = scale > 1 ? scaleUp(c.buf, scale) : c.buf;
+    const [dim, lit] = lightUp(buf, fireDir, rimSide, rimColor);
+    return { dim: toCanvas(dim), lit: toCanvas(lit), w: buf.w, h: buf.h, ax: c.ax * scale + Math.floor(scale / 2), ay: c.ay * scale + scale - 1, glow: c.glow };
   }
   const c = compose(id, mutation, view, frame, t);
   let buf = c.buf;
@@ -438,7 +438,9 @@ export function knightSprite(id: string, mutation: MutationId | null, view: View
     buf = flipX(buf);
     ax = buf.w - 1 - ax;
   }
-  buf = scale3x(buf);
-  const [dim, lit] = lightUp(buf, fireDir, rimSide);
-  return { dim: toCanvas(dim), lit: toCanvas(lit), w: buf.w, h: buf.h, ax: ax * 3 + 1, ay: c.ay * 3 + 2, glow: c.glow };
+  // (The old art is drawn at three to one, smoothed with Scale3x; at one to one it's as it is.)
+  const k = scale > 1 ? 3 : 1;
+  if (k === 3) buf = scale3x(buf);
+  const [dim, lit] = lightUp(buf, fireDir, rimSide, rimColor);
+  return { dim: toCanvas(dim), lit: toCanvas(lit), w: buf.w, h: buf.h, ax: ax * k + (k === 3 ? 1 : 0), ay: c.ay * k + (k === 3 ? 2 : 0), glow: c.glow };
 }

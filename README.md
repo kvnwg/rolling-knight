@@ -313,8 +313,9 @@ Every attack effect by tier and frame on grass, stone, a crypt, sand and snow (`
 
 What a player waits for, and what's done about each:
 
-- **The title** is up in well under a second: its backdrop (about a second's painting) is built a
-  part each frame behind a plain dusk and fades in, so the name and PLAY never wait for it.
+- **The title** is up in well under a second: its backdrop (`render/titleCamp.ts`, the camp in the
+  woods at night) is chunky pixel art, about 125 art pixels to the short side, painted in a few
+  milliseconds on the first frame.
 - **PLAY to the hub**: while the title is up, the hub is painted and drawn once behind it (nothing
   else is drawn under the title), so PLAY opens straight onto it.
 - **Pictures made into data URLs** (icons, knights, skill art, frames) are drawn on canvases kept

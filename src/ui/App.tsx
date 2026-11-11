@@ -129,7 +129,7 @@ export function App() {
   const csPick = useRef<string | null>(null);
   // (The tutorial points at spots in the world: it needs the camera.)
   const rendRef = useRef<Renderer | null>(null);
-  // The title screen (PLAY over the camp at dusk) until the player starts.
+  // The title screen (PLAY over the camp at night) until the player starts.
   const choosing = !picked && !game.inDungeon && reveals.length === 0 && station === null;
   const sheetOpen = detail !== null || settings || luck || station !== null || choosing;
   const sheetRef = useRef(sheetOpen);

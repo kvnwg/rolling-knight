@@ -6,7 +6,7 @@
  *  - StationSheet: a keeper's counter, opened by talking to them: the altar, the broker (your
  *    extras), the tinker, the sage, the shrine, the notice board, the gate; each one the shared
  *    keeper screen (src/ui/keeper/: the keeper at their counter, tabs, offers as cards);
- *  - TitleScreen: the game's name and PLAY, over the camp at dusk, when the game opens.
+ *  - TitleScreen: the game's name and PLAY, over the camp at night, when the game opens.
  * In the dungeon none of this is reachable: to change your squad or spend anything you leave, or fall.
  */
 import { useEffect, type CSSProperties } from 'react';
@@ -181,7 +181,7 @@ export function StationSheet({ game, station, onOpen, onClose }: { game: Game; s
 // ------------------------------------------------------------------ who you play as
 
 /**
- * The title screen the game opens on: the camp by the lake at dusk behind it (VistaCanvas, your
+ * The title screen the game opens on: the camp in the woods at night behind it (VistaCanvas, your
  * squad round the fire), the game's name, and PLAY. Who you play as is picked at the Warden's
  * counter (LEAD), not here.
  */
