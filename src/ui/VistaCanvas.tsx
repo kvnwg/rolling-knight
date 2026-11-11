@@ -6,6 +6,7 @@
  */
 import { useEffect, useRef, type MutableRefObject } from 'react';
 import type { Game } from '../game';
+import { graphicsReset } from '../render/art/draw';
 import { Vista, type VistaHero } from '../render/vista';
 
 /** `onReady`: called once, when the scene has been painted (it's built over the first frames, behind a plain dusk). */
@@ -18,7 +19,13 @@ export function VistaCanvas({ game, wide, pick, onReady }: { game: Game; wide: b
   useEffect(() => {
     const c = ref.current!;
     const ctx = c.getContext('2d')!;
-    const vista = new Vista();
+    let vista = new Vista();
+    // A graphics reset wipes the scene's painted layers: it's painted again from nothing.
+    const again = () => {
+      graphicsReset();
+      vista = new Vista();
+    };
+    c.addEventListener('contextrestored', again);
     let raf = 0;
     let told = false;
     const start = performance.now();
@@ -49,7 +56,10 @@ export function VistaCanvas({ game, wide, pick, onReady }: { game: Game; wide: b
       }
     };
     raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      c.removeEventListener('contextrestored', again);
+    };
   }, [game, pick]);
   return <canvas ref={ref} className="vista" />;
 }

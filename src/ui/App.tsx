@@ -31,6 +31,7 @@ import type { SoundName } from '../audio/sfx';
 import { uiSound } from './sound';
 import { rebirthPitch } from './RebirthPill';
 import { VistaCanvas } from './VistaCanvas';
+import { canvasesHealing, graphicsReset, healingGivenUp } from '../render/art/draw';
 import { hubScene } from '../world/hub';
 import { Tutorial } from './Tutorial';
 import { WelcomeBack } from './WelcomeBack';
@@ -66,6 +67,13 @@ function uiPx(): number {
   return Math.max(2, Math.min(4, Math.round(raw * 2) / 2));
 }
 
+/** After the context is back: how long the rebuild waits for the sprites to be given back too (ms). */
+const HEAL_WAIT_MS = 2500;
+/** How long a lost context is waited for before the canvas is swapped for a new one (ms). */
+const LOST_WAIT_MS = 3000;
+/** On the plain 2D path after a reset: how often WebGL is looked for again (ms). */
+const SHADERS_RETRY_MS = 20000;
+
 export function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const game = useMemo(() => devGame(), []);
@@ -99,6 +107,14 @@ export function App() {
       document.removeEventListener('webglcontextrestored', back, true);
     };
   }, []);
+  // The game's canvas itself is swapped for a new one when its context is gone for good (`canvasKey`
+  // makes the new element; the loop's `rebuild` then makes the renderer on it).
+  const [canvasKey, setCanvasKey] = useState(0);
+  const newCanvas = useCallback(() => setCanvasKey((n) => n + 1), []);
+  const rebuildRef = useRef<() => boolean>(() => false);
+  useEffect(() => {
+    if (canvasKey > 0) rebuildRef.current();
+  }, [canvasKey]);
   // CAMP asks first (leaving costs floors): the fight waits while it's up.
   const [campAsk, setCampAsk] = useState(false);
   const campAskRef = useRef(campAsk);
@@ -289,12 +305,86 @@ export function App() {
 
   // The loop.
   useEffect(() => {
-    const canvas = canvasRef.current!;
-    const r = new Renderer(canvas);
+    let canvas = canvasRef.current!;
+    let r = new Renderer(canvas);
     rendRef.current = r;
     (window as unknown as { __renderer: Renderer }).__renderer = r;
     const onResize = () => r.resize();
     window.addEventListener('resize', onResize);
+    // A graphics reset (the driver hiccups, the browser's GPU process restarts) takes the canvas's
+    // context and wipes every picture the renderer had painted and kept: the ground, its layers, the
+    // lights. Sprites paint themselves again (render/art/draw.ts); everything else is rebuilt by
+    // making the renderer anew once the context is back. `lostAt`: when the context went (0: it's
+    // here); `backAt`: when it came back and a rebuild became due (0: none due).
+    let lostAt = 0;
+    let backAt = 0;
+    // (After too many resets the browser may refuse WebGL for a while: the game carries on on the
+    // plain 2D path, and looks now and then for WebGL coming back.)
+    const hadShaders = r.shaders;
+    let lookedAt = 0;
+    let watch = new AbortController();
+    const listen = () => {
+      watch.abort();
+      watch = new AbortController();
+      const o = { signal: watch.signal };
+      const lost = () => {
+        lostAt = lostAt || performance.now();
+      };
+      const back = () => {
+        lostAt = 0;
+        backAt = performance.now();
+      };
+      canvas.addEventListener('webglcontextlost', lost, o);
+      canvas.addEventListener('contextlost', lost, o);
+      canvas.addEventListener('webglcontextrestored', back, o);
+      canvas.addEventListener('contextrestored', back, o);
+    };
+    listen();
+    /** The renderer made anew on the canvas now on the page. False: this canvas can't be drawn on any more. */
+    const rebuild = (): boolean => {
+      canvas = canvasRef.current ?? canvas;
+      graphicsReset();
+      const next = new Renderer(canvas);
+      if (!next.ok) {
+        next.dispose();
+        return false;
+      }
+      r.dispose();
+      r = next;
+      rendRef.current = r;
+      (window as unknown as { __renderer: Renderer }).__renderer = r;
+      lostAt = 0;
+      backAt = 0;
+      listen();
+      return true;
+    };
+    rebuildRef.current = rebuild;
+    /** Each frame: is a rebuild due, or has the context been gone too long to wait for? */
+    const mend = (now: number) => {
+      if (backAt) {
+        // (Not while the sprites are still being given back: a picture built from them now would be built from blanks.)
+        if (canvasesHealing() > 0 && now - backAt < HEAL_WAIT_MS) return;
+        healingGivenUp();
+        if (!rebuild()) newCanvas();
+      } else if (lostAt && now - lostAt > LOST_WAIT_MS) {
+        // The browser isn't giving it back (it stops trying after a few resets): a fresh canvas, and
+        // whatever it can still draw with (the plain 2D path if WebGL is gone for good).
+        lostAt = now;
+        newCanvas();
+      } else if (hadShaders && !r.shaders && now - lookedAt > SHADERS_RETRY_MS) {
+        lookedAt = now;
+        let gl: WebGL2RenderingContext | null = null;
+        try {
+          gl = document.createElement('canvas').getContext('webgl2');
+        } catch {
+          gl = null;
+        }
+        if (gl) {
+          gl.getExtension('WEBGL_lose_context')?.loseContext();
+          newCanvas();
+        }
+      }
+    };
     let last = performance.now();
     let raf = 0;
     let hudT = 0;
@@ -303,6 +393,7 @@ export function App() {
     let wasIn = !game.inDungeon;
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
+      mend(now);
       const dt = Math.max(0, Math.min(0.1, (now - last) / 1000));
       last = now;
       const c = ctl.controls;
@@ -413,6 +504,9 @@ export function App() {
     window.addEventListener('keydown', unlock, { once: true });
     return () => {
       cancelAnimationFrame(raf);
+      watch.abort();
+      rebuildRef.current = () => false;
+      r.dispose();
       window.removeEventListener('resize', onResize);
       window.removeEventListener('beforeunload', save);
       document.removeEventListener('visibilitychange', vis);
@@ -498,7 +592,7 @@ export function App() {
   const aiming = inDungeon && !game.bot && !sheetOpen && !talking;
   return (
     <>
-      <canvas ref={canvasRef} className={aiming ? 'game aiming' : 'game'} data-play="1" />
+      <canvas key={canvasKey} ref={canvasRef} className={aiming ? 'game aiming' : 'game'} data-play="1" />
       {choosing && <VistaCanvas game={game} wide={wide} pick={csPick} onReady={warmHub} />}
       {inDungeon ? (
         <DungeonHud key={`DungeonHud${gpu}`}

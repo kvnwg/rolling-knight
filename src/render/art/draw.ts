@@ -151,11 +151,63 @@ export function makeCanvas(w: number, h: number): AnyCanvas {
   return new OffscreenCanvas(w, h);
 }
 
+/**
+ * A graphics reset (the driver hiccups, the browser's GPU process dies and comes back) wipes every
+ * canvas the browser kept on the card, the ones nobody is looking at too: every cached sprite, the
+ * painted ground, the lights' discs all go blank and stay blank, while the game runs on over nothing.
+ * The browser tells each canvas when it has it back ('contextrestored'), so a canvas that's painted
+ * once and kept says here how to paint itself again.
+ */
+let wiped = 0;
+
+/** Canvases wiped by a graphics reset that haven't been given back yet (a picture built from others waits for 0). */
+export function canvasesHealing(): number {
+  return wiped;
+}
+
+/** Keeps a painted-once canvas whole through a graphics reset: `paint` draws it again when it's back. */
+export function heals(c: AnyCanvas, paint: () => void): void {
+  if (typeof c.addEventListener !== 'function') return;
+  let gone = false;
+  c.addEventListener('contextlost', () => {
+    if (!gone) wiped++;
+    gone = true;
+  });
+  c.addEventListener('contextrestored', () => {
+    if (gone) wiped = Math.max(0, wiped - 1);
+    gone = false;
+    paint();
+  });
+}
+
+const forgetters: Array<() => void> = [];
+
+/** A cache of canvases drawn some other way (no pixels kept to paint them from): emptied after a reset, to be drawn afresh. */
+export function onGraphicsReset(forget: () => void): void {
+  forgetters.push(forget);
+}
+
+/** The graphics are back after a reset: every cache that asked is emptied. */
+export function graphicsReset(): void {
+  for (const f of forgetters) f();
+}
+
+/** A count that can't be trusted any more (a wiped canvas that was thrown away never reports back). */
+export function healingGivenUp(): void {
+  wiped = 0;
+}
+
 export function toCanvas(b: PixelBuf): HTMLCanvasElement {
-  const c = makeCanvas(Math.max(1, b.w), Math.max(1, b.h)) as HTMLCanvasElement;
-  const ctx = c.getContext('2d')!;
-  const img = ctx.createImageData(Math.max(1, b.w), Math.max(1, b.h));
-  img.data.set(b.px);
-  ctx.putImageData(img, 0, 0);
+  const w = Math.max(1, b.w);
+  const h = Math.max(1, b.h);
+  const c = makeCanvas(w, h) as HTMLCanvasElement;
+  const paint = () => {
+    const ctx = c.getContext('2d')!;
+    const img = ctx.createImageData(w, h);
+    img.data.set(b.px);
+    ctx.putImageData(img, 0, 0);
+  };
+  paint();
+  heals(c, paint);
   return c;
 }

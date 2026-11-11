@@ -3,7 +3,7 @@
  * 255; soft layers may use partial alpha), color helpers, a seeded random, smooth noise and a
  * Gaussian blur that soft layers get once per layout (never per frame).
  */
-import { makeCanvas } from '../art/draw';
+import { makeCanvas, onGraphicsReset } from '../art/draw';
 
 export type RGB = readonly [number, number, number];
 export type Canvas = HTMLCanvasElement;
@@ -327,6 +327,7 @@ export function blurred(src: Pix, sigma: number, scale = 1, clampEdge = false): 
 // ------------------------------------------------------------------ glow sprites
 
 const glowCache = new Map<string, Canvas>();
+onGraphicsReset(() => glowCache.clear());
 
 /** A soft round glow (color at the middle fading to nothing), cached per color. Draw it scaled. */
 export function glowSprite(color: RGB, falloff = 1): Canvas {

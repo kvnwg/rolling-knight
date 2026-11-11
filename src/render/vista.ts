@@ -23,6 +23,7 @@ import { idleFrameAt } from './pf/frames';
 import { FIRE_H, FIRE_W, fireFrames, fireFront, knightSprite, paintCamp, type KnightSprite } from './vista/camp';
 import { ground, makeLayout, mistStrip, paintFar, paintFront, paintLake, paintMid, paintNear, riverPath, type Glow, type Layout } from './vista/land';
 import { blurRGBA, blurred, canvas, clamp, crop, ctx2d, firstRow, glowSprite, hex, luma, padPix, Pix, rng, type Canvas } from './vista/pix';
+import { onGraphicsReset } from './art/draw';
 import { cumulus, SKY, skyAt, streak, type CloudKind } from './vista/sky';
 
 export interface VistaHero {
@@ -707,6 +708,9 @@ function bloomOf(src: Pix, sigma: number, pad: number, threshold: number): Canva
 
 /** The flames don't depend on the layout: painted once. */
 let fireCache: Canvas[] | null = null;
+onGraphicsReset(() => {
+  fireCache = null;
+});
 
 /**
  * The layers, a part at a time (the first build: about a second's painting on a desktop, several on

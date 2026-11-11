@@ -7,7 +7,7 @@
  * pixel.
  */
 import { rgb } from './pixel/buf';
-import { makeCanvas } from './art/draw';
+import { makeCanvas, onGraphicsReset } from './art/draw';
 
 export interface Light {
   x: number;
@@ -23,6 +23,12 @@ export interface Light {
 type Ctx = CanvasRenderingContext2D;
 
 const spriteCache = new Map<string, HTMLCanvasElement>();
+const smoothCache = new Map<string, HTMLCanvasElement>();
+// (Drawn, not kept as pixels: after a graphics reset they're blank, so they go and are drawn again.)
+onGraphicsReset(() => {
+  spriteCache.clear();
+  smoothCache.clear();
+});
 
 /** A light's disc: stepped bands of its color falling off to black (it's added to the light map). */
 function lightSprite(color: string, r: number, bands: number): HTMLCanvasElement {
@@ -53,8 +59,6 @@ function lightSprite(color: string, r: number, bands: number): HTMLCanvasElement
   if (spriteCache.size > 400) spriteCache.delete(spriteCache.keys().next().value!);
   return c;
 }
-
-const smoothCache = new Map<string, HTMLCanvasElement>();
 
 /** A light's disc for the shader path: a smooth falloff (the screen-resolution pass keeps it smooth). */
 function smoothSprite(color: string, r: number): HTMLCanvasElement {
