@@ -1,83 +1,102 @@
 /**
  * A new game's altar, sealed: Dumpster Legend's padlocked dumpster (its DumpsterLock: "click the
- * spinner for the lock and metal to fall off and then it starts spinning"), made a magic seal. Two
- * runic bands and a third down the middle bind the reels, the Oracle's seal on them: it breathes,
- * wiggles now and then, a glint runs along the bands and motes of light drift up off it. A tap jolts
- * it (the clank), it cracks open in a flash with a ring of light and a burst of sparks (the break),
- * and everything drops off the altar on the same launches, gravity and whole-pixel steps as the
- * dumpster's metal, the seal in two halves; the altar starts to spin while the pieces still fall
+ * spinner for the lock and metal to fall off and then it starts spinning"), made the Oracle's. Two
+ * heavy chains bind the reels, one across and one down, and a brass padlock hangs where they cross,
+ * its keyhole alight with her violet magic: it breathes (the keyhole and the glow behind it swell and
+ * ebb), jiggles now and then, a shine sweeps across the brass and glints run along the chains, and
+ * motes of light drift up off it. A tap jolts it and rattles the chains (the clank), the shackle
+ * springs open in a flash, a ring of light and a burst of sparks out of the keyhole (the break), and
+ * the lock and the four lengths of chain drop off the altar on the same launches, gravity and
+ * whole-pixel steps as the dumpster's metal; the altar starts to spin while they still fall
  * (Game.breakSeal). Shown until the pieces are gone, then never again.
+ *
+ * All of it is pixel art (sealArt.ts) on the altar's own grid: one art pixel is the altar's (var(--u),
+ * as AltarReels draws it), everything sits on whole art pixels and moves in whole-pixel steps.
  */
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import type { Game } from '../../game';
 import { uiSound } from '../sound';
-import { SEAL, sealArt } from './sealArt';
+import { chainArt, sealArt, sealLayout, SHINE_N, type Rect } from './sealArt';
 import { readU } from './util';
 import s from './altarSeal.module.css';
 
 type Phase = 'idle' | 'hit' | 'open' | 'fall';
-const PIECES = ['strap', 'plateA', 'plateB', 'left', 'right'] as const;
+const PIECES = ['lock', 'top', 'bottom', 'left', 'right'] as const;
 type Piece = (typeof PIECES)[number];
+const CHAINS = ['bottom', 'top', 'left', 'right'] as const;
 
 /**
  * Launch velocities and start delays of the fall: Dumpster Legend's, in its stage pixels (6 to an art
- * pixel), so the pieces move the same in art pixels at any size. The seal's right half flies as the
- * padlock did, its left half the mirror of it.
+ * pixel), so the pieces move the same in art pixels at any size. The lock flies as the padlock did,
+ * the chain down's top length as the strap, the chain across as the plates, and its bottom length
+ * slips off last.
  */
 const LAUNCH: Record<Piece, { vx: number; vy: number; delay: number }> = {
-  right: { vx: 150, vy: -640, delay: 0 },
-  left: { vx: -130, vy: -600, delay: 20 },
-  strap: { vx: -36, vy: -240, delay: 50 },
-  plateA: { vx: -100, vy: -170, delay: 100 },
-  plateB: { vx: 120, vy: -110, delay: 160 },
+  lock: { vx: 150, vy: -640, delay: 0 },
+  top: { vx: -36, vy: -240, delay: 50 },
+  left: { vx: -100, vy: -170, delay: 100 },
+  right: { vx: 120, vy: -110, delay: 160 },
+  bottom: { vx: 42, vy: -90, delay: 120 },
 };
 const STAGE_PX = 6;
 const GRAVITY = 3300;
 const FALL_MS = 1150;
-/** When the seal cracks, the bindings start to fall, and the altar spins (ms after the tap). */
+/** When the shackle springs, the pieces start to fall, and the altar spins (ms after the tap). */
 const T_OPEN = 170;
 const T_FALL = 320;
 const T_ROLL = 720;
 
 /**
- * Sparks out of the crack as it breaks, well past the rim (art pixels; multiples of 3, so each third of
- * the way is whole): the padlock's six, three times as far, and six more.
+ * Sparks out of the keyhole as it breaks, well past the lock (art pixels; multiples of 3, so each
+ * third of the way is whole).
  */
-const SPARKS: ReadonlyArray<readonly [number, number, 'w' | 'v' | 'c']> = [
+const SPARKS: ReadonlyArray<readonly [number, number, 'w' | 'v' | 'g']> = [
   [-27, -18, 'w'],
   [27, -18, 'w'],
   [-36, 9, 'v'],
   [36, 9, 'v'],
-  [-18, -27, 'c'],
-  [18, -36, 'c'],
-  [-45, -9, 'c'],
+  [-18, -27, 'g'],
+  [18, -36, 'g'],
+  [-45, -9, 'g'],
   [45, -18, 'v'],
   [-9, -45, 'w'],
   [9, 36, 'v'],
   [-27, 27, 'w'],
-  [36, 27, 'c'],
+  [36, 27, 'g'],
 ];
 
-/** Motes of light drifting up off the seal: [x from the middle, y from the middle, delay s, length s, color]. */
-const MOTES: ReadonlyArray<readonly [number, number, number, number, 'w' | 'v' | 'c' | 'g']> = [
-  [-22, 4, 0, 2.4, 'v'],
-  [18, 10, 0.4, 2.1, 'c'],
-  [-8, 14, 0.9, 2.6, 'g'],
-  [26, -2, 1.3, 2.2, 'v'],
-  [-30, -6, 1.7, 2.5, 'c'],
-  [6, 16, 0.2, 2.3, 'w'],
-  [-16, -12, 2.1, 2.0, 'g'],
-  [12, -14, 1.1, 2.4, 'v'],
-  [34, 8, 0.6, 2.7, 'g'],
-  [-36, 12, 1.9, 2.2, 'w'],
-  [0, -18, 1.5, 2.0, 'c'],
-  [22, 16, 2.4, 2.5, 'w'],
+/** Motes of light drifting up off the lock: [x from the keyhole, y from it, delay s, length s, color]. */
+const MOTES: ReadonlyArray<readonly [number, number, number, number, 'w' | 'v' | 'p' | 'g']> = [
+  [-20, 2, 0, 2.4, 'v'],
+  [17, 8, 0.4, 2.1, 'p'],
+  [-9, 12, 0.9, 2.6, 'g'],
+  [24, -4, 1.3, 2.2, 'v'],
+  [-27, -8, 1.7, 2.5, 'p'],
+  [6, 14, 0.2, 2.3, 'w'],
+  [-15, -14, 2.1, 2.0, 'g'],
+  [12, -16, 1.1, 2.4, 'v'],
+  [31, 6, 0.6, 2.7, 'g'],
+  [-33, 10, 1.9, 2.2, 'w'],
+  [1, -20, 1.5, 2.0, 'p'],
+  [21, 14, 2.4, 2.5, 'w'],
 ];
+
+/** How far a glint runs along a chain in each step (art pixels). */
+const GLINT_STEP = 4;
+const GLINT_W = 12;
+
+interface Box {
+  /** The altar's size in art pixels, and where its reel window is in it. */
+  W: number;
+  H: number;
+  win: Rect | null;
+  u: number;
+}
 
 export function AltarSeal({ game }: { game: Game }) {
   const sealed = !!game.state.roll.sealed;
   const [phase, setPhase] = useState<Phase | null>(sealed ? 'idle' : null);
-  const [box, setBox] = useState<{ w: number; h: number; u: number } | null>(null);
+  const [box, setBox] = useState<Box | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const pieces = useRef<Partial<Record<Piece, HTMLElement | null>>>({});
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -87,12 +106,40 @@ export function AltarSeal({ game }: { game: Game }) {
   useLayoutEffect(() => {
     const el = root.current;
     if (!el) return;
-    // (In the altar's own art pixels (var(--u), as AltarReels draws it), so the two match.)
-    const measure = () => setBox({ w: el.offsetWidth, h: el.offsetHeight, u: readU(el) });
+    let tries = 0;
+    let wait = 0;
+    let watched: Element | null = null;
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => measure()) : null;
+    // In the altar's own art pixels (var(--u), as AltarReels draws it), so the two match; and where
+    // its reel window is (the reels lay it out once they've measured: look again until it's there,
+    // drawing nothing till then, and keep an eye on it).
+    const measure = () => {
+      cancelAnimationFrame(wait);
+      const u = readU(el);
+      const r = el.getBoundingClientRect();
+      const bank = el.parentElement?.querySelector('[data-altar][data-bulbs]') ?? null;
+      let win: Rect | null = null;
+      if (bank) {
+        if (bank !== watched) {
+          if (watched) ro?.unobserve(watched);
+          ro?.observe(bank);
+          watched = bank;
+        }
+        const b = bank.getBoundingClientRect();
+        win = { x: Math.round((b.left - r.left) / u), y: Math.round((b.top - r.top) / u), w: Math.round(b.width / u), h: Math.round(b.height / u) };
+      } else if (tries++ < 60) {
+        wait = requestAnimationFrame(measure);
+        return;
+      }
+      const next: Box = { W: Math.ceil(el.offsetWidth / u), H: Math.ceil(el.offsetHeight / u), win, u };
+      setBox((p) => (p && p.W === next.W && p.H === next.H && p.u === next.u && JSON.stringify(p.win) === JSON.stringify(next.win) ? p : next));
+    };
     measure();
-    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
     ro?.observe(el);
-    return () => ro?.disconnect();
+    return () => {
+      ro?.disconnect();
+      cancelAnimationFrame(wait);
+    };
   }, [phase === null]);
 
   useEffect(
@@ -178,15 +225,15 @@ export function AltarSeal({ game }: { game: Game }) {
     }
   };
 
-  const art = sealArt();
-  // Everything on whole art pixels from the altar's middle.
-  const w = box?.w ?? 0;
-  const h = box?.h ?? 0;
-  const midX = snap(w / 2);
-  const midY = snap(h / 2);
-  const half = (SEAL - 1) / 2;
-  const sealPos: CSSProperties = { left: midX - at(half), top: midY - at(half), width: at(SEAL), height: at(SEAL) };
   const broken = phase === 'open' || phase === 'fall';
+  const L = box ? sealLayout(box.W, box.H, box.win) : null;
+  const art = L ? sealArt(L.size) : null;
+  const chains = L ? chainArt(L) : null;
+  const whole: CSSProperties | undefined = L ? { left: 0, top: 0, width: at(L.W), height: at(L.H) } : undefined;
+  const pic: CSSProperties | undefined = L && art ? { left: 0, top: at(-art.pad), width: at(L.lockW), height: at(L.lockH + art.pad) } : undefined;
+  // The glints run along the chains in whole steps, from off one end to off the other.
+  const runX = L ? Math.ceil((L.W + GLINT_W) / GLINT_STEP) : 0;
+  const runY = L ? Math.ceil((L.H + GLINT_W) / GLINT_STEP) : 0;
   return (
     <div
       ref={root}
@@ -199,66 +246,101 @@ export function AltarSeal({ game }: { game: Game }) {
       aria-label="Break the seal"
       onClick={open}
       onKeyDown={onKey}
-      style={{ ['--px' as string]: `${u}px`, ['--runes-x' as string]: `url(${art.runesAcross})`, ['--runes-y' as string]: `url(${art.runesDown})` } as CSSProperties}
+      style={
+        {
+          ['--px' as string]: `${u}px`,
+          ['--run-x' as string]: `${at(runX * GLINT_STEP)}px`,
+          ['--run-y' as string]: `${at(runY * GLINT_STEP)}px`,
+        } as CSSProperties
+      }
     >
       <div className={s.tint} />
-      {box && (
+      {L && art && chains && (
         <>
-          <div
-            ref={(el) => {
-              pieces.current.strap = el;
-            }}
-            className={s.strap}
-            style={{ left: midX - at(8) }}
-          >
-            <span className={s.rivet} style={{ left: at(6), top: at(3) }} />
-            <span className={s.rivet} style={{ left: at(6), bottom: at(3) }} />
-          </div>
-          {(['plateA', 'plateB'] as const).map((p, i) => (
-            <div
+          {(
+            [
+              [art.glow, s.glow],
+              [art.glowBig, s.glowBig],
+            ] as const
+          ).map(([g, cls]) => (
+            <img
+              key={cls}
+              className={cls}
+              src={g.src}
+              alt=""
+              draggable={false}
+              style={{ left: at(L.gx - Math.floor(g.w / 2)), top: at(L.gy - Math.floor(g.h / 2)), width: at(g.w), height: at(g.h) }}
+            />
+          ))}
+          {CHAINS.map((p) => (
+            <img
               key={p}
               ref={(el) => {
                 pieces.current[p] = el;
               }}
-              className={s.plate}
-              style={{ top: midY + (i === 0 ? at(-20) : at(9)) }}
-            >
-              <span className={s.rivet} style={{ left: at(4), top: at(4) }} />
-              <span className={s.rivet} style={{ right: at(4), top: at(4) }} />
-              <span className={s.rivet} style={{ left: midX - at(14), top: at(4) }} />
-              <span className={s.rivet} style={{ left: midX + at(12), top: at(4) }} />
-            </div>
+              className={s.chain}
+              data-run={p === 'left' || p === 'right' ? 'x' : 'y'}
+              src={chains[p]}
+              alt=""
+              draggable={false}
+              style={whole}
+            />
           ))}
+          {phase === 'idle' && (
+            <div className={s.glints} aria-hidden>
+              <div className={s.glintX} style={{ width: at(GLINT_W), height: at(L.H), animationTimingFunction: `steps(${runX}, end)` }}>
+                <img src={chains.glintAcross} alt="" draggable={false} style={{ ...whole, animationTimingFunction: `steps(${runX}, end)` }} />
+              </div>
+              <div className={s.glintY} style={{ width: at(L.W), height: at(GLINT_W), animationTimingFunction: `steps(${runY}, end)` }}>
+                <img src={chains.glintDown} alt="" draggable={false} style={{ ...whole, animationTimingFunction: `steps(${runY}, end)` }} />
+              </div>
+            </div>
+          )}
           {!broken && (
             <div className={s.mote} aria-hidden>
               {MOTES.map(([x, y, d, len, c], i) => (
-                <i key={i} data-c={c} style={{ left: midX + at(x), top: midY + at(y), animationDelay: `${d}s`, animationDuration: `${len}s` }} />
+                <i key={i} data-c={c} style={{ left: at(L.kx + x), top: at(L.ky + y), animationDelay: `${d}s`, animationDuration: `${len}s` }} />
               ))}
             </div>
           )}
-          <div className={s.glow} style={{ left: midX - at(half + 8), top: midY - at(half + 8), width: at(SEAL + 16), height: at(SEAL + 16) }} />
-          {broken ? (
-            (['left', 'right'] as const).map((p) => (
-              <div
-                key={p}
-                ref={(el) => {
-                  pieces.current[p] = el;
-                }}
-                className={s.half}
-                style={sealPos}
-              >
-                <img src={art[p]} alt="" draggable={false} />
-              </div>
-            ))
-          ) : (
-            <div className={s.disc} style={sealPos} data-seal-disc>
-              <img src={art.whole} alt="" draggable={false} />
-              <img className={s.lit} src={art.bright} alt="" draggable={false} />
-            </div>
-          )}
+          {/* It breaks: a ring of light goes out from behind the lock. */}
           {broken && (
-            <div className={s.burst} style={sealPos} aria-hidden>
-              <img className={s.ring} src={art.ring} alt="" draggable={false} style={{ width: at(41), height: at(41), left: at(half - 20), top: at(half - 20) }} />
+            <i
+              className={s.ring}
+              aria-hidden
+              style={
+                {
+                  backgroundImage: `url(${art.ring.src})`,
+                  width: at(art.ring.n),
+                  height: at(art.ring.n),
+                  left: at(L.gx - (art.ring.n - 1) / 2),
+                  top: at(L.gy - (art.ring.n - 1) / 2),
+                  ['--ring-w' as string]: `${at(art.ring.n * art.ring.frames)}px`,
+                } as CSSProperties
+              }
+            />
+          )}
+          <div
+            ref={(el) => {
+              pieces.current.lock = el;
+            }}
+            className={s.lock}
+            style={{ left: at(L.lockX), top: at(L.lockY), width: at(L.lockW), height: at(L.lockH) }}
+          >
+            {/* (What the tutorial points at: the lock, shut. Its pictures reach higher, for the shackle to spring into.) */}
+            <div className={s.body} data-seal-disc>
+              <img src={broken ? art.lockOpen : art.lock} alt="" draggable={false} style={pic} />
+              {!broken && <img className={s.lit} src={art.lockBright} alt="" draggable={false} style={pic} />}
+              {!broken && (
+                <i
+                  className={s.shine}
+                  style={{ ...pic, backgroundImage: `url(${art.shine})`, ['--shine-w' as string]: `${at(L.lockW * SHINE_N)}px` } as CSSProperties}
+                />
+              )}
+            </div>
+          </div>
+          {broken && (
+            <div className={s.burst} style={{ left: at(L.kx), top: at(L.ky) }} aria-hidden>
               {SPARKS.map(([dx, dy, c], i) => (
                 <span key={i} className={s.spark} data-c={c} style={{ '--dx': `${at(dx)}px`, '--dy': `${at(dy)}px` } as CSSProperties} />
               ))}
