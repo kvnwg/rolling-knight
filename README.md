@@ -230,7 +230,7 @@ as usual). `?fresh` starts a new game. The game is on
 npm test
 ```
 
-531 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
+538 tests: the rarity odds (exact and over 20,000 rolls), tokens, chains, combos and floors, spin
 timing, extra reels, the start's ordinary quick spins, bad-luck protection, Lucky Spins, repeat pulls
 kept as extras at the worth they landed with and sold (one knight's, all at once, or with the knight
 at the Warden's) without touching the knight, old saves' spares cashed in and extras mended,
