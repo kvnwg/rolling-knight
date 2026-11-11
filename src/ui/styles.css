@@ -4008,6 +4008,23 @@ body,
     animation: none;
   }
 }
+/* A short landscape screen: the best pull beside the tally, not over it, so COLLECT stays in view. */
+@media (min-aspect-ratio: 1/1) and (max-height: 640px) {
+  .modal > .wb-sheet {
+    width: min(100%, calc(240 * var(--px)));
+  }
+  .wb-body {
+    flex-direction: row;
+    align-items: center;
+  }
+  .wb-best {
+    flex: none;
+  }
+  .wb-tally {
+    flex: 1;
+    min-width: 0;
+  }
+}
 
 /* ------------------------------------------------------------ "Back to camp?" (CampAsk.tsx) */
 .camp-ask > .sheet {
