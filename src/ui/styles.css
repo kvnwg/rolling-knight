@@ -123,6 +123,11 @@ canvas.vista {
 .num {
   font-variant-numeric: tabular-nums;
 }
+/* Words never come out smaller than --fmin (App.tsx): every font size here is max(var(--fmin), ...),
+   and a <small> with no size of its own is the browser's "smaller", floored the same. */
+small {
+  font-size: max(var(--fmin, 0px), 0.83em);
+}
 
 /* ------------------------------------------------------------ display lettering (Chunky) */
 
@@ -165,7 +170,7 @@ canvas.vista {
   min-height: calc(15 * var(--px));
   padding: 0 calc(5 * var(--px));
   font-weight: 700;
-  font-size: calc(6 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(6 * var(--fpx, var(--px))));
   letter-spacing: 0.04em;
   color: #fff;
   text-shadow: var(--pixel-text);
@@ -209,13 +214,13 @@ canvas.vista {
 }
 .btn.small {
   min-height: calc(12 * var(--px));
-  font-size: calc(5 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(5 * var(--fpx, var(--px))));
   padding: 0 calc(3.5 * var(--px));
   gap: calc(1.5 * var(--px));
 }
 .btn.big {
   min-height: calc(22 * var(--px));
-  font-size: calc(9 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(9 * var(--fpx, var(--px))));
   padding: 0 calc(8 * var(--px));
 }
 .btn.square {
@@ -225,7 +230,7 @@ canvas.vista {
 }
 .btn .sub {
   display: block;
-  font-size: 0.55em;
+  font-size: max(var(--fmin, 0px), 0.55em);
   font-weight: 500;
 }
 @media (hover: hover) and (pointer: fine) {
@@ -272,7 +277,7 @@ canvas.vista {
   -webkit-backdrop-filter: blur(8px) saturate(1.3);
   box-shadow: var(--pixel-edge);
   font-weight: 700;
-  font-size: calc(5.5 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(5.5 * var(--fpx, var(--px))));
   white-space: nowrap;
   color: var(--text);
 }
@@ -323,7 +328,7 @@ button.pill {
 .badge {
   position: absolute;
   z-index: 2;
-  font-size: calc(4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4 * var(--fpx, var(--px))));
   font-weight: 700;
   line-height: 1;
   padding: calc(1 * var(--px)) calc(1.5 * var(--px));
@@ -379,7 +384,7 @@ button.pill {
   gap: calc(2 * var(--px));
   padding: calc(1 * var(--px));
   padding-right: calc(3 * var(--px));
-  font-size: calc(4.5 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.5 * var(--fpx, var(--px))));
   min-width: calc(62 * var(--px));
 }
 .lvl .n {
@@ -387,7 +392,7 @@ button.pill {
   place-items: center;
   min-width: calc(11 * var(--px));
   height: calc(11 * var(--px));
-  font-size: calc(6 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(6 * var(--fpx, var(--px))));
   font-weight: 700;
   text-shadow: var(--pixel-text);
   background: linear-gradient(180deg, #ffe08a 0 var(--px), #f5a623 var(--px) calc(100% - var(--px)), #b86a0e calc(100% - var(--px)) 100%);
@@ -461,20 +466,20 @@ button.pill {
   gap: calc(2 * var(--px));
   flex-wrap: wrap;
   font-weight: 700;
-  font-size: calc(6.5 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(6.5 * var(--fpx, var(--px))));
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text);
 }
 .section-title small {
-  font-size: calc(4.5 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.5 * var(--fpx, var(--px))));
   letter-spacing: 0.04em;
   text-transform: none;
   color: var(--gold);
   font-weight: 500;
 }
 .lead {
-  font-size: calc(4.5 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.5 * var(--fpx, var(--px))));
   color: var(--muted);
   line-height: 1.35;
   margin: 0;
@@ -526,7 +531,7 @@ button.pill {
   justify-content: flex-end;
   gap: calc(1 * var(--px));
   padding: calc(2 * var(--px)) 0 calc(1.5 * var(--px));
-  font-size: calc(4.2 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.2 * var(--fpx, var(--px))));
   font-weight: 700;
   color: var(--muted);
 }
@@ -567,7 +572,7 @@ button.pill {
   padding: calc(2 * var(--px));
   gap: calc(1.5 * var(--px));
   text-align: center;
-  font-size: calc(4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4 * var(--fpx, var(--px))));
   line-height: 1.15;
   color: var(--text);
   background: linear-gradient(180deg, #2a1c1f, #1c1215);
@@ -613,7 +618,7 @@ button.kcard:active {
   display: inline-flex;
   align-items: center;
   padding: 0 calc(1.5 * var(--px));
-  font-size: calc(3.6 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(3.6 * var(--fpx, var(--px))));
   line-height: 1.5;
   font-weight: 800;
   letter-spacing: 0.02em;
@@ -653,14 +658,14 @@ button.kcard:active {
 }
 .kcard .kc-name {
   font-weight: 700;
-  font-size: calc(4.8 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.8 * var(--fpx, var(--px))));
   line-height: 1.1;
   color: var(--text);
   text-shadow: var(--pixel-text);
   overflow-wrap: anywhere;
 }
 .kcard .kc-meta {
-  font-size: calc(4.2 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.2 * var(--fpx, var(--px))));
   color: var(--muted);
 }
 .kcard .kc-foot {
@@ -671,7 +676,7 @@ button.kcard:active {
   margin-top: auto;
   padding-top: calc(1.5 * var(--px));
   border-top: var(--px) solid color-mix(in srgb, var(--rc) 22%, #3a2a2c);
-  font-size: calc(4.4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
   font-weight: 700;
   white-space: nowrap;
 }
@@ -691,7 +696,7 @@ button.kcard:active {
   align-items: center;
   gap: calc(0.5 * var(--px));
   padding: 0 var(--px);
-  font-size: calc(3.4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(3.4 * var(--fpx, var(--px))));
   font-weight: 700;
   line-height: calc(5 * var(--px));
   letter-spacing: 0.08em;
@@ -726,7 +731,7 @@ button.kcard:active {
   flex-wrap: wrap;
   justify-content: center;
   gap: calc(1 * var(--px)) calc(2 * var(--px));
-  font-size: calc(4.4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
   font-weight: 700;
   line-height: 1.25;
   color: var(--text);
@@ -737,12 +742,12 @@ button.kcard:active {
   gap: var(--px);
 }
 .kextras .ktag {
-  font-size: calc(3.8 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(3.8 * var(--fpx, var(--px))));
   line-height: calc(6 * var(--px));
 }
 .kextras small {
   flex-basis: 100%;
-  font-size: calc(4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4 * var(--fpx, var(--px))));
   font-weight: 400;
   color: var(--muted);
 }
@@ -762,7 +767,7 @@ button.kcard:active {
   box-shadow: 0 0 0 var(--px) var(--ink), inset 0 0 0 var(--px) #b97a26;
 }
 .kspare b {
-  font-size: calc(4.6 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.6 * var(--fpx, var(--px))));
   font-weight: 700;
   line-height: 1;
 }
@@ -779,7 +784,7 @@ button.kcard:active {
   flex-wrap: wrap;
 }
 .chip {
-  font-size: calc(4.2 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.2 * var(--fpx, var(--px))));
   font-weight: 700;
   padding: calc(1.5 * var(--px)) calc(2.5 * var(--px));
   background: var(--navy-2);
@@ -791,7 +796,7 @@ button.kcard:active {
   color: #fff;
 }
 select.select {
-  font-size: calc(4.2 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.2 * var(--fpx, var(--px))));
   font-weight: 700;
   padding: calc(1 * var(--px)) calc(2 * var(--px));
   background: var(--navy-2);
@@ -821,7 +826,7 @@ select.select {
   justify-content: center;
   gap: calc(0.5 * var(--px));
   padding: calc(1.5 * var(--px)) var(--px);
-  font-size: calc(4.8 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.8 * var(--fpx, var(--px))));
   font-weight: 700;
   white-space: nowrap;
   color: var(--text);
@@ -829,7 +834,7 @@ select.select {
   box-shadow: 0 0 0 var(--px) var(--ink);
 }
 .kstats > span > small {
-  font-size: calc(3.6 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(3.6 * var(--fpx, var(--px))));
   letter-spacing: 0.06em;
   color: var(--muted);
 }
@@ -843,12 +848,12 @@ select.select {
   display: inline-flex;
   align-items: center;
   gap: calc(2 * var(--px));
-  font-size: calc(4.4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
   font-weight: 700;
 }
 .kspare-why {
   margin: calc(-1 * var(--px)) 0 0;
-  font-size: calc(4.2 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.2 * var(--fpx, var(--px))));
   line-height: 1.3;
   color: var(--muted);
 }
@@ -868,13 +873,13 @@ select.select {
   display: flex;
   align-items: baseline;
   gap: calc(0.5 * var(--px));
-  font-size: calc(7 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(7 * var(--fpx, var(--px))));
   font-weight: 700;
   line-height: 1;
   color: var(--gold);
 }
 .klv small {
-  font-size: calc(4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4 * var(--fpx, var(--px))));
   color: var(--muted);
 }
 .kshards {
@@ -883,7 +888,7 @@ select.select {
   flex-direction: column;
   gap: var(--px);
   min-width: 0;
-  font-size: calc(4.4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
   font-weight: 700;
   color: var(--text);
 }
@@ -897,7 +902,7 @@ select.select {
   display: inline-flex;
   align-items: center;
   gap: calc(0.5 * var(--px));
-  font-size: 0.85em;
+  font-size: max(var(--fmin, 0px), 0.85em);
 }
 .kcost.short {
   color: var(--bad);
@@ -934,7 +939,7 @@ select.select {
   }
 }
 .ksquad {
-  font-size: calc(4.4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
   font-weight: 700;
   color: var(--muted);
 }
@@ -943,7 +948,7 @@ select.select {
 }
 .kforge-msg {
   align-self: flex-end;
-  font-size: calc(4.4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
 }
 .stage-art .stage-gold {
   position: absolute;
@@ -960,7 +965,7 @@ select.select {
   place-items: center;
   width: calc(9 * var(--px));
   height: calc(9 * var(--px));
-  font-size: calc(5.5 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(5.5 * var(--fpx, var(--px))));
   font-weight: 700;
   color: var(--text);
   background: #3a2a2c;
@@ -983,7 +988,7 @@ select.select {
   gap: calc(2 * var(--px));
   width: min(100%, calc(150 * var(--px)));
   padding: calc(4 * var(--px)) calc(5 * var(--px));
-  font-size: calc(4.6 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.6 * var(--fpx, var(--px))));
   line-height: 1.35;
   color: var(--text);
   animation: popIn 0.18s steps(3) both;
@@ -1015,14 +1020,14 @@ select.select {
   flex-direction: column;
   gap: calc(2 * var(--px));
   padding: calc(3 * var(--px)) calc(4 * var(--px));
-  font-size: calc(4.4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
   color: var(--text);
 }
 .kconfirm > b {
   display: flex;
   align-items: center;
   gap: var(--px);
-  font-size: calc(5 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(5 * var(--fpx, var(--px))));
 }
 .kconfirm ul {
   display: flex;
@@ -1050,7 +1055,7 @@ select.select {
   padding: calc(2 * var(--px)) calc(3 * var(--px));
 }
 .krules label {
-  font-size: calc(4.2 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.2 * var(--fpx, var(--px))));
 }
 
 /* Feedback for every press (fx/Pops.tsx): "+3 shards" or "+120 gold" jumps off the button and flies
@@ -1062,7 +1067,7 @@ select.select {
   align-items: center;
   gap: var(--px);
   translate: -50% -50%;
-  font-size: calc(5.5 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(5.5 * var(--fpx, var(--px))));
   font-weight: 700;
   white-space: nowrap;
   color: #ffe08a;
@@ -1185,7 +1190,7 @@ select.select {
   display: flex;
   flex-direction: column;
   gap: calc(3 * var(--px));
-  font-size: calc(4.6 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.6 * var(--fpx, var(--px))));
   animation: popIn 0.22s steps(4) both;
 }
 .modal .x {
@@ -1236,7 +1241,7 @@ select.select {
   display: flex;
   justify-content: space-between;
   gap: calc(2 * var(--px));
-  font-size: calc(4.6 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.6 * var(--fpx, var(--px))));
   color: var(--muted);
 }
 .stat-line b {
@@ -1246,7 +1251,7 @@ select.select {
   padding: calc(2 * var(--px)) calc(3 * var(--px));
   background: rgba(10, 8, 22, 0.45);
   box-shadow: var(--pixel-edge);
-  font-size: calc(4.3 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.3 * var(--fpx, var(--px))));
   line-height: 1.3;
   color: var(--muted);
 }
@@ -1265,12 +1270,12 @@ select.select {
   gap: calc(1 * var(--px)) calc(3 * var(--px));
   align-items: center;
   padding: calc(2.5 * var(--px)) calc(3 * var(--px));
-  font-size: calc(4.3 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.3 * var(--fpx, var(--px))));
   color: var(--muted);
 }
 .upg .name {
   font-weight: 700;
-  font-size: calc(5.2 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(5.2 * var(--fpx, var(--px))));
   color: var(--text);
 }
 .pips {
@@ -1295,12 +1300,12 @@ select.select {
 .perk {
   position: relative;
   padding: calc(2.5 * var(--px));
-  font-size: calc(4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4 * var(--fpx, var(--px))));
   line-height: 1.3;
   cursor: pointer;
 }
 .perk b {
-  font-size: calc(4.6 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.6 * var(--fpx, var(--px))));
 }
 .perk.owned {
   outline: var(--px) solid var(--good);
@@ -1330,11 +1335,11 @@ select.select {
   flex-direction: column;
   gap: calc(0.5 * var(--px));
   padding: calc(1.5 * var(--px)) calc(3 * var(--px));
-  font-size: calc(4.2 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.2 * var(--fpx, var(--px))));
   color: var(--muted);
 }
 .floor-pill b {
-  font-size: calc(6 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(6 * var(--fpx, var(--px))));
   color: var(--gold);
   letter-spacing: 0.08em;
 }
@@ -1345,7 +1350,7 @@ select.select {
   align-items: center;
   gap: calc(1 * var(--px));
   margin-left: calc(2 * var(--px));
-  font-size: calc(4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4 * var(--fpx, var(--px))));
   font-weight: 700;
   letter-spacing: 0.06em;
   color: var(--cc, var(--gold));
@@ -1366,7 +1371,7 @@ select.select {
   flex-wrap: wrap;
   gap: calc(1.5 * var(--px)) calc(3.5 * var(--px));
   padding: calc(1.5 * var(--px)) calc(3 * var(--px));
-  font-size: calc(4.4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
   color: var(--text);
 }
 .power-check b {
@@ -1390,7 +1395,17 @@ select.select {
   gap: calc(2 * var(--px));
 }
 .squad.top .member {
-  width: calc(56 * var(--px));
+  width: calc(64 * var(--px));
+}
+/* A phone held upright: narrower cards, and the class's little chip goes (the face and the skill's
+   well say who it is), so the name has the room to be read whole. */
+@media (max-aspect-ratio: 1/1) {
+  .squad.top .member {
+    width: calc(56 * var(--px));
+  }
+  .squad.top .member.plate .nm > .cls-chip {
+    display: none;
+  }
 }
 .member.plate .nm > span {
   min-width: 0;
@@ -1411,7 +1426,7 @@ select.select {
   padding: calc(1.5 * var(--px));
   padding-right: calc(2.5 * var(--px));
   cursor: pointer;
-  font-size: calc(3.8 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(3.8 * var(--fpx, var(--px))));
   color: var(--muted);
 }
 .member.me {
@@ -1462,14 +1477,14 @@ select.select {
   width: calc(26 * var(--px));
   height: calc(26 * var(--px));
   padding: 0;
-  font-size: calc(3.8 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(3.8 * var(--fpx, var(--px))));
   line-height: 1;
   overflow: hidden;
 }
 .act.big {
   width: calc(34 * var(--px));
   height: calc(34 * var(--px));
-  font-size: calc(4.4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
 }
 .act .cool {
   position: absolute;
@@ -1481,7 +1496,7 @@ select.select {
 }
 .act .secs {
   position: relative;
-  font-size: calc(9 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(9 * var(--fpx, var(--px))));
   line-height: calc(10 * var(--px));
   font-weight: 700;
   color: var(--text);
@@ -1525,7 +1540,7 @@ select.select {
   animation: readyPulse 0.5s steps(2) infinite;
 }
 .bossbar .title {
-  font-size: calc(4.2 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.2 * var(--fpx, var(--px))));
   font-weight: 700;
   color: var(--muted);
   letter-spacing: 0.04em;
@@ -1546,7 +1561,7 @@ select.select {
   }
 }
 .act .key {
-  font-size: calc(3.2 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(3.2 * var(--fpx, var(--px))));
   color: rgba(255, 255, 255, 0.85);
 }
 .act.ready {
@@ -1579,7 +1594,7 @@ select.select {
   --u: var(--mini-u, var(--px));
 }
 .mini-roller .note {
-  font-size: calc(3.8 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(3.8 * var(--fpx, var(--px))));
   padding: calc(0.5 * var(--px)) calc(2 * var(--px));
 }
 /* A desktop: the altar stands centered over the skill reel, as wide as it (whatever its reel count). */
@@ -1631,7 +1646,7 @@ select.select {
   gap: calc(1.5 * var(--px));
   min-width: 0;
   padding: calc(0.5 * var(--px)) calc(2 * var(--px)) calc(0.5 * var(--px)) calc(1.5 * var(--px));
-  font-size: calc(3.6 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(3.6 * var(--fpx, var(--px))));
   font-weight: 700;
   line-height: 1.3;
   color: #3b2716;
@@ -1693,7 +1708,7 @@ canvas.game.aiming {
   transform: translateX(-50%);
   max-width: 92vw;
   text-align: center;
-  font-size: calc(4.2 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.2 * var(--fpx, var(--px))));
   padding: calc(1.5 * var(--px)) calc(3 * var(--px));
   pointer-events: none !important;
   color: var(--text);
@@ -1715,7 +1730,7 @@ canvas.game.aiming {
   grid-template-columns: auto 1fr;
   gap: calc(2 * var(--px)) calc(4 * var(--px));
   padding: calc(4 * var(--px));
-  font-size: calc(4.8 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.8 * var(--fpx, var(--px))));
   line-height: 1.35;
   animation: popIn 0.22s steps(4) both;
 }
@@ -1743,16 +1758,16 @@ canvas.game.aiming {
 /* Narrow screens: the floor's plate on three lines (floor, place, foes left) rather than a ragged wrap. */
 @media (max-width: 480px) {
   .floor-pill {
-    font-size: calc(3.8 * var(--fpx, var(--px)));
+    font-size: max(var(--fmin, 0px), calc(3.8 * var(--fpx, var(--px))));
     padding: calc(1 * var(--px)) calc(2.5 * var(--px));
   }
   .floor-pill b {
-    font-size: calc(5 * var(--fpx, var(--px)));
+    font-size: max(var(--fmin, 0px), calc(5 * var(--fpx, var(--px))));
     white-space: nowrap;
   }
   .floor-pill .dchip {
     margin-left: calc(1 * var(--px));
-    font-size: calc(3.6 * var(--fpx, var(--px)));
+    font-size: max(var(--fmin, 0px), calc(3.6 * var(--fpx, var(--px))));
   }
   .floor-pill .dchip::before {
     width: calc(9 * var(--px));
@@ -1790,7 +1805,7 @@ canvas.game.aiming {
   display: flex;
   align-items: center;
   gap: calc(2 * var(--px));
-  font-size: calc(4.6 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.6 * var(--fpx, var(--px))));
   font-weight: 700;
   padding: calc(1.5 * var(--px)) calc(3 * var(--px));
   color: var(--text);
@@ -1799,14 +1814,18 @@ canvas.game.aiming {
 .toast .who {
   color: var(--tc, var(--text));
 }
-/* On touch screens the squad's cards sit at the top left: news drops in on the right, under the altar. */
-:root:has(.squad.top) .toasts {
-  top: calc(66 * var(--px) + env(safe-area-inset-top, 0px));
-  left: auto;
-  right: calc(3 * var(--px) + env(safe-area-inset-right, 0px));
-  transform: none;
-  align-items: flex-end;
-  max-width: 58vw;
+/* On a touch screen held upright the squad's cards sit at the top left: news drops in on the right,
+   under the altar. (On its side there's room for it top center, between the floor's plate and the
+   altar, as on a desktop.) */
+@media (max-aspect-ratio: 1/1) {
+  :root:has(.squad.top) .toasts {
+    top: calc(66 * var(--px) + env(safe-area-inset-top, 0px));
+    left: auto;
+    right: calc(3 * var(--px) + env(safe-area-inset-right, 0px));
+    transform: none;
+    align-items: flex-end;
+    max-width: 58vw;
+  }
 }
 /* With a boss on the floor, news drops in under its bar instead of over its name. */
 :root:has(.dhud.has-boss) .toasts {
@@ -1842,7 +1861,7 @@ canvas.game.aiming {
   animation: bannerIn 0.35s steps(5) both, toastOut 0.5s steps(4) 1.9s both;
 }
 .banner .sub {
-  font-size: calc(5.5 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(5.5 * var(--fpx, var(--px))));
   font-weight: 700;
   padding: calc(1 * var(--px)) calc(4 * var(--px));
   color: var(--text);
@@ -1868,14 +1887,14 @@ input[type='checkbox'] {
   align-items: center;
   justify-content: space-between;
   gap: calc(3 * var(--px));
-  font-size: calc(4.6 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.6 * var(--fpx, var(--px))));
   padding: calc(2 * var(--px)) calc(3 * var(--px));
   color: var(--text);
 }
 .setting small {
   display: block;
   color: var(--muted);
-  font-size: calc(3.8 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(3.8 * var(--fpx, var(--px))));
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1917,7 +1936,7 @@ input[type='checkbox'] {
 .reveal .kick {
   position: relative;
   font-weight: 700;
-  font-size: calc(6 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(6 * var(--fpx, var(--px))));
   letter-spacing: 0.1em;
   color: var(--rc);
   text-shadow: var(--pixel-text);
@@ -1925,7 +1944,7 @@ input[type='checkbox'] {
 .reveal .name {
   position: relative;
   font-weight: 700;
-  font-size: calc(9 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(9 * var(--fpx, var(--px))));
   text-align: center;
   padding: 0 calc(6 * var(--px));
   text-shadow: var(--pixel-text);
@@ -1933,7 +1952,7 @@ input[type='checkbox'] {
 .reveal .odds {
   position: relative;
   font-weight: 700;
-  font-size: calc(9 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(9 * var(--fpx, var(--px))));
   color: var(--gold);
   text-shadow: var(--pixel-text);
 }
@@ -1951,7 +1970,7 @@ input[type='checkbox'] {
 .reveal .tapnote {
   position: absolute;
   bottom: calc(10 * var(--px));
-  font-size: calc(4.5 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.5 * var(--fpx, var(--px))));
   color: var(--muted);
 }
 .reveal .muted {
@@ -2296,7 +2315,7 @@ body,
   align-items: center;
   gap: calc(1.5 * var(--px));
   min-width: 0;
-  font-size: calc(4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4 * var(--fpx, var(--px))));
   font-weight: 700;
   color: #3b2716;
   text-shadow: none;
@@ -2475,7 +2494,7 @@ body,
   inset: 0;
   display: grid;
   place-items: center;
-  font-size: calc(8 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(8 * var(--fpx, var(--px))));
   font-weight: 700;
   color: var(--text);
   text-shadow: var(--pixel-text);
@@ -2492,7 +2511,7 @@ body,
 }
 .wkey .lbl {
   padding: 0 calc(1.5 * var(--px));
-  font-size: calc(3.8 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(3.8 * var(--fpx, var(--px))));
   font-weight: 700;
   letter-spacing: 0.06em;
   white-space: nowrap;
@@ -2500,7 +2519,7 @@ body,
   text-shadow: var(--pixel-text);
 }
 .wkey.lg .lbl {
-  font-size: calc(4.4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
 }
 .wkey.cooling .lbl {
   color: var(--muted);
@@ -2510,7 +2529,7 @@ body,
   top: calc(-1.5 * var(--px));
   right: calc(-2 * var(--px));
   padding: 0 calc(1.2 * var(--px)) calc(0.5 * var(--px));
-  font-size: calc(3.2 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(3.2 * var(--fpx, var(--px))));
   font-weight: 700;
   color: var(--text-dark);
   background: #f4e6c8;
@@ -2590,12 +2609,12 @@ body,
 .talk-card .who {
   display: flex;
   flex-direction: column;
-  font-size: calc(4.2 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.2 * var(--fpx, var(--px))));
   color: var(--muted);
   white-space: nowrap;
 }
 .talk-card .who b {
-  font-size: calc(5.5 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(5.5 * var(--fpx, var(--px))));
   color: var(--gold);
 }
 
@@ -2678,7 +2697,7 @@ body,
   gap: calc(1 * var(--px));
 }
 .tp-name {
-  font-size: calc(3.8 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(3.8 * var(--fpx, var(--px))));
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -2691,7 +2710,7 @@ body,
   margin-left: calc(2 * var(--px));
   padding: 0 calc(2 * var(--px));
   font: inherit;
-  font-size: calc(4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4 * var(--fpx, var(--px))));
   font-weight: 700;
   line-height: calc(7 * var(--px));
   color: #2b170c;
@@ -2738,12 +2757,12 @@ body,
   gap: calc(1 * var(--px));
 }
 .station-sheet .job {
-  font-size: calc(4.4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
   color: var(--muted);
 }
 .station-sheet .say {
   margin: 0;
-  font-size: calc(4.6 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.6 * var(--fpx, var(--px))));
   line-height: 1.35;
   color: var(--text);
   font-style: italic;
@@ -2886,13 +2905,13 @@ body,
   padding-top: calc(1 * var(--px));
 }
 .dialog-box .who {
-  font-size: calc(5.5 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(5.5 * var(--fpx, var(--px))));
   color: var(--gold);
 }
 .dialog-box .say {
   margin: 0;
   min-height: calc(14 * var(--px));
-  font-size: calc(5 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(5 * var(--fpx, var(--px))));
   line-height: 1.4;
   color: var(--text);
 }
@@ -2923,7 +2942,7 @@ body,
   min-height: calc(12 * var(--px));
   padding: calc(1.5 * var(--px)) calc(2.5 * var(--px)) calc(1.5 * var(--px)) calc(1 * var(--px));
   text-align: left;
-  font-size: calc(5 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(5 * var(--fpx, var(--px))));
   line-height: 1.25;
   color: var(--text);
   background: rgba(255, 240, 210, 0.035);
@@ -2950,7 +2969,7 @@ body,
   place-items: center;
   min-width: calc(6 * var(--px));
   height: calc(6.5 * var(--px));
-  font-size: calc(3.8 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(3.8 * var(--fpx, var(--px))));
   font-weight: 700;
   color: var(--muted);
   background: rgba(0, 0, 0, 0.4);
@@ -3039,7 +3058,7 @@ body,
   margin-bottom: calc(1.5 * var(--px));
   padding: calc(2.5 * var(--px)) calc(4 * var(--px)) calc(2.5 * var(--px)) calc(3 * var(--px));
   text-align: left;
-  font-size: calc(4.4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
   color: var(--text-dark);
   background: linear-gradient(180deg, #faf0d8 0, #f4e6c8 45%, #ecdab4 100%);
   box-shadow: 0 0 0 var(--px) #2a120c, inset 0 0 0 var(--px) #9a6440, inset var(--px) var(--px) 0 var(--px) #fffaea,
@@ -3075,7 +3094,7 @@ body,
   align-items: center;
   gap: calc(2 * var(--px));
   padding-right: calc(16 * var(--px));
-  font-size: calc(5.5 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(5.5 * var(--fpx, var(--px))));
   font-weight: 700;
 }
 .dialog-box .job-mark {
@@ -3155,15 +3174,15 @@ body,
   gap: calc(1 * var(--px));
   padding-top: calc(1.5 * var(--px));
   border-top: var(--px) dashed rgba(126, 70, 52, 0.45);
-  font-size: calc(4.4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
   line-height: 1.3;
   animation: dlgRowIn 0.15s steps(3) both;
 }
 .dialog-box .job-words b {
-  font-size: calc(5 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(5 * var(--fpx, var(--px))));
 }
 .dialog-box .job-fine {
-  font-size: calc(2.4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(2.4 * var(--fpx, var(--px))));
   line-height: 1.2;
   letter-spacing: 0;
   color: rgba(46, 37, 35, 0.6);
@@ -3208,22 +3227,22 @@ body,
   flex-direction: column;
   min-width: 0;
   gap: calc(0.5 * var(--px));
-  font-size: calc(4.6 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.6 * var(--fpx, var(--px))));
   line-height: 1.15;
   color: #fff3d8;
 }
 .buy-what b {
-  font-size: calc(5.4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(5.4 * var(--fpx, var(--px))));
   color: #ffd86a;
 }
 .buy-what small {
-  font-size: calc(4.2 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.2 * var(--fpx, var(--px))));
   color: #e8dcc0;
 }
 .buy-btn {
   flex: none;
   min-height: calc(16 * var(--px)) !important;
-  font-size: calc(5.6 * var(--fpx, var(--px))) !important;
+  font-size: max(var(--fmin, 0px), calc(5.6 * var(--fpx, var(--px)))) !important;
   gap: calc(1 * var(--px)) !important;
 }
 /* Beside the price, the other way to have it: STEAL, in crimson, a gap away from the price so a
@@ -3235,7 +3254,7 @@ body,
 }
 .steal-btn kbd {
   font: inherit;
-  font-size: 0.7em;
+  font-size: max(var(--fmin, 0px), 0.7em);
   margin-left: calc(1 * var(--px));
   padding: 0 calc(1.2 * var(--px));
   color: #ffd0b8;
@@ -3259,7 +3278,7 @@ body,
   white-space: nowrap;
   padding: 0 calc(1 * var(--px));
   font-style: normal;
-  font-size: calc(3.4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(3.4 * var(--fpx, var(--px))));
   line-height: 1.35;
   color: #fff1e6;
   background: #b3261e;
@@ -3299,7 +3318,7 @@ body,
   position: absolute;
   right: calc(-1 * var(--px));
   bottom: calc(-1.5 * var(--px));
-  font-size: calc(3.6 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(3.6 * var(--fpx, var(--px))));
   color: #fff;
   text-shadow: 1px 0 0 #1a1326, -1px 0 0 #1a1326, 0 1px 0 #1a1326, 0 -1px 0 #1a1326;
 }
@@ -3319,14 +3338,14 @@ body,
     height: calc(18 * var(--px));
   }
   .buy-what b {
-    font-size: calc(4.8 * var(--fpx, var(--px)));
+    font-size: max(var(--fmin, 0px), calc(4.8 * var(--fpx, var(--px))));
   }
   .buy-what small {
-    font-size: calc(3.7 * var(--fpx, var(--px)));
+    font-size: max(var(--fmin, 0px), calc(3.7 * var(--fpx, var(--px))));
   }
   .buy-btn {
     min-height: calc(13 * var(--px)) !important;
-    font-size: calc(4.8 * var(--fpx, var(--px))) !important;
+    font-size: max(var(--fmin, 0px), calc(4.8 * var(--fpx, var(--px)))) !important;
     padding-left: calc(2 * var(--px)) !important;
     padding-right: calc(2 * var(--px)) !important;
   }
@@ -3373,7 +3392,7 @@ body,
   grid-template-columns: auto 1fr 1fr;
   gap: calc(1.5 * var(--px)) calc(3 * var(--px));
   padding: calc(3 * var(--px));
-  font-size: calc(4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4 * var(--fpx, var(--px))));
   line-height: 1.25;
 }
 .controls-list .control-row {
@@ -3407,13 +3426,13 @@ body,
   image-rendering: pixelated;
 }
 .class-tag b {
-  font-size: calc(3.8 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(3.8 * var(--fpx, var(--px))));
   font-weight: 700;
   letter-spacing: 0.04em;
   text-shadow: calc(0.5 * var(--px)) 0 0 #1a1326, calc(-0.5 * var(--px)) 0 0 #1a1326, 0 calc(0.5 * var(--px)) 0 #1a1326, 0 calc(-0.5 * var(--px)) 0 #1a1326;
 }
 .class-tag small {
-  font-size: calc(3.2 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(3.2 * var(--fpx, var(--px))));
   opacity: 0.9;
 }
 .class-tag .px {
@@ -3461,7 +3480,7 @@ body,
   right: calc(1 * var(--px));
   top: 50%;
   transform: translateY(-50%);
-  font-size: calc(3.4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(3.4 * var(--fpx, var(--px))));
   font-weight: 700;
   line-height: 1;
   color: #fff;
@@ -3573,7 +3592,7 @@ body,
   position: absolute;
   right: calc(2 * var(--px));
   top: calc(-1 * var(--px));
-  font-size: calc(4.4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
   font-weight: 700;
   line-height: 1;
   color: #ff6a5a;
@@ -3685,12 +3704,12 @@ body,
   text-align: left;
 }
 .rebirth-pill .rp-text b {
-  font-size: calc(6 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(6 * var(--fpx, var(--px))));
   letter-spacing: 0.04em;
   white-space: nowrap;
 }
 .rebirth-pill .rp-text small {
-  font-size: calc(3.8 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(3.8 * var(--fpx, var(--px))));
   opacity: 0.9;
   white-space: nowrap;
   overflow: hidden;
@@ -3725,6 +3744,13 @@ body,
     display: none;
   }
 }
+/* A small window: just the call too, or its line runs into the floor's plate (what it brings is in
+   the news when it opens up, and at the Shrine). */
+@media (max-width: 960px) {
+  .rebirth-pill .rp-text small {
+    display: none;
+  }
+}
 /* A boss's bar, its title and the news under it hold the top middle: the plate steps aside, under
    the floor's plate on the left (on a tall screen, under the boss's band, between the squad and the
    little altar). */
@@ -3735,6 +3761,13 @@ body,
 }
 .dhud.has-boss .rebirth-pill:active {
   transform: translateY(var(--px));
+}
+/* A touch screen on its side keeps the squad up there under the floor's plate: it steps down under
+   the plate. */
+@media (min-aspect-ratio: 1/1) {
+  .dhud.has-boss:has(.rebirth-pill) .hud-left.top {
+    top: calc(50 * var(--px) + env(safe-area-inset-top, 0px));
+  }
 }
 @media (max-aspect-ratio: 1/1) {
   .dhud.has-boss .rebirth-pill {
@@ -3868,7 +3901,7 @@ body,
   align-items: center;
   justify-content: center;
   gap: calc(1.5 * var(--px));
-  font-size: calc(4.4 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
   color: var(--text);
 }
 .wb-head b {
@@ -3931,13 +3964,13 @@ body,
   align-items: center;
   gap: calc(1.5 * var(--px));
   font-weight: 700;
-  font-size: calc(4.6 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.6 * var(--fpx, var(--px))));
   color: var(--rc);
 }
 .wb-n {
   grid-column: 3;
   grid-row: 1 / 3;
-  font-size: calc(6 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(6 * var(--fpx, var(--px))));
   color: #fff4dc;
 }
 .wb-bar {
@@ -3964,7 +3997,7 @@ body,
   display: inline-flex;
   align-items: center;
   gap: calc(1.5 * var(--px));
-  font-size: calc(4.2 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(4.2 * var(--fpx, var(--px))));
   color: var(--text);
 }
 .wb-gain b {
@@ -3975,10 +4008,27 @@ body,
     animation: none;
   }
 }
+/* A short landscape screen: the best pull beside the tally, not over it, so COLLECT stays in view. */
+@media (min-aspect-ratio: 1/1) and (max-height: 640px) {
+  .modal > .wb-sheet {
+    width: min(100%, calc(240 * var(--px)));
+  }
+  .wb-body {
+    flex-direction: row;
+    align-items: center;
+  }
+  .wb-best {
+    flex: none;
+  }
+  .wb-tally {
+    flex: 1;
+    min-width: 0;
+  }
+}
 
 /* ------------------------------------------------------------ "Back to camp?" (CampAsk.tsx) */
 .camp-ask > .sheet {
-  width: min(100%, calc(150 * var(--px)));
+  width: min(100%, calc(190 * var(--px)));
   align-items: center;
   gap: calc(3 * var(--px));
   text-align: center;
@@ -3999,13 +4049,13 @@ body,
   box-shadow: 0 0 0 var(--px) #140c14, inset 0 0 0 var(--px) rgba(255, 255, 255, 0.12);
 }
 .ca-floor small {
-  font-size: calc(3.6 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(3.6 * var(--fpx, var(--px))));
   font-weight: 800;
   letter-spacing: 0.1em;
   color: #b8b0c8;
 }
 .ca-floor b {
-  font-size: calc(13 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(13 * var(--fpx, var(--px))));
   line-height: 1.05;
   color: #f4f0ff;
 }
@@ -4021,7 +4071,7 @@ body,
 }
 .ca-line {
   margin: 0;
-  font-size: calc(5 * var(--fpx, var(--px)));
+  font-size: max(var(--fmin, 0px), calc(5 * var(--fpx, var(--px))));
   line-height: 1.3;
   color: var(--text);
 }
@@ -4040,12 +4090,20 @@ body,
   gap: calc(3 * var(--px));
   width: 100%;
 }
+/* The answer's key under its word, so both fit side by side. */
+.ca-btns .btn {
+  flex-direction: column;
+  gap: 0;
+  padding-left: calc(4 * var(--px));
+  padding-right: calc(4 * var(--px));
+  line-height: 1.05;
+}
 /* Which key answers (a keyboard's players only: nothing on a touch screen). */
 .ca-key {
   display: block;
   margin-top: calc(1 * var(--px));
   font: inherit;
-  font-size: calc(5 * var(--px));
+  font-size: max(var(--fmin, 0px), calc(5 * var(--fpx, var(--px))));
   letter-spacing: 0.08em;
   opacity: 0.7;
 }

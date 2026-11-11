@@ -123,7 +123,7 @@
 .tier {
   font-family: 'RK Digits', 'Pixelify Sans', 'Courier New', monospace;
   font-weight: 700;
-  font-size: calc(4.4 * var(--px, 3px));
+  font-size: max(var(--fmin, 0px), calc(4.4 * var(--fpx, var(--px))));
   letter-spacing: 0.08em;
   color: var(--tc);
   text-shadow: 1px 0 0 #1a1326, -1px 0 0 #1a1326, 0 1px 0 #1a1326, 0 -1px 0 #1a1326, 0 2px 0 #1a1326;

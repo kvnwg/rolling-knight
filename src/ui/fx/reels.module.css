@@ -390,7 +390,7 @@
 }
 .odds i {
   font-style: normal;
-  font-size: 0.72em;
+  font-size: max(var(--fmin, 0px), 0.72em);
   color: #ffffff;
 }
 .odds b {
@@ -426,7 +426,7 @@
   paint-order: stroke fill;
 }
 .bank[data-side] .odds i {
-  font-size: var(--small);
+  font-size: max(var(--fmin, 0px), var(--small));
   -webkit-text-stroke: var(--u) var(--ink);
 }
 .bank[data-side] .tier {
@@ -710,7 +710,7 @@
 .badge {
   height: calc(5 * var(--u));
   padding: 0 var(--u);
-  font-size: calc(4 * var(--u));
+  font-size: max(var(--fmin, 0px), calc(4 * var(--u)));
   line-height: calc(5 * var(--u));
   color: #ffffff;
   background: #5a5668;
@@ -746,7 +746,7 @@
   flex-direction: column;
   align-items: center;
   white-space: nowrap;
-  font-size: calc(7 * var(--u));
+  font-size: max(var(--fmin, 0px), calc(7 * var(--u)));
   line-height: 1;
   color: #7ef08f;
   -webkit-text-stroke: calc(1.2 * var(--u)) var(--ink);
@@ -758,21 +758,21 @@
   from { transform: translateY(calc(-2 * var(--u))); color: #ffffff; }
 }
 .chain[data-tier='1'] {
-  font-size: calc(8 * var(--u));
+  font-size: max(var(--fmin, 0px), calc(8 * var(--u)));
   color: #6fd8ff;
 }
 .chain[data-tier='2'] {
-  font-size: calc(10 * var(--u));
+  font-size: max(var(--fmin, 0px), calc(10 * var(--u)));
   color: #d29bff;
   animation: chainBig 0.33s steps(4) backwards;
 }
 .chain[data-tier='3'] {
-  font-size: calc(11 * var(--u));
+  font-size: max(var(--fmin, 0px), calc(11 * var(--u)));
   color: #ffd23f;
   animation: chainBig 0.36s steps(4) backwards;
 }
 .chain[data-tier='4'] {
-  font-size: calc(12 * var(--u));
+  font-size: max(var(--fmin, 0px), calc(12 * var(--u)));
   color: #ff5252;
   animation: chainBig 0.4s steps(5) backwards, chainRainbow 0.8s steps(1) 0.4s infinite;
 }
@@ -791,7 +791,7 @@
 .chainFloor {
   margin-top: calc(0.5 * var(--u));
   font-style: normal;
-  font-size: calc(4 * var(--u));
+  font-size: max(var(--fmin, 0px), calc(4 * var(--u)));
   color: inherit;
   -webkit-text-stroke: var(--u) var(--ink);
 }
